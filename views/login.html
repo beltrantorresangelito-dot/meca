@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema MECA - Login</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    
+    <style>
+        /* ====================================================== */
+        /* ESTILOS ADICIONALES - SIN AFECTAR EL FONDO ORIGINAL   */
+        /* ====================================================== */
+        
+        /* Asegurar que el botón tenga el color correcto */
+        .login-card button[type="submit"] {
+            background: linear-gradient(135deg, #019DF4, #0071ad) !important;
+            color: white !important;
+            border: none !important;
+            padding: 12px !important;
+            border-radius: 10px !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: all 0.2s !important;
+            box-shadow: 0 4px 12px rgba(1,157,244,0.3) !important;
+            width: 100% !important;
+        }
+        
+        .login-card button[type="submit"]:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(1,157,244,0.4) !important;
+        }
+        
+        /* Footer dentro del login */
+        .login-footer {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        
+        .login-footer p {
+            margin: 0;
+            padding: 0;
+        }
+        
+        /* Modal mejorado */
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        #modalPrimerLogin input:focus {
+            outline: none;
+            border-color: #019DF4;
+            box-shadow: 0 0 0 3px rgba(1,157,244,0.1);
+        }
+        
+        #modalPrimerLogin input::placeholder {
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <!-- ====================================================== -->
+    <!-- PANTALLA DE LOGIN (SIN FONDO EXTRA)                   -->
+    <!-- ====================================================== -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-card">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <img src="/img/logo.png" 
+                    alt="Sistema MECA" 
+                    style="max-width: 200px; width: 100%; height: auto;"
+                    onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🔐%3C/text%3E%3C/svg%3E'">
+            </div>
+            <div class="subtitle">SISTEMA GESTIÓN CALIDAD MOVISTAR</div>
+            
+            <form id="loginForm">
+                <input type="text" id="loginUsuario" placeholder="👤 Usuario" required autocomplete="off">
+                <input type="password" id="loginPassword" placeholder="🔒 Contraseña" required>
+                <button type="submit">🚀 Iniciar Sesión</button>
+            </form>
+            
+            <div id="loginError" class="error-message" style="display: none; margin-top: 14px; padding: 10px 14px; border-radius: 8px; font-size: 13px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;"></div>
+            
+            <!-- ====================================================== -->
+            <!-- FOOTER - DENTRO DEL CARD                              -->
+            <!-- ====================================================== -->
+            <div id="footer-placeholder" class="login-footer"></div>
+        </div>
+    </div>
+
+    <!-- ====================================================== -->
+    <!-- MODAL: CAMBIO DE CONTRASEÑA (PRIMER LOGIN)             -->
+    <!-- ====================================================== -->
+    <div id="modalPrimerLogin" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10050; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+        <div style="background: white; border-radius: 16px; width: 90%; max-width: 440px; overflow: hidden; box-shadow: 0 25px 60px rgba(0,0,0,0.3); animation: modalSlideIn 0.3s ease;">
+            
+            <!-- Cabecera -->
+            <div style="padding: 20px 24px; background: linear-gradient(135deg, #019DF4, #0071ad); color: white; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 26px;">🔐</span>
+                    <div>
+                        <strong style="font-size: 17px; display: block;">Cambio de contraseña requerido</strong>
+                        <span style="font-size: 12px; opacity: 0.9;">Por seguridad, debe actualizar su contraseña</span>
+                    </div>
+                </div>
+                <button onclick="cerrarModalPrimerLogin()" style="background: none; border: none; color: white; font-size: 26px; cursor: pointer; opacity: 0.8; transition: opacity 0.2s; padding: 0 4px;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">✖</button>
+            </div>
+            
+            <!-- Cuerpo -->
+            <div style="padding: 28px 24px 20px;">
+                
+                <!-- Usuario (solo lectura) -->
+                <div style="margin-bottom: 18px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">👤 Usuario</label>
+                    <input type="text" id="primerLoginUsuario" readonly style="width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f1f5f9; font-size: 14px; color: #0f172a; cursor: not-allowed; box-sizing: border-box;">
+                </div>
+                
+                <!-- Nueva contraseña -->
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">🔒 Nueva contraseña *</label>
+                    <input type="password" id="primerLoginNuevaPassword" placeholder="Mínimo 6 caracteres" style="width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: border-color 0.2s; box-sizing: border-box; background: #fcfdfe;" onfocus="this.style.borderColor='#019DF4'" onblur="this.style.borderColor='#e2e8f0'">
+                    <small style="color: #94a3b8; font-size: 11px; display: block; margin-top: 4px;">Mínimo 6 caracteres, use mayúsculas o números para mayor seguridad</small>
+                </div>
+                
+                <!-- Confirmar contraseña -->
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">✅ Confirmar contraseña *</label>
+                    <input type="password" id="primerLoginConfirmarPassword" placeholder="Repita la nueva contraseña" style="width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: border-color 0.2s; box-sizing: border-box; background: #fcfdfe;" onfocus="this.style.borderColor='#019DF4'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+                
+                <!-- Error -->
+                <div id="primerLoginError" style="display: none; background: #fef2f2; color: #dc2626; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; border: 1px solid #fecaca;"></div>
+                
+                <!-- Botones -->
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="cerrarModalPrimerLogin()" style="padding: 10px 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; color: #475569; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; box-sizing: border-box;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">Cancelar</button>
+                    <button id="btnCambiarPasswordPrimerLogin" onclick="cambiarPasswordPrimerLogin()" style="padding: 10px 24px; border: none; border-radius: 8px; background: linear-gradient(135deg, #019DF4, #0071ad); color: white; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(1,157,244,0.3); box-sizing: border-box;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">💾 Cambiar contraseña</button>
+                </div>
+            </div>
+            
+            <!-- Footer del modal -->
+            <div style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center;">
+                ⚠️ Por seguridad, debe cambiar su contraseña temporal antes de continuar.
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================== -->
+    <!-- SCRIPTS                                               -->
+    <!-- ====================================================== -->
+    <script src="/js/db-client.js"></script>
+    <script src="/js/api-client.js"></script>
+
+    <!-- ====================================================== -->
+    <!-- CARGA DEL FOOTER DESDE PARTIALS                       -->
+    <!-- ====================================================== -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cargar footer desde partials
+            fetch('/partials/footer.html')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('No se pudo cargar el footer');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    document.getElementById('footer-placeholder').innerHTML = html;
+                    console.log('✅ Footer cargado correctamente');
+                })
+                .catch(error => {
+                    console.error('❌ Error cargando footer:', error);
+                    document.getElementById('footer-placeholder').innerHTML = `
+                        <p>© Desarrollado por Ing. Angel Torres Beltran || Inspirado por Dios</p>
+                    `;
+                });
+        });
+    </script>
+
+    <!-- ====================================================== -->
+    <!-- LÓGICA DE LOGIN - VERSIÓN COMPLETA CON MODAL          -->
+    <!-- ====================================================== -->
+    <script>
+        (function() {
+            const loginForm = document.getElementById('loginForm');
+            const loginUsuario = document.getElementById('loginUsuario');
+            const loginPassword = document.getElementById('loginPassword');
+            const loginError = document.getElementById('loginError');
+            
+            if (!loginForm) {
+                console.error('Formulario de login no encontrado');
+                return;
+            }
+            
+            // ======================================================
+            // REDIRECCIÓN SEGURA
+            // ======================================================
+            async function redirigirSegunRol(token) {
+                try {
+                    const response = await fetch('/api/auth/redirect', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Error al obtener redirección');
+                    }
+                    
+                    const data = await response.json();
+                    console.log('📍 Redirigiendo a:', data.redirectUrl);
+                    window.location.href = data.redirectUrl;
+                    
+                } catch (error) {
+                    console.error('Error en redirección:', error);
+                    window.location.href = '/login';
+                }
+            }
+            
+            // ======================================================
+            // VERIFICAR SESIÓN EXISTENTE
+            // ======================================================
+            async function verificarSesionExistente() {
+                const token = localStorage.getItem('meca_token');
+                if (!token) return false;
+                
+                try {
+                    const response = await fetch('/api/auth/verify', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.valid && data.redirectUrl) {
+                        window.location.href = data.redirectUrl;
+                        return true;
+                    } else {
+                        localStorage.removeItem('meca_token');
+                        localStorage.removeItem('meca_usuario');
+                        return false;
+                    }
+                    
+                } catch (error) {
+                    console.error('Error verificando sesión:', error);
+                    localStorage.removeItem('meca_token');
+                    localStorage.removeItem('meca_usuario');
+                    return false;
+                }
+            }
+            
+            // ======================================================
+            // LOGIN - VERSIÓN COMPLETA CON MODAL
+            // ======================================================
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const usuario = loginUsuario.value.trim();
+                const contrasena = loginPassword.value;
+                
+                if (!usuario || !contrasena) {
+                    loginError.textContent = '⚠️ Complete todos los campos';
+                    loginError.style.display = 'block';
+                    return;
+                }
+                
+                loginError.style.display = 'none';
+                const btn = loginForm.querySelector('button');
+                const textoOriginal = btn.textContent;
+                btn.textContent = '⏳ Validando...';
+                btn.disabled = true;
+                
+                try {
+                    const resultado = await API.login(usuario, contrasena);
+                    console.log('📝 Resultado login:', resultado);
+                    
+                    // CASO 1: LOGIN EXITOSO
+                    if (resultado.success && resultado.token) {
+                        localStorage.setItem('meca_token', resultado.token);
+                        localStorage.setItem('meca_usuario', JSON.stringify(resultado.usuario));
+                        
+                        console.log('✅ Token guardado');
+                        btn.textContent = textoOriginal;
+                        btn.disabled = false;
+                        await redirigirSegunRol(resultado.token);
+                        
+                    // CASO 2: REQUIERE CAMBIO DE CONTRASEÑA
+                    } else if (resultado.requiereCambioPassword) {
+                        console.log('⚠️ Usuario requiere cambio de contraseña:', resultado.usuario);
+                        
+                        const modal = document.getElementById('modalPrimerLogin');
+                        if (modal) {
+                            modal.style.display = 'flex';
+                            
+                            const usuarioInput = document.getElementById('primerLoginUsuario');
+                            if (usuarioInput) {
+                                usuarioInput.value = resultado.usuario.usuario || resultado.usuario.nombre_completo;
+                            }
+                            
+                            window.usuarioPrimerLoginId = resultado.usuario.id;
+                            
+                            document.getElementById('primerLoginNuevaPassword').value = '';
+                            document.getElementById('primerLoginConfirmarPassword').value = '';
+                            document.getElementById('primerLoginError').style.display = 'none';
+                            
+                            // Ocultar el overlay de login
+                            const loginOverlay = document.getElementById('loginOverlay');
+                            if (loginOverlay) {
+                                loginOverlay.style.display = 'none';
+                            }
+                            
+                            btn.textContent = textoOriginal;
+                            btn.disabled = false;
+                            
+                        } else {
+                            alert('⚠️ Debe cambiar su contraseña antes de continuar.');
+                            btn.textContent = textoOriginal;
+                            btn.disabled = false;
+                        }
+                        
+                    // CASO 3: LOGIN FALLIDO
+                    } else {
+                        loginError.textContent = resultado.error || 'Error al iniciar sesión';
+                        loginError.style.display = 'block';
+                        btn.textContent = textoOriginal;
+                        btn.disabled = false;
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Error en login:', error);
+                    loginError.textContent = error.message || 'Error al iniciar sesión';
+                    loginError.style.display = 'block';
+                    const btn = loginForm.querySelector('button');
+                    if (btn) {
+                        btn.textContent = '🚀 Iniciar Sesión';
+                        btn.disabled = false;
+                    }
+                }
+            });
+            
+            // ======================================================
+            // FUNCIONES PARA EL MODAL DE CAMBIO DE CONTRASEÑA
+            // ======================================================
+            
+            window.cerrarModalPrimerLogin = function() {
+                const modal = document.getElementById('modalPrimerLogin');
+                if (modal) {
+                    modal.style.display = 'none';
+                }
+                const loginOverlay = document.getElementById('loginOverlay');
+                if (loginOverlay) {
+                    loginOverlay.style.display = 'flex';
+                }
+                document.getElementById('loginUsuario').value = '';
+                document.getElementById('loginPassword').value = '';
+                document.getElementById('primerLoginError').style.display = 'none';
+            };
+            
+            window.cambiarPasswordPrimerLogin = async function() {
+                const nuevaPassword = document.getElementById('primerLoginNuevaPassword').value;
+                const confirmarPassword = document.getElementById('primerLoginConfirmarPassword').value;
+                const errorDiv = document.getElementById('primerLoginError');
+                
+                if (!nuevaPassword || !confirmarPassword) {
+                    errorDiv.textContent = '⚠️ Complete ambos campos';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                
+                if (nuevaPassword !== confirmarPassword) {
+                    errorDiv.textContent = '⚠️ Las contraseñas no coinciden';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                
+                if (nuevaPassword.length < 6) {
+                    errorDiv.textContent = '⚠️ La contraseña debe tener al menos 6 caracteres';
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+                
+                errorDiv.style.display = 'none';
+                
+                const btn = document.getElementById('btnCambiarPasswordPrimerLogin');
+                const textoOriginal = btn.textContent;
+                btn.textContent = '⏳ Actualizando...';
+                btn.disabled = true;
+                
+                try {
+                    const response = await fetch('/api/auth/cambiar-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            usuarioId: window.usuarioPrimerLoginId,
+                            nuevaPassword: nuevaPassword
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('✅ Contraseña actualizada correctamente');
+                        window.cerrarModalPrimerLogin();
+                        const loginError = document.getElementById('loginError');
+                        if (loginError) {
+                            loginError.textContent = '✅ Contraseña actualizada. Inicie sesión con su nueva contraseña.';
+                            loginError.style.display = 'block';
+                            loginError.style.color = '#28a745';
+                            loginError.style.background = '#f0fff4';
+                            loginError.style.border = '1px solid #b7eb8f';
+                        }
+                    } else {
+                        errorDiv.textContent = '❌ ' + (data.error || 'Error al actualizar');
+                        errorDiv.style.display = 'block';
+                    }
+                    
+                } catch (error) {
+                    console.error('Error:', error);
+                    errorDiv.textContent = '❌ Error al actualizar: ' + error.message;
+                    errorDiv.style.display = 'block';
+                } finally {
+                    btn.textContent = textoOriginal;
+                    btn.disabled = false;
+                }
+            };
+            
+            // ======================================================
+            // VERIFICAR SESIÓN AL CARGAR LA PÁGINA
+            // ======================================================
+            verificarSesionExistente();
+            
+        })();
+    </script>
+
+</body>
+</html>

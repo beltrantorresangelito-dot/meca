@@ -1,0 +1,61 @@
+<!-- ========================================================== -->
+<!-- HEADER SUPERVISOR - CON BOTONES VISIBLES                   -->
+<!-- ========================================================== -->
+<div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px; padding: 12px 24px; background: transparent; border: none; box-shadow: none;">
+    
+    <!-- ========================================================== -->
+    <!-- SECCIÓN: INFORMACIÓN DEL USUARIO Y BOTONES                -->
+    <!-- ========================================================== -->
+    <div class="user-info" id="userInfo" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+        
+        <!-- Icono de usuario -->
+        <span style="font-size: 20px;">🧑‍💻</span>
+        
+        <!-- Nombre del usuario -->
+        <span id="userName" style="font-weight: bold; font-size: 15px; color: #ffffff;">Cargando...</span>
+        
+        <!-- Rol del usuario -->
+        <span id="userRol" style="font-size: 11px; background: #ffffff; padding: 2px 14px; border-radius: 20px; color: #475569; font-weight: 600;">SUPERVISOR</span>
+        
+        <!-- ✅ BOTÓN: Cambiar contraseña (FONDO SÓLIDO) -->
+        <button onclick="abrirModalCambioPasswordVoluntario()" 
+                style="display: inline-flex; align-items: center; gap: 6px; background: #019DF4; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; color: #ffffff; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 4px rgba(1,157,244,0.3);">
+            🔐 Cambiar contraseña
+        </button>
+        
+        <!-- ✅ BOTÓN: Cerrar sesión (FONDO SÓLIDO) -->
+        <button onclick="cerrarSesion()" 
+                style="display: inline-flex; align-items: center; gap: 6px; background: #dc3545; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; color: #ffffff; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 4px rgba(220,53,69,0.3);">
+            🚪 Salir
+        </button>
+    </div>
+    
+</div>
+
+<!-- ========================================================== -->
+<!-- ESTILOS DE HOVER                                            -->
+<!-- ========================================================== -->
+<style>
+    /* Efecto hover para los botones */
+    .user-info button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25) !important;
+    }
+    
+    /* Asegurar que userInfo sea visible */
+    .user-info {
+        display: flex !important;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    /* Asegurar que los botones sean visibles */
+    .user-info button {
+        display: inline-flex !important;
+        align-items: center;
+        gap: 5px;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+</style>

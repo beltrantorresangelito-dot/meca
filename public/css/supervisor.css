@@ -1,0 +1,1809 @@
+/* ======================================================
+   supervisor.css - ESTILOS DEL MÓDULO SUPERVISOR
+   ======================================================
+   
+   📌 PROPÓSITO: Estilos específicos para la interfaz de supervisor
+   📌 VERSIÓN: Completa (1763 líneas)
+   ====================================================== */
+
+/* ======================================================
+   1. VARIABLES GLOBALES
+   ====================================================== */
+
+:root {
+    --bg: #a0aec2;
+    --card: #ffffff;
+    --text: #0b1b2b;
+    --muted: #4b6074;
+    --line: #d8e6f6;
+    --accent: #019DF4;
+    --accent2: #00B4F0;
+    --danger: #d93025;
+    --ok: #1a7f37;
+    --warning: #f39c12;
+    --shadow: 0 10px 30px rgba(1, 157, 244, .08);
+    --radius: 18px;
+    --mono: ui-monospace, monospace;
+    --sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ======================================================
+   2. ESTILOS BASE
+   ====================================================== */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--text);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 15px;
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.container {
+    max-width: 1600px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ======================================================
+   3. TARJETAS Y CONTENEDORES
+   ====================================================== */
+
+.card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+}
+
+.card h3 {
+    margin: 0 0 20px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--accent);
+    border-bottom: 2px solid var(--line);
+    padding-bottom: 10px;
+}
+
+.evaluacion-item {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-left: 5px solid var(--accent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.evaluacion-item h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* ======================================================
+   4. SISTEMA DE PESTAÑAS
+   ====================================================== */
+
+.tabs-container {
+    background: transparent;
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.tabs-header {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 0;
+    padding-left: 15px;
+    flex-wrap: wrap;
+}
+
+.tab-button {
+    padding: 12px 28px;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid var(--line);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 15px;
+    backdrop-filter: blur(5px);
+}
+
+.tab-button:hover {
+    background: white;
+    color: var(--accent);
+}
+
+.tab-button.active {
+    background: white;
+    color: var(--accent);
+    border-bottom: 3px solid var(--accent);
+    transform: translateY(-2px);
+}
+
+.tab-content {
+    background: white;
+    border-radius: 0 15px 15px 15px;
+    padding: 25px;
+    box-shadow: var(--shadow);
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+/* ======================================================
+   5. FORMULARIOS - VERSIÓN COMPACTA Y LEGIBLE
+   ====================================================== */
+
+label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    padding: 10px 12px;
+    font-size: 14px;
+    background: #fcfdfe;
+    outline: none;
+    font-family: var(--sans);
+    transition: all 0.2s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(1, 157, 244, 0.15);
+}
+
+select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234b6074' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 40px;
+}
+
+button {
+    border: 0;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    background: var(--accent);
+    color: #fff;
+    transition: all 0.2s;
+    font-family: var(--sans);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(1, 157, 244, 0.3);
+}
+
+button.secondary {
+    background: #fff;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
+button.danger {
+    background: #fff;
+    color: var(--danger);
+    border: 1px solid #ffcfcf;
+}
+
+/* ======================================================
+   6. GRIDS - SISTEMA DE COLUMNAS MEJORADO
+   ====================================================== */
+
+.grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+/* Grid específico para items de evaluación - 3 columnas fijas */
+.eval-row {
+    display: grid;
+    grid-template-columns: minmax(200px, 2fr) minmax(120px, 1fr) 60px;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 10px;
+    padding: 6px 0;
+    border-bottom: 1px dashed rgba(0, 0, 0, 0.05);
+}
+
+.eval-row:last-child {
+    border-bottom: none;
+}
+
+.eval-row span:first-child {
+    font-size: 14px;
+    color: var(--text);
+}
+
+.eval-group {
+    margin-left: 15px;
+    margin-top: 10px;
+    margin-bottom: 15px;
+}
+
+/* ======================================================
+   7. COMPONENTES VISUALES
+   ====================================================== */
+
+footer {
+    margin-top: auto;
+    text-align: center;
+    padding: 15px;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: bold;
+    border-top: 1px solid var(--line);
+}
+
+.badge {
+    font-size: 12px;
+    padding: 6px 12px;
+    background: var(--accent);
+    border-radius: 20px;
+    color: white;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.badge-success {
+    background: var(--ok);
+}
+
+.badge-danger {
+    background: var(--danger);
+}
+
+.badge-warning {
+    background: var(--warning);
+}
+
+.peso-indicador {
+    font-weight: 700;
+    color: var(--accent);
+    background: #e3f2fd;
+    padding: 4px 8px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 13px;
+    display: inline-block;
+    min-width: 45px;
+    justify-self: end;
+}
+
+.resultado-bloque {
+    background: #e3f2fd;
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin: 15px 0;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* ======================================================
+   8. TABLAS
+   ====================================================== */
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+th {
+    padding: 14px 12px;
+    text-align: left;
+    background: #f8f9fa;
+    border-bottom: 2px solid var(--accent);
+    position: sticky;
+    top: 0;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}
+
+td {
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+}
+
+.table-container {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    max-height: 500px;
+}
+
+/* ======================================================
+   9. KPI CARDS
+   ====================================================== */
+
+.kpi-card {
+    background: linear-gradient(135deg, #019DF4, #00B4F0);
+    color: white;
+    padding: 20px;
+    border-radius: 15px;
+    transition: transform 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: scale(1.02);
+}
+
+.kpi-card .kpi-label {
+    font-size: 14px;
+    opacity: 0.9;
+    margin-bottom: 8px;
+}
+
+.kpi-card .kpi-value {
+    font-size: 36px;
+    font-weight: bold;
+    line-height: 1.2;
+}
+
+/* ======================================================
+   10. UTILIDADES
+   ====================================================== */
+
+.flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mb-2 {
+    margin-bottom: 15px;
+}
+
+.mb-3 {
+    margin-bottom: 25px;
+}
+
+.mt-3 {
+    margin-top: 25px;
+}
+
+.text-success {
+    color: var(--ok);
+}
+
+.text-danger {
+    color: var(--danger);
+}
+
+.text-warning {
+    color: var(--warning);
+}
+
+/* ======================================================
+   11. RESPONSIVE
+   ====================================================== */
+
+@media (max-width: 1200px) {
+    .grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .eval-row {
+        display: grid;
+        grid-template-columns: minmax(200px, 3fr) minmax(100px, 1fr) 50px;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 8px;
+        padding: 4px 0;
+        border-bottom: 1px dashed rgba(0, 0, 0, 0.05);
+    }
+
+    .eval-row select {
+        width: 100%;
+        max-width: 140px;
+        padding: 6px 8px;
+        font-size: 13px;
+    }
+
+    .eval-row span:first-child {
+        font-size: 13px;
+        color: var(--text);
+        white-space: normal;
+        line-height: 1.3;
+    }
+
+    .peso-indicador {
+        font-weight: 700;
+        color: var(--accent);
+        background: #e3f2fd;
+        padding: 4px 6px;
+        border-radius: 10px;
+        text-align: center;
+        font-size: 12px;
+        min-width: 40px;
+        justify-self: center;
+    }
+}
+
+@media (max-width: 768px) {
+    .grid-2,
+    .grid-3,
+    .grid-4 {
+        grid-template-columns: 1fr;
+    }
+
+    .tabs-header {
+        padding-left: 0;
+    }
+
+    .tab-button {
+        width: 100%;
+        border-radius: 8px;
+    }
+}
+
+/* ======================================================
+   12. FRENTES COLAPSABLES - NUEVO
+   ====================================================== */
+
+.frente-container {
+    margin-bottom: 15px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.frente-header {
+    padding: 16px 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+    border-left: 6px solid transparent;
+}
+
+.frente-header:hover {
+    filter: brightness(0.98);
+}
+
+.frente-header.cliente {
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    border-left-color: #019DF4;
+}
+
+.frente-header.negocio {
+    background: linear-gradient(135deg, #ffeeee, #ffeeee);
+    border-left-color: #feb3b3;
+}
+
+.frente-header.proceso {
+    background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+    border-left-color: #fd7e14;
+}
+
+.frente-titulo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.frente-icono {
+    font-size: 22px;
+}
+
+.frente-badge {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+.frente-resultado {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.frente-porcentaje {
+    font-weight: 700;
+    font-size: 18px;
+    min-width: 60px;
+    text-align: right;
+}
+
+.frente-expand-icon {
+    font-size: 20px;
+    width: 24px;
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.frente-contenido {
+    background: white;
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    transition: all 0.3s ease;
+}
+
+.frente-contenido.collapsed {
+    display: none;
+}
+
+/* Badges de colores para los resultados */
+.badge-cliente {
+    background: #019DF4;
+    color: white;
+}
+
+.badge-negocio {
+    background: #ffeeee;
+    color: white;
+}
+
+.badge-proceso {
+    background: #fd7e14;
+    color: white;
+}
+
+/* Contador de items */
+.frente-count {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 5px;
+}
+
+/* ======================================================
+   13. KPI CARDS - VERSIÓN COMPACTA
+   ====================================================== */
+
+.kpi-card {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+    padding: 10px 8px;
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-align: center;
+    min-width: 0;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+}
+
+.kpi-card .kpi-label {
+    font-size: 10px;
+    font-weight: 500;
+    opacity: 0.85;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.kpi-card .kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 2px;
+}
+
+.kpi-card .kpi-detail {
+    font-size: 9px;
+    opacity: 0.8;
+    margin-top: 2px;
+}
+
+@media (max-width: 1200px) {
+    .kpi-card .kpi-value {
+        font-size: 18px;
+    }
+
+    .kpi-card .kpi-label {
+        font-size: 9px;
+    }
+}
+
+@media (max-width: 768px) {
+    .kpi-card .kpi-value {
+        font-size: 16px;
+    }
+}
+
+/* Estilos para botones de vista evolutiva */
+.btn-view.active {
+    background: var(--accent) !important;
+    color: white !important;
+}
+
+.btn-view:not(.active) {
+    background: #e9ecef !important;
+    color: var(--muted) !important;
+}
+
+.btn-view:hover {
+    transform: translateY(-1px);
+    transition: all 0.2s;
+}
+
+/* ======================================================
+   14. ESTILOS PARA ATRIBUTOS CLICKEABLES
+   ====================================================== */
+
+.atributo-item {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 4px solid var(--accent);
+}
+
+.atributo-item:hover {
+    background: #e9ecef;
+    transform: translateX(5px);
+}
+
+.submotivo-item {
+    padding: 8px 12px;
+    margin: 5px 0;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    font-size: 13px;
+}
+
+.badge-fallas {
+    background: var(--danger);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+/* ======================================================
+   15. MÓDULO EVOLUTIVO - VERSIÓN MEJORADA
+   ====================================================== */
+
+.view-toggle {
+    transition: all 0.2s ease;
+}
+
+.view-toggle.active {
+    background: var(--accent) !important;
+    color: white !important;
+    box-shadow: 0 2px 8px rgba(1, 157, 244, 0.3);
+}
+
+.view-toggle:not(.active) {
+    background: white !important;
+    color: var(--muted) !important;
+    border: 1px solid #e0e0e0;
+}
+
+.view-toggle:not(.active):hover {
+    background: #f5f5f5 !important;
+}
+
+/* Tarjetas de atributos para drill-down */
+.atributo-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.atributo-card:hover {
+    transform: translateX(5px);
+    border-left-color: var(--accent);
+    border-left-width: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.atributo-titulo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.atributo-nombre {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.atributo-badge {
+    background: var(--danger);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.atributo-preview {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    gap: 15px;
+    margin-top: 8px;
+}
+
+/* Submotivos expandidos */
+.submotivos-container {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px dashed #e9ecef;
+}
+
+.submotivo-item {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s;
+}
+
+.submotivo-item:hover {
+    background: #e9ecef;
+}
+
+/* ======================================================
+   16. CHIPS MULTI-SELECT (Power-BI-like)
+   ====================================================== */
+
+.chips-container {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 14px;
+    font-size: 12px;
+    cursor: grab;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.chip button {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.chip.dragging {
+    opacity: 0.6;
+}
+
+/* Acciones compactas bajo controles de filtro */
+.filtro-acciones {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.filtro-acciones button {
+    padding: 6px 12px;
+    border-radius: 8px;
+}
+
+.submotivo-nombre {
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.submotivo-frente {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    color: white;
+    margin-left: 10px;
+}
+
+.submotivo-count {
+    background: var(--warning);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* ======================================================
+   17. LEYENDA Y TOOLTIP
+   ====================================================== */
+
+.legend-color {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    margin-right: 5px;
+}
+
+.chartjs-tooltip {
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+/* ======================================================
+   18. KPI ROWS - CENTRADOS
+   ====================================================== */
+
+.kpi-row {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 16px;
+    justify-content: center;
+}
+
+.kpi-row-primary {
+    grid-template-columns: repeat(6, 1fr);
+}
+
+.kpi-row-secondary {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 20px;
+}
+
+/* Centrar contenido interno de cada KPI */
+.kpi-card {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+    padding: 12px 8px;
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-align: center;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.kpi-card .kpi-label {
+    font-size: 10px;
+    font-weight: 500;
+    opacity: 0.85;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.kpi-card .kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 2px;
+    text-align: center;
+}
+
+.kpi-card .kpi-detail {
+    font-size: 9px;
+    opacity: 0.8;
+    margin-top: 2px;
+    text-align: center;
+}
+
+/* FORZAR CENTRADO DE KPI EN PANTALLA */
+.kpi-row-primary,
+.kpi-row-secondary {
+    display: grid !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    justify-content: center !important;
+}
+
+.kpi-row-primary {
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 12px !important;
+}
+
+.kpi-row-secondary {
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 20px !important;
+}
+
+[style*="grid-template-columns: repeat(6, 1fr)"] {
+    justify-content: center;
+    margin: 0 auto;
+}
+
+.kpi-card {
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.kpi-card .kpi-label,
+.kpi-card .kpi-value,
+.kpi-card .kpi-detail {
+    text-align: center !important;
+    width: 100%;
+}
+
+/* ======================================================
+   19. FILAS EXPANDIBLES
+   ====================================================== */
+
+.expandable-row {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.expandable-row:hover {
+    background: #f0f7ff !important;
+}
+
+.expand-icon {
+    display: inline-block;
+    transition: transform 0.2s;
+    font-size: 14px;
+}
+
+.expand-icon.expanded {
+    transform: rotate(90deg);
+}
+
+.detail-row {
+    background: #f8f9fa;
+}
+
+.detail-content {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.detail-items {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 8px;
+    border-left: 4px solid;
+    font-size: 13px;
+}
+
+.detail-item.cumple {
+    border-left-color: var(--ok);
+    background: #f0fff0;
+}
+
+.detail-item.no-cumple {
+    border-left-color: var(--danger);
+    background: #fff0f0;
+}
+
+.detail-item .item-bloque {
+    font-weight: 600;
+    min-width: 100px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.detail-item .item-atributo {
+    flex: 1;
+}
+
+.detail-item .item-submotivo {
+    color: var(--text);
+}
+
+.detail-item .item-peso {
+    font-size: 11px;
+    background: #e9ecef;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.detail-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.detail-badge.ok {
+    background: var(--ok);
+    color: white;
+}
+
+.detail-badge.no {
+    background: var(--danger);
+    color: white;
+}
+
+/* ======================================================
+   20. PANTALLA DE LOGIN
+   ====================================================== */
+
+.login-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #0e5fc2 0%, #0095ff 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(5px);
+}
+
+.login-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: fadeInUp 0.5s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.login-card h2 {
+    text-align: center;
+    color: var(--accent);
+    margin-bottom: 10px;
+}
+
+.login-card .subtitle {
+    text-align: center;
+    color: var(--muted);
+    margin-bottom: 30px;
+    font-size: 13px;
+}
+
+.login-card input {
+    width: 100%;
+    margin-bottom: 20px;
+    padding: 12px 15px;
+}
+
+.login-card button {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    margin-top: 10px;
+}
+
+.login-error {
+    color: var(--danger);
+    text-align: center;
+    margin-top: 15px;
+    font-size: 13px;
+    display: none;
+}
+
+.user-info {
+    background: var(--accent);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+}
+
+.user-info button {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 10px;
+    font-size: 11px;
+}
+
+.user-info button:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.login-footer {
+    margin-top: 30px;
+    padding-top: 15px;
+    text-align: center;
+    width: 100%;
+}
+
+.login-footer hr {
+    border: none;
+    height: 1px;
+    background: rgba(1, 157, 244, 0.3);
+    margin: 0 0 12px 0;
+}
+
+.login-footer p {
+    margin: 0;
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.4;
+}
+
+/* ======================================================
+   21. TABLA DE LÍDERES - FILAS CLICKEABLES
+   ====================================================== */
+
+.fila-lider:hover {
+    background: #f0f7ff !important;
+    transition: background 0.2s ease;
+}
+
+.fila-lider-seleccionada {
+    background: #e3f2fd !important;
+    border-left: 4px solid var(--accent);
+}
+
+/* ======================================================
+   22. BUSCADOR DE GESTORES
+   ====================================================== */
+
+.sugerencia-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sugerencia-item:hover {
+    background: #e3f2fd;
+}
+
+.sugerencia-item.selected {
+    background: var(--accent);
+    color: white;
+}
+
+.sugerencia-item .sugerencia-nombre {
+    font-weight: 500;
+}
+
+.sugerencia-item .sugerencia-detalle {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.sugerencia-item.selected .sugerencia-detalle {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.sugerencia-resaltado {
+    background: #f39c12;
+    color: white;
+    padding: 0 2px;
+    border-radius: 3px;
+}
+
+@keyframes fadeOut {
+    0% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    70% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-10px);
+        visibility: hidden;
+    }
+}
+
+.sugerencia-item.selected {
+    background: var(--accent);
+    color: white;
+}
+
+.sugerencia-item.selected .sugerencia-detalle {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* ======================================================
+   23. CHECKLIST DE PDA
+   ====================================================== */
+
+.checklist-item {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-left: 4px solid #f39c12;
+    transition: all 0.2s ease;
+}
+
+.checklist-item.completado {
+    background: #e8f5e9;
+    border-left-color: #28a745;
+}
+
+.checklist-item:hover {
+    transform: translateX(3px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.checklist-tipo-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.checklist-tipo-feedback {
+    background: #019DF4;
+    color: white;
+}
+
+.checklist-tipo-proceso {
+    background: #7b1fa2;
+    color: white;
+}
+
+.checklist-tipo-habilidades {
+    background: #fd7e14;
+    color: white;
+}
+
+.progress-bar-container {
+    background: #e9ecef;
+    border-radius: 10px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+.progress-bar-fill.pendiente {
+    background: #f39c12;
+}
+
+.progress-bar-fill.completado {
+    background: #28a745;
+}
+
+/* ======================================================
+   24. MODAL DE GESTIÓN PDA
+   ====================================================== */
+
+.modal-gestion-pda {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 10001;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-gestion-content {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 850px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.modal-gestion-header {
+    padding: 15px 20px;
+    background: linear-gradient(135deg, #019DF4, #00B4F0);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-gestion-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-gestion-footer {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* ======================================================
+   25. GESTIÓN DE PERSONAS
+   ====================================================== */
+
+.fila-gestor-expandida-gp {
+    background: #f0f7ff !important;
+}
+
+.detalle-ciclos-gp {
+    padding: 0;
+}
+
+.detalle-ciclos-gp .table-container {
+    margin: 0;
+}
+
+.evaluacion-item-gp {
+    background: white;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #e0e0e0;
+    overflow: hidden;
+}
+
+.evaluacion-header-gp {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.evaluacion-header-gp:hover {
+    background: #e9ecef;
+}
+
+.evaluacion-header-gp.expanded {
+    background: #e3f2fd;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.evaluacion-contenido-gp {
+    padding: 15px;
+    display: none;
+    background: white;
+}
+
+.evaluacion-contenido-gp.show {
+    display: block;
+}
+
+.error-item-gp {
+    background: #fff0f0;
+    border-left: 3px solid #d93025;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+.error-agrupado-row {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.error-agrupado-row:hover {
+    background: #f8f9fa;
+}
+
+.tab-active-gp {
+    color: #fd7e14 !important;
+    border-bottom: 2px solid #fd7e14 !important;
+    font-weight: bold !important;
+}
+
+.tab-inactive-gp {
+    color: #6c757d !important;
+    border-bottom: none !important;
+    font-weight: normal !important;
+}
+
+.scrollable-table {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.barra-progreso-gp {
+    background: #e9ecef;
+    border-radius: 10px;
+    height: 6px;
+    overflow: hidden;
+}
+
+.barra-progreso-fill-gp {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+
+/* ======================================================
+   26. MODAL DE AGENTES - SCROLL VERTICAL CORREGIDO
+   ====================================================== */
+
+.modal-agentes {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.7) !important;
+    z-index: 100050 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+.modal-agentes .modal-content {
+    background: white !important;
+    border-radius: 16px !important;
+    width: 90% !important;
+    max-width: 1100px !important;
+    max-height: 85vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+.modal-agentes .modal-body {
+    padding: 20px !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+    flex: 1 !important;
+    max-height: calc(85vh - 120px) !important;
+}
+
+.modal-agentes .table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.modal-agentes table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    min-width: 600px;
+}
+
+.modal-agentes thead th {
+    position: sticky;
+    top: 0;
+    background: #019DF4;
+    color: white;
+    padding: 10px 8px;
+    z-index: 10;
+}
+
+.modal-agentes th:first-child,
+.modal-agentes td:first-child {
+    position: sticky;
+    left: 0;
+    background: white;
+    z-index: 5;
+    font-weight: 600;
+}
+
+.modal-agentes tr:hover td:first-child {
+    background: #f0f7ff;
+}
+
+.modal-agentes td {
+    padding: 8px 10px;
+    text-align: center;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-agentes td:first-child {
+    text-align: left;
+}
+
+.modal-agentes tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.modal-agentes tbody tr:hover {
+    background-color: #f0f7ff;
+}
+
+/* ======================================================
+   27. TABLA EVOLUTIVA COLAPSABLE
+   ====================================================== */
+
+.indicador-seccion {
+    transition: all 0.2s ease;
+}
+
+.indicador-header {
+    transition: background 0.2s ease;
+}
+
+.indicador-header:hover {
+    background: #e9ecef !important;
+}
+
+.indicador-contenido {
+    border-top: 1px solid var(--line);
+}
+
+.indicador-contenido table {
+    width: 100%;
+    font-size: 12px;
+}
+
+.indicador-contenido th {
+    background: #f8f9fa;
+    padding: 10px 8px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.indicador-contenido td {
+    padding: 8px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.indicador-contenido tr:hover td {
+    background: #f8f9fa;
+}
+
+#tablaEvolutivaIndicadores {
+    margin-top: 25px;
+}
+
+/* Scroll horizontal para tablas */
+.indicador-contenido {
+    overflow-x: auto;
+}
+
+/* ======================================================
+   28. KPIs - SOLICITUDES (Mis Solicitudes y Gestión)
+   ====================================================== */
+
+.solicitudes-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 25px;
+}
+
+.solicitud-kpi-card {
+    border-radius: 14px;
+    padding: 20px 22px;
+    color: white;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    cursor: default;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 80px;
+}
+
+.solicitud-kpi-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+.solicitud-kpi-card .kpi-number {
+    font-size: 32px;
+    font-weight: 700;
+    color: white;
+    line-height: 1.2;
+}
+
+.solicitud-kpi-card .kpi-label {
+    font-size: 13px;
+    opacity: 0.9;
+    margin-top: 4px;
+    color: white;
+}
+
+.solicitud-kpi-card .kpi-icon {
+    font-size: 34px;
+    opacity: 0.8;
+}
+
+/* ======================================================
+   29. COLORES ESPECÍFICOS POR TIPO DE KPI
+   ====================================================== */
+
+.solicitud-kpi-card.kpi-pendientes {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+}
+.solicitud-kpi-card.kpi-pendientes:hover {
+    box-shadow: 0 8px 30px rgba(243, 156, 18, 0.4);
+}
+
+.solicitud-kpi-card.kpi-en-curso {
+    background: linear-gradient(135deg, #7b1fa2, #9c27b0);
+}
+.solicitud-kpi-card.kpi-en-curso:hover {
+    box-shadow: 0 8px 30px rgba(123, 31, 162, 0.4);
+}
+
+.solicitud-kpi-card.kpi-completadas {
+    background: linear-gradient(135deg, #28a745, #20c997);
+}
+.solicitud-kpi-card.kpi-completadas:hover {
+    box-shadow: 0 8px 30px rgba(40, 167, 69, 0.4);
+}
+
+.solicitud-kpi-card.kpi-verificadas {
+    background: linear-gradient(135deg, #019DF4, #00B4F0);
+}
+.solicitud-kpi-card.kpi-verificadas:hover {
+    box-shadow: 0 8px 30px rgba(1, 157, 244, 0.4);
+}
+
+/* ======================================================
+   30. RESPONSIVE - MEDIA QUERIES
+   ====================================================== */
+
+@media (max-width: 768px) {
+    .solicitudes-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    .solicitud-kpi-card .kpi-number {
+        font-size: 26px;
+    }
+    .solicitud-kpi-card .kpi-icon {
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 480px) {
+    .solicitudes-grid-4 {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+}
+
+/* ======================================================
+   31. ANIMACIONES Y SCROLLBAR
+   ====================================================== */
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #0077b3;
+}
+
+/* Reducir animaciones si el usuario lo prefiere */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

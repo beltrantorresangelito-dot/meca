@@ -1,0 +1,194 @@
+/* ======================================================
+   styles.css - ESTILOS GLOBALES DEL SISTEMA
+   ======================================================
+   
+   📌 PROPÓSITO: Estilos base y utilidades compartidas
+   📌 ESTRUCTURA: 
+       1. Reset global
+       2. Estilos base
+       3. Componentes comunes
+       4. Login (estilos propios)
+   ====================================================== */
+
+/* ======================================================
+   1. RESET GLOBAL
+   ======================================================
+   📌 Elimina márgenes y paddings por defecto
+   📌 Uniformiza el box-sizing en todos los elementos
+   ====================================================== */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ======================================================
+   2. ESTILOS BASE
+   ====================================================== */
+
+body {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: #f0f2f5;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* ======================================================
+   3. COMPONENTES COMUNES
+   ====================================================== */
+
+/* Títulos */
+h1 {
+    color: #019DF4;
+    margin-bottom: 20px;
+}
+
+/* Tarjetas (cards) */
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.card h3 {
+    color: #019DF4;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #e0e0e0;
+    padding-bottom: 10px;
+}
+
+/* Bloques de código / preformateado */
+pre {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    overflow-x: auto;
+}
+
+/* ======================================================
+   4. ESTILOS DE LOGIN
+   ======================================================
+   📌 Estilos específicos para la pantalla de login
+   📌 Sobrescribe los estilos base para la página de login
+   📌 Incluye animaciones y efectos visuales
+   ====================================================== */
+
+/* Reset para la página de login (sobrescribe body) */
+body {
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #0e5fc2 0%, #0095ff 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+/* Tarjeta de login */
+.login-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: fadeInUp 0.5s ease;  /* Animación al cargar */
+}
+
+/* Animación de entrada */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Logo */
+.logo {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.logo img {
+    max-width: 180px;
+    width: 100%;
+    height: auto;
+}
+
+/* Subtítulo */
+.subtitle {
+    text-align: center;
+    color: #6c757d;
+    margin-bottom: 30px;
+    font-size: 13px;
+}
+
+/* Campos de entrada (login) */
+input {
+    width: 100%;
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s;
+}
+
+input:focus {
+    border-color: #019DF4;
+    box-shadow: 0 0 0 3px rgba(1, 157, 244, 0.15);
+}
+
+/* Botón de login */
+button {
+    width: 100%;
+    padding: 12px;
+    background: #019DF4;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* Mensaje de error */
+.error-message {
+    color: #d93025;
+    text-align: center;
+    margin-top: 15px;
+    font-size: 13px;
+    display: none;  /* Oculto por defecto, se muestra con JS */
+}
+
+/* Pie de página del login */
+.footer {
+    margin-top: 30px;
+    padding-top: 15px;
+    text-align: center;
+    border-top: 1px solid #e0e0e0;
+}
+
+.footer p {
+    margin: 0;
+    font-size: 11px;
+    color: #999;
+}

@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Sistema MECA - Movistar</title>
+
+    <!-- ====================================================================== -->
+    <!-- 1. ESTILOS GLOBALES DEL SISTEMA                                        -->
+    <!-- ====================================================================== -->
+    <!-- 📌 auditor.css: Contiene todos los estilos del módulo auditor          -->
+    <!-- ====================================================================== -->
+    <link rel="stylesheet" href="/css/auditor.css">
+
+    <!-- ====================================================================== -->
+    <!-- 2. LIBRERÍAS EXTERNAS                                                 -->
+    <!-- ====================================================================== -->
+    <!-- 📌 Chart.js: Gráficos interactivos                                    -->
+    <!-- 📌 Moment.js: Manejo de fechas                                        -->
+    <!-- 📌 ChartJS Adapter: Adaptador para Moment.js                         -->
+    <!-- 📌 ChartJS DataLabels: Etiquetas en gráficos                         -->
+    <!-- 📌 SheetJS (XLSX): Lectura/escritura de Excel                        -->
+    <!-- ====================================================================== -->
+    <script src="https://unpkg.com/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://unpkg.com/moment@2.29.4/moment.js"></script>
+    <script src="https://unpkg.com/chartjs-adapter-moment@1.0.1"></script>
+    <script src="https://unpkg.com/chartjs-plugin-datalabels@2.2.0"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+
+    <!-- ====================================================================== -->
+    <!-- 3. CONFIGURACIÓN DEL SISTEMA                                          -->
+    <!-- ====================================================================== -->
+    <!-- 📌 TIPO_SISTEMA: Define si es auditor, supervisor o admin             -->
+    <!-- ====================================================================== -->
+    <script>
+        window.TIPO_SISTEMA = 'auditor';
+    </script>
+
+    <!-- ====================================================================== -->
+    <!-- 4. SCRIPT PARA CARGAR COMPONENTES (HEADER Y FOOTER)                   -->
+    <!-- ====================================================================== -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // Cargar HEADER
+            fetch('/partials/header-auditor.html')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    document.getElementById('header-placeholder').innerHTML = html;
+                    console.log('✅ Header cargado correctamente');
+                    
+                    // 🔴 AÑADE ESTO: Disparar evento y llamar a la función
+                    document.dispatchEvent(new CustomEvent('headerLoaded'));
+                    
+                    setTimeout(() => {
+                        if (typeof window.actualizarHeaderConUsuario === 'function') {
+                            window.actualizarHeaderConUsuario();
+                        } else {
+                            console.warn('⚠️ actualizarHeaderConUsuario no disponible');
+                        }
+                    }, 100);
+                })
+                .catch(error => {
+                    console.error('❌ Error cargando header:', error);
+                });
+
+            // Cargar FOOTER
+            fetch('/partials/footer.html')
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById('footer-placeholder').innerHTML = html;
+                    console.log('✅ Footer cargado correctamente');
+                })
+                .catch(error => console.error('❌ Error cargando footer:', error));
+        });
+        </script>
+
+    <!-- ====================================================================== -->
+    <!-- 5. LÓGICA DEL SISTEMA                                                 -->
+    <!-- ====================================================================== -->
+    <!-- 📌 db-client.js: Capa de acceso a base de datos                       -->
+    <!-- 📌 api-client.js: Cliente API REST                                    -->
+    <!-- 📌 auditor.js: Lógica principal del auditor                           -->
+    <!-- ====================================================================== -->
+    <script src="/js/db-client.js"></script>
+    <script src="/js/api-client.js"></script>
+    <script src="/js/auditor.js"></script>
+
+</head>
+
+<body>
+    <!-- ====================================================================== -->
+    <!-- 6. PANTALLA DE LOGIN                                                   -->
+    <!-- ====================================================================== -->
+    <!-- 📌 loginOverlay: Cubre toda la pantalla mientras el usuario no ha     -->
+    <!--    iniciado sesión. Contiene formulario de login con usuario y        -->
+    <!--    contraseña.                                                         -->
+    <!-- ====================================================================== -->
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-card">
+            <!-- Logo -->
+            <div style="text-align: center; margin-bottom: 20px;">
+                <img src="/img/logo.png"
+                    alt="Sistema MECA"
+                    style="max-width: 200px; width: 100%; height: auto;"
+                    onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🔐%3C/text%3E%3C/svg%3E'">
+            </div>
+            <div class="subtitle">SISTEMA GESTIÓN CALIDAD MOVISTAR</div>
+
+            <!-- Formulario de login -->
+            <form id="loginForm">
+                <input type="text" id="loginUsuario" placeholder="👤 Usuario" required autocomplete="off">
+                <input type="password" id="loginPassword" placeholder="🔒 Contraseña" required>
+                <button type="submit" style="background: var(--accent);">🚀 Iniciar Sesión</button>
+            </form>
+
+            <!-- Mensaje de error -->
+            <div id="loginError" class="login-error"></div>
+
+            <!-- Footer del login -->
+            <div class="login-footer">
+                <hr>
+                <p>© Desarrollado por Ing. Angel Torres Beltran || Inspirado por Dios</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================================== -->
+    <!-- 7. CONTENEDOR PRINCIPAL                                                -->
+    <!-- ====================================================================== -->
+    <!-- 📌 container: Contiene todo el contenido del sistema                   -->
+    <!-- ====================================================================== -->
+    <div class="container">
+
+        <!-- ====================================================================== -->
+        <!-- 7a. HEADER - CARGADO DINÁMICAMENTE                                     -->
+        <!-- ====================================================================== -->
+        <!-- 📌 header-placeholder: Aquí se inyecta el header-auditor.html         -->
+        <!-- ====================================================================== -->
+        <div id="header-placeholder"></div>
+
+        <!-- ====================================================================== -->
+        <!-- 7b. SISTEMA DE PESTAÑAS                                                -->
+        <!-- ====================================================================== -->
+        <!-- 📌 tabs-container: Contiene todas las pestañas del sistema             -->
+        <!-- ====================================================================== -->
+        <div class="tabs-container">
+
+            <!-- ====================================================================== -->
+            <!-- 7b.1. ENCABEZADO DE PESTAÑAS                                           -->
+            <!-- ====================================================================== -->
+            <div class="tabs-header">
+                <button class="tab-button active" onclick="showTab('misEscuchas', event)">🎧 Mis Escuchas</button>
+                <button class="tab-button" onclick="showTab('incidencias', event)">
+                    ⚠️ Incidencias
+                    <span id="incidenciasCount" style="background: red; color: white; border-radius: 50%; padding: 2px 8px; font-size: 11px; margin-left: 5px; display: none;">0</span>
+                </button>
+                <button class="tab-button" onclick="showTab('evaluacion', event)">📝 Evaluación de Calidad</button>
+                <button class="tab-button" onclick="showTab('historial', event)">📋 Historial de Evaluaciones</button>
+            </div>
+
+            <!-- ====================================================================== -->
+            <!-- 7b.2. PESTAÑA: MIS ESCUCHAS                                             -->
+            <!-- ====================================================================== -->
+            <!-- 📌 Pestaña principal del auditor: muestra escuchas asignadas           -->
+            <!-- ====================================================================== -->
+            <div id="tab-misEscuchas" class="tab-content tab-pane active">
+
+                <!-- Tarjetas de resumen (KPIs) -->
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px;">
+                    <div class="card" style="text-align: center; padding: 15px; background: linear-gradient(135deg, #f39c12, #e67e22); color: white;">
+                        <div style="font-size: 32px; font-weight: bold;" id="totalPendientes">0</div>
+                        <div style="font-size: 12px;">⏳ Pendientes</div>
+                    </div>
+                    <div class="card" style="text-align: center; padding: 15px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white;">
+                        <div style="font-size: 32px; font-weight: bold;" id="totalEnProceso">0</div>
+                        <div style="font-size: 12px;">🔄 En Proceso</div>
+                    </div>
+                    <div class="card" style="text-align: center; padding: 15px; background: linear-gradient(135deg, #6c757d, #5a6268); color: white;">
+                        <div style="font-size: 32px; font-weight: bold;" id="totalAsignados">0</div>
+                        <div style="font-size: 12px;">📊 Total Asignados</div>
+                    </div>
+                </div>
+
+                <!-- Tabs internos para filtrar por estado -->
+                <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--line);">
+                    <button class="tab-escucha-btn active" data-estado="pendiente" onclick="filtrarEscuchasPorEstado('pendiente')" style="background: none; border: none; padding: 10px 20px; cursor: pointer; font-weight: 600; color: var(--warning); border-bottom: 3px solid var(--warning);">
+                        ⏳ Pendientes
+                    </button>
+                    <button class="tab-escucha-btn" data-estado="en_proceso" onclick="filtrarEscuchasPorEstado('en_proceso')" style="background: none; border: none; padding: 10px 20px; cursor: pointer; font-weight: 600; color: var(--accent);">
+                        🔄 En Proceso
+                    </button>
+                </div>
+
+                <!-- 🔴 NUEVO: CUADRO DE BÚSQUEDA -->
+                <div class="card" style="margin-bottom: 20px; padding: 15px;">
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <label style="font-size: 12px; margin-bottom: 4px; display: block;">🔍 Buscar</label>
+                            <input type="text" id="buscarEscucha" placeholder="Buscar por Ticket PSI, Gestor o Supervisor..." onkeyup="filtrarMisEscuchas()" style="width: 100%;">
+                        </div>
+                        <div style="min-width: 120px;">
+                            <label style="font-size: 12px; margin-bottom: 4px; display: block;">📅 Filtrar por fecha</label>
+                            <input type="date" id="filtroFechaEscucha" style="width: 100%;" onchange="filtrarMisEscuchas()">
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: flex-end;">
+                            <button onclick="limpiarFiltrosEscuchas()" style="background: #6c757d; padding: 8px 16px; font-size: 13px;">
+                                🗑️ Limpiar filtros
+                            </button>
+                        </div>
+                    </div>
+                    <div id="infoResultadosEscuchas" style="margin-top: 8px; font-size: 11px; color: var(--muted);"></div>
+                </div>
+
+                <!-- Tabla de escuchas -->
+                <div class="card">
+                    <div class="table-container" style="max-height: 500px;">
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Ticket PSI</th>
+                                    <th>Gestor Auditado</th>
+                                    <th>Supervisor</th>
+                                    <th>Motivos</th>
+                                    <th>Fecha Asignación</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaMisEscuchas">
+                                <tr>
+                                    <td colspan="7" style="text-align: center; padding: 40px;">Cargando tus escuchas...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====================================================================== -->
+            <!-- 7b.3. PESTAÑA: INCIDENCIAS                                               -->
+            <!-- ====================================================================== -->
+            <!-- 📌 Muestra incidencias de audio reportadas por el auditor              -->
+            <!-- ====================================================================== -->
+            <div id="tab-incidencias" class="tab-content tab-pane">
+                <div class="card">
+                    <h3 style="color: var(--accent);">⚠️ Incidencias de Audio</h3>
+
+                    <!-- Tabs internos para incidencias -->
+                    <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--line);">
+                        <button class="tab-incidencia-btn active" data-tipo="activas" onclick="filtrarIncidenciasPorTipo('activas')" style="background: none; border: none; padding: 8px 16px; cursor: pointer; font-weight: 600; color: var(--danger); border-bottom: 3px solid var(--danger);">
+                            🔴 Activas (<span id="incidenciasActivasCount">0</span>)
+                        </button>
+                        <button class="tab-incidencia-btn" data-tipo="resueltas" onclick="filtrarIncidenciasPorTipo('resueltas')" style="background: none; border: none; padding: 8px 16px; cursor: pointer; font-weight: 600; color: var(--ok);">
+                            ✅ Resueltas (<span id="incidenciasResueltasCount">0</span>)
+                        </button>
+                    </div>
+
+                    <!-- Cuadro de búsqueda para incidencias -->
+                    <div style="margin-bottom: 20px;">
+                        <input type="text" id="buscarIncidencia" placeholder="Buscar por Ticket PSI, Gestor o Motivo..." onkeyup="filtrarIncidencias()" style="width: 100%;">
+                    </div>
+
+                    <div class="table-container" style="max-height: 500px;">
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Ticket PSI</th>
+                                    <th>Gestor Auditado</th>
+                                    <th>Supervisor</th>
+                                    <th>Motivo de Incidencia</th>
+                                    <th>Reportado por</th>
+                                    <th>Fecha Reporte</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaIncidencias">
+                                <tr>
+                                    <td colspan="7" style="text-align: center; padding: 40px;">Cargando incidencias...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="margin-top: 20px; display: flex; gap: 20px; justify-content: flex-end; padding: 10px; background: #f8f9fa; border-radius: 10px;">
+                        <span><strong>Total incidencias:</strong> <span id="totalIncidenciasCount">0</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====================================================================== -->
+            <!-- 7b.4. PESTAÑA: EVALUACIÓN                                                -->
+            <!-- ====================================================================== -->
+            <!-- 📌 Formulario para realizar evaluaciones de calidad                    -->
+            <!-- ====================================================================== -->
+            <div id="tab-evaluacion" class="tab-content tab-pane">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="color: var(--accent);">📝 Formulario de Evaluación - Calidad de Cobranza</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="btnAuditar" onclick="iniciarAuditoria()" class="secondary" style="background: var(--ok); color: white;">🎯 Auditar</button>
+                            <button id="btnFinalizar" onclick="finalizarAuditoria()" class="secondary" style="display: none;">⏱️ Finalizar y Guardar</button>
+                            <button id="btnCancelarGestion" onclick="cancelarGestionActual()" class="secondary danger" style="display: none;">❌ Cancelar Gestión</button>
+                        </div>
+                    </div>
+
+                    <!-- DATOS BÁSICOS -->
+                    <div class="form-grid-basicos" style="margin-bottom: 25px;">
+                        <div>
+                            <label>🎫 TICKET PSI</label>
+                            <input type="text" id="evalTicketPSI" placeholder="Ej: E37185646" maxlength="50" style="text-transform: uppercase;">
+                        </div>
+                        <div>
+                            <label>👥 GESTOR EVALUADO</label>
+                            <div class="select-buscador-container" id="agente-container">
+                                <input type="text" id="evalAgenteInput" class="select-buscador-input" placeholder="Buscar agente..." autocomplete="off">
+                                <input type="hidden" id="evalAgente" name="evalAgente" value="">
+                                <div id="agenteDropdown" class="select-buscador-dropdown"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <label>📅 FECHA Y HORA</label>
+                            <input type="datetime-local" id="evalFecha" value="">
+                        </div>
+                        <div>
+                            <label>🎫 ID LLAMADA</label>
+                            <input type="text" id="evalIdLlamada" placeholder="Ej: 00OJ12NCDOCO945A04000VTAES00QJN4_2026-03-20_18-21-30">
+                        </div>
+                        <div>
+                            <label>📅 FECHA AUDIO</label>
+                            <input type="text" id="evalFechaDescargaAudio" placeholder="Se cargará automáticamente" readonly disabled style="background-color: #f0f0f0;">
+                        </div>
+                    </div>
+
+                    <!-- DATOS PSI -->
+                    <div id="seccionDatosPSI" style="display: none; margin-bottom: 25px; padding: 15px; background: #f8f9fa; border-radius: 12px;">
+                        <h4 style="margin: 0 0 15px 0; font-size: 14px;">📋 DATOS REGISTRADOS EN PSI</h4>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                            <div><label>📌 MOTIVOS</label><input type="text" id="psiMotivos" readonly disabled style="background-color: #f0f0f0;"></div>
+                            <div><label>📌 SUBMOTIVOS</label><input type="text" id="psiSubmotivos" readonly disabled style="background-color: #f0f0f0;"></div>
+                            <div><label>📌 SUBNIVEL</label><input type="text" id="psiSubnivel" readonly disabled style="background-color: #f0f0f0;"></div>
+                            <div><label>📌 PETICION</label><input type="text" id="psiPeticion" readonly disabled style="background-color: #f0f0f0;"></div>
+                        </div>
+                    </div>
+
+                    <!-- CONTENEDOR DINÁMICO PARA EVALUACIÓN -->
+                    <div id="evaluacion-dinamica-container">
+                        <div style="text-align: center; padding: 40px;">⏳ Cargando estructura de evaluación...</div>
+                    </div>
+
+                    <!-- NOTA FINAL GLOBAL -->
+                    <div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #019DF4, #00B4F0); border-radius: 12px; text-align: center;">
+                        <strong style="color: white; font-size: 18px;">🎯 NOTA FINAL: <span id="notaFinalGlobal">0%</span></strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====================================================================== -->
+            <!-- 7b.5. PESTAÑA: HISTORIAL                                                -->
+            <!-- ====================================================================== -->
+            <!-- 📌 Muestra todas las evaluaciones realizadas por el auditor            -->
+            <!-- ====================================================================== -->
+            <div id="tab-historial" class="tab-content tab-pane">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                        <h3 style="color: var(--accent);">📋 Historial de Evaluaciones</h3>
+                    </div>
+
+                    <!-- Cuadro de búsqueda -->
+                    <div style="margin-bottom: 20px;">
+                        <input type="text" id="buscarHistorial" placeholder="Buscar por agente, auditor o ID..." onkeyup="filtrarHistorial()" style="width: 100%;">
+                    </div>
+
+                    <!-- Tabla de historial -->
+                    <div id="tablaHistorial-container" class="table-container">
+                        <table id="tablaHistorial">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 140px;">📅 Fecha y Hora</th>
+                                    <th style="min-width: 110px;">🎫 Ticket PSI</th>
+                                    <th style="min-width: 130px;">👥 Gestor</th>
+                                    <th style="min-width: 130px;">👤 Auditor</th>
+                                    <th style="min-width: 200px;">🎧 ID Llamada</th>
+                                    <th style="min-width: 120px;">📅 Fecha Audio</th>
+                                    <th style="min-width: 70px;">📊 Nota</th>
+                                    <th style="min-width: 80px;">⏱️ TMO</th>
+                                    <th style="min-width: 70px;">✏️ Editado</th>
+                                    <th style="min-width: 100px;">⚙️ Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaHistorialBody">
+                                <tr><td colspan="10" style="text-align: center; padding: 50px;">Cargando evaluaciones...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Contadores -->
+                    <div style="margin-top: 20px; display: flex; gap: 20px; justify-content: flex-end; padding: 10px; background: #f8f9fa; border-radius: 10px;">
+                        <span><strong>Total:</strong> <span id="totalHistorialCount">0</span></span>
+                        <span><strong>Mostrando:</strong> <span id="mostrandoHistorialCount">0</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====================================================================== -->
+            <!-- 7c. MODALES                                                              -->
+            <!-- ====================================================================== -->
+
+            <!-- ====================================================================== -->
+            <!-- 7c.1. MODAL: REPORTAR INCIDENCIA                                        -->
+            <!-- ====================================================================== -->
+            <div id="modalIncidencia" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10001; justify-content: center; align-items: center;">
+                <div style="background: white; border-radius: 20px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="color: var(--danger); margin: 0;">⚠️ Reportar Incidencia de Audio</h3>
+                        <button onclick="cerrarModalIncidencia()" style="background: none; color: var(--muted); font-size: 24px; padding: 0; width: 30px;">&times;</button>
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <p><strong>Ticket PSI:</strong> <span id="modalTicketPSI">-</span></p>
+                        <p><strong>Gestor Auditado:</strong> <span id="modalGestor">-</span></p>
+                    </div>
+
+                    <div style="margin-bottom: 20px;">
+                        <label style="font-weight: bold;">Seleccione el motivo de la incidencia:</label>
+                        <select id="motivoIncidencia" style="width: 100%; margin-top: 10px; padding: 10px;">
+                            <option value="">-- Seleccione un motivo --</option>
+                            <option value="El archivo de audio no existe en el repositorio">📁 El archivo de audio no existe en el repositorio</option>
+                            <option value="El enlace del audio está roto o no accesible">🔗 El enlace del audio está roto o no accesible</option>
+                            <option value="El audio no corresponde al ticket PSI indicado">🔄 El audio no corresponde al ticket PSI indicado</option>
+                            <option value="El audio está corrupto o no se puede reproducir">💥 El audio está corrupto o no se puede reproducir</option>
+                            <option value="El audio corresponde a otra llamada (duplicado)">📋 El audio corresponde a otra llamada (duplicado)</option>
+                            <option value="Otro (requiere revisión manual)">❓ Otro (requiere revisión manual)</option>
+                        </select>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button onclick="cerrarModalIncidencia()" class="secondary">Cancelar</button>
+                        <button onclick="confirmarReporteIncidencia()" style="background: var(--danger);">✅ Confirmar Reporte</button>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- Cierre de tabs-container -->
+
+        <!-- ====================================================================== -->
+        <!-- 7d. FOOTER - CARGADO DINÁMICAMENTE                                     -->
+        <!-- ====================================================================== -->
+        <!-- 📌 footer-placeholder: Aquí se inyecta el footer.html                  -->
+        <!-- ====================================================================== -->
+        <div id="footer-placeholder"></div>
+
+    </div> <!-- Cierre de container -->
+
+    <!-- ====================================================================== -->
+    <!-- 8. MODALES DE CAMBIO DE CONTRASEÑA                                     -->
+    <!-- ====================================================================== -->
+
+    <!-- ====================================================================== -->
+    <!-- 8a. MODAL: PRIMER LOGIN                                                -->
+    <!-- ====================================================================== -->
+    <!-- 📌 Se muestra cuando el usuario debe cambiar su contraseña temporal    -->
+    <!-- ====================================================================== -->
+    <div id="modalPrimerLogin" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10050; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 20px; width: 90%; max-width: 450px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+            <div style="padding: 20px 25px; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 28px;">🔐</span>
+                    <div>
+                        <strong style="font-size: 18px;">Cambio de contraseña requerido</strong>
+                        <div style="font-size: 12px; opacity: 0.9;">Por seguridad, debe cambiar su contraseña temporal</div>
+                    </div>
+                </div>
+            </div>
+            <div style="padding: 25px;">
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 13px; font-weight: 600;">👤 Usuario</label>
+                    <input type="text" id="primerLoginUsuario" readonly style="background: #f0f0f0; cursor: not-allowed;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 13px; font-weight: 600;">🔒 Nueva contraseña *</label>
+                    <input type="password" id="primerLoginNuevaPassword" placeholder="Mínimo 6 caracteres" style="width: 100%;">
+                    <small style="color: var(--muted);">Mínimo 6 caracteres, use mayúsculas, números o símbolos para mayor seguridad</small>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 13px; font-weight: 600;">✅ Confirmar nueva contraseña *</label>
+                    <input type="password" id="primerLoginConfirmarPassword" placeholder="Repita la contraseña" style="width: 100%;">
+                </div>
+                <div id="primerLoginError" style="background: #fff0f0; color: var(--danger); padding: 10px; border-radius: 8px; font-size: 12px; display: none; margin-bottom: 15px;"></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="cerrarModalPrimerLogin()" class="secondary">Cancelar</button>
+                    <button id="btnCambiarPasswordPrimerLogin" onclick="cambiarPasswordPrimerLogin()" style="background: var(--ok);">💾 Cambiar contraseña</button>
+                </div>
+            </div>
+            <div style="padding: 12px 20px; background: #f8f9fa; font-size: 11px; color: var(--muted); text-align: center; border-top: 1px solid var(--line);">
+                ⚠️ Por seguridad, debe cambiar su contraseña temporal antes de continuar.
+            </div>
+        </div>
+    </div>
+
+    <!-- ====================================================================== -->
+    <!-- 8b. MODAL: CAMBIO VOLUNTARIO DE CONTRASEÑA                             -->
+    <!-- ====================================================================== -->
+    <!-- 📌 Se muestra cuando el usuario quiere cambiar su contraseña           -->
+    <!-- ====================================================================== -->
+    <div id="modalCambioPasswordVoluntario" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10051; justify-content: center; align-items: center;">
+        <div style="background: white; border-radius: 20px; width: 90%; max-width: 450px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+            <div style="padding: 20px 25px; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 28px;">🔐</span>
+                    <div>
+                        <strong style="font-size: 18px;">Cambiar contraseña</strong>
+                        <div style="font-size: 12px; opacity: 0.9;">Actualice su contraseña por seguridad</div>
+                    </div>
+                </div>
+            </div>
+            <div style="padding: 25px;">
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 13px; font-weight: 600;">🔒 Contraseña actual *</label>
+                    <input type="password" id="cambioPassActual" placeholder="Ingrese su contraseña actual" style="width: 100%;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 13px; font-weight: 600;">🆕 Nueva contraseña *</label>
+                    <input type="password" id="cambioPassNueva" placeholder="Mínimo 6 caracteres" style="width: 100%;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 13px; font-weight: 600;">✅ Confirmar nueva contraseña *</label>
+                    <input type="password" id="cambioPassConfirmar" placeholder="Repita la nueva contraseña" style="width: 100%;">
+                </div>
+                <div id="cambioPassError" style="background: #fff0f0; color: var(--danger); padding: 10px; border-radius: 8px; font-size: 12px; display: none; margin-bottom: 15px;"></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="cerrarModalCambioPasswordVoluntario()" class="secondary">Cancelar</button>
+                    <button onclick="cambiarPasswordVoluntario()" style="background: var(--ok);">💾 Actualizar contraseña</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

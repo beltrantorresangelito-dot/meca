@@ -1,0 +1,49 @@
+<!-- ========================================================== -->
+<!-- HEADER AUDITOR - CON BOTONES VISIBLES                      -->
+<!-- ========================================================== -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 12px 24px; background: transparent; border: none; box-shadow: none;">
+    
+    <!-- ========================================================== -->
+    <!-- SECCIÓN IZQUIERDA: INFORMACIÓN DEL USUARIO                -->
+    <!-- ========================================================== -->
+    <div class="user-info" id="userInfo" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+        <span style="font-size: 20px;">👤</span>
+        <span id="userName" style="font-weight: bold; font-size: 15px; color: #ffffff;">Cargando...</span>
+        <span id="userRol" style="font-size: 11px; background: #e2e8f0; padding: 2px 14px; border-radius: 20px; color: #475569; font-weight: 600;">AUDITOR</span>
+        
+        <!-- ✅ BOTÓN: Cambiar contraseña (FONDO SÓLIDO) -->
+        <button onclick="abrirModalCambioPasswordVoluntario()" 
+                style="display: inline-flex; align-items: center; gap: 6px; background: #019DF4; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; color: #ffffff; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 4px rgba(1,157,244,0.3);">
+            🔐 Cambiar contraseña
+        </button>
+        
+        <!-- ✅ BOTÓN: Cerrar sesión (FONDO SÓLIDO) -->
+        <button onclick="cerrarSesion()" 
+                style="display: inline-flex; align-items: center; gap: 6px; background: #dc3545; border: none; padding: 8px 18px; border-radius: 8px; cursor: pointer; font-size: 13px; color: #ffffff; font-weight: 600; transition: all 0.2s; box-shadow: 0 2px 4px rgba(220,53,69,0.3);">
+            🚪 Salir
+        </button>
+    </div>
+    
+    <!-- ========================================================== -->
+    <!-- SECCIÓN DERECHA: CONTADOR DE GESTIONES                    -->
+    <!-- ========================================================== -->
+    <div style="background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 14px; white-space: nowrap; box-shadow: 0 2px 4px rgba(1,157,244,0.2);">
+        📊 Total Gestionado: <span id="totalEvaluacionesHeader">0</span>
+    </div>
+    
+</div>
+
+<style>
+    /* ✅ Estilos para hover */
+    .user-info button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25) !important;
+    }
+    
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+</style>
