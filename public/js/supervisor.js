@@ -2939,6 +2939,9 @@ async function calcularIndicadoresPorMes(evaluaciones, mesesData) {
 // ======================================================
 // Generar HTML de la tabla evolutiva
 // ======================================================
+// ======================================================
+// GENERAR HTML DE LA TABLA EVOLUTIVA (COMPLETO)
+// ======================================================
 function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
     // Filtrar meses con datos
     const mesesValidos = mesesData.filter(m => indicadoresPorMes[m.clave] !== null);
@@ -2955,7 +2958,6 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
         const fechaMes = new Date(m.anio, m.mes - 1, 1);
         const esMatrizAntigua = fechaMes < FECHA_CAMBIO;
         
-        // Valores de la matriz según el período
         const matrizText = esMatrizAntigua ? 'M. ANTERIOR' : 'M. NUEVA';
         const badge = esMatrizAntigua ? '🔵' : '';
         const badgeTitle = esMatrizAntigua 
@@ -2982,43 +2984,13 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
     // Calcular tendencias para cada indicador
     const tendencias = calcularTendencias(mesesValidos, indicadoresPorMes);
     
-    // Función para formatear valores con color
-    const formatearValor = (valor, esPorcentaje = true, umbralBueno = 85, umbralCritico = 70) => {
-        if (valor === null || valor === undefined) return '<span style="color: var(--muted);">-</span>';
-        let numValor = parseFloat(valor);
-        if (isNaN(numValor)) return '<span style="color: var(--muted);">-</span>';
-        
-        let color = '';
-        if (esPorcentaje) {
-            if (numValor >= umbralBueno) color = '#28a745';
-            else if (numValor >= umbralCritico) color = '#f39c12';
-            else color = '#d93025';
-        }
-        
-        const valorMostrar = esPorcentaje ? `${numValor}%` : numValor.toLocaleString();
-        return `<span style="color: ${color}; font-weight: 500;">${valorMostrar}</span>`;
-    };
-    
-    const formatearCantidad = (valor) => {
-        if (valor === null || valor === undefined) return '<span style="color: var(--muted);">-</span>';
-        return `<span>${valor}</span>`;
-    };
-    
-    // Generar fila de valores por mes
-    const generarFila = (indicador, formatter) => {
-        let html = '';
-        for (const mes of mesesValidos) {
-            const valor = indicadoresPorMes[mes.clave]?.[indicador];
-            html += `<td style="padding: 8px; text-align: center;">${formatter(valor)}</td>`;
-        }
-        return html;
-    };
-    
-    // Calcular último valor para cada indicador (para el resumen de cabecera)
+    // Calcular últimos valores
     const ultimoMes = mesesValidos[mesesValidos.length - 1];
     const ultimosValores = indicadoresPorMes[ultimoMes.clave] || {};
     
-    // 📌 LEYENDA SUPERIOR (explicación de la matriz)
+    // ======================================================
+    // LEYENDA SUPERIOR (explicación de la matriz)
+    // ======================================================
     const leyendaMatriz = `
         <div style="
             background: linear-gradient(135deg, #f8f9fa, #e9ecef);
@@ -3061,7 +3033,9 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
         </div>
     `;
     
-    // 📌 LEYENDA INFERIOR (explicación del badge)
+    // ======================================================
+    // LEYENDA INFERIOR (explicación del badge)
+    // ======================================================
     const leyendaBadge = `
         <div style="
             margin-top: 12px;
@@ -3079,7 +3053,9 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
         </div>
     `;
     
-    // HTML completo
+    // ======================================================
+    // HTML COMPLETO
+    // ======================================================
     return `
         ${leyendaMatriz}
         
@@ -3093,7 +3069,9 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                 </div>
             </div>
             
+            <!-- ====================================================== -->
             <!-- SECCIÓN VOLUMEN -->
+            <!-- ====================================================== -->
             <div class="indicador-seccion" data-seccion="volumen" style="margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
                 <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
                     <div style="display: flex; align-items: center; gap: 10px;">
@@ -3114,12 +3092,12 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                         <tbody>
                             <tr style="border-bottom: 1px solid #e0e0e0;">
                                 <td style="padding: 8px;"><strong>📞 Q Llamadas evaluadas</strong></td>
-                                ${generarFila('totalEval', (v) => v?.toLocaleString() || '-')}
+                                ${generarFilaConTendenciaGlobal('totalEval', mesesValidos, indicadoresPorMes, false, 0)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.totalEval.color}">${tendencias.totalEval.icono} ${tendencias.totalEval.texto}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px;"><strong>👥 Total Gestores Evaluados</strong></td>
-                                ${generarFila('totalGestores', (v) => v?.toLocaleString() || '-')}
+                                ${generarFilaConTendenciaGlobal('totalGestores', mesesValidos, indicadoresPorMes, false, 0)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.totalGestores.color}">${tendencias.totalGestores.icono} ${tendencias.totalGestores.texto}</td>
                             </tr>
                         </tbody>
@@ -3127,7 +3105,9 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                 </div>
             </div>
             
+            <!-- ====================================================== -->
             <!-- SECCIÓN CALIDAD -->
+            <!-- ====================================================== -->
             <div class="indicador-seccion" data-seccion="calidad" style="margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
                 <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
                     <div style="display: flex; align-items: center; gap: 10px;">
@@ -3147,21 +3127,26 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                         <tbody>
                             <tr style="border-bottom: 1px solid #e0e0e0;">
                                 <td style="padding: 8px;"><strong>⭐ Promedio Puntaje General</strong></td>
-                                ${generarFila('promedioGeneral', (v) => `${v}%`)}
+                                ${generarFilaConTendenciaGlobal('promedioGeneral', mesesValidos, indicadoresPorMes, true, 1)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.promedioGeneral.color}">${tendencias.promedioGeneral.icono} ${tendencias.promedioGeneral.texto}</td>
                             </tr>
-                            <!--<tr>
+                            <!--
+                            <tr>                                
                                 <td style="padding: 8px;"><strong>⚠️ % Llamadas con NOTA &lt; 85%</strong></td>
-                                ${generarFila('pctQuiebres', (v) => `${v}%`)}
+                                ${generarFilaConTendenciaGlobal('pctQuiebres', mesesValidos, indicadoresPorMes, true, 1)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.pctQuiebres.color}">${tendencias.pctQuiebres.icono} ${tendencias.pctQuiebres.texto}</td>
-                            </tr>-->
+                            </tr>
+                            -->
                         </tbody>
                     </table>
                 </div>
             </div>
             
+            <!-- ====================================================== -->
             <!-- SECCIÓN MOTIVOS DE IMPACTO -->
-            <!--<div class="indicador-seccion" data-seccion="motivos" style="margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
+            <!-- ====================================================== -->
+            <!--
+            <div class="indicador-seccion" data-seccion="motivos" style="margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
                 <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 18px;">🎯</span>
@@ -3180,25 +3165,27 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                         <tbody>
                             <tr style="border-bottom: 1px solid #e0e0e0;">
                                 <td style="padding: 8px;"><strong>🎯 % Llamadas con ENC &lt; 30</strong></td>
-                                ${generarFila('pctENC', (v) => `${v}%`)}
+                                ${generarFilaConTendenciaGlobal('pctENC', mesesValidos, indicadoresPorMes, true, 1)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.pctENC.color}">${tendencias.pctENC.icono} ${tendencias.pctENC.texto}</td>
                             </tr>
                             <tr style="border-bottom: 1px solid #e0e0e0;">
                                 <td style="padding: 8px;"><strong>⚠️ % Llamadas con ECUF &lt; 30</strong></td>
-                                ${generarFila('pctECUF', (v) => `${v}%`)}
+                                ${generarFilaConTendenciaGlobal('pctECUF', mesesValidos, indicadoresPorMes, true, 1)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.pctECUF.color}">${tendencias.pctECUF.icono} ${tendencias.pctECUF.texto}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px;"><strong>💰 % Llamadas con ECN &lt; 40</strong></td>
-                                ${generarFila('pctECN', (v) => `${v}%`)}
+                                ${generarFilaConTendenciaGlobal('pctECN', mesesValidos, indicadoresPorMes, true, 1)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.pctECN.color}">${tendencias.pctECN.icono} ${tendencias.pctECN.texto}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-            </div>-->
-            
+            </div>
+            -->
+            <!-- ====================================================== -->
             <!-- SECCIÓN NOTA PROMEDIO POR MOTIVO -->
+            <!-- ====================================================== -->
             <div class="indicador-seccion" data-seccion="notas" style="margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
                 <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
                     <div style="display: flex; align-items: center; gap: 10px;">
@@ -3218,17 +3205,17 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                         <tbody>
                             <tr style="border-bottom: 1px solid #e0e0e0;">
                                 <td style="padding: 8px;"><strong>🎯 Promedio ENC (Cliente)</strong></td>
-                                ${generarFila('promedioENC', (v) => `${v}%`)}
+                                ${generarFilaConTendenciaGlobal('promedioENC', mesesValidos, indicadoresPorMes, true, 1)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.promedioENC.color}">${tendencias.promedioENC.icono} ${tendencias.promedioENC.texto}</td>
                             </tr>
                             <tr style="border-bottom: 1px solid #e0e0e0;">
                                 <td style="padding: 8px;"><strong>⚠️ Promedio ECUF (Negocio)</strong></td>
-                                ${generarFila('promedioECUF', (v) => `${v}%`)}
+                                ${generarFilaConTendenciaGlobal('promedioECUF', mesesValidos, indicadoresPorMes, true, 1)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.promedioECUF.color}">${tendencias.promedioECUF.icono} ${tendencias.promedioECUF.texto}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px;"><strong>💰 Promedio ECN (Proceso)</strong></td>
-                                ${generarFila('promedioECN', (v) => `${v}%`)}
+                                ${generarFilaConTendenciaGlobal('promedioECN', mesesValidos, indicadoresPorMes, true, 1)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.promedioECN.color}">${tendencias.promedioECN.icono} ${tendencias.promedioECN.texto}</td>
                             </tr>
                         </tbody>
@@ -3236,7 +3223,9 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                 </div>
             </div>
             
+            <!-- ====================================================== -->
             <!-- SECCIÓN DISTRIBUCIÓN POR CUARTILES -->
+            <!-- ====================================================== -->
             <div class="indicador-seccion" data-seccion="cuartiles" style="margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
                 <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
                     <div style="display: flex; align-items: center; gap: 10px;">
@@ -3256,22 +3245,22 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                         <tbody>
                             <tr style="border-bottom: 1px solid #e0e0e0;">
                                 <td style="padding: 8px;"><strong>🏆 Gestores Q1 (Excelente)</strong></td>
-                                ${generarFila('q1', (v) => v || 0)}
+                                ${generarFilaConTendenciaGlobal('q1', mesesValidos, indicadoresPorMes, false, 0)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.q1.color}">${tendencias.q1.icono} ${tendencias.q1.texto}</td>
                             </tr>
                             <tr style="border-bottom: 1px solid #e0e0e0;">
                                 <td style="padding: 8px;"><strong>📈 Gestores Q2 (Bueno)</strong></td>
-                                ${generarFila('q2', (v) => v || 0)}
+                                ${generarFilaConTendenciaGlobal('q2', mesesValidos, indicadoresPorMes, false, 0)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.q2.color}">${tendencias.q2.icono} ${tendencias.q2.texto}</td>
                             </tr>
                             <tr style="border-bottom: 1px solid #e0e0e0;">
                                 <td style="padding: 8px;"><strong>⚠️ Gestores Q3 (Regular)</strong></td>
-                                ${generarFila('q3', (v) => v || 0)}
+                                ${generarFilaConTendenciaGlobal('q3', mesesValidos, indicadoresPorMes, false, 0)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.q3.color}">${tendencias.q3.icono} ${tendencias.q3.texto}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 8px;"><strong>🔴 Gestores Q4 (Riesgo)</strong></td>
-                                ${generarFila('q4', (v) => v || 0)}
+                                ${generarFilaConTendenciaGlobal('q4', mesesValidos, indicadoresPorMes, false, 0)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.q4.color}">${tendencias.q4.icono} ${tendencias.q4.texto}</td>
                             </tr>
                         </tbody>
@@ -3341,6 +3330,69 @@ function calcularTendencias(mesesValidos, indicadoresPorMes) {
     };
 }
 
+// ============================================================
+// FUNCIÓN: Calcular tendencia entre paréntesis
+// ============================================================
+function calcularTendenciaParentesis(valores, index) {
+    if (index === 0) {
+        return { texto: '●', color: '#019DF4', diff: 0 };
+    }
+    const anterior = valores[index - 1];
+    const actual = valores[index];
+    if (anterior === 0 || actual === 0 || isNaN(anterior) || isNaN(actual)) {
+        return { texto: '●', color: '#019DF4', diff: 0 };
+    }
+    const diff = actual - anterior;
+    // Usar umbral de 0.1 para evitar cambios insignificantes
+    return {
+        texto: diff > 0.1 ? '▲' : (diff < -0.1 ? '▼' : '→'),
+        color: diff > 0.1 ? '#28a745' : (diff < -0.1 ? '#d93025' : '#6c757d'),
+        diff: diff
+    };
+}
+
+// ============================================================
+// FUNCIÓN: Generar fila con tendencia entre paréntesis
+// ============================================================
+function generarFilaConTendenciaGlobal(indicador, mesesValidos, indicadoresPorMes, esPorcentaje = true, decimals = 1) {
+    let html = '';
+    const valoresArray = mesesValidos.map(m => {
+        const val = indicadoresPorMes[m.clave]?.[indicador];
+        return (val !== null && val !== undefined && !isNaN(val)) ? val : 0;
+    });
+    
+    for (let i = 0; i < mesesValidos.length; i++) {
+        const valor = valoresArray[i];
+        const tendencia = calcularTendenciaParentesis(valoresArray, i);
+        
+        // Formatear valor
+        let valorStr = '-';
+        if (valor !== 0) {
+            if (esPorcentaje) {
+                valorStr = `${Number(valor).toFixed(decimals)}%`;
+            } else {
+                valorStr = Math.round(valor).toLocaleString();
+            }
+        }
+        
+        // Agregar tendencia
+        let celdaHtml = valorStr;
+        if (i === 0) {
+            celdaHtml += ` <span style="color: #019DF4;">●</span>`;
+        } else if (Math.abs(tendencia.diff) > 0.01) {
+            const signo = tendencia.diff > 0 ? '+' : '';
+            // 🔴 CAMBIO: Siempre mostrar cambio porcentual
+            const pctChange = (tendencia.diff / valoresArray[i-1]) * 100;
+            const pctFormateado = `${signo}${pctChange.toFixed(1)}%`;
+            celdaHtml += ` <span style="color: ${tendencia.color}; font-weight: 500;">(${tendencia.texto} ${pctFormateado})</span>`;
+        } else {
+            celdaHtml += ` <span style="color: #6c757d; font-weight: 500;">(→ 0.0%)</span>`;
+        }
+        
+        html += `<td style="padding: 8px; text-align: center;">${celdaHtml}</td>`;
+    }
+    return html;
+}
 // ======================================================
 // Configurar eventos de colapso
 // ======================================================
@@ -8175,135 +8227,129 @@ function exportarAgentesJerarquiaCSV(tipo, key) {
 
     // ===== 32. INICIO FUNCIÓN: limpiarFiltrosReportes =======================
     async function limpiarFiltrosReportes() {
-        console.log('🧹 Limpiando filtros de reportes...');
+    console.log('🧹 Limpiando filtros de reportes...');
 
-        // ======================================================
-        // 1. RESETEAR TODAS LAS VARIABLES DE FILTRO
-        // ======================================================
-        filtroPeriodoActual = 'dia';
-        filtroCantidadActual = 'all';
-        filtroFechaInicioActual = null;
-        filtroFechaFinActual = null;
-        
-        // Limpiar filtros de período unitario
-        filtroDiaDesde = null;
-        filtroDiaHasta = null;
-        filtroSemanaAnio = null;
-        filtroSemanaNumero = null;
-        filtroMesAnio = null;
-        filtroMesNumero = null;
-        filtroTrimestreAnio = null;
-        filtroTrimestreNumero = null;
-        filtroAnio = null;
-        
-        // Limpiar filtros de rango
-        filtroRangoInicio = null;
-        filtroRangoFin = null;
-        
-        // Limpiar filtros de múltiples
-        filtroMultiples = [];
+    // ======================================================
+    // 1. RESETEAR TODAS LAS VARIABLES DE FILTRO
+    // ======================================================
+    filtroPeriodoActual = 'dia';
+    filtroCantidadActual = 'all';
+    filtroFechaInicioActual = null;
+    filtroFechaFinActual = null;
+    
+    filtroDiaDesde = null;
+    filtroDiaHasta = null;
+    filtroSemanaAnio = null;
+    filtroSemanaNumero = null;
+    filtroMesAnio = null;
+    filtroMesNumero = null;
+    filtroTrimestreAnio = null;
+    filtroTrimestreNumero = null;
+    filtroAnio = null;
+    filtroRangoInicio = null;
+    filtroRangoFin = null;
+    filtroMultiples = [];
 
-        // Resetear selector de período a "dia"
-        const periodoSelect = document.getElementById('filtroPeriodoReportes');
-        if (periodoSelect) periodoSelect.value = 'mes';
-        
-        // Renderizar los controles para que vuelvan a mostrar "día"
-        renderizarControlesPeriodo();
+    const periodoSelect = document.getElementById('filtroPeriodoReportes');
+    if (periodoSelect) periodoSelect.value = 'mes';
+    renderizarControlesPeriodo();
 
-        // ======================================================
-        // 2. RESETEAR FILTRO POR LÍDER
-        // ======================================================
-        liderSeleccionadoActual = 'todos';
+    // ======================================================
+    // 2. RESETEAR FILTRO POR LÍDER
+    // ======================================================
+    liderSeleccionadoActual = 'todos';
+    const selectLider = document.getElementById('selectFiltrarLider');
+    if (selectLider) selectLider.value = 'todos';
+    document.querySelectorAll('.fila-lider').forEach(row => {
+        row.style.background = '';
+        row.style.fontWeight = 'normal';
+    });
 
-        const selectLider = document.getElementById('selectFiltrarLider');
-        if (selectLider) selectLider.value = 'todos';
-
-        // Remover resaltado de filas en la tabla de líderes
-        document.querySelectorAll('.fila-lider').forEach(row => {
-            row.style.background = '';
-            row.style.fontWeight = 'normal';
-        });
-
-        // ======================================================
-        // 3. RESETEAR FILTRO POR CUARTIL (si existe)
-        // ======================================================
-        if (typeof cuartilActivoGlobal !== 'undefined') {
-            cuartilActivoGlobal = 'todos';
-            actualizarEstiloBotonesCuartil('todos');
-        }
-
-        // ======================================================
-        // 4. ACTUALIZAR INFORMACIÓN VISUAL
-        // ======================================================
-        const infoSpan = document.getElementById('infoRangoSeleccionado');
-        if (infoSpan) {
-            infoSpan.innerHTML = '📅 Mostrando TODOS los datos (sin filtros)';
-        }
-
-        // ======================================================
-        // 5. RECARGAR DATOS COMPLETOS (SIN FILTROS)
-        // ======================================================
-        // Asegurar que tenemos todas las evaluaciones
-        if (!window.evaluacionesGlobales || window.evaluacionesGlobales.length === 0) {
-            await cargarEvaluacionesDesdePostgreSQL();
-        }
-
-        const evaluacionesCompletas = window.evaluacionesGlobales || [];
-
-        // ======================================================
-        // ACTUALIZAR KPIs CON DATOS COMPLETOS (NUEVO)
-        // ======================================================
-        await actualizarKPIsConFiltro(evaluacionesCompletas);
-
-        if (evaluacionesCompletas.length === 0) {
-            console.warn('⚠️ No hay evaluaciones cargadas');
-            mostrarMensajeSinDatosEnGraficos();
-            return;
-        }
-
-        // ======================================================
-        // 6. REGENERAR TODOS LOS GRÁFICOS CON DATOS COMPLETOS
-        // ======================================================
-        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesCompletas, 'mes');
-        datosAgrupadosActualesGlobal = datosAgrupados;
-
-        // Actualizar KPIs
-        actualizarCardsPromedioMotivosAgrupados(datosAgrupados);
-        actualizarCardPorcentajeQuiebresAgrupados(datosAgrupados);
-
-        // Actualizar tabla jerárquica de fallas
-        generarTablaJerarquicaFallas(evaluacionesCompletas);
-
-        // Actualizar gráficos
-        setTimeout(() => {
-            generarEvolutivoAudiosAgrupado(datosAgrupados, 'mes');
-            generarDistribucionRangosAgrupado(evaluacionesCompletas);
-            generarEvolutivoAtributosAgrupado(evaluacionesCompletas, datosAgrupados, 'mes');
-            generarEvolutivoQuiebresAgrupado(datosAgrupados);
-            generarGraficoComparativaAgrupado(evaluacionesCompletas);
-            generarEvolutivoCuartiles(evaluacionesCompletas, datosAgrupados, 'mes');
-            generarGraficoGestionLlamadas(evaluacionesCompletas);
-            renderizarEvolutivoConDatosFiltrados(evaluacionesCompletas);
-        }, 50);
-
-        // ======================================================
-        // 7. ACTUALIZAR TABLA DE LÍDERES (COMPLETA)
-        // ======================================================
-        await cargarResumenPorLider();
-
-        // ======================================================
-        // 8. ACTUALIZAR RANKING DE AGENTES (COMPLETO)
-        // ======================================================
-        const rankingCompleto = construirRankingAgentes(evaluacionesCompletas);
-        rankingCompletoGlobal = rankingCompleto;
-        actualizarTablaRanking(rankingCompleto);
-
-        
-        window.evaluacionesFiltradasGlobal = evaluacionesCompletas;
-        console.log('✅ Filtros limpiados, mostrando todos los datos');
-        // Limpiar variables de filtro adicionales
-        window.evaluacionesFiltradasPorLider = null;
+    // ======================================================
+    // 3. RESETEAR FILTRO POR CUARTIL
+    // ======================================================
+    if (typeof cuartilActivoGlobal !== 'undefined') {
+        cuartilActivoGlobal = 'todos';
+        actualizarEstiloBotonesCuartil('todos');
     }
+
+    // ======================================================
+    // 4. ACTUALIZAR INFORMACIÓN VISUAL
+    // ======================================================
+    const infoSpan = document.getElementById('infoRangoSeleccionado');
+    if (infoSpan) {
+        infoSpan.innerHTML = '📅 Mostrando TODOS los datos (sin filtros)';
+    }
+
+    // ======================================================
+    // 5. RECARGAR DATOS COMPLETOS
+    // ======================================================
+    if (!window.evaluacionesGlobales || window.evaluacionesGlobales.length === 0) {
+        await cargarEvaluacionesDesdePostgreSQL();
+    }
+
+    const evaluacionesCompletas = window.evaluacionesGlobales || [];
+
+    if (evaluacionesCompletas.length === 0) {
+        console.warn('⚠️ No hay evaluaciones cargadas');
+        mostrarMensajeSinDatosEnGraficos();
+        return;
+    }
+
+    // ======================================================
+    // 6. ACTUALIZAR DATOS FILTRADOS
+    // ======================================================
+    window.evaluacionesFiltradasGlobal = evaluacionesCompletas;
+
+    // ======================================================
+    // 7. 🔴 ACTUALIZAR KPIs CON DATOS COMPLETOS
+    // ======================================================
+    console.log('🔄 Actualizando KPIs con datos completos...');
+    await actualizarKPIsConFiltro(evaluacionesCompletas);
+
+    // ======================================================
+    // 8. 🔴 🔴 🔴 CLAVE: RECALCULAR TARJETAS DE PROMEDIOS 🔴 🔴 🔴
+    // ======================================================
+    console.log('🔄 Recalculando tarjetas de promedios...');
+    actualizarCardsPromedioMotivos(evaluacionesCompletas);
+    
+    // ======================================================
+    // 9. 🔴 RECALCULAR TARJETA DE QUIEBRES
+    // ======================================================
+    console.log('🔄 Recalculando tarjeta de quiebres...');
+    actualizarCardPorcentajeQuiebres(evaluacionesCompletas);
+
+    // ======================================================
+    // 10. REGENERAR GRÁFICOS
+    // ======================================================
+    const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesCompletas, 'mes');
+    datosAgrupadosActualesGlobal = datosAgrupados;
+
+    setTimeout(() => {
+        generarEvolutivoAudiosAgrupado(datosAgrupados, 'mes');
+        generarDistribucionRangosAgrupado(evaluacionesCompletas);
+        generarEvolutivoAtributosAgrupado(evaluacionesCompletas, datosAgrupados, 'mes');
+        generarEvolutivoQuiebresAgrupado(datosAgrupados);
+        generarGraficoComparativaAgrupado(evaluacionesCompletas);
+        generarEvolutivoCuartiles(evaluacionesCompletas, datosAgrupados, 'mes');
+        generarGraficoGestionLlamadas(evaluacionesCompletas);
+        renderizarEvolutivoConDatosFiltrados(evaluacionesCompletas);
+    }, 50);
+
+    // ======================================================
+    // 11. ACTUALIZAR TABLA DE LÍDERES Y RANKING
+    // ======================================================
+    await cargarResumenPorLider();
+
+    const rankingCompleto = construirRankingAgentes(evaluacionesCompletas);
+    rankingCompletoGlobal = rankingCompleto;
+    actualizarTablaRanking(rankingCompleto);
+
+    window.evaluacionesFiltradasPorLider = null;
+    
+    console.log('✅ Filtros limpiados, mostrando todos los datos');
+    console.log(`   kpiPromedioENC: ${document.getElementById('kpiPromedioENC')?.textContent}`);
+}
     // ===== FIN FUNCIÓN: limpiarFiltrosReportes ==============================
     
     // ======================================================
@@ -9113,241 +9159,241 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     }
     // ===== FIN FUNCIÓN: calcularEficaciaPDA ================================
 
+        // ======================================================
+    // ACTUALIZAR TODOS LOS KPIs CON DATOS FILTRADOS (VERSIÓN DINÁMICA)
     // ======================================================
-// ACTUALIZAR TODOS LOS KPIs CON DATOS FILTRADOS (VERSIÓN DINÁMICA)
-// ======================================================
-async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
-    console.log('📊 Actualizando KPIs con', evaluacionesFiltradas.length, 'evaluaciones filtradas');
-    
-    if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
-        resetearKPIs();
-        return;
-    }
-    
-    const totalEval = evaluacionesFiltradas.length;
-    
-    // ======================================================
-    // 1. KPI: Promedio General
-    // ======================================================
-    const promedioGeneral = Math.round(evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.notaFinal), 0) / totalEval);
-    document.getElementById('kpiPromedio').textContent = promedioGeneral + '%';
-    document.getElementById('kpiTotalEval').textContent = totalEval;
-    
-    // ======================================================
-    // 2. KPIs: % de llamadas con motivos bajos (CON VERSIÓN DINÁMICA)
-    // ======================================================
-    const conteosMotivos = contarMotivosPorDebajoDePeso(evaluacionesFiltradas);
-    const conENC = conteosMotivos.conENC;
-    const conECUF = conteosMotivos.conECUF;
-    const conECN = conteosMotivos.conECN;
-    
-    const pctENC = totalEval > 0 ? Math.round((conENC / totalEval) * 100) : 0;
-    const pctECUF = totalEval > 0 ? Math.round((conECUF / totalEval) * 100) : 0;
-    const pctECN = totalEval > 0 ? Math.round((conECN / totalEval) * 100) : 0;
-    
-    // Actualizar valores
-    document.getElementById('kpiConENC').textContent = pctENC + '%';
-    document.getElementById('kpiConECUF').textContent = pctECUF + '%';
-    document.getElementById('kpiConECN').textContent = pctECN + '%';
-    document.getElementById('kpiConENCDetalle').textContent = `${conENC} de ${totalEval} llamadas`;
-    document.getElementById('kpiConECUFDetalle').textContent = `${conECUF} de ${totalEval} llamadas`;
-    document.getElementById('kpiConECNDetalle').textContent = `${conECN} de ${totalEval} llamadas`;
-    
-    // ======================================================
-    // 🔴 NUEVO: OBTENER MATRIZ DOMINANTE Y UMBRALES DINÁMICOS
-    // ======================================================
-    const matrizDominante = obtenerMatrizDominante(evaluacionesFiltradas);
-    const pesos = matrizDominante ? matrizDominante.pesos : { ENC: 30, ECUF: 30, ECN: 40 };
-    const nombreMatriz = matrizDominante ? matrizDominante.nombre : 'Original (30|30|40)';
-    
-    // Detectar si hay mezcla de matrices
-    let esMixto = false;
-    let infoMixto = null;
-    
-    if (!matrizDominante) {
-        esMixto = true;
-        let countAntigua = 0, countNueva = 0;
-        for (const e of evaluacionesFiltradas) {
-            const fecha = obtenerFechaEvaluacion(e);
-            const matriz = getMatrizByFecha(fecha);
-            if (matriz.nombre === MATRIZ_ANTIGUA.nombre) {
-                countAntigua++;
+    async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
+        console.log('📊 Actualizando KPIs con', evaluacionesFiltradas.length, 'evaluaciones filtradas');
+        
+        if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
+            resetearKPIs();
+            return;
+        }
+        
+        const totalEval = evaluacionesFiltradas.length;
+        
+        // ======================================================
+        // 1. KPI: Promedio General
+        // ======================================================
+        const promedioGeneral = Math.round(evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.notaFinal), 0) / totalEval);
+        document.getElementById('kpiPromedio').textContent = promedioGeneral + '%';
+        document.getElementById('kpiTotalEval').textContent = totalEval;
+        
+        // ======================================================
+        // 2. KPIs: % de llamadas con motivos bajos (CON VERSIÓN DINÁMICA)
+        // ======================================================
+        const conteosMotivos = contarMotivosPorDebajoDePeso(evaluacionesFiltradas);
+        const conENC = conteosMotivos.conENC;
+        const conECUF = conteosMotivos.conECUF;
+        const conECN = conteosMotivos.conECN;
+        
+        const pctENC = totalEval > 0 ? Math.round((conENC / totalEval) * 100) : 0;
+        const pctECUF = totalEval > 0 ? Math.round((conECUF / totalEval) * 100) : 0;
+        const pctECN = totalEval > 0 ? Math.round((conECN / totalEval) * 100) : 0;
+        
+        // Actualizar valores
+        document.getElementById('kpiConENC').textContent = pctENC + '%';
+        document.getElementById('kpiConECUF').textContent = pctECUF + '%';
+        document.getElementById('kpiConECN').textContent = pctECN + '%';
+        document.getElementById('kpiConENCDetalle').textContent = `${conENC} de ${totalEval} llamadas`;
+        document.getElementById('kpiConECUFDetalle').textContent = `${conECUF} de ${totalEval} llamadas`;
+        document.getElementById('kpiConECNDetalle').textContent = `${conECN} de ${totalEval} llamadas`;
+        
+        // ======================================================
+        // 🔴 NUEVO: OBTENER MATRIZ DOMINANTE Y UMBRALES DINÁMICOS
+        // ======================================================
+        const matrizDominante = obtenerMatrizDominante(evaluacionesFiltradas);
+        const pesos = matrizDominante ? matrizDominante.pesos : { ENC: 30, ECUF: 30, ECN: 40 };
+        const nombreMatriz = matrizDominante ? matrizDominante.nombre : 'Original (30|30|40)';
+        
+        // Detectar si hay mezcla de matrices
+        let esMixto = false;
+        let infoMixto = null;
+        
+        if (!matrizDominante) {
+            esMixto = true;
+            let countAntigua = 0, countNueva = 0;
+            for (const e of evaluacionesFiltradas) {
+                const fecha = obtenerFechaEvaluacion(e);
+                const matriz = getMatrizByFecha(fecha);
+                if (matriz.nombre === MATRIZ_ANTIGUA.nombre) {
+                    countAntigua++;
+                } else {
+                    countNueva++;
+                }
+            }
+            const pctAntigua = (countAntigua / totalEval * 100).toFixed(0);
+            const pctNueva = (countNueva / totalEval * 100).toFixed(0);
+            
+            infoMixto = {
+                enc: `${MATRIZ_NUEVA.pesos.ENC}/${MATRIZ_ANTIGUA.pesos.ENC}`,
+                ecuf: `${MATRIZ_NUEVA.pesos.ECUF}/${MATRIZ_ANTIGUA.pesos.ECUF}`,
+                ecn: `${MATRIZ_NUEVA.pesos.ECN}/${MATRIZ_ANTIGUA.pesos.ECN}`,
+                pctAntigua: pctAntigua,
+                pctNueva: pctNueva,
+                countAntigua: countAntigua,
+                countNueva: countNueva
+            };
+        }
+        
+        // ======================================================
+        // 🔴 ACTUALIZAR UMBRALES DINÁMICOS EN LA UI
+        // ======================================================
+        
+        // Actualizar umbral ENC
+        const umbralENC = document.getElementById('kpiUmbralENC');
+        const labelENC = document.getElementById('kpiLabelENC');
+        if (umbralENC) {
+            umbralENC.textContent = esMixto ? infoMixto.enc : pesos.ENC;
+            // Cambiar color si el umbral cambió
+            umbralENC.style.color = (esMixto ? '#ffffff' : (pesos.ENC === 15 ? '#ffffff' : '#ffffff'));
+        }
+        if (labelENC) {
+            if (esMixto) {
+                labelENC.innerHTML = `🎯 % Llam con ENC &lt; <span style="color: #ffffff;">15% (nueva)</span> / <span style="color: #ffffff;">30% (antigua)</span>`;
             } else {
-                countNueva++;
+                const color = pesos.ENC === 15 ? '#ffffff' : '#ffffff';
+                labelENC.innerHTML = `🎯 % Llam con ENC &lt; <span style="color: ${color};">${pesos.ENC}%</span>`;
             }
         }
-        const pctAntigua = (countAntigua / totalEval * 100).toFixed(0);
-        const pctNueva = (countNueva / totalEval * 100).toFixed(0);
         
-        infoMixto = {
-            enc: `${MATRIZ_NUEVA.pesos.ENC}/${MATRIZ_ANTIGUA.pesos.ENC}`,
-            ecuf: `${MATRIZ_NUEVA.pesos.ECUF}/${MATRIZ_ANTIGUA.pesos.ECUF}`,
-            ecn: `${MATRIZ_NUEVA.pesos.ECN}/${MATRIZ_ANTIGUA.pesos.ECN}`,
-            pctAntigua: pctAntigua,
-            pctNueva: pctNueva,
-            countAntigua: countAntigua,
-            countNueva: countNueva
-        };
-    }
-    
-    // ======================================================
-    // 🔴 ACTUALIZAR UMBRALES DINÁMICOS EN LA UI
-    // ======================================================
-    
-    // Actualizar umbral ENC
-    const umbralENC = document.getElementById('kpiUmbralENC');
-    const labelENC = document.getElementById('kpiLabelENC');
-    if (umbralENC) {
-        umbralENC.textContent = esMixto ? infoMixto.enc : pesos.ENC;
-        // Cambiar color si el umbral cambió
-        umbralENC.style.color = (esMixto ? '#ffffff' : (pesos.ENC === 15 ? '#ffffff' : '#ffffff'));
-    }
-    if (labelENC) {
-        if (esMixto) {
-            labelENC.innerHTML = `🎯 % Llam con ENC &lt; <span style="color: #ffffff;">15% (nueva)</span> / <span style="color: #ffffff;">30% (antigua)</span>`;
-        } else {
-            const color = pesos.ENC === 15 ? '#ffffff' : '#ffffff';
-            labelENC.innerHTML = `🎯 % Llam con ENC &lt; <span style="color: ${color};">${pesos.ENC}%</span>`;
+        // Actualizar umbral ECUF
+        const umbralECUF = document.getElementById('kpiUmbralECUF');
+        const labelECUF = document.getElementById('kpiLabelECUF');
+        if (umbralECUF) {
+            umbralECUF.textContent = esMixto ? infoMixto.ecuf : pesos.ECUF;
+            umbralECUF.style.color = (esMixto ? '#ffffff' : (pesos.ECUF === 15 ? '#ffffff' : '#ffffff'));
         }
-    }
-    
-    // Actualizar umbral ECUF
-    const umbralECUF = document.getElementById('kpiUmbralECUF');
-    const labelECUF = document.getElementById('kpiLabelECUF');
-    if (umbralECUF) {
-        umbralECUF.textContent = esMixto ? infoMixto.ecuf : pesos.ECUF;
-        umbralECUF.style.color = (esMixto ? '#ffffff' : (pesos.ECUF === 15 ? '#ffffff' : '#ffffff'));
-    }
-    if (labelECUF) {
-        if (esMixto) {
-            labelECUF.innerHTML = `⚠️ % Llam con ECUF &lt; <span style="color: #ffffff;">15% (nueva)</span> / <span style="color: #ffffff;">30% (antigua)</span>`;
-        } else {
-            const color = pesos.ECUF === 15 ? '#ffffff' : '#ffffff';
-            labelECUF.innerHTML = `⚠️ % Llam con ECUF &lt; <span style="color: ${color};">${pesos.ECUF}%</span>`;
+        if (labelECUF) {
+            if (esMixto) {
+                labelECUF.innerHTML = `⚠️ % Llam con ECUF &lt; <span style="color: #ffffff;">15% (nueva)</span> / <span style="color: #ffffff;">30% (antigua)</span>`;
+            } else {
+                const color = pesos.ECUF === 15 ? '#ffffff' : '#ffffff';
+                labelECUF.innerHTML = `⚠️ % Llam con ECUF &lt; <span style="color: ${color};">${pesos.ECUF}%</span>`;
+            }
         }
-    }
-    
-    // Actualizar umbral ECN
-    const umbralECN = document.getElementById('kpiUmbralECN');
-    const labelECN = document.getElementById('kpiLabelECN');
-    if (umbralECN) {
-        umbralECN.textContent = esMixto ? infoMixto.ecn : pesos.ECN;
-        umbralECN.style.color = (esMixto ? '#ffffff' : (pesos.ECN === 70 ? '#ffffff' : '#ffffff'));
-    }
-    if (labelECN) {
-        if (esMixto) {
-            labelECN.innerHTML = `💰 % Llam con ECN &lt; <span style="color: #ffffff;">70% (nueva)</span> / <span style="color: #ffffff;">40% (antigua)</span>`;
-        } else {
-            const color = pesos.ECN === 70 ? '#ffffff' : '#ffffff';
-            labelECN.innerHTML = `💰 % Llam con ECN &lt; <span style="color: ${color};">${pesos.ECN}%</span>`;
+        
+        // Actualizar umbral ECN
+        const umbralECN = document.getElementById('kpiUmbralECN');
+        const labelECN = document.getElementById('kpiLabelECN');
+        if (umbralECN) {
+            umbralECN.textContent = esMixto ? infoMixto.ecn : pesos.ECN;
+            umbralECN.style.color = (esMixto ? '#ffffff' : (pesos.ECN === 70 ? '#ffffff' : '#ffffff'));
         }
-    }
-    
-    // ======================================================
-    // 🔴 ACTUALIZAR INFO DE MATRIZ
-    // ======================================================
-    const matrizInfo = document.getElementById('kpiMatrizInfo');
-    const matrizNombre = document.getElementById('kpiMatrizNombre');
-    if (matrizInfo && matrizNombre) {
-        if (esMixto) {
-            matrizNombre.textContent = `⚠️ Mezcla de matrices`;
-            matrizInfo.innerHTML = `
-                📊 <span id="kpiMatrizNombre" style="color: #f39c12;">⚠️ Mezcla de matrices</span>
-                <span style="font-size: 11px; color: var(--muted); margin-left: 10px;">
-                    (${infoMixto.countAntigua} eval - 30/30/40 = ${infoMixto.pctAntigua}% | 
-                    ${infoMixto.countNueva} eval - 15/15/70 = ${infoMixto.pctNueva}%)
-                </span>
-            `;
-        } else {
-            matrizNombre.textContent = nombreMatriz;
-            matrizInfo.innerHTML = `📊 <span id="kpiMatrizNombre">${nombreMatriz}</span>`;
+        if (labelECN) {
+            if (esMixto) {
+                labelECN.innerHTML = `💰 % Llam con ECN &lt; <span style="color: #ffffff;">70% (nueva)</span> / <span style="color: #ffffff;">40% (antigua)</span>`;
+            } else {
+                const color = pesos.ECN === 70 ? '#ffffff' : '#ffffff';
+                labelECN.innerHTML = `💰 % Llam con ECN &lt; <span style="color: ${color};">${pesos.ECN}%</span>`;
+            }
         }
-    }
-    
-    // ======================================================
-    // 3. KPI: Total Gestores Evaluados
-    // ======================================================
-    const gestoresUnicos = new Set();
-    evaluacionesFiltradas.forEach(e => { if (e.agente) gestoresUnicos.add(e.agente); });
-    const totalGestores = gestoresUnicos.size;
-    document.getElementById('kpiTotalGestores').textContent = totalGestores;
-    document.getElementById('kpiTotalGestoresDetalle').textContent = totalGestores === 1 ? '1 gestor único' : `${totalGestores} gestores únicos`;
-    
-    // ======================================================
-    // 4. Promedios de motivos (ENC, ECUF, ECN)
-    // ======================================================
-    const sumENC = evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.totalENC), 0);
-    const sumECUF = evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.totalECUF), 0);
-    const sumECN = evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.totalECN), 0);
-    
-    const promedioENC = (sumENC / totalEval).toFixed(1);
-    const promedioECUF = (sumECUF / totalEval).toFixed(1);
-    const promedioECN = (sumECN / totalEval).toFixed(1);
-    
-    // 🔴 Usar los pesos dinámicos para calcular porcentajes
-    const pctPromedioENC = Math.round((promedioENC / pesos.ENC) * 100);
-    const pctPromedioECUF = Math.round((promedioECUF / pesos.ECUF) * 100);
-    const pctPromedioECN = Math.round((promedioECN / pesos.ECN) * 100);
+        
+        // ======================================================
+        // 🔴 ACTUALIZAR INFO DE MATRIZ
+        // ======================================================
+        const matrizInfo = document.getElementById('kpiMatrizInfo');
+        const matrizNombre = document.getElementById('kpiMatrizNombre');
+        if (matrizInfo && matrizNombre) {
+            if (esMixto) {
+                matrizNombre.textContent = `⚠️ Mezcla de matrices`;
+                matrizInfo.innerHTML = `
+                    📊 <span id="kpiMatrizNombre" style="color: #f39c12;">⚠️ Mezcla de matrices</span>
+                    <span style="font-size: 11px; color: var(--muted); margin-left: 10px;">
+                        (${infoMixto.countAntigua} eval - 30/30/40 = ${infoMixto.pctAntigua}% | 
+                        ${infoMixto.countNueva} eval - 15/15/70 = ${infoMixto.pctNueva}%)
+                    </span>
+                `;
+            } else {
+                matrizNombre.textContent = nombreMatriz;
+                matrizInfo.innerHTML = `📊 <span id="kpiMatrizNombre">${nombreMatriz}</span>`;
+            }
+        }
+        
+        // ======================================================
+        // 3. KPI: Total Gestores Evaluados
+        // ======================================================
+        const gestoresUnicos = new Set();
+        evaluacionesFiltradas.forEach(e => { if (e.agente) gestoresUnicos.add(e.agente); });
+        const totalGestores = gestoresUnicos.size;
+        document.getElementById('kpiTotalGestores').textContent = totalGestores;
+        document.getElementById('kpiTotalGestoresDetalle').textContent = totalGestores === 1 ? '1 gestor único' : `${totalGestores} gestores únicos`;
+        
+        // ======================================================
+        // 4. Promedios de motivos (ENC, ECUF, ECN)
+        // ======================================================
+        const sumENC = evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.totalENC), 0);
+        const sumECUF = evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.totalECUF), 0);
+        const sumECN = evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.totalECN), 0);
+        
+        const promedioENC = (sumENC / totalEval).toFixed(1);
+        const promedioECUF = (sumECUF / totalEval).toFixed(1);
+        const promedioECN = (sumECN / totalEval).toFixed(1);
+        
+        // 🔴 Usar los pesos dinámicos para calcular porcentajes
+        const pctPromedioENC = Math.round((promedioENC / pesos.ENC) * 100);
+        const pctPromedioECUF = Math.round((promedioECUF / pesos.ECUF) * 100);
+        const pctPromedioECN = Math.round((promedioECN / pesos.ECN) * 100);
 
-    document.getElementById('kpiPromedioENC').textContent = pctPromedioENC + '%';
-    document.getElementById('kpiPromedioECUF').textContent = pctPromedioECUF + '%';
-    document.getElementById('kpiPromedioECN').textContent = pctPromedioECN + '%';
-    document.getElementById('kpiPromedioENCDetalle').textContent = promedioENC + '/' + pesos.ENC + ' pts';
-    document.getElementById('kpiPromedioECUFDetalle').textContent = promedioECUF + '/' + pesos.ECUF + ' pts';
-    document.getElementById('kpiPromedioECNDetalle').textContent = promedioECN + '/' + pesos.ECN + ' pts';
-    
-    // ======================================================
-    // 5. Porcentaje de quiebres (nota < 85%)
-    // ======================================================
-    const quiebresCount = evaluacionesFiltradas.filter(e => numeroSeguro(e.notaFinal) < 85).length;
-    const pctQuiebres = totalEval > 0 ? Math.round((quiebresCount / totalEval) * 100) : 0;
-    document.getElementById('kpiPorcentajeQuiebres').textContent = pctQuiebres + '%';
-    document.getElementById('kpiPorcentajeQuiebresDetalle').textContent = `${quiebresCount} de ${totalEval} evaluaciones`;
-    
-    // ======================================================
-    // 6. Ranking de agentes (para cálculos de cuartiles)
-    // ======================================================
-    const ranking = construirRankingAgentes(evaluacionesFiltradas);
-    const totalAgentes = ranking.length;
-    
-    const q1 = ranking.filter(a => a.cuartil === 'Q1').length;
-    const q2 = ranking.filter(a => a.cuartil === 'Q2').length;
-    const q3 = ranking.filter(a => a.cuartil === 'Q3').length;
-    const q4 = ranking.filter(a => a.cuartil === 'Q4').length;
-    
-    const pctQ1 = totalAgentes > 0 ? Math.round((q1 / totalAgentes) * 100) : 0;
-    const pctQ2 = totalAgentes > 0 ? Math.round((q2 / totalAgentes) * 100) : 0;
-    const pctQ3 = totalAgentes > 0 ? Math.round((q3 / totalAgentes) * 100) : 0;
-    const pctQ4 = totalAgentes > 0 ? Math.round((q4 / totalAgentes) * 100) : 0;
-    
-    document.getElementById('kpiPorcentajeQ1').textContent = pctQ1 + '%';
-    document.getElementById('kpiPorcentajeQ2').textContent = pctQ2 + '%';
-    document.getElementById('kpiPorcentajeQ3').textContent = pctQ3 + '%';
-    document.getElementById('kpiTasaQuiebre').textContent = pctQ4 + '%';
-    
-    document.getElementById('kpiPorcentajeQ1Detalle').textContent = `${q1} gestores`;
-    document.getElementById('kpiPorcentajeQ2Detalle').textContent = `${q2} gestores`;
-    document.getElementById('kpiPorcentajeQ3Detalle').textContent = `${q3} gestores`;
-    document.getElementById('kpiTasaQuiebreDetalle').textContent = `${q4} gestores`;
-    
-    // ======================================================
-    // 7. KPIs de productividad (auditores)
-    // ======================================================
-    const productividad = await calcularProductividadAuditor(evaluacionesFiltradas);
-    document.getElementById('kpiProductividad').textContent = productividad.porAuditor;
-    document.getElementById('kpiCapacidadTotal').textContent = productividad.capacidadTotal;
-    
-    // ======================================================
-    // 8. Mostrar resumen de matriz (solo en consola para depuración)
-    // ======================================================
-    console.log(`📊 Matriz actual: ${nombreMatriz} (${esMixto ? '⚠️ MIXTA' : 'unificada'})`);
-    console.log(`   Umbrales: ENC=${pesos.ENC}%, ECUF=${pesos.ECUF}%, ECN=${pesos.ECN}%`);
-    if (esMixto) {
-        console.log(`   Mezcla: ${infoMixto.countAntigua} eval (30|30|40) + ${infoMixto.countNueva} eval (15|15|70)`);
+        document.getElementById('kpiPromedioENC').textContent = pctPromedioENC + '%';
+        document.getElementById('kpiPromedioECUF').textContent = pctPromedioECUF + '%';
+        document.getElementById('kpiPromedioECN').textContent = pctPromedioECN + '%';
+        document.getElementById('kpiPromedioENCDetalle').textContent = promedioENC + '/' + pesos.ENC + ' pts';
+        document.getElementById('kpiPromedioECUFDetalle').textContent = promedioECUF + '/' + pesos.ECUF + ' pts';
+        document.getElementById('kpiPromedioECNDetalle').textContent = promedioECN + '/' + pesos.ECN + ' pts';
+        
+        // ======================================================
+        // 5. Porcentaje de quiebres (nota < 85%)
+        // ======================================================
+        const quiebresCount = evaluacionesFiltradas.filter(e => numeroSeguro(e.notaFinal) < 85).length;
+        const pctQuiebres = totalEval > 0 ? Math.round((quiebresCount / totalEval) * 100) : 0;
+        document.getElementById('kpiPorcentajeQuiebres').textContent = pctQuiebres + '%';
+        document.getElementById('kpiPorcentajeQuiebresDetalle').textContent = `${quiebresCount} de ${totalEval} evaluaciones`;
+        
+        // ======================================================
+        // 6. Ranking de agentes (para cálculos de cuartiles)
+        // ======================================================
+        const ranking = construirRankingAgentes(evaluacionesFiltradas);
+        const totalAgentes = ranking.length;
+        
+        const q1 = ranking.filter(a => a.cuartil === 'Q1').length;
+        const q2 = ranking.filter(a => a.cuartil === 'Q2').length;
+        const q3 = ranking.filter(a => a.cuartil === 'Q3').length;
+        const q4 = ranking.filter(a => a.cuartil === 'Q4').length;
+        
+        const pctQ1 = totalAgentes > 0 ? Math.round((q1 / totalAgentes) * 100) : 0;
+        const pctQ2 = totalAgentes > 0 ? Math.round((q2 / totalAgentes) * 100) : 0;
+        const pctQ3 = totalAgentes > 0 ? Math.round((q3 / totalAgentes) * 100) : 0;
+        const pctQ4 = totalAgentes > 0 ? Math.round((q4 / totalAgentes) * 100) : 0;
+        
+        document.getElementById('kpiPorcentajeQ1').textContent = pctQ1 + '%';
+        document.getElementById('kpiPorcentajeQ2').textContent = pctQ2 + '%';
+        document.getElementById('kpiPorcentajeQ3').textContent = pctQ3 + '%';
+        document.getElementById('kpiTasaQuiebre').textContent = pctQ4 + '%';
+        
+        document.getElementById('kpiPorcentajeQ1Detalle').textContent = `${q1} gestores`;
+        document.getElementById('kpiPorcentajeQ2Detalle').textContent = `${q2} gestores`;
+        document.getElementById('kpiPorcentajeQ3Detalle').textContent = `${q3} gestores`;
+        document.getElementById('kpiTasaQuiebreDetalle').textContent = `${q4} gestores`;
+        
+        // ======================================================
+        // 7. KPIs de productividad (auditores)
+        // ======================================================
+        const productividad = await calcularProductividadAuditor(evaluacionesFiltradas);
+        document.getElementById('kpiProductividad').textContent = productividad.porAuditor;
+        document.getElementById('kpiCapacidadTotal').textContent = productividad.capacidadTotal;
+        
+        // ======================================================
+        // 8. Mostrar resumen de matriz (solo en consola para depuración)
+        // ======================================================
+        console.log(`📊 Matriz actual: ${nombreMatriz} (${esMixto ? '⚠️ MIXTA' : 'unificada'})`);
+        console.log(`   Umbrales: ENC=${pesos.ENC}%, ECUF=${pesos.ECUF}%, ECN=${pesos.ECN}%`);
+        if (esMixto) {
+            console.log(`   Mezcla: ${infoMixto.countAntigua} eval (30|30|40) + ${infoMixto.countNueva} eval (15|15|70)`);
+        }
+        
+        console.log('✅ KPIs actualizados con datos filtrados y umbrales dinámicos');
     }
-    
-    console.log('✅ KPIs actualizados con datos filtrados y umbrales dinámicos');
-}
 
     // ======================================================
     // RESETEAR KPIs (cuando no hay datos)

@@ -269,39 +269,34 @@
                     <!-- ====================================================== -->
                     <!-- KPI: ENC (Cliente) - VERSIÓN DINÁMICA                  -->
                     <!-- ====================================================== -->
-                    <!-- 
-                    <div class="kpi-card">
+                    <div class="kpi-card" style="display: none !important;">
                         <div class="kpi-label" id="kpiLabelENC">
                             🎯 % Llam con ENC &lt; <span id="kpiUmbralENC" class="umbral-valor">30</span>%
                         </div>
                         <div class="kpi-value" id="kpiConENC">0%</div>
                         <div class="kpi-detail" id="kpiConENCDetalle">0 de 0 llamadas</div>
-                    </div>-->
+                    </div>
 
                     <!-- ====================================================== -->
                     <!-- KPI: ECUF (Negocio) - VERSIÓN DINÁMICA                 -->
                     <!-- ====================================================== -->
-                    <!--
-                    <div class="kpi-card">
+                    <div class="kpi-card" style="display: none !important;">
                         <div class="kpi-label" id="kpiLabelECUF">
                             ⚠️ % Llam con ECUF &lt; <span id="kpiUmbralECUF" class="umbral-valor">30</span>%
                         </div>
                         <div class="kpi-value" id="kpiConECUF">0%</div>
                         <div class="kpi-detail" id="kpiConECUFDetalle">0 de 0 llamadas</div>
                     </div>
-                    -->
                     <!-- ====================================================== -->
                     <!-- KPI: ECN (Proceso) - VERSIÓN DINÁMICA                  -->
                     <!-- ====================================================== -->
-                    <!--
-                    <div class="kpi-card">
+                    <div class="kpi-card" style="display: none !important;">
                         <div class="kpi-label" id="kpiLabelECN">
                             💰 % Llam con ECN &lt; <span id="kpiUmbralECN" class="umbral-valor">40</span>%
                         </div>
                         <div class="kpi-value" id="kpiConECN">0%</div>
                         <div class="kpi-detail" id="kpiConECNDetalle">0 de 0 llamadas</div>
                     </div>
-                    -->
 
                     <div class="kpi-card" style="background: linear-gradient(135deg, #074769, #0071ad); padding: 10px 8px;">
                         <div class="kpi-label">👥 Total Gestores Evaluados</div>
@@ -357,7 +352,7 @@
                 <!-- ====================================================== -->
                 <!-- NUEVA FILA: Promedio por Motivos + % Quiebres -->
                 <!-- ====================================================== -->
-                <div class="grid-4" style="margin-bottom: 25px;">
+                <div class="grid-3" style="margin-bottom: 25px;">
                     <!-- Card: Promedio ENC -->
                     <div class="card" style="text-align: center; padding: 15px;">
                         <div style="font-size: 12px; color: var(--muted);">🎯 Prom Nota ENC - Cliente</div>
@@ -380,7 +375,7 @@
                     </div>
 
                     <!-- Card: % Quiebres por Motivo -->
-                    <div class="card" style="text-align: center; padding: 15px;">
+                    <div class="card" style="text-align: center; padding: 15px; display: none !important;">
                         <div style="font-size: 12px; color: var(--muted);">📉 % Llamadas con NOTA FINAL < 85%</div>
                             <div style="font-size: 32px; font-weight: bold; color: var(--danger);" id="kpiPorcentajeQuiebres">0%</div>
                             <div style="font-size: 11px; color: var(--muted);" id="kpiPorcentajeQuiebresDetalle">0 de 0 evaluaciones</div>

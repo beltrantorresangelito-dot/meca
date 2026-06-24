@@ -926,10 +926,13 @@ td {
     gap: 12px;
     margin-bottom: 16px;
     justify-content: center;
+    justify-items: center;
+    align-items: center;
 }
 
 .kpi-row-primary {
     grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
 }
 
 .kpi-row-secondary {
@@ -937,7 +940,31 @@ td {
     gap: 20px;
 }
 
-/* Centrar contenido interno de cada KPI */
+/* FORZAR CENTRADO DE KPI EN PANTALLA */
+.kpi-row-primary,
+.kpi-row-secondary {
+    display: grid !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    justify-content: center !important;
+    justify-items: center !important;
+    align-items: center !important;
+}
+
+.kpi-row-primary {
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 12px !important;
+}
+
+.kpi-row-secondary {
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 20px !important;
+}
+
+/* ======================================================
+   CENTRAR CONTENIDO DE CADA KPI CARD
+   ====================================================== */
+
 .kpi-card {
     background: linear-gradient(135deg, var(--accent), var(--accent2));
     color: white;
@@ -950,6 +977,12 @@ td {
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    width: 100%;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
 }
 
 .kpi-card .kpi-label {
@@ -977,30 +1010,7 @@ td {
     text-align: center;
 }
 
-/* FORZAR CENTRADO DE KPI EN PANTALLA */
-.kpi-row-primary,
-.kpi-row-secondary {
-    display: grid !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    justify-content: center !important;
-}
-
-.kpi-row-primary {
-    grid-template-columns: repeat(6, 1fr) !important;
-    gap: 12px !important;
-}
-
-.kpi-row-secondary {
-    grid-template-columns: repeat(6, 1fr) !important;
-    gap: 20px !important;
-}
-
-[style*="grid-template-columns: repeat(6, 1fr)"] {
-    justify-content: center;
-    margin: 0 auto;
-}
-
+/* FORZAR CENTRADO EN TODOS LOS ELEMENTOS INTERNOS */
 .kpi-card {
     text-align: center !important;
     display: flex !important;
@@ -1014,6 +1024,40 @@ td {
 .kpi-card .kpi-detail {
     text-align: center !important;
     width: 100%;
+}
+
+@media (max-width: 1200px) {
+    .kpi-card .kpi-value {
+        font-size: 18px;
+    }
+    .kpi-card .kpi-label {
+        font-size: 9px;
+    }
+}
+
+@media (max-width: 768px) {
+    .kpi-row-primary {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 10px !important;
+    }
+    .kpi-row-secondary {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px !important;
+    }
+    .kpi-card .kpi-value {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .kpi-row-primary {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+    .kpi-row-secondary {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
 }
 
 /* ======================================================
@@ -1806,4 +1850,174 @@ td {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* ======================================================
+   ASEGURAR CENTRADO DE KPIs
+   ====================================================== */
+
+/* Contenedor oculto - no afecta el layout */
+#hiddenKPIsContainer {
+    display: none !important;
+    position: absolute !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+
+/* Filas de KPIs - centradas */
+.kpi-row-primary,
+.kpi-row-secondary {
+    display: grid !important;
+    justify-content: center !important;
+    justify-items: center !important;
+    align-items: center !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    width: 100% !important;
+    max-width: 1200px !important;
+}
+
+.kpi-row-primary {
+    grid-template-columns: repeat(5, 1fr) !important;  /* ← 5 columnas en lugar de 6 */
+    gap: 12px !important;
+}
+
+.kpi-row-secondary {
+    grid-template-columns: repeat(4, 1fr) !important;  /* ← 4 columnas en lugar de 6 */
+    gap: 20px !important;
+}
+
+/* Cards - centradas */
+.kpi-card {
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+}
+
+.kpi-card .kpi-label,
+.kpi-card .kpi-value,
+.kpi-card .kpi-detail {
+    text-align: center !important;
+    width: 100% !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .kpi-row-primary {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 10px !important;
+    }
+    .kpi-row-secondary {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .kpi-row-primary {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+    .kpi-row-secondary {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+}
+
+/* ======================================================
+   ALTURA UNIFORME PARA KPI CARDS
+   ====================================================== */
+
+.kpi-row-primary,
+.kpi-row-secondary {
+    display: grid !important;
+    justify-content: center !important;
+    justify-items: stretch !important;  /* ← Cambiar de center a stretch */
+    align-items: stretch !important;    /* ← Estirar todas las cards a la misma altura */
+    margin-left: auto !important;
+    margin-right: auto !important;
+    width: 100% !important;
+    max-width: 1200px !important;
+}
+
+.kpi-row-primary {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 12px !important;
+}
+
+.kpi-row-secondary {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 20px !important;
+}
+
+/* Cards - altura uniforme */
+.kpi-card {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: white;
+    padding: 12px 8px;
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-align: center;
+    min-width: 0;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 100% !important;           /* ← Ocupa toda la altura de la celda */
+    min-height: 80px !important;       /* ← Altura mínima uniforme */
+    box-sizing: border-box;
+}
+
+/* Asegurar que los elementos internos no desborden */
+.kpi-card .kpi-label {
+    font-size: 10px;
+    font-weight: 500;
+    opacity: 0.85;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    text-align: center;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kpi-card .kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 2px;
+    text-align: center;
+    width: 100%;
+}
+
+.kpi-card .kpi-detail {
+    font-size: 9px;
+    opacity: 0.8;
+    margin-top: 2px;
+    text-align: center;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Si quieres que los textos largos se ajusten en varias líneas */
+.kpi-card .kpi-label {
+    white-space: normal !important;
+    line-height: 1.3;
+    min-height: 24px;
+}
+
+.kpi-card .kpi-detail {
+    white-space: normal !important;
+    line-height: 1.3;
+    min-height: 16px;
 }
