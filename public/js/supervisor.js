@@ -31893,38 +31893,342 @@ async function showTab(tabName, event) {
 
 let matrizData = null;
 
-// Cargar estructura completa
+// ======================================================
+// CARGAR MATRIZ COMPLETA (VERSIÓN COMPLETA CON SELECTOR)
+// ======================================================
 async function cargarMatrizCompleta() {
+    console.log('📊 Cargando matriz de evaluación versionada...');
+    
+    const container = document.getElementById('matrizTreeContainer');
+    if (!container) {
+        console.warn('⚠️ No se encontró matrizTreeContainer');
+        return;
+    }
+    
+    container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Cargando estructura...</div>';
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        if (!token) {
+            throw new Error('No hay token de autenticación');
+        }
+        
+        // 🔴 FORZAR SIN CACHÉ
+        const timestamp = Date.now();
+        
+        // 1. Obtener versión activa (sin caché)
+        console.log('📡 Obteniendo versión activa...');
+        const versionResponse = await fetch(`/api/matriz/versiones/activa?_=${timestamp}`, {
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
+        
+        if (!versionResponse.ok) {
+            throw new Error(`Error al obtener versión activa: ${versionResponse.status}`);
+        }
+        
+        const versionActiva = await versionResponse.json();
+        
+        if (!versionActiva || !versionActiva.id) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--warning);">
+                    ⚠️ No hay versión activa configurada.
+                    <br><br>
+                    <button onclick="abrirModalNuevaVersion()" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; color: white; cursor: pointer;">
+                        📦 Crear Versión Inicial
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        console.log(`✅ Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
+        
+        // 2. Obtener estructura (sin caché)
+        console.log('📡 Obteniendo estructura...');
+        const estructuraResponse = await fetch(`/api/matriz/versiones/${versionActiva.id}/estructura?_=${timestamp}`, {
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            }
+        });
+        
+        if (!estructuraResponse.ok) {
+            throw new Error(`Error al obtener estructura: ${estructuraResponse.status}`);
+        }
+        
+        const estructura = await estructuraResponse.json();
+        
+        if (!estructura || !estructura.frentes || estructura.frentes.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--warning);">
+                    ⚠️ La versión activa no tiene estructura definida.
+                    <br><br>
+                    <button onclick="cargarMatrizCompleta()" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; color: white; cursor: pointer;">
+                        🔄 Reintentar
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        // 3. Guardar en variable global
+        window.matrizData = estructura;
+        window.versionActivaActual = versionActiva;
+        
+        // 4. Renderizar el árbol
+        console.log('📡 Renderizando matriz...');
+        renderMatrizVersionada(estructura, versionActiva);
+        
+        // 🔴 PASO 3: CARGAR EL SELECTOR DE VERSIONES
+        console.log('📡 Cargando selector de versiones...');
+        if (document.getElementById('selectorVersionesContainer')) {
+            await cargarSelectorVersiones();
+            console.log('   ✅ Selector de versiones cargado');
+        } else {
+            console.warn('   ⚠️ selectorVersionesContainer no encontrado en el DOM');
+            console.log('   💡 Agrega: <div id="selectorVersionesContainer"></div> en el HTML');
+        }
+        
+        // 5. Contar sub-motivos para verificar
+        let totalSubs = 0;
+        for (const frente of (estructura.frentes || [])) {
+            for (const attr of (frente.atributos || [])) {
+                totalSubs += (attr.sub_motivos || []).length;
+            }
+        }
+        
+        console.log(`✅ Matriz cargada: ${estructura.frentes.length} frentes, ${totalSubs} sub-motivos`);
+        console.log('✅ Versión activa:', versionActiva.version, '(ID:', versionActiva.id, ')');
+        
+    } catch (error) {
+        console.error('❌ Error cargando matriz:', error);
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--danger);">
+                ❌ Error: ${error.message}
+                <br><br>
+                <button onclick="cargarMatrizCompleta()" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; color: white; cursor: pointer;">
+                    🔄 Reintentar
+                </button>
+            </div>
+        `;
+    }
+}
+
+// ======================================================
+// RENDERIZAR MATRIZ VERSIONADA (CORREGIDA)
+// ======================================================
+// ======================================================
+// RENDERIZAR MATRIZ VERSIONADA (COMPLETA)
+// ======================================================
+function renderMatrizVersionada(estructura, versionInfo) {
     const container = document.getElementById('matrizTreeContainer');
     if (!container) return;
     
-    try {
-        const [frentes, versiones] = await Promise.all([
-            API.getFrentes(),
-            API.getVersionesMatriz()
-        ]);
+    const { frentes, version } = estructura;
+    
+    // Determinar el estado de la versión
+    const esVistaPrevia = versionInfo?.esVistaPrevia || false;
+    const esActiva = versionInfo?.activa === true || version.activa === true;
+    
+    // Calcular estadísticas
+    const totalAtributos = frentes.reduce((sum, f) => sum + (f.atributos || []).length, 0);
+    const totalSubMotivos = frentes.reduce((sum, f) => {
+        return sum + (f.atributos || []).reduce((s, a) => s + (a.sub_motivos || []).length, 0);
+    }, 0);
+    
+    // Color del encabezado según estado
+    const headerBg = esActiva ? '#e8f5e9' : (esVistaPrevia ? '#fff3e0' : '#f8f9fa');
+    const headerBorder = esActiva ? '#28a745' : (esVistaPrevia ? '#f39c12' : '#6c757d');
+    const estadoTexto = esActiva ? '✅ Activa' : (esVistaPrevia ? '👁️ Vista previa' : '⏸️ Inactiva');
+    const estadoColor = esActiva ? '#28a745' : (esVistaPrevia ? '#f39c12' : '#6c757d');
+    
+    // Mostrar información de la versión
+    let html = `
+        <div style="margin-bottom: 20px; padding: 15px; background: ${headerBg}; border-radius: 12px; border-left: 4px solid ${headerBorder};">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <strong style="font-size: 16px;">📌 ${version.version}</strong>
+                    <span style="margin-left: 10px; font-size: 12px; padding: 2px 12px; background: ${headerBorder}; color: white; border-radius: 12px;">
+                        ${estadoTexto}
+                    </span>
+                    <span style="margin-left: 10px; font-size: 12px; color: var(--muted);">
+                        (ID: ${version.id}) - Vigente desde: ${new Date(version.fecha_vigencia).toLocaleDateString('es-ES')}
+                    </span>
+                    ${version.descripcion ? `<div style="font-size: 12px; color: var(--muted); margin-top: 4px;">📝 ${escapeHtml(version.descripcion)}</div>` : ''}
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    ${esActiva && !esVistaPrevia ? `
+                        <button onclick="abrirModalNuevaVersion()" style="background: #7b1fa2; padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                            📦 Nueva Versión
+                        </button>
+                    ` : ''}
+                    ${esVistaPrevia ? `
+                        <button onclick="cargarMatrizCompleta()" style="background: var(--accent); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                            ⬅ Volver a Activa
+                        </button>
+                    ` : `
+                        <button onclick="cargarMatrizCompleta()" style="background: var(--accent); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                            🔄 Refrescar
+                        </button>
+                    `}
+                </div>
+            </div>
+            <div style="margin-top: 8px; font-size: 13px; color: var(--muted); display: flex; gap: 20px; flex-wrap: wrap;">
+                <span>📁 ${frentes.length} frentes</span>
+                <span>📄 ${totalAtributos} atributos</span>
+                <span>🔹 ${totalSubMotivos} sub-motivos</span>
+                ${!esActiva && !esVistaPrevia ? `<span style="color: var(--warning);">⚠️ Inactiva - Solo consulta</span>` : ''}
+                ${esVistaPrevia ? `<span style="color: #f39c12;">👁️ Modo vista previa - Los cambios no se guardarán</span>` : ''}
+            </div>
+        </div>
         
-        matrizData = { frentes, versiones };
+        <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+            ${esActiva && !esVistaPrevia ? `
+                <button onclick="abrirModalNuevoFrente()" style="background: var(--ok); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                    ➕ Nuevo Frente
+                </button>
+                <button onclick="exportarMatrizCSV()" style="background: var(--accent); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                    📥 Exportar CSV
+                </button>
+                <button onclick="recalcularTodasEvaluaciones()" style="background: var(--warning); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                    🔄 Recalcular Evaluaciones
+                </button>
+                <button onclick="validarPesosMatriz()" style="background: #7b1fa2; padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                    ✅ Validar Pesos
+                </button>
+            ` : `
+                <span style="color: var(--muted); font-size: 13px; padding: 8px 0;">
+                    ${esVistaPrevia ? '👁️ Modo solo lectura - Vista previa de la versión' : '⏸️ Versión inactiva - Solo consulta'}
+                </span>
+            `}
+        </div>
         
-        // Cargar selector de versiones
-        const versionSelect = document.getElementById('versionSelect');
-        if (versionSelect) {
-            versionSelect.innerHTML = '<option value="">Seleccione versión</option>';
-            versiones.forEach(v => {
-                const option = document.createElement('option');
-                option.value = v.id;
-                option.textContent = `${v.version} ${v.activa ? '(Activa)' : ''}`;
-                if (v.activa) option.selected = true;
-                versionSelect.appendChild(option);
-            });
+        <div class="matriz-tree">
+    `;
+    
+    // Renderizar cada frente
+    for (const frente of frentes) {
+        html += `
+            <div class="matriz-node matriz-frente" data-id="${frente.id}" data-tipo="frente">
+                <div class="matriz-node-header" onclick="toggleMatrizNode(this)">
+                    <span class="matriz-expand">▶</span>
+                    <span class="matriz-icon">📁</span>
+                    <strong>${escapeHtml(frente.nombre)}</strong>
+                    <span class="matriz-badge">${frente.peso_maximo}%</span>
+                    <span style="font-size: 11px; color: var(--muted);">${frente.codigo}</span>
+                    <span class="matriz-actions">
+                        ${esActiva && !esVistaPrevia ? `
+                            <button onclick="event.stopPropagation(); editarFrente(${frente.id})" class="btn-icon" title="Editar">✏️</button>
+                            <button onclick="event.stopPropagation(); eliminarFrente(${frente.id})" class="btn-icon danger" title="Eliminar">🗑️</button>
+                            <button onclick="event.stopPropagation(); abrirModalNuevoAtributo(${frente.id})" class="btn-icon success" title="Agregar Atributo">➕</button>
+                        ` : `
+                            <span style="font-size: 11px; color: var(--muted);">🔒 Solo lectura</span>
+                        `}
+                    </span>
+                </div>
+                <div class="matriz-node-content" style="display: none;">
+                    <div class="matriz-atributos" data-frente-id="${frente.id}">
+        `;
+        
+        // Renderizar atributos de este frente
+        if (frente.atributos && frente.atributos.length > 0) {
+            for (const attr of frente.atributos) {
+                html += `
+                    <div class="matriz-node matriz-atributo" data-id="${attr.id}" data-tipo="atributo">
+                        <div class="matriz-node-header" onclick="toggleMatrizNode(this)">
+                            <span class="matriz-expand">▶</span>
+                            <span class="matriz-icon">📄</span>
+                            ${escapeHtml(attr.nombre)}
+                            <span class="matriz-badge">${attr.peso_maximo}%</span>
+                            <span class="matriz-actions">
+                                ${esActiva && !esVistaPrevia ? `
+                                    <button onclick="event.stopPropagation(); editarAtributo(${attr.id})" class="btn-icon" title="Editar">✏️</button>
+                                    <button onclick="event.stopPropagation(); eliminarAtributo(${attr.id})" class="btn-icon danger" title="Eliminar">🗑️</button>
+                                    <button onclick="event.stopPropagation(); abrirModalNuevoSubMotivo(${attr.id})" class="btn-icon success" title="Agregar Sub-Motivo">➕</button>
+                                ` : `
+                                    <span style="font-size: 11px; color: var(--muted);">🔒 Solo lectura</span>
+                                `}
+                            </span>
+                        </div>
+                        <div class="matriz-node-content" style="display: none;">
+                            <div class="matriz-submotivos" data-atributo-id="${attr.id}">
+                `;
+                
+                // Renderizar sub-motivos de este atributo
+                if (attr.sub_motivos && attr.sub_motivos.length > 0) {
+                    for (const sub of attr.sub_motivos) {
+                        html += `
+                            <div class="matriz-node matriz-submotivo" data-id="${sub.id}" data-codigo="${escapeHtml(sub.codigo)}">
+                                <div class="matriz-node-header" style="padding-left: 40px;">
+                                    <span class="matriz-icon">🔹</span>
+                                    <span><strong>${escapeHtml(sub.codigo)}</strong> - ${escapeHtml(sub.descripcion)}</span>
+                                    <span class="matriz-badge">${sub.peso_individual}%</span>
+                                    <span class="matriz-actions">
+                                        ${esActiva && !esVistaPrevia ? `
+                                            <button onclick="event.stopPropagation(); editarSubMotivo(${sub.id})" class="btn-icon" title="Editar">✏️</button>
+                                            <button onclick="event.stopPropagation(); eliminarSubMotivo(${sub.id})" class="btn-icon danger" title="Eliminar">🗑️</button>
+                                        ` : `
+                                            <span style="font-size: 11px; color: var(--muted);">🔒</span>
+                                        `}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    html += `<div style="padding: 10px; color: var(--muted);">📭 No hay sub-motivos</div>`;
+                }
+                
+                html += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        } else {
+            html += `<div style="padding: 10px; color: var(--muted);">📭 No hay atributos</div>`;
         }
         
-        // Generar árbol
-        renderMatrizTree(frentes);
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+
+// ======================================================
+// CREAR VERSIÓN INICIAL (SI NO HAY NINGUNA)
+// ======================================================
+async function crearVersionInicial() {
+    if (!confirm('⚠️ No hay versión activa. ¿Desea crear la versión inicial v1.0.0 con la estructura actual?')) {
+        return;
+    }
+    
+    try {
+        const result = await API.congelarVersionActual({
+            version: 'v1.0.0',
+            fecha_vigencia: new Date().toISOString().split('T')[0],
+            descripcion: 'Versión inicial de la matriz de evaluación'
+        });
+        
+        alert('✅ Versión inicial creada correctamente');
+        await cargarMatrizCompleta();
         
     } catch (error) {
-        console.error('Error cargando matriz:', error);
-        container.innerHTML = `<div style="color: red; padding: 20px;">❌ Error: ${error.message}</div>`;
+        console.error('Error:', error);
+        alert('❌ Error al crear versión inicial: ' + error.message);
     }
 }
 
@@ -32060,18 +32364,255 @@ async function cargarSubMotivos(atributoId) {
     }
 }
 
-// Toggle expandir/contraer nodo
+// ======================================================
+// TOGGLE EXPANDIR/CONTRAER NODO
+// ======================================================
 function toggleMatrizNode(header) {
     const content = header.nextElementSibling;
     const expandIcon = header.querySelector('.matriz-expand');
     
     if (content) {
-        if (content.style.display === 'none') {
+        if (content.style.display === 'none' || !content.style.display) {
             content.style.display = 'block';
             if (expandIcon) expandIcon.textContent = '▼';
         } else {
             content.style.display = 'none';
             if (expandIcon) expandIcon.textContent = '▶';
+        }
+    }
+}
+
+// ======================================================
+// CARGAR SELECTOR DE VERSIONES
+// ======================================================
+async function cargarSelectorVersiones() {
+    console.log('📦 Cargando selector de versiones...');
+    
+    const container = document.getElementById('selectorVersionesContainer');
+    if (!container) {
+        console.warn('⚠️ selectorVersionesContainer no encontrado');
+        return;
+    }
+    
+    try {
+        // Obtener todas las versiones
+        const versiones = await API.getVersionesMatriz();
+        
+        if (!versiones || versiones.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 10px; text-align: center; color: var(--muted); background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+                    📭 No hay versiones disponibles. 
+                    <button onclick="abrirModalNuevaVersion()" style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px; margin-left: 10px;">
+                        📦 Crear primera versión
+                    </button>
+                </div>
+            `;
+            return;
+        }
+        
+        // Obtener la versión activa
+        const versionActiva = await API.getVersionActiva();
+        const activaId = versionActiva?.id;
+        
+        let html = `
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #f8f9fa; padding: 10px 15px; border-radius: 8px; border: 1px solid #e0e0e0;">
+                <span style="font-size: 13px; font-weight: 600; color: var(--muted);">📦 Versiones:</span>
+                <select id="selectVersion" onchange="cambiarVersionSeleccionada(this.value)" 
+                        style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: white; min-width: 200px; cursor: pointer;">
+        `;
+        
+        for (const v of versiones) {
+            const esActiva = v.id === activaId;
+            const label = esActiva ? '✅ Activa' : '⏸️ Inactiva';
+            const selected = esActiva ? 'selected' : '';
+            const bgColor = esActiva ? 'background: #e8f5e9;' : '';
+            html += `<option value="${v.id}" ${selected} style="${bgColor}">${v.version} (${label})</option>`;
+        }
+        
+        html += `
+                </select>
+                <button onclick="cargarMatrizCompleta()" 
+                        style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;" 
+                        title="Refrescar">
+                    🔄
+                </button>
+                <button onclick="abrirModalActivarVersion()" 
+                        style="background: var(--warning); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;" 
+                        title="Activar versión seleccionada">
+                    ⭐ Activar
+                </button>
+                <button onclick="abrirModalNuevaVersion()" 
+                        style="background: #7b1fa2; padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;" 
+                        title="Crear nueva versión">
+                    📦 Nueva
+                </button>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+        // Guardar lista de versiones para referencia
+        window._versionesDisponibles = versiones;
+        
+        console.log(`✅ Selector cargado: ${versiones.length} versiones`);
+        
+    } catch (error) {
+        console.error('❌ Error cargando selector:', error);
+        container.innerHTML = `
+            <div style="padding: 10px; text-align: center; color: var(--danger); background: #fff0f0; border-radius: 8px; border: 1px solid #ffcfcf;">
+                ❌ Error cargando versiones: ${error.message}
+                <button onclick="cargarSelectorVersiones()" style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px; margin-left: 10px;">
+                    🔄 Reintentar
+                </button>
+            </div>
+        `;
+    }
+}
+
+// ======================================================
+// CAMBIAR VERSIÓN SELECCIONADA (VISTA PREVIA)
+// ======================================================
+async function cambiarVersionSeleccionada(versionId) {
+    if (!versionId) return;
+    
+    try {
+        console.log(`📌 Viendo versión ID: ${versionId}`);
+        
+        // Obtener la estructura de la versión seleccionada
+        const estructura = await API.getEstructuraVersion(versionId);
+        
+        if (!estructura) {
+            alert('❌ No se pudo cargar la estructura de la versión');
+            return;
+        }
+        
+        // Guardar la versión seleccionada
+        window.versionSeleccionada = estructura.version;
+        window.matrizData = estructura;
+        
+        // Renderizar el árbol (con indicador de que es vista previa)
+        renderMatrizVersionada(estructura, {
+            ...estructura.version,
+            esVistaPrevia: true
+        });
+        
+        // Mostrar indicador de vista previa
+        const container = document.getElementById('matrizTreeContainer');
+        if (container) {
+            // Verificar si ya existe el indicador
+            let indicator = document.getElementById('vistaPreviaIndicator');
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'vistaPreviaIndicator';
+                indicator.style.cssText = `
+                    background: #fff3e0;
+                    padding: 8px 15px;
+                    border-radius: 8px;
+                    margin-bottom: 10px;
+                    font-size: 13px;
+                    border-left: 4px solid #f39c12;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                `;
+                container.prepend(indicator);
+            }
+            
+            const esActiva = estructura.version.id === window.versionActivaActual?.id;
+            indicator.innerHTML = `
+                <span>👁️ ${esActiva ? '✅ Versión ACTIVA' : '📌 Vista previa'} - <strong>${estructura.version.version}</strong> 
+                (ID: ${estructura.version.id}) - ${esActiva ? '' : 'INACTIVA - Solo consulta'}</span>
+                ${!esActiva ? `<button onclick="cargarMatrizCompleta()" style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;">
+                    ⬅ Volver a Activa
+                </button>` : ''}
+            `;
+        }
+        
+        console.log(`✅ Vista previa de versión: ${estructura.version.version}`);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al cargar la versión: ' + error.message);
+    }
+}
+
+// ======================================================
+// ABRIR MODAL PARA ACTIVAR VERSIÓN
+// ======================================================
+function abrirModalActivarVersion() {
+    const select = document.getElementById('selectVersion');
+    const versionId = select?.value;
+    
+    if (!versionId) {
+        alert('⚠️ Seleccione una versión para activar');
+        return;
+    }
+    
+    // Obtener la versión seleccionada
+    const versiones = window._versionesDisponibles || [];
+    const version = versiones.find(v => v.id == versionId);
+    
+    if (!version) {
+        alert('❌ Versión no encontrada');
+        return;
+    }
+    
+    if (version.activa) {
+        alert(`✅ La versión "${version.version}" ya está activa`);
+        return;
+    }
+    
+    // Confirmar activación
+    const confirmar = confirm(
+        `⚠️ ¿ACTIVAR VERSIÓN "${version.version}"?\n\n` +
+        `📌 Descripción: ${version.descripcion || 'Sin descripción'}\n` +
+        `📅 Fecha vigencia: ${new Date(version.fecha_vigencia).toLocaleDateString('es-ES')}\n\n` +
+        `⚠️ Al activar esta versión:\n` +
+        `   • Se desactivará la versión actual\n` +
+        `   • Los auditores verán la nueva matriz\n` +
+        `   • Las evaluaciones futuras usarán esta versión\n\n` +
+        `¿Está seguro de continuar?`
+    );
+    
+    if (!confirmar) return;
+    
+    activarVersion(versionId);
+}
+
+// ======================================================
+// ACTIVAR VERSIÓN
+// ======================================================
+async function activarVersion(versionId) {
+    console.log(`⭐ Activando versión ID: ${versionId}`);
+    
+    const btn = document.querySelector('#selectorVersionesContainer button:last-child');
+    const textoOriginal = btn?.innerHTML;
+    if (btn) {
+        btn.innerHTML = '⏳ Activando...';
+        btn.disabled = true;
+    }
+    
+    try {
+        const result = await API.activarVersion(versionId);
+        console.log('✅ Versión activada:', result);
+        
+        alert('✅ Versión activada correctamente');
+        
+        // Limpiar caché
+        localStorage.removeItem(`estructura_evaluacion_v${versionId}`);
+        localStorage.removeItem(`estructura_evaluacion_v${versionId}_time`);
+        
+        // Recargar todo
+        await cargarMatrizCompleta();
+        await cargarSelectorVersiones();
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al activar versión: ' + error.message);
+    } finally {
+        if (btn) {
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
         }
     }
 }
@@ -32105,49 +32646,54 @@ async function editarFrente(id) {
     }
 }
 
+// ======================================================
+// GUARDAR FRENTE - CON VALIDACIÓN POR VERSIÓN ACTIVA
+// ======================================================
 async function guardarFrente() {
     const id = document.getElementById('frenteId').value;
+    const codigo = document.getElementById('frenteCodigo').value.trim().toUpperCase();
+    const nombre = document.getElementById('frenteNombre').value.trim();
     const peso_maximo = parseFloat(document.getElementById('frentePeso').value);
-    const codigo = document.getElementById('frenteCodigo').value;
-    const nombre = document.getElementById('frenteNombre').value;
+    const orden = parseInt(document.getElementById('frenteOrden').value) || 0;
     
     if (!codigo || !nombre || !peso_maximo) {
         alert('⚠️ Complete todos los campos obligatorios');
         return;
     }
     
-    // 🔴 VALIDACIÓN: Verificar que la suma total no exceda 100%
-    try {
-        const todosFrentes = await API.getFrentes();
-        
-        let sumaOtros = 0;
-        for (const frente of todosFrentes) {
-            if (id && frente.id == id) continue;
-            sumaOtros += parseFloat(frente.peso_maximo);
-        }
-        
-        const nuevaSuma = sumaOtros + peso_maximo;
-        
-        if (nuevaSuma > 100) {
-            alert(`❌ No se puede guardar. La suma total de los frentes (${nuevaSuma}%) excede el 100%.`);
-            return;
-        }
-        
-    } catch (err) {
-        console.error('Error en validación:', err);
-        alert('❌ Error al validar: ' + err.message);
+    if (peso_maximo <= 0 || peso_maximo > 100) {
+        alert('⚠️ El peso debe ser mayor a 0 y menor o igual a 100');
         return;
     }
     
-    const data = {
-        codigo: codigo,
-        nombre: nombre,
-        peso_maximo: peso_maximo,
-        orden: parseInt(document.getElementById('frenteOrden').value) || 0,
-        activo: true
-    };
-    
     try {
+        // 🔴 OBTENER LA VERSIÓN ACTIVA
+        const versionActiva = await API.getVersionActiva();
+        if (!versionActiva) {
+            alert('❌ No hay versión activa');
+            return;
+        }
+        console.log(`📌 Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
+        
+        // 🔴 OBTENER SOLO FRENTES DE LA VERSIÓN ACTIVA
+        const frentes = await API.getFrentes(); // Esta función ya debe filtrar por versión activa
+        
+        // Calcular suma actual (excluyendo el que se está editando)
+        let sumaActual = 0;
+        for (const f of frentes) {
+            if (id && f.id == id) continue;
+            sumaActual += parseFloat(f.peso_maximo);
+        }
+        
+        const nuevaSuma = sumaActual + peso_maximo;
+        
+        if (nuevaSuma > 100) {
+            alert(`❌ La suma total de los frentes en la versión activa excede el 100%.\n\nActual: ${sumaActual}% + ${peso_maximo}% = ${nuevaSuma}%\n\nAjuste los pesos para que sumen exactamente 100%.`);
+            return;
+        }
+        
+        const data = { codigo, nombre, peso_maximo, orden, activo: true };
+        
         if (id) {
             await API.actualizarFrente(id, data);
             alert('✅ Frente actualizado correctamente');
@@ -32155,10 +32701,13 @@ async function guardarFrente() {
             await API.crearFrente(data);
             alert('✅ Frente creado correctamente');
         }
+        
         cerrarModalFrente();
-        cargarMatrizCompleta();
+        await cargarMatrizCompleta();
+        
     } catch (error) {
-        alert('❌ Error: ' + error.message);
+        console.error('Error:', error);
+        alert('❌ Error al guardar: ' + error.message);
     }
 }
 
@@ -32220,53 +32769,63 @@ async function editarAtributo(id) {
     }
 }
 
+// ======================================================
+// GUARDAR ATRIBUTO - CON VALIDACIÓN POR VERSIÓN ACTIVA
+// ======================================================
 async function guardarAtributo() {
     const id = document.getElementById('atributoId').value;
     const frente_id = parseInt(document.getElementById('atributoFrenteId').value);
+    const nombre = document.getElementById('atributoNombre').value.trim();
     const peso_maximo = parseFloat(document.getElementById('atributoPeso').value);
-    const nombre = document.getElementById('atributoNombre').value;
+    const orden = parseInt(document.getElementById('atributoOrden').value) || 0;
     
     if (!nombre || !peso_maximo) {
         alert('⚠️ Complete todos los campos obligatorios');
         return;
     }
     
-    // 🔴 VALIDACIÓN: Verificar que no exceda el límite del frente
-    try {
-        const todosAtributos = await API.getAtributos(frente_id);
-        
-        let sumaOtros = 0;
-        for (const attr of todosAtributos) {
-            if (id && attr.id == id) continue;
-            sumaOtros += parseFloat(attr.peso_maximo);
-        }
-        
-        const nuevaSuma = sumaOtros + peso_maximo;
-        
-        const frentes = await API.getFrentes();
-        const frente = frentes.find(f => f.id == frente_id);
-        const limiteFrente = parseFloat(frente.peso_maximo);
-        
-        if (nuevaSuma > limiteFrente) {
-            alert(`❌ No se puede guardar. La suma de los atributos (${nuevaSuma}%) excede el límite del frente (${limiteFrente}%).`);
-            return;
-        }
-        
-    } catch (err) {
-        console.error('Error en validación:', err);
-        alert('❌ Error al validar: ' + err.message);
+    if (peso_maximo <= 0) {
+        alert('⚠️ El peso debe ser mayor a 0');
         return;
     }
     
-    const data = {
-        frente_id: frente_id,
-        nombre: nombre,
-        peso_maximo: peso_maximo,
-        orden: parseInt(document.getElementById('atributoOrden').value) || 0,
-        activo: true
-    };
-    
     try {
+        // 🔴 OBTENER LA VERSIÓN ACTIVA
+        const versionActiva = await API.getVersionActiva();
+        if (!versionActiva) {
+            alert('❌ No hay versión activa');
+            return;
+        }
+        console.log(`📌 Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
+        
+        // 🔴 OBTENER EL FRENTE DE LA VERSIÓN ACTIVA
+        const frentes = await API.getFrentes();
+        const frente = frentes.find(f => f.id === frente_id);
+        if (!frente) {
+            alert('❌ Frente no encontrado en la versión activa');
+            return;
+        }
+        
+        // 🔴 OBTENER SOLO ATRIBUTOS DE LA VERSIÓN ACTIVA PARA ESTE FRENTE
+        const atributos = await API.getAtributos(frente_id);
+        
+        // Calcular suma actual (excluyendo el que se está editando)
+        let sumaActual = 0;
+        for (const attr of atributos) {
+            if (id && attr.id == id) continue;
+            sumaActual += parseFloat(attr.peso_maximo);
+        }
+        
+        const pesoMaximoFrente = parseFloat(frente.peso_maximo);
+        const nuevaSuma = sumaActual + peso_maximo;
+        
+        if (nuevaSuma > pesoMaximoFrente) {
+            alert(`❌ La suma de los atributos en la versión activa excede el peso del frente (${pesoMaximoFrente}%).\n\nActual: ${sumaActual}% + ${peso_maximo}% = ${nuevaSuma}%\n\nAjuste los pesos para que sumen exactamente ${pesoMaximoFrente}%.`);
+            return;
+        }
+        
+        const data = { frente_id, nombre, peso_maximo, orden, activo: true };
+        
         if (id) {
             await API.actualizarAtributo(id, data);
             alert('✅ Atributo actualizado correctamente');
@@ -32274,10 +32833,13 @@ async function guardarAtributo() {
             await API.crearAtributo(data);
             alert('✅ Atributo creado correctamente');
         }
+        
         cerrarModalAtributo();
-        cargarMatrizCompleta();
+        await cargarMatrizCompleta();
+        
     } catch (error) {
-        alert('❌ Error: ' + error.message);
+        console.error('Error:', error);
+        alert('❌ Error al guardar: ' + error.message);
     }
 }
 
@@ -32322,74 +32884,95 @@ function abrirModalNuevoSubMotivo(atributoId) {
     document.getElementById('modalSubMotivo').style.display = 'flex';
 }
 
+// ======================================================
+// EDITAR SUB-MOTIVO - VERSIÓN CORREGIDA
+// ======================================================
 async function editarSubMotivo(id) {
+    console.log(`📝 Editando sub-motivo con ID: ${id}`);
+    
     try {
+        // Usar la función corregida que consulta version_sub_motivos
         const subMotivos = await API.getSubMotivos();
-        const sub = subMotivos.find(s => s.id == id);
-        if (!sub) throw new Error('Sub-motivo no encontrado');
+        const sub = subMotivos.find(s => parseInt(s.id) === parseInt(id));
         
-        document.getElementById('modalSubMotivoTitle').textContent = '✏️ Editar Sub-Motivo';
+        if (!sub) {
+            alert(`❌ Sub-motivo no encontrado (ID: ${id})`);
+            return;
+        }
+        
+        document.getElementById('modalSubMotivoTitle').textContent = `✏️ Editar Sub-Motivo: ${sub.codigo}`;
         document.getElementById('subMotivoId').value = sub.id;
         document.getElementById('subMotivoAtributoId').value = sub.atributo_id;
-        document.getElementById('subMotivoCodigo').value = sub.codigo;
-        document.getElementById('subMotivoDescripcion').value = sub.descripcion;
-        document.getElementById('subMotivoPeso').value = sub.peso_individual;
+        document.getElementById('subMotivoCodigo').value = sub.codigo || '';
+        document.getElementById('subMotivoDescripcion').value = sub.descripcion || '';
+        document.getElementById('subMotivoPeso').value = sub.peso_individual || 0;
         document.getElementById('subMotivoOrden').value = sub.orden || 0;
         document.getElementById('modalSubMotivo').style.display = 'flex';
+        
     } catch (error) {
-        alert('Error: ' + error.message);
+        console.error('Error:', error);
+        alert('❌ Error al cargar sub-motivo: ' + error.message);
     }
 }
 
+// ======================================================
+// GUARDAR SUB-MOTIVO - CON VALIDACIÓN POR VERSIÓN ACTIVA
+// ======================================================
 async function guardarSubMotivo() {
     const id = document.getElementById('subMotivoId').value;
     const atributo_id = parseInt(document.getElementById('subMotivoAtributoId').value);
+    const codigo = document.getElementById('subMotivoCodigo').value.trim();
+    const descripcion = document.getElementById('subMotivoDescripcion').value.trim();
     const peso_individual = parseFloat(document.getElementById('subMotivoPeso').value);
-    const codigo = document.getElementById('subMotivoCodigo').value;
-    const descripcion = document.getElementById('subMotivoDescripcion').value;
+    const orden = parseInt(document.getElementById('subMotivoOrden').value) || 0;
     
     if (!codigo || !descripcion || !peso_individual) {
         alert('⚠️ Complete todos los campos obligatorios');
         return;
     }
     
-    // 🔴 VALIDACIÓN: Verificar que no exceda el límite del atributo
-    try {
-        const todosSubMotivos = await API.getSubMotivos(atributo_id);
-        
-        let sumaOtros = 0;
-        for (const sub of todosSubMotivos) {
-            if (id && sub.id == id) continue;
-            sumaOtros += parseFloat(sub.peso_individual);
-        }
-        
-        const nuevaSuma = sumaOtros + peso_individual;
-        
-        const atributos = await API.getAtributos();
-        const atributo = atributos.find(a => a.id == atributo_id);
-        const limiteAtributo = parseFloat(atributo.peso_maximo);
-        
-        if (nuevaSuma > limiteAtributo) {
-            alert(`❌ No se puede guardar. La suma de los sub-motivos (${nuevaSuma}%) excede el límite del atributo (${limiteAtributo}%).`);
-            return;
-        }
-        
-    } catch (err) {
-        console.error('Error en validación:', err);
-        alert('❌ Error al validar: ' + err.message);
+    if (peso_individual <= 0) {
+        alert('⚠️ El peso debe ser mayor a 0');
         return;
     }
     
-    const data = {
-        atributo_id: atributo_id,
-        codigo: codigo,
-        descripcion: descripcion,
-        peso_individual: peso_individual,
-        orden: parseInt(document.getElementById('subMotivoOrden').value) || 0,
-        activo: true
-    };
-    
     try {
+        // 🔴 OBTENER LA VERSIÓN ACTIVA
+        const versionActiva = await API.getVersionActiva();
+        if (!versionActiva) {
+            alert('❌ No hay versión activa');
+            return;
+        }
+        console.log(`📌 Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
+        
+        // 🔴 OBTENER EL ATRIBUTO DE LA VERSIÓN ACTIVA
+        const atributos = await API.getAtributos();
+        const atributo = atributos.find(a => a.id === atributo_id);
+        if (!atributo) {
+            alert('❌ Atributo no encontrado en la versión activa');
+            return;
+        }
+        
+        // 🔴 OBTENER SOLO SUB-MOTIVOS DE LA VERSIÓN ACTIVA PARA ESTE ATRIBUTO
+        const subMotivos = await API.getSubMotivos(atributo_id);
+        
+        // Calcular suma actual (excluyendo el que se está editando)
+        let sumaActual = 0;
+        for (const sub of subMotivos) {
+            if (id && sub.id == id) continue;
+            sumaActual += parseFloat(sub.peso_individual);
+        }
+        
+        const pesoMaximoAtributo = parseFloat(atributo.peso_maximo);
+        const nuevaSuma = sumaActual + peso_individual;
+        
+        if (nuevaSuma > pesoMaximoAtributo) {
+            alert(`❌ La suma de los sub-motivos en la versión activa excede el peso del atributo (${pesoMaximoAtributo}%).\n\nActual: ${sumaActual}% + ${peso_individual}% = ${nuevaSuma}%\n\nAjuste los pesos para que sumen exactamente ${pesoMaximoAtributo}%.`);
+            return;
+        }
+        
+        const data = { atributo_id, codigo, descripcion, peso_individual, orden, activo: true };
+        
         if (id) {
             await API.actualizarSubMotivo(id, data);
             alert('✅ Sub-motivo actualizado correctamente');
@@ -32397,34 +32980,183 @@ async function guardarSubMotivo() {
             await API.crearSubMotivo(data);
             alert('✅ Sub-motivo creado correctamente');
         }
+        
         cerrarModalSubMotivo();
-        cargarMatrizCompleta();
-    } catch (error) {
-        alert('❌ Error: ' + error.message);
-    }
-}
-
-async function eliminarSubMotivo(id) {
-    try {
-        const subMotivos = await API.getSubMotivos();
-        const sub = subMotivos.find(s => s.id == id);
-        
-        if (!sub) {
-            alert('❌ Sub-motivo no encontrado');
-            return;
-        }
-        
-        const confirmar = confirm(`⚠️ ¿ELIMINAR SUB-MOTIVO "${sub.codigo}"?\n\nDescripción: ${sub.descripcion}\nPeso: ${sub.peso_individual}%\n\n¿Está seguro de continuar?`);
-        
-        if (!confirmar) return;
-        
-        const result = await API.eliminarSubMotivo(id);
-        alert(result.message || '✅ Sub-motivo eliminado correctamente');
-        cargarMatrizCompleta();
+        await cargarMatrizCompleta();
         
     } catch (error) {
         console.error('Error:', error);
-        alert('❌ Error al eliminar sub-motivo: ' + error.message);
+        alert('❌ Error al guardar: ' + error.message);
+    }
+}
+
+// ======================================================
+// VERIFICAR INTEGRIDAD DE LA MATRIZ (DESDE CONSOLA)
+// ======================================================
+
+async function verificarIntegridadMatriz() {
+    console.log('🔍 VERIFICANDO INTEGRIDAD DE LA MATRIZ');
+    console.log('========================================\n');
+
+    try {
+        const token = localStorage.getItem('meca_token');
+        if (!token) {
+            console.error('❌ No hay token');
+            return;
+        }
+
+        // 1. Obtener la versión activa
+        const versionResponse = await fetch('/api/matriz/versiones/activa', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const versionActiva = await versionResponse.json();
+        console.log(`📌 Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
+        console.log('');
+
+        // 2. Obtener la estructura completa
+        const estructuraResponse = await fetch(`/api/matriz/versiones/${versionActiva.id}/estructura`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const estructura = await estructuraResponse.json();
+
+        let sumaTotalFrentes = 0;
+        let errores = [];
+
+        console.log('📊 ANÁLISIS DE PESOS:');
+        console.log('----------------------------------------');
+
+        for (const frente of (estructura.frentes || [])) {
+            console.log(`\n📁 FRENTE: ${frente.codigo} - ${frente.nombre}`);
+            console.log(`   Peso asignado: ${frente.peso_maximo}%`);
+            
+            let sumaAtributos = 0;
+            
+            for (const attr of (frente.atributos || [])) {
+                console.log(`   📄 ATRIBUTO: ${attr.nombre}`);
+                console.log(`      Peso asignado: ${attr.peso_maximo}%`);
+                
+                let sumaSubMotivos = 0;
+                for (const sub of (attr.sub_motivos || [])) {
+                    console.log(`      🔹 SUB-MOTIVO: ${sub.codigo} - ${sub.peso_individual}%`);
+                    sumaSubMotivos += parseFloat(sub.peso_individual);
+                }
+                
+                console.log(`      📊 Suma sub-motivos: ${sumaSubMotivos}%`);
+                if (sumaSubMotivos !== parseFloat(attr.peso_maximo)) {
+                    errores.push(`❌ Atributo "${attr.nombre}" tiene suma de sub-motivos (${sumaSubMotivos}%) diferente al peso asignado (${attr.peso_maximo}%)`);
+                }
+                
+                sumaAtributos += parseFloat(attr.peso_maximo);
+            }
+            
+            console.log(`   📊 Suma atributos: ${sumaAtributos}%`);
+            if (sumaAtributos !== parseFloat(frente.peso_maximo)) {
+                errores.push(`❌ Frente "${frente.codigo}" tiene suma de atributos (${sumaAtributos}%) diferente al peso asignado (${frente.peso_maximo}%)`);
+            }
+            
+            sumaTotalFrentes += parseFloat(frente.peso_maximo);
+        }
+
+        console.log('\n========================================');
+        console.log(`📊 SUMA TOTAL DE FRENTES: ${sumaTotalFrentes}%`);
+        
+        if (sumaTotalFrentes !== 100) {
+            errores.push(`❌ SUMA TOTAL DE FRENTES ES ${sumaTotalFrentes}% (DEBE SER 100%)`);
+        }
+
+        if (errores.length === 0) {
+            console.log('✅ ¡TODOS LOS PESOS ESTÁN CORRECTOS!');
+        } else {
+            console.log('\n❌ ERRORES ENCONTRADOS:');
+            for (const error of errores) {
+                console.log(`   ${error}`);
+            }
+        }
+
+        console.log('\n========================================');
+        
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+// ======================================================
+// ELIMINAR SUB-MOTIVO - VERSIÓN CORREGIDA
+// ======================================================
+async function eliminarSubMotivo(idDelDOM) {
+    console.log(`🗑️ Intentando eliminar sub-motivo con ID del DOM: ${idDelDOM}`);
+    
+    try {
+        // 1. Obtener sub-motivos de version_sub_motivos (con la función corregida)
+        const subMotivosBD = await API.getSubMotivos();
+        console.log(`📌 Sub-motivos en version_sub_motivos: ${subMotivosBD.length}`);
+        
+        // 2. Buscar por ID
+        let subEncontrado = subMotivosBD.find(s => parseInt(s.id) === parseInt(idDelDOM));
+        
+        // 3. Si no se encuentra por ID, buscar por código en el DOM
+        if (!subEncontrado) {
+            console.log(`⚠️ ID ${idDelDOM} no encontrado en version_sub_motivos. Buscando por código...`);
+            
+            // Buscar el elemento en el DOM
+            const container = document.getElementById('matrizTreeContainer');
+            const elemento = container?.querySelector(`.matriz-submotivo[data-id="${idDelDOM}"]`);
+            
+            if (elemento) {
+                let codigo = elemento.getAttribute('data-codigo');
+                if (!codigo) {
+                    const spans = elemento.querySelectorAll('.matriz-node-header span');
+                    for (const span of spans) {
+                        const text = span.textContent?.trim() || '';
+                        if (text && !text.includes('%') && !text.includes('🔹') && !text.includes('📄') && text.length > 0) {
+                            codigo = text;
+                            break;
+                        }
+                    }
+                }
+                
+                if (codigo) {
+                    console.log(`   🔍 Buscando por código: "${codigo}"`);
+                    subEncontrado = subMotivosBD.find(s => s.codigo === codigo);
+                    if (subEncontrado) {
+                        console.log(`   ✅ Encontrado: ${subEncontrado.codigo} (ID: ${subEncontrado.id})`);
+                    }
+                }
+            }
+        }
+        
+        if (!subEncontrado) {
+            alert(`❌ Sub-motivo no encontrado.\n\nID buscado: ${idDelDOM}\n\nPor favor, recargue la página.`);
+            return;
+        }
+        
+        // 4. Confirmar
+        const confirmar = confirm(
+            `⚠️ ¿ELIMINAR SUB-MOTIVO?\n\n` +
+            `📌 Código: ${subEncontrado.codigo}\n` +
+            `📌 Descripción: ${subEncontrado.descripcion}\n` +
+            `📌 Peso: ${subEncontrado.peso_individual}%\n` +
+            `📌 ID en BD: ${subEncontrado.id}\n\n` +
+            `¿Está seguro de continuar?`
+        );
+        
+        if (!confirmar) return;
+        
+        // 5. Eliminar
+        await API.eliminarSubMotivo(subEncontrado.id);
+        alert('✅ Sub-motivo eliminado correctamente');
+        
+        // 6. Recargar
+        const versionActiva = await API.getVersionActiva();
+        if (versionActiva) {
+            localStorage.removeItem(`estructura_evaluacion_v${versionActiva.id}`);
+            localStorage.removeItem(`estructura_evaluacion_v${versionActiva.id}_time`);
+        }
+        await cargarMatrizCompleta();
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al eliminar: ' + error.message);
     }
 }
 
@@ -32432,11 +33164,113 @@ function cerrarModalSubMotivo() {
     document.getElementById('modalSubMotivo').style.display = 'none';
 }
 
-// ========== VERSIONES ==========
+// ======================================================
+// ABRIR MODAL PARA CREAR NUEVA VERSIÓN
+// ======================================================
 function abrirModalNuevaVersion() {
-    document.getElementById('versionNombre').value = '';
-    document.getElementById('versionDescripcion').value = '';
-    document.getElementById('modalVersion').style.display = 'flex';
+    // Limpiar modal anterior
+    const modalExistente = document.getElementById('modalNuevaVersion');
+    if (modalExistente) modalExistente.remove();
+    
+    const modalHtml = `
+        <div id="modalNuevaVersion" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10002; display: flex; justify-content: center; align-items: center;">
+            <div style="background: white; border-radius: 16px; width: 90%; max-width: 500px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+                <div style="padding: 15px 20px; background: linear-gradient(135deg, #7b1fa2, #9c27b0); color: white;">
+                    <strong style="font-size: 16px;">📦 Crear Nueva Versión de Matriz</strong>
+                </div>
+                <div style="padding: 20px;">
+                    <p style="margin-bottom: 15px; font-size: 13px; color: var(--muted);">
+                        Esta acción creará un "snapshot" de la versión actual. 
+                        La nueva versión será una copia exacta que podrás modificar sin afectar la versión activa.
+                    </p>
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-size: 12px; font-weight: 600;">📌 Nombre de la versión *</label>
+                        <input type="text" id="nuevaVersionNombre" placeholder="Ej: v2.0.0" 
+                            style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                        <small style="color: var(--muted);">Formato: vX.X.X</small>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-size: 12px; font-weight: 600;">📅 Fecha de vigencia *</label>
+                        <input type="date" id="nuevaVersionFecha" value="${new Date().toISOString().split('T')[0]}"
+                            style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-size: 12px; font-weight: 600;">📝 Descripción</label>
+                        <textarea id="nuevaVersionDescripcion" rows="2" placeholder="Describe los cambios de esta versión..."
+                            style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);"></textarea>
+                    </div>
+                    <div style="background: #fff3e0; padding: 12px; border-radius: 8px; font-size: 12px; border-left: 4px solid #f39c12;">
+                        ⚠️ La nueva versión se creará como <strong>INACTIVA</strong>. 
+                        Deberás activarla manualmente después de hacer los cambios necesarios.
+                    </div>
+                </div>
+                <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0;">
+                    <button onclick="cerrarModalNuevaVersion()" style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white;">Cancelar</button>
+                    <button onclick="crearNuevaVersion()" style="padding: 8px 20px; background: #7b1fa2; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                        📦 Crear Snapshot
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function cerrarModalNuevaVersion() {
+    const modal = document.getElementById('modalNuevaVersion');
+    if (modal) modal.remove();
+}
+
+async function crearNuevaVersion() {
+    const nombre = document.getElementById('nuevaVersionNombre').value.trim();
+    const fecha = document.getElementById('nuevaVersionFecha').value;
+    const descripcion = document.getElementById('nuevaVersionDescripcion').value.trim();
+    
+    if (!nombre) {
+        alert('⚠️ Ingrese un nombre para la versión');
+        return;
+    }
+    
+    if (!fecha) {
+        alert('⚠️ Seleccione una fecha de vigencia');
+        return;
+    }
+    
+    // Validar formato de versión
+    if (!/^v\d+\.\d+\.\d+$/.test(nombre)) {
+        alert('⚠️ Formato inválido. Use: v1.0.0, v2.0.0, etc.');
+        return;
+    }
+    
+    const btn = document.querySelector('#modalNuevaVersion button:last-child');
+    const textoOriginal = btn?.innerHTML;
+    if (btn) {
+        btn.innerHTML = '⏳ Creando...';
+        btn.disabled = true;
+    }
+    
+    try {
+        const result = await API.congelarVersionActual({
+            version: nombre,
+            fecha_vigencia: fecha,
+            descripcion: descripcion || `Snapshot de versión ${nombre}`
+        });
+        
+        alert(`✅ Versión "${nombre}" creada exitosamente como snapshot.\n\nAhora puedes modificarla y luego activarla.`);
+        
+        cerrarModalNuevaVersion();
+        await cargarMatrizCompleta();
+        
+    } catch (error) {
+        console.error('Error creando versión:', error);
+        alert('❌ Error al crear versión: ' + error.message);
+    } finally {
+        if (btn) {
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
+        }
+    }
 }
 
 async function crearVersion() {

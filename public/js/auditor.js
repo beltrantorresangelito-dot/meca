@@ -1619,26 +1619,28 @@ async function finalizarAuditoria() {
     // 3h. CONSTRUIR OBJETO EVALUACIÓN
     // ======================================================
     const evaluacion = {
-        id: Date.now(),                              // ID temporal (se genera en BD)
-        timestamp: fechaObj.getTime(),               // Timestamp para ordenar
-        evaluador: evaluador,                        // Nombre del evaluador
-        ticketPSI: ticketPSI,                        // Ticket PSI
-        agente: agenteSeleccionado,                  // Agente evaluado
-        fecha: fechaRaw,                             // Fecha original
-        fechaFormateada: fechaFormateada,            // Fecha legible
-        idLlamada: idLlamada,                        // ID de la llamada
+        id: Date.now(),
+        timestamp: fechaObj.getTime(),
+        evaluador: evaluador,
+        ticketPSI: ticketPSI,
+        agente: agenteSeleccionado,
+        fecha: fechaRaw,
+        fechaFormateada: fechaFormateada,
+        idLlamada: idLlamada,
         fechaDescarga: convertirFecha(document.getElementById('evalFechaDescargaAudio')?.value),
-        totalENC: totalENC,                          // Puntaje ENC
-        totalECUF: totalECUF,                        // Puntaje ECUF
-        totalECN: totalECN.toFixed(1),               // Puntaje ECN
-        notaFinal: notaFinal.toFixed(1),             // Nota final
-        rango: rango,                                // Rango de desempeño
-        detalles: detalles,                          // Detalle de cada item
-        fechaRegistro: new Date().toLocaleString('es-ES'),  // Fecha de registro
-        tiempoAuditoria: tiempoTotalSegundos,        // Tiempo en segundos
-        tiempoAuditoriaFormateado: tiempoFormateado, // Tiempo legible
+        totalENC: totalENC,
+        totalECUF: totalECUF,
+        totalECN: totalECN.toFixed(1),
+        notaFinal: notaFinal.toFixed(1),
+        rango: rango,
+        detalles: detalles,
+        fechaRegistro: new Date().toLocaleString('es-ES'),
+        tiempoAuditoria: tiempoTotalSegundos,
+        tiempoAuditoriaFormateado: tiempoFormateado,
         fechaInicioAuditoria: tiempoInicio.toISOString(),
-        fechaFinAuditoria: tiempoFin.toISOString()
+        fechaFinAuditoria: tiempoFin.toISOString(),  
+        // 🔴 NUEVO: Guardar el ID de la versión utilizada
+        versionMatrizId: window.versionMatrizActualId || null
     };
 
     // ======================================================
@@ -7996,35 +7998,74 @@ let estructuraEvaluacionCache = null;  // Cache en memoria
 
 async function cargarEstructuraEvaluacion() {
     try {
-        // ======================================================
-        // 3a. INTENTAR DESDE CACHÉ
-        // ======================================================
-        const cache = localStorage.getItem('estructura_evaluacion_v2');
-        const cacheTime = localStorage.getItem('estructura_evaluacion_v2_time');
+        console.log('📋 Cargando estructura de evaluación con versionado...');
         
-        // Si hay caché válido (menos de 5 minutos)
-        if (cache && cacheTime && (Date.now() - parseInt(cacheTime)) < 300000) {
-            estructuraEvaluacionCache = JSON.parse(cache);
-            console.log('📦 Estructura cargada desde caché');
-            return estructuraEvaluacionCache;
+        // 1. Obtener la fecha actual
+        const hoy = new Date();
+        const fechaISO = hoy.toISOString().split('T')[0]; // '2026-06-24'
+        
+        // 2. Obtener la versión activa para esta fecha
+        const version = await API.getVersionPorFecha(fechaISO);
+        
+        if (!version) {
+            console.warn('⚠️ No hay versión para la fecha actual, usando versión activa por defecto');
+            const versionActiva = await API.getVersionActiva();
+            if (!versionActiva) {
+                throw new Error('No hay versión activa configurada en el sistema');
+            }
+            window.versionMatrizActualId = versionActiva.id;
+            const estructura = await API.getEstructuraVersion(versionActiva.id);
+            guardarEstructuraEnCache(versionActiva.id, estructura);
+            return estructura;
         }
         
-        // ======================================================
-        // 3b. CARGAR DESDE API
-        // ======================================================
-        estructuraEvaluacionCache = await API.getEstructuraEvaluacion();
+        // 3. Guardar el ID de la versión para usarlo al guardar la evaluación
+        window.versionMatrizActualId = version.id;
         
-        // Guardar en caché
-        localStorage.setItem('estructura_evaluacion_v2', JSON.stringify(estructuraEvaluacionCache));
-        localStorage.setItem('estructura_evaluacion_v2_time', Date.now().toString());
+        // 4. Intentar cargar desde caché local
+        const cacheKey = `estructura_evaluacion_v${version.id}`;
+        const cacheTimeKey = `estructura_evaluacion_v${version.id}_time`;
+        const cached = localStorage.getItem(cacheKey);
+        const cachedTime = localStorage.getItem(cacheTimeKey);
         
-        console.log('✅ Estructura cargada desde BD');
-        return estructuraEvaluacionCache;
+        // Caché válido por 1 hora (3600000 ms)
+        if (cached && cachedTime && (Date.now() - parseInt(cachedTime)) < 3600000) {
+            console.log(`📦 Estructura cargada desde caché local (versión ${version.version})`);
+            return JSON.parse(cached);
+        }
+        
+        // 5. Obtener la estructura completa de la versión desde el servidor
+        console.log(`📡 Descargando estructura de versión ${version.version} (ID: ${version.id})`);
+        const estructura = await API.getEstructuraVersion(version.id);
+        
+        // 6. Guardar en caché
+        guardarEstructuraEnCache(version.id, estructura);
+        
+        console.log(`✅ Estructura cargada de versión: ${version.version} (ID: ${version.id})`);
+        console.log(`   Frentes: ${estructura.frentes?.length || 0}`);
+        return estructura;
         
     } catch (error) {
         console.error('❌ Error cargando estructura:', error);
+        // Fallback: intentar cargar estructura de la versión activa
+        try {
+            const versionActiva = await API.getVersionActiva();
+            if (versionActiva) {
+                const estructura = await API.getEstructuraVersion(versionActiva.id);
+                guardarEstructuraEnCache(versionActiva.id, estructura);
+                return estructura;
+            }
+        } catch (fallbackError) {
+            console.error('❌ Fallback también falló:', fallbackError);
+        }
         return null;
     }
+}
+
+// Función auxiliar para guardar en caché
+function guardarEstructuraEnCache(versionId, estructura) {
+    localStorage.setItem(`estructura_evaluacion_v${versionId}`, JSON.stringify(estructura));
+    localStorage.setItem(`estructura_evaluacion_v${versionId}_time`, Date.now().toString());
 }
 
 // ======================================================

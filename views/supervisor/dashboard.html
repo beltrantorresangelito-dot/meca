@@ -1566,30 +1566,10 @@
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h3 style="color: var(--accent);">📊 Administrador de Matriz de Evaluación</h3>
-                        <div>
-                            <button onclick="abrirModalNuevoFrente()" class="btn-primary" style="background: var(--ok);">➕ Nuevo Frente</button>
-                            <button onclick="recalcularTodasEvaluaciones()" class="btn-warning" style="background: var(--warning);">🔄 Recalcular Todo</button>
-                        </div>
                     </div>
 
-                    <!-- Selección de Versión -->
-                    <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 12px;">
-                        <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
-                            <div>
-                                <label style="font-weight: bold;">📌 Versión Activa:</label>
-                                <select id="versionSelect" onchange="cambiarVersionActiva()" style="margin-left: 10px; padding: 5px 10px;">
-                                        <option value="">Cargando...</option>
-                                    </select>
-                            </div>
-                            <div>
-                                <button onclick="abrirModalNuevaVersion()" class="secondary">➕ Nueva Versión</button>
-                            </div>
-                            <div style="margin-left: auto;">
-                                <span class="badge" id="versionActivaBadge" style="background: var(--ok); color: white; padding: 5px 12px;">v1.0</span>
-                            </div>
-                        </div>
-                    </div>
-
+                    <!-- SELECTOR DE VERSIONES -->
+                    <div id="selectorVersionesContainer" style="margin-bottom: 15px;"></div>
                     <!-- Árbol de la Matriz -->
                     <div id="matrizTreeContainer">
                         <div style="text-align: center; padding: 40px;">⏳ Cargando estructura...</div>

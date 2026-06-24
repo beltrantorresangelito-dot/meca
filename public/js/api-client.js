@@ -363,11 +363,35 @@ const API = (function() {
      * @param {Object} evaluacion - Datos de la evaluación
      * @returns {Object} Resultado con ID de la evaluación creada
      */
+    // api-client.js - guardarEvaluacion()
+
     async function guardarEvaluacion(evaluacion) {
         const response = await fetch('/api/evaluaciones', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(evaluacion)
+            body: JSON.stringify({
+                id: evaluacion.id,
+                timestamp: evaluacion.timestamp,
+                fecha: evaluacion.fecha,
+                fechaFormateada: evaluacion.fechaFormateada,
+                ticketPSI: evaluacion.ticketPSI,
+                agente: evaluacion.agente,
+                evaluador: evaluacion.evaluador,
+                idLlamada: evaluacion.idLlamada,
+                fechaDescarga: evaluacion.fechaDescarga,
+                totalENC: evaluacion.totalENC,
+                totalECUF: evaluacion.totalECUF,
+                totalECN: evaluacion.totalECN,
+                notaFinal: evaluacion.notaFinal,
+                rango: evaluacion.rango,
+                detalles: evaluacion.detalles,
+                fechaRegistro: evaluacion.fechaRegistro,
+                tiempoAuditoria: evaluacion.tiempoAuditoria,
+                tiempoAuditoriaFormateado: evaluacion.tiempoAuditoriaFormateado,
+                
+                // 🔴 NUEVO: Enviar el ID de la versión
+                versionMatrizId: evaluacion.versionMatrizId
+            })
         });
 
         if (!response.ok) {
@@ -1437,101 +1461,283 @@ const API = (function() {
         return await response.json();
     }
 
-    /**
-     * getVersionActiva - Obtiene la versión activa de la matriz
-     * @returns {Object} Versión activa de la matriz
-     */
-    async function getVersionActiva() {
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/evaluacion/version-activa', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('Error al obtener versión');
-        return await response.json();
-    }
-
     // ======================================================
     // Módulo: Supervisor - Administración de Matriz
     // ======================================================
 
-    // --- FRENTES ---
-
-    /**
-     * getFrentes - Obtiene todos los frentes de la matriz
-     * @returns {Array} Frentes de la matriz
-     */
+    // ======================================================
+    // GET FRENTES - SOLO VERSIÓN ACTIVA
+    // ======================================================
     async function getFrentes() {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/matriz/frentes', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('Error al cargar frentes');
-        return await response.json();
+        
+        try {
+            // 1. Obtener la versión activa
+            const versionActiva = await getVersionActiva();
+            if (!versionActiva) {
+                console.warn('⚠️ No hay versión activa');
+                return [];
+            }
+            
+            console.log(`📌 getFrentes() - Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
+            
+            // 2. Obtener frentes de la versión activa
+            const response = await fetch('/api/query', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    table: 'version_frentes',
+                    operation: 'select',
+                    selectFields: `
+                        id,
+                        codigo,
+                        nombre,
+                        peso_maximo,
+                        orden,
+                        activo,
+                        created_at,
+                        updated_at
+                    `,
+                    filters: [
+                        { type: 'eq', column: 'version_id', value: versionActiva.id },
+                        { type: 'eq', column: 'activo', value: true }
+                    ]
+                })
+            });
+            
+            if (!response.ok) throw new Error('Error al cargar frentes');
+            
+            const result = await response.json();
+            
+            // Asegurar que los datos tengan el formato esperado
+            return (result.data || []).map(item => ({
+                id: item.id,
+                codigo: item.codigo,
+                nombre: item.nombre,
+                peso_maximo: parseFloat(item.peso_maximo) || 0,
+                orden: parseInt(item.orden) || 0,
+                activo: item.activo === true || item.activo === 'true'
+            }));
+            
+        } catch (error) {
+            console.error('❌ Error en getFrentes:', error);
+            return [];
+        }
     }
 
-    /**
-     * crearFrente - Crea un nuevo frente
-     * @param {Object} data - Datos del frente
-     * @returns {Object} Frente creado
-     */
+    // ======================================================
+    // CREAR FRENTE - USAR VERSION_FRENTES
+    // ======================================================
     async function crearFrente(data) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/matriz/frentes', {
+        
+        const response = await fetch('/api/query', {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                table: 'version_frentes',
+                operation: 'insert',
+                data: {
+                    codigo: data.codigo,
+                    nombre: data.nombre,
+                    peso_maximo: data.peso_maximo,
+                    orden: data.orden || 0,
+                    activo: data.activo !== undefined ? data.activo : true,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }
+            })
         });
-        if (!response.ok) throw new Error('Error al crear frente');
-        return await response.json();
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al crear frente');
+        }
+        
+        const result = await response.json();
+        return result.data && result.data.length > 0 ? result.data[0] : null;
     }
 
-    /**
-     * actualizarFrente - Actualiza un frente existente
-     * @param {number} id - ID del frente
-     * @param {Object} data - Datos a actualizar
-     * @returns {Object} Frente actualizado
-     */
+    // ======================================================
+    // ACTUALIZAR FRENTE - USAR VERSION_FRENTES
+    // ======================================================
     async function actualizarFrente(id, data) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`/api/matriz/frentes/${id}`, {
-            method: 'PUT',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+        
+        const response = await fetch('/api/query', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                table: 'version_frentes',
+                operation: 'update',
+                data: {
+                    codigo: data.codigo,
+                    nombre: data.nombre,
+                    peso_maximo: data.peso_maximo,
+                    orden: data.orden || 0,
+                    activo: data.activo !== undefined ? data.activo : true,
+                    updated_at: new Date().toISOString()
+                },
+                filters: [
+                    { type: 'eq', column: 'id', value: parseInt(id) }
+                ]
+            })
         });
-        if (!response.ok) throw new Error('Error al actualizar frente');
-        return await response.json();
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al actualizar frente');
+        }
+        
+        const result = await response.json();
+        return result.data && result.data.length > 0 ? result.data[0] : null;
     }
 
-    /**
-     * eliminarFrente - Elimina un frente
-     * @param {number} id - ID del frente
-     * @returns {Object} Resultado de la operación
-     */
+    // ======================================================
+    // ELIMINAR FRENTE - USAR VERSION_FRENTES
+    // ======================================================
     async function eliminarFrente(id) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`/api/matriz/frentes/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+        
+        const response = await fetch('/api/query', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                table: 'version_frentes',
+                operation: 'delete',
+                filters: [
+                    { type: 'eq', column: 'id', value: parseInt(id) }
+                ]
+            })
         });
-        if (!response.ok) throw new Error('Error al eliminar frente');
-        return await response.json();
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al eliminar frente');
+        }
+        
+        const result = await response.json();
+        
+        if (result.error) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            success: true,
+            message: 'Frente eliminado correctamente',
+            data: result.data,
+            count: result.count
+        };
     }
 
-    // --- ATRIBUTOS ---
 
-    /**
-     * getAtributos - Obtiene atributos (opcionalmente por frente)
-     * @param {number} frenteId - ID del frente (opcional)
-     * @returns {Array} Atributos
-     */
-    async function getAtributos(frenteId = null) {
+    // ======================================================
+    // GET ATRIBUTOS - SOLO VERSIÓN ACTIVA (SIN JOIN)
+    // ======================================================
+    async function getAtributos(frenteId) {
         const token = localStorage.getItem('meca_token');
-        const url = frenteId ? `/api/matriz/atributos?frente_id=${frenteId}` : '/api/matriz/atributos';
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('Error al cargar atributos');
-        return await response.json();
+        
+        try {
+            // 1. Obtener la versión activa
+            const versionActiva = await getVersionActiva();
+            if (!versionActiva) {
+                console.warn('⚠️ No hay versión activa');
+                return [];
+            }
+            
+            console.log(`📌 getAtributos() - Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
+            
+            // 2. Primero, obtener los frentes de la versión activa
+            const frentesResponse = await fetch('/api/query', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    table: 'version_frentes',
+                    operation: 'select',
+                    selectFields: 'id',
+                    filters: [
+                        { type: 'eq', column: 'version_id', value: versionActiva.id },
+                        { type: 'eq', column: 'activo', value: true }
+                    ]
+                })
+            });
+            
+            if (!frentesResponse.ok) throw new Error('Error al obtener frentes de la versión activa');
+            const frentesResult = await frentesResponse.json();
+            const frenteIds = (frentesResult.data || []).map(f => f.id);
+            
+            if (frenteIds.length === 0) {
+                console.log('⚠️ No hay frentes en la versión activa');
+                return [];
+            }
+            
+            // 3. Construir filtro para atributos (solo de los frentes de la versión activa)
+            let filters = [
+                { type: 'eq', column: 'activo', value: true }
+            ];
+            
+            // Si se pasa frenteId, filtrar por él
+            if (frenteId) {
+                filters.push({ type: 'eq', column: 'version_frente_id', value: parseInt(frenteId) });
+            } else {
+                // Si no se pasa frenteId, filtrar por los frentes de la versión activa
+                filters.push({ type: 'in', column: 'version_frente_id', values: frenteIds });
+            }
+            
+            // 4. Obtener atributos
+            const response = await fetch('/api/query', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    table: 'version_atributos',
+                    operation: 'select',
+                    selectFields: `
+                        id,
+                        nombre,
+                        peso_maximo,
+                        orden,
+                        activo,
+                        version_frente_id as frente_id
+                    `,
+                    filters: filters
+                })
+            });
+            
+            if (!response.ok) throw new Error('Error al cargar atributos');
+            
+            const result = await response.json();
+            
+            return (result.data || []).map(item => ({
+                id: item.id,
+                nombre: item.nombre,
+                peso_maximo: parseFloat(item.peso_maximo) || 0,
+                orden: parseInt(item.orden) || 0,
+                activo: item.activo === true || item.activo === 'true',
+                frente_id: item.frente_id || item.version_frente_id
+            }));
+            
+        } catch (error) {
+            console.error('❌ Error en getAtributos:', error);
+            return [];
+        }
     }
 
     /**
@@ -1550,21 +1756,42 @@ const API = (function() {
         return await response.json();
     }
 
-    /**
-     * actualizarAtributo - Actualiza un atributo existente
-     * @param {number} id - ID del atributo
-     * @param {Object} data - Datos a actualizar
-     * @returns {Object} Atributo actualizado
-     */
+    // ======================================================
+    // ACTUALIZAR ATRIBUTO - USAR /api/query
+    // ======================================================
     async function actualizarAtributo(id, data) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`/api/matriz/atributos/${id}`, {
-            method: 'PUT',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+        
+        // 🔴 CAMBIAR: Usar /api/query en lugar de /api/matriz/atributos/:id
+        const response = await fetch('/api/query', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                table: 'version_atributos',
+                operation: 'update',
+                data: {
+                    nombre: data.nombre,
+                    peso_maximo: data.peso_maximo,
+                    orden: data.orden || 0,
+                    activo: data.activo !== undefined ? data.activo : true,
+                    updated_at: new Date().toISOString()
+                },
+                filters: [
+                    { type: 'eq', column: 'id', value: parseInt(id) }
+                ]
+            })
         });
-        if (!response.ok) throw new Error('Error al actualizar atributo');
-        return await response.json();
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al actualizar atributo');
+        }
+        
+        const result = await response.json();
+        return result.data && result.data.length > 0 ? result.data[0] : null;
     }
 
     /**
@@ -1582,84 +1809,248 @@ const API = (function() {
         return await response.json();
     }
 
-    // --- SUB-MOTIVOS ---
-
-    /**
-     * getSubMotivos - Obtiene sub-motivos (opcionalmente por atributo)
-     * @param {number} atributoId - ID del atributo (opcional)
-     * @returns {Array} Sub-motivos
-     */
-    async function getSubMotivos(atributoId = null) {
-        const token = localStorage.getItem('meca_token');
-        const url = atributoId ? `/api/matriz/sub-motivos?atributo_id=${atributoId}` : '/api/matriz/sub-motivos';
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('Error al cargar sub-motivos');
-        return await response.json();
-    }
-
-    /**
-     * crearSubMotivo - Crea un nuevo sub-motivo
-     * @param {Object} data - Datos del sub-motivo
-     * @returns {Object} Sub-motivo creado
-     */
+    // ======================================================
+    // CREAR SUB-MOTIVO - USAR /api/query
+    // ======================================================
     async function crearSubMotivo(data) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/matriz/sub-motivos', {
+        
+        const response = await fetch('/api/query', {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                table: 'version_sub_motivos',
+                operation: 'insert',
+                data: {
+                    version_atributo_id: data.atributo_id,
+                    codigo: data.codigo,
+                    descripcion: data.descripcion,
+                    peso_individual: data.peso_individual,
+                    orden: data.orden || 0,
+                    activo: data.activo !== undefined ? data.activo : true,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }
+            })
         });
-        if (!response.ok) throw new Error('Error al crear sub-motivo');
-        return await response.json();
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al crear sub-motivo');
+        }
+        
+        const result = await response.json();
+        return result.data && result.data.length > 0 ? result.data[0] : null;
     }
 
-    /**
-     * actualizarSubMotivo - Actualiza un sub-motivo existente
-     * @param {number} id - ID del sub-motivo
-     * @param {Object} data - Datos a actualizar
-     * @returns {Object} Sub-motivo actualizado
-     */
+    // ======================================================
+    // ACTUALIZAR SUB-MOTIVO - USAR /api/query
+    // ======================================================
     async function actualizarSubMotivo(id, data) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`/api/matriz/sub-motivos/${id}`, {
-            method: 'PUT',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+        
+        const response = await fetch('/api/query', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                table: 'version_sub_motivos',
+                operation: 'update',
+                data: {
+                    codigo: data.codigo,
+                    descripcion: data.descripcion,
+                    peso_individual: data.peso_individual,
+                    orden: data.orden || 0,
+                    activo: data.activo !== undefined ? data.activo : true,
+                    updated_at: new Date().toISOString()
+                },
+                filters: [
+                    { type: 'eq', column: 'id', value: parseInt(id) }
+                ]
+            })
         });
-        if (!response.ok) throw new Error('Error al actualizar sub-motivo');
-        return await response.json();
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al actualizar sub-motivo');
+        }
+        
+        const result = await response.json();
+        return result.data && result.data.length > 0 ? result.data[0] : null;
     }
 
-    /**
-     * eliminarSubMotivo - Elimina un sub-motivo
-     * @param {number} id - ID del sub-motivo
-     * @returns {Object} Resultado de la operación
-     */
+    // ======================================================
+    // GET SUB-MOTIVOS - SOLO VERSIÓN ACTIVA (SIN JOIN)
+    // ======================================================
+    async function getSubMotivos(atributoId) {
+        const token = localStorage.getItem('meca_token');
+        
+        try {
+            // 1. Obtener la versión activa
+            const versionActiva = await getVersionActiva();
+            if (!versionActiva) {
+                console.warn('⚠️ No hay versión activa');
+                return [];
+            }
+            
+            console.log(`📌 getSubMotivos() - Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
+            
+            // 2. Obtener los frentes de la versión activa
+            const frentesResponse = await fetch('/api/query', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    table: 'version_frentes',
+                    operation: 'select',
+                    selectFields: 'id',
+                    filters: [
+                        { type: 'eq', column: 'version_id', value: versionActiva.id },
+                        { type: 'eq', column: 'activo', value: true }
+                    ]
+                })
+            });
+            
+            if (!frentesResponse.ok) throw new Error('Error al obtener frentes de la versión activa');
+            const frentesResult = await frentesResponse.json();
+            const frenteIds = (frentesResult.data || []).map(f => f.id);
+            
+            if (frenteIds.length === 0) {
+                console.log('⚠️ No hay frentes en la versión activa');
+                return [];
+            }
+            
+            // 3. Obtener los atributos de esos frentes
+            const atributosResponse = await fetch('/api/query', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    table: 'version_atributos',
+                    operation: 'select',
+                    selectFields: 'id',
+                    filters: [
+                        { type: 'in', column: 'version_frente_id', values: frenteIds },
+                        { type: 'eq', column: 'activo', value: true }
+                    ]
+                })
+            });
+            
+            if (!atributosResponse.ok) throw new Error('Error al obtener atributos de la versión activa');
+            const atributosResult = await atributosResponse.json();
+            const atributoIds = (atributosResult.data || []).map(a => a.id);
+            
+            if (atributoIds.length === 0) {
+                console.log('⚠️ No hay atributos en la versión activa');
+                return [];
+            }
+            
+            // 4. Construir filtro para sub-motivos
+            let filters = [
+                { type: 'eq', column: 'activo', value: true }
+            ];
+            
+            if (atributoId) {
+                // Si se pasa atributoId, filtrar por él
+                filters.push({ type: 'eq', column: 'version_atributo_id', value: parseInt(atributoId) });
+            } else {
+                // Si no se pasa atributoId, filtrar por todos los atributos de la versión activa
+                filters.push({ type: 'in', column: 'version_atributo_id', values: atributoIds });
+            }
+            
+            // 5. Obtener sub-motivos
+            const response = await fetch('/api/query', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    table: 'version_sub_motivos',
+                    operation: 'select',
+                    selectFields: `
+                        id,
+                        codigo,
+                        descripcion,
+                        peso_individual,
+                        orden,
+                        activo,
+                        version_atributo_id as atributo_id
+                    `,
+                    filters: filters
+                })
+            });
+            
+            if (!response.ok) throw new Error('Error al cargar sub-motivos');
+            
+            const result = await response.json();
+            
+            return (result.data || []).map(item => ({
+                id: item.id,
+                codigo: item.codigo,
+                descripcion: item.descripcion,
+                peso_individual: parseFloat(item.peso_individual) || 0,
+                orden: parseInt(item.orden) || 0,
+                activo: item.activo === true || item.activo === 'true',
+                atributo_id: item.atributo_id || item.version_atributo_id
+            }));
+            
+        } catch (error) {
+            console.error('❌ Error en getSubMotivos:', error);
+            return [];
+        }
+    }
+
+
+    // ======================================================
+    // ELIMINAR SUB-MOTIVO - USAR /api/query
+    // ======================================================
     async function eliminarSubMotivo(id) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`/api/matriz/sub-motivos/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+        
+        // 🔴 CAMBIAR: Usar /api/query en lugar de /api/matriz/sub-motivos/:id
+        const response = await fetch('/api/query', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                table: 'version_sub_motivos',
+                operation: 'delete',
+                filters: [
+                    { type: 'eq', column: 'id', value: parseInt(id) }
+                ]
+            })
         });
-        if (!response.ok) throw new Error('Error al eliminar sub-motivo');
-        return await response.json();
-    }
-
-    // --- VERSIONES DE MATRIZ ---
-
-    /**
-     * getVersionesMatriz - Obtiene versiones de la matriz
-     * @returns {Array} Versiones de la matriz
-     */
-    async function getVersionesMatriz() {
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/matriz/versiones', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) throw new Error('Error al cargar versiones');
-        return await response.json();
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al eliminar sub-motivo');
+        }
+        
+        const result = await response.json();
+        
+        // Verificar si se eliminó correctamente
+        if (result.error) {
+            throw new Error(result.error);
+        }
+        
+        return { 
+            success: true, 
+            message: 'Sub-motivo eliminado correctamente',
+            data: result.data,
+            count: result.count
+        };
     }
 
     /**
@@ -2066,65 +2457,84 @@ const API = (function() {
         return await response.json();
     }
 
-    /**
-     * getVersionPorFecha - Obtiene la versión vigente para una fecha
-     * @param {string} fecha - Fecha en formato ISO (YYYY-MM-DD)
-     * @returns {Object} Versión vigente
-     */
+    // ======================================================
+    // GET VERSIÓN ACTIVA
+    // ======================================================
+    async function getVersionActiva() {
+        const token = localStorage.getItem('meca_token');
+        try {
+            const response = await fetch('/api/matriz/versiones/activa', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!response.ok) {
+                if (response.status === 404) return null;
+                throw new Error(`Error ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error obteniendo versión activa:', error);
+            return null;
+        }
+    }
+
+    // Obtener versión de matriz para una fecha específica
     async function getVersionPorFecha(fecha) {
         const token = localStorage.getItem('meca_token');
         const response = await fetch(`/api/matriz/versiones/por-fecha?fecha=${fecha}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!response.ok) {
             if (response.status === 404) return null;
-            throw new Error(`HTTP ${response.status}`);
+            throw new Error('Error al obtener versión por fecha');
         }
         return await response.json();
     }
 
-    /**
-     * getEstructuraVersion - Obtiene estructura completa de una versión
-     * @param {number} versionId - ID de la versión
-     * @returns {Object} Estructura con frentes, atributos y submotivos
-     */
+    // Obtener estructura completa de una versión
     async function getEstructuraVersion(versionId) {
         const token = localStorage.getItem('meca_token');
         const response = await fetch(`/api/matriz/versiones/${versionId}/estructura`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (!response.ok) {
-            if (response.status === 404) return null;
-            throw new Error(`HTTP ${response.status}`);
-        }
+        if (!response.ok) throw new Error('Error al cargar la estructura de la versión');
         return await response.json();
     }
 
-    /**
-     * getVersionActiva - Obtiene la versión activa actual
-     * @returns {Object} Versión activa
-     */
-    async function getVersionActiva() {
+    // Congelar la versión activa actual (crear snapshot)
+    async function congelarVersionActual(data) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/matriz/version-activa', {
+        const response = await fetch('/api/matriz/versiones/congelar', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al congelar la versión');
+        }
+        return await response.json();
+    }
+
+    // Activar una versión
+    async function activarVersion(versionId) {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`/api/matriz/versiones/${versionId}/activar`, {
+            method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             }
         });
         if (!response.ok) {
-            if (response.status === 404) return null;
-            throw new Error(`HTTP ${response.status}`);
+            const error = await response.json();
+            throw new Error(error.error || 'Error al activar la versión');
         }
         return await response.json();
     }
-
+    
     // ======================================================
     // API PÚBLICA - Exportación de todos los métodos
     // ======================================================
@@ -2277,8 +2687,7 @@ const API = (function() {
         // ==============================================
         // MATRIZ DE EVALUACIÓN - ADMINISTRACIÓN
         // ==============================================
-        getEstructuraEvaluacion,
-        getVersionActiva,
+        getEstructuraEvaluacion,        
         getFrentes,
         crearFrente,
         actualizarFrente,
@@ -2308,15 +2717,12 @@ const API = (function() {
         // ==============================================
         hashSHA256,
 
-        // ==============================================
-        // MATRIZ - VERSIONES
-        // ==============================================
-        getVersionesMatriz,
-        crearVersionMatriz,
-        activarVersionMatriz,
+        // Nuevas funciones de matriz versionada
+        getVersionActiva,
         getVersionPorFecha,
         getEstructuraVersion,
-        getVersionActiva,
+        congelarVersionActual,
+        activarVersion,
         
         // Utilidad: cambiar modo de un módulo (para pruebas)
         setModo: (modulo, modo) => {

@@ -480,14 +480,15 @@ const servidor = http.createServer(async (peticion, respuesta) => {
                 await client.query(`
                     INSERT INTO evaluaciones (id, timestamp, fecha, fecha_formateada, ticket_psi, agente, evaluador,
                         id_llamada, fecha_descarga, total_enc, total_ecuf, total_ecn, nota_final, rango,
-                        tiempo_auditoria, tiempo_auditoria_formateado, fecha_registro)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+                        tiempo_auditoria, tiempo_auditoria_formateado, fecha_registro, version_matriz_id)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
                 `, [
                     evaluacion.id, evaluacion.timestamp, evaluacion.fecha, evaluacion.fechaFormateada,
                     evaluacion.ticketPSI, evaluacion.agente, evaluacion.evaluador, evaluacion.idLlamada,
                     evaluacion.fechaDescarga || null, evaluacion.totalENC, evaluacion.totalECUF,
                     evaluacion.totalECN, evaluacion.notaFinal, evaluacion.rango, evaluacion.tiempoAuditoria,
-                    evaluacion.tiempoAuditoriaFormateado, evaluacion.fechaRegistro
+                    evaluacion.tiempoAuditoriaFormateado, evaluacion.fechaRegistro,
+                    evaluacion.versionMatrizId || null  // 🔴 NUEVO CAMPO
                 ]);
 
                 // 2. Insertar detalles
@@ -2781,6 +2782,9 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         return;
     }
 
+    // ======================================================
+    // FRENTES - POST (CREAR) - CON VALIDACIÓN POR VERSIÓN
+    // ======================================================
     if (ruta === '/api/matriz/frentes' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/frentes');
         
@@ -2796,14 +2800,88 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         peticion.on('end', async () => {
             try {
                 const { codigo, nombre, peso_maximo, orden, activo } = JSON.parse(body);
-                const result = await pool.query(
-                    'INSERT INTO frentes (codigo, nombre, peso_maximo, orden, activo) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-                    [codigo, nombre, peso_maximo, orden || 0, activo !== false]
+                
+                if (!codigo || !nombre || !peso_maximo) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Faltan campos obligatorios' }));
+                    return;
+                }
+                
+                if (peso_maximo <= 0 || peso_maximo > 100) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'El peso debe ser mayor a 0 y menor o igual a 100' }));
+                    return;
+                }
+                
+                // 1. Obtener versión activa
+                const versionResult = await pool.query(
+                    'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
                 );
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                
+                if (versionResult.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
+                    return;
+                }
+                
+                const versionId = versionResult.rows[0].id;
+                
+                // 2. Verificar que no exista un frente con el mismo código en la versión activa
+                const existenteResult = await pool.query(
+                    'SELECT id FROM version_frentes WHERE version_id = $1 AND codigo = $2',
+                    [versionId, codigo]
+                );
+                
+                if (existenteResult.rows.length > 0) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: `Ya existe un frente con el código "${codigo}" en esta versión` }));
+                    return;
+                }
+                
+                // 3. 🔴 VALIDAR SUMA TOTAL DE FRENTES SOLO EN LA VERSIÓN ACTIVA
+                const frentesResult = await pool.query(
+                    'SELECT COALESCE(SUM(peso_maximo), 0) as total FROM version_frentes WHERE version_id = $1 AND activo = true',
+                    [versionId]
+                );
+                
+                const sumaActual = parseFloat(frentesResult.rows[0].total) || 0;
+                const nuevoPeso = parseFloat(peso_maximo);
+                const nuevaSuma = sumaActual + nuevoPeso;
+                
+                if (nuevaSuma > 100) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ 
+                        error: `La suma total de los frentes en la versión activa excede el 100%. Actual: ${sumaActual}% + ${nuevoPeso}% = ${nuevaSuma}%`,
+                        suma_actual: sumaActual,
+                        nuevo_peso: nuevoPeso,
+                        peso_maximo: 100,
+                        suma_total: nuevaSuma
+                    }));
+                    return;
+                }
+                
+                // 4. Insertar frente en la versión activa
+                const result = await pool.query(`
+                    INSERT INTO version_frentes (
+                        version_id,
+                        codigo,
+                        nombre,
+                        peso_maximo,
+                        orden,
+                        activo,
+                        created_at,
+                        updated_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                    RETURNING id, codigo, nombre, peso_maximo, orden, activo
+                `, [versionId, codigo, nombre, nuevoPeso, orden || 0, activo !== false]);
+                
+                console.log(`✅ Frente creado en versión ${versionId}: ${codigo} (ID: ${result.rows[0].id})`);
+                
+                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify(result.rows[0]));
+                
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error creando frente:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: error.message }));
             }
@@ -2811,6 +2889,9 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         return;
     }
 
+    // ======================================================
+    // FRENTES - PUT (ACTUALIZAR) - CON VALIDACIÓN POR VERSIÓN
+    // ======================================================
     if (ruta.match(/^\/api\/matriz\/frentes\/\d+$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/matriz/frentes/:id');
         
@@ -2821,20 +2902,106 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
             return;
         }
         
-        const id = ruta.split('/').pop();
+        const id = parseInt(ruta.split('/').pop());
+        
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
-                const { nombre, peso_maximo, orden, activo } = JSON.parse(body);
-                const result = await pool.query(
-                    'UPDATE frentes SET nombre = $1, peso_maximo = $2, orden = $3, activo = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
-                    [nombre, peso_maximo, orden, activo, id]
+                const { codigo, nombre, peso_maximo, orden, activo } = JSON.parse(body);
+                
+                // 1. Obtener versión activa
+                const versionResult = await pool.query(
+                    'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
                 );
+                
+                if (versionResult.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
+                    return;
+                }
+                
+                const versionId = versionResult.rows[0].id;
+                
+                // 2. Verificar que el frente existe en la versión activa
+                const frenteResult = await pool.query(
+                    'SELECT id, peso_maximo, codigo FROM version_frentes WHERE id = $1 AND version_id = $2',
+                    [id, versionId]
+                );
+                
+                if (frenteResult.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Frente no encontrado en la versión activa' }));
+                    return;
+                }
+                
+                const frenteActual = frenteResult.rows[0];
+                const pesoActual = parseFloat(frenteActual.peso_maximo);
+                const nuevoPeso = peso_maximo !== undefined ? parseFloat(peso_maximo) : pesoActual;
+                const nuevoCodigo = codigo || frenteActual.codigo;
+                
+                // 3. Verificar que no exista otro frente con el mismo código en la versión activa
+                if (codigo && codigo !== frenteActual.codigo) {
+                    const existenteResult = await pool.query(
+                        'SELECT id FROM version_frentes WHERE version_id = $1 AND codigo = $2 AND id != $3',
+                        [versionId, codigo, id]
+                    );
+                    
+                    if (existenteResult.rows.length > 0) {
+                        respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                        respuesta.end(JSON.stringify({ error: `Ya existe un frente con el código "${codigo}" en esta versión` }));
+                        return;
+                    }
+                }
+                
+                // 4. 🔴 VALIDAR SUMA TOTAL DE FRENTES SOLO EN LA VERSIÓN ACTIVA (excluyendo el actual)
+                const frentesResult = await pool.query(
+                    'SELECT COALESCE(SUM(peso_maximo), 0) as total FROM version_frentes WHERE version_id = $1 AND activo = true AND id != $2',
+                    [versionId, id]
+                );
+                
+                const sumaOtros = parseFloat(frentesResult.rows[0].total) || 0;
+                const nuevaSuma = sumaOtros + nuevoPeso;
+                
+                if (nuevaSuma > 100) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ 
+                        error: `La suma total de los frentes en la versión activa excede el 100%. Otros: ${sumaOtros}% + ${nuevoPeso}% = ${nuevaSuma}%`,
+                        suma_actual: sumaOtros,
+                        nuevo_peso: nuevoPeso,
+                        peso_maximo: 100,
+                        suma_total: nuevaSuma
+                    }));
+                    return;
+                }
+                
+                // 5. Actualizar frente en la versión activa
+                const result = await pool.query(`
+                    UPDATE version_frentes 
+                    SET codigo = $1,
+                        nombre = $2,
+                        peso_maximo = $3,
+                        orden = $4,
+                        activo = $5,
+                        updated_at = NOW()
+                    WHERE id = $6
+                    RETURNING id, codigo, nombre, peso_maximo, orden, activo
+                `, [
+                    nuevoCodigo,
+                    nombre || frenteActual.nombre,
+                    nuevoPeso,
+                    orden !== undefined ? orden : 0,
+                    activo !== undefined ? activo : true,
+                    id
+                ]);
+                
+                console.log(`✅ Frente actualizado en versión ${versionId}: ${nuevoCodigo} (ID: ${id})`);
+                
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify(result.rows[0]));
+                
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error actualizando frente:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: error.message }));
             }
@@ -2930,6 +3097,9 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         return;
     }
 
+    // ======================================================
+    // ATRIBUTOS - POST (CREAR) - CON VALIDACIÓN POR VERSIÓN
+    // ======================================================
     if (ruta === '/api/matriz/atributos' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/atributos');
         
@@ -2945,45 +3115,101 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         peticion.on('end', async () => {
             try {
                 const { frente_id, nombre, peso_maximo, orden, activo } = JSON.parse(body);
-                const result = await pool.query(
-                    'INSERT INTO atributos (frente_id, nombre, peso_maximo, orden, activo) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-                    [frente_id, nombre, peso_maximo, orden || 0, activo !== false]
+                
+                if (!frente_id || !nombre || !peso_maximo) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Faltan campos obligatorios' }));
+                    return;
+                }
+                
+                if (peso_maximo <= 0) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'El peso debe ser mayor a 0' }));
+                    return;
+                }
+                
+                // 1. Obtener versión activa
+                const versionResult = await pool.query(
+                    'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
                 );
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify(result.rows[0]));
-            } catch (error) {
-                console.error('Error:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
-    if (ruta.match(/^\/api\/matriz\/atributos\/\d+$/) && metodo === 'PUT') {
-        console.log('[API] PUT /api/matriz/atributos/:id');
-        
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-        
-        const id = ruta.split('/').pop();
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { nombre, peso_maximo, orden, activo } = JSON.parse(body);
-                const result = await pool.query(
-                    'UPDATE atributos SET nombre = $1, peso_maximo = $2, orden = $3, activo = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
-                    [nombre, peso_maximo, orden, activo, id]
+                
+                if (versionResult.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
+                    return;
+                }
+                
+                const versionId = versionResult.rows[0].id;
+                
+                // 2. Verificar que el frente existe en la versión activa
+                const frenteResult = await pool.query(
+                    'SELECT id, peso_maximo FROM version_frentes WHERE id = $1 AND version_id = $2 AND activo = true',
+                    [frente_id, versionId]
                 );
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                
+                if (frenteResult.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Frente no encontrado en la versión activa' }));
+                    return;
+                }
+                
+                const pesoMaximoFrente = parseFloat(frenteResult.rows[0].peso_maximo);
+                
+                // 3. Verificar que no exista un atributo con el mismo nombre en la versión activa
+                const existenteResult = await pool.query(
+                    'SELECT id FROM version_atributos va JOIN version_frentes vf ON va.version_frente_id = vf.id WHERE vf.version_id = $1 AND va.nombre = $2 AND va.version_frente_id = $3',
+                    [versionId, nombre, frente_id]
+                );
+                
+                if (existenteResult.rows.length > 0) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: `Ya existe un atributo con el nombre "${nombre}" en este frente en la versión activa` }));
+                    return;
+                }
+                
+                // 4. 🔴 VALIDAR SUMA DE ATRIBUTOS SOLO EN LA VERSIÓN ACTIVA
+                const atributosResult = await pool.query(
+                    'SELECT COALESCE(SUM(va.peso_maximo), 0) as total FROM version_atributos va JOIN version_frentes vf ON va.version_frente_id = vf.id WHERE vf.version_id = $1 AND va.version_frente_id = $2 AND va.activo = true',
+                    [versionId, frente_id]
+                );
+                
+                const sumaActual = parseFloat(atributosResult.rows[0].total) || 0;
+                const nuevoPeso = parseFloat(peso_maximo);
+                const nuevaSuma = sumaActual + nuevoPeso;
+                
+                if (nuevaSuma > pesoMaximoFrente) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ 
+                        error: `La suma de los atributos en la versión activa excede el peso del frente (${pesoMaximoFrente}%). Actual: ${sumaActual}% + ${nuevoPeso}% = ${nuevaSuma}%`,
+                        suma_actual: sumaActual,
+                        nuevo_peso: nuevoPeso,
+                        peso_maximo_frente: pesoMaximoFrente,
+                        suma_total: nuevaSuma
+                    }));
+                    return;
+                }
+                
+                // 5. Insertar atributo en la versión activa
+                const result = await pool.query(`
+                    INSERT INTO version_atributos (
+                        version_frente_id,
+                        nombre,
+                        peso_maximo,
+                        orden,
+                        activo,
+                        created_at,
+                        updated_at
+                    ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+                    RETURNING id, nombre, peso_maximo, orden, activo
+                `, [frente_id, nombre, nuevoPeso, orden || 0, activo !== false]);
+                
+                console.log(`✅ Atributo creado en versión ${versionId}: ${nombre} (ID: ${result.rows[0].id})`);
+                
+                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify(result.rows[0]));
+                
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error creando atributo:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: error.message }));
             }
@@ -3070,6 +3296,9 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         return;
     }
 
+    // ======================================================
+    // SUB-MOTIVOS - POST (CREAR) - CON VALIDACIÓN POR VERSIÓN
+    // ======================================================
     if (ruta === '/api/matriz/sub-motivos' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/sub-motivos');
         
@@ -3085,45 +3314,109 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         peticion.on('end', async () => {
             try {
                 const { atributo_id, codigo, descripcion, peso_individual, orden, activo } = JSON.parse(body);
-                const result = await pool.query(
-                    'INSERT INTO sub_motivos (atributo_id, codigo, descripcion, peso_individual, orden, activo) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-                    [atributo_id, codigo, descripcion, peso_individual, orden || 0, activo !== false]
+                
+                if (!atributo_id || !codigo || !descripcion || !peso_individual) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Faltan campos obligatorios' }));
+                    return;
+                }
+                
+                if (peso_individual <= 0) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'El peso debe ser mayor a 0' }));
+                    return;
+                }
+                
+                // 1. Obtener versión activa
+                const versionResult = await pool.query(
+                    'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
                 );
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                
+                if (versionResult.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
+                    return;
+                }
+                
+                const versionId = versionResult.rows[0].id;
+                
+                // 2. Verificar que el atributo existe en la versión activa
+                const atributoResult = await pool.query(`
+                    SELECT va.id, va.peso_maximo
+                    FROM version_atributos va
+                    JOIN version_frentes vf ON va.version_frente_id = vf.id
+                    WHERE va.id = $1 AND vf.version_id = $2 AND va.activo = true
+                `, [atributo_id, versionId]);
+                
+                if (atributoResult.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Atributo no encontrado en la versión activa' }));
+                    return;
+                }
+                
+                const pesoMaximoAtributo = parseFloat(atributoResult.rows[0].peso_maximo);
+                
+                // 3. Verificar que no exista un sub-motivo con el mismo código en la versión activa
+                const existenteResult = await pool.query(`
+                    SELECT vsm.id FROM version_sub_motivos vsm 
+                    JOIN version_atributos va ON vsm.version_atributo_id = va.id
+                    JOIN version_frentes vf ON va.version_frente_id = vf.id
+                    WHERE vf.version_id = $1 AND vsm.codigo = $2 AND vsm.version_atributo_id = $3
+                `, [versionId, codigo, atributo_id]);
+                
+                if (existenteResult.rows.length > 0) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: `Ya existe un sub-motivo con el código "${codigo}" en este atributo en la versión activa` }));
+                    return;
+                }
+                
+                // 4. 🔴 VALIDAR SUMA DE SUB-MOTIVOS SOLO EN LA VERSIÓN ACTIVA
+                const subMotivosResult = await pool.query(`
+                    SELECT COALESCE(SUM(vsm.peso_individual), 0) as total 
+                    FROM version_sub_motivos vsm 
+                    JOIN version_atributos va ON vsm.version_atributo_id = va.id
+                    JOIN version_frentes vf ON va.version_frente_id = vf.id
+                    WHERE vf.version_id = $1 AND vsm.version_atributo_id = $2 AND vsm.activo = true
+                `, [versionId, atributo_id]);
+                
+                const sumaActual = parseFloat(subMotivosResult.rows[0].total) || 0;
+                const nuevoPeso = parseFloat(peso_individual);
+                const nuevaSuma = sumaActual + nuevoPeso;
+                
+                if (nuevaSuma > pesoMaximoAtributo) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ 
+                        error: `La suma de los sub-motivos en la versión activa excede el peso del atributo (${pesoMaximoAtributo}%). Actual: ${sumaActual}% + ${nuevoPeso}% = ${nuevaSuma}%`,
+                        suma_actual: sumaActual,
+                        nuevo_peso: nuevoPeso,
+                        peso_maximo_atributo: pesoMaximoAtributo,
+                        suma_total: nuevaSuma
+                    }));
+                    return;
+                }
+                
+                // 5. Insertar sub-motivo en la versión activa
+                const result = await pool.query(`
+                    INSERT INTO version_sub_motivos (
+                        version_atributo_id,
+                        codigo,
+                        descripcion,
+                        peso_individual,
+                        orden,
+                        activo,
+                        created_at,
+                        updated_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                    RETURNING id, codigo, descripcion, peso_individual, orden, activo
+                `, [atributo_id, codigo, descripcion, nuevoPeso, orden || 0, activo !== false]);
+                
+                console.log(`✅ Sub-motivo creado en versión ${versionId}: ${codigo} (ID: ${result.rows[0].id})`);
+                
+                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify(result.rows[0]));
+                
             } catch (error) {
-                console.error('Error:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
-    if (ruta.match(/^\/api\/matriz\/sub-motivos\/\d+$/) && metodo === 'PUT') {
-        console.log('[API] PUT /api/matriz/sub-motivos/:id');
-        
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-        
-        const id = ruta.split('/').pop();
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { codigo, descripcion, peso_individual, orden, activo } = JSON.parse(body);
-                const result = await pool.query(
-                    'UPDATE sub_motivos SET codigo = $1, descripcion = $2, peso_individual = $3, orden = $4, activo = $5, updated_at = NOW() WHERE id = $6 RETURNING *',
-                    [codigo, descripcion, peso_individual, orden, activo, id]
-                );
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify(result.rows[0]));
-            } catch (error) {
-                console.error('Error:', error);
+                console.error('Error creando sub-motivo:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: error.message }));
             }
@@ -3170,7 +3463,224 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         return;
     }
 
-    // ========== VERSIONES ==========
+    // ======================================================
+// CONGELAR VERSIÓN ACTUAL (CREAR SNAPSHOT) - CORREGIDO
+// ======================================================
+
+if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
+    console.log('[API] POST /api/matriz/versiones/congelar');
+    
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+        return;
+    }
+    
+    let body = '';
+    peticion.on('data', chunk => body += chunk);
+    peticion.on('end', async () => {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            
+            const { version, descripcion, fecha_vigencia } = JSON.parse(body);
+            
+            if (!version || !fecha_vigencia) {
+                await client.query('ROLLBACK');
+                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'Versión y fecha vigencia son requeridos' }));
+                client.release();
+                return;
+            }
+            
+            // 1. Obtener versión activa actual
+            const versionActivaResult = await client.query(
+                'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
+            );
+            
+            if (versionActivaResult.rows.length === 0) {
+                await client.query('ROLLBACK');
+                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'No hay una versión activa para congelar' }));
+                client.release();
+                return;
+            }
+            
+            const versionActivaId = versionActivaResult.rows[0].id;
+            
+            // 2. Verificar que la nueva versión no exista ya
+            const existeResult = await client.query(
+                'SELECT id FROM versiones_matriz WHERE version = $1',
+                [version]
+            );
+            
+            if (existeResult.rows.length > 0) {
+                await client.query('ROLLBACK');
+                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: `La versión "${version}" ya existe` }));
+                client.release();
+                return;
+            }
+            
+            // 3. Crear la nueva versión (INACTIVA por defecto)
+            const nuevaVersionResult = await client.query(`
+                INSERT INTO versiones_matriz (
+                    version,
+                    descripcion,
+                    fecha_vigencia,
+                    activa,
+                    creado_por,
+                    creado_en
+                ) VALUES ($1, $2, $3, false, $4, NOW())
+                RETURNING id
+            `, [version, descripcion || `Snapshot de versión ${versionActivaId}`, fecha_vigencia, 'Sistema']);
+            
+            const nuevaVersionId = nuevaVersionResult.rows[0].id;
+            
+            // 4. COPIAR FRENTES Y GUARDAR MAPA DE IDs
+            const frentes = await client.query(
+                'SELECT id, codigo, nombre, peso_maximo, orden, activo FROM version_frentes WHERE version_id = $1',
+                [versionActivaId]
+            );
+            
+            const mapaFrentes = {}; // old_id -> new_id
+            
+            for (const frente of frentes.rows) {
+                const nuevoFrenteResult = await client.query(`
+                    INSERT INTO version_frentes (
+                        version_id,
+                        codigo,
+                        nombre,
+                        peso_maximo,
+                        orden,
+                        activo,
+                        created_at,
+                        updated_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                    RETURNING id
+                `, [
+                    nuevaVersionId,
+                    frente.codigo,
+                    frente.nombre,
+                    frente.peso_maximo,
+                    frente.orden,
+                    frente.activo
+                ]);
+                
+                const nuevoFrenteId = nuevoFrenteResult.rows[0].id;
+                mapaFrentes[frente.id] = nuevoFrenteId;
+            }
+            
+            console.log(`   📦 Frentes copiados: ${frentes.rows.length}`);
+            
+            // 5. COPIAR ATRIBUTOS USANDO EL MAPA DE FRENTES
+            let totalAtributos = 0;
+            const mapaAtributos = {}; // old_id -> new_id
+            
+            for (const [oldFrenteId, newFrenteId] of Object.entries(mapaFrentes)) {
+                const atributos = await client.query(
+                    'SELECT id, nombre, peso_maximo, orden, activo FROM version_atributos WHERE version_frente_id = $1',
+                    [oldFrenteId]
+                );
+                
+                for (const attr of atributos.rows) {
+                    const nuevoAtributoResult = await client.query(`
+                        INSERT INTO version_atributos (
+                            version_frente_id,
+                            nombre,
+                            peso_maximo,
+                            orden,
+                            activo,
+                            created_at,
+                            updated_at
+                        ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+                        RETURNING id
+                    `, [
+                        newFrenteId,
+                        attr.nombre,
+                        attr.peso_maximo,
+                        attr.orden,
+                        attr.activo
+                    ]);
+                    
+                    const nuevoAtributoId = nuevoAtributoResult.rows[0].id;
+                    mapaAtributos[attr.id] = nuevoAtributoId;
+                    totalAtributos++;
+                }
+            }
+            
+            console.log(`   📄 Atributos copiados: ${totalAtributos}`);
+            
+            // 6. COPIAR SUB-MOTIVOS USANDO EL MAPA DE ATRIBUTOS
+            let totalSubMotivos = 0;
+            
+            for (const [oldAttrId, newAttrId] of Object.entries(mapaAtributos)) {
+                const subMotivos = await client.query(
+                    'SELECT codigo, descripcion, peso_individual, orden, activo FROM version_sub_motivos WHERE version_atributo_id = $1',
+                    [oldAttrId]
+                );
+                
+                for (const sub of subMotivos.rows) {
+                    await client.query(`
+                        INSERT INTO version_sub_motivos (
+                            version_atributo_id,
+                            codigo,
+                            descripcion,
+                            peso_individual,
+                            orden,
+                            activo,
+                            created_at,
+                            updated_at
+                        ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                    `, [
+                        newAttrId,
+                        sub.codigo,
+                        sub.descripcion,
+                        sub.peso_individual,
+                        sub.orden,
+                        sub.activo
+                    ]);
+                    totalSubMotivos++;
+                }
+            }
+            
+            console.log(`   🔹 Sub-motivos copiados: ${totalSubMotivos}`);
+            
+            // 7. Confirmar transacción
+            await client.query('COMMIT');
+            
+            console.log(`✅ Versión "${version}" creada como snapshot (ID: ${nuevaVersionId})`);
+            console.log(`   📊 Resumen: ${frentes.rows.length} frentes, ${totalAtributos} atributos, ${totalSubMotivos} sub-motivos`);
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({
+                success: true,
+                message: `Versión "${version}" creada exitosamente como snapshot`,
+                version_id: nuevaVersionId,
+                resumen: {
+                    frentes: frentes.rows.length,
+                    atributos: totalAtributos,
+                    sub_motivos: totalSubMotivos
+                }
+            }));
+            
+        } catch (error) {
+            await client.query('ROLLBACK');
+            console.error('❌ Error congelando versión:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        } finally {
+            client.release();
+        }
+    });
+    return;
+}
+
+    // ======================================================
+    // API - MATRIZ - OBTENER VERSIONES (CORREGIDO)
+    // ======================================================
+
     if (ruta === '/api/matriz/versiones' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/versiones');
         
@@ -3182,15 +3692,38 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         }
         
         try {
-            const result = await pool.query(
-                'SELECT id, version, descripcion, activa, created_at FROM versiones_matriz ORDER BY created_at DESC'
-            );
+            // Verificar si la tabla existe
+            const checkTable = await pool.query(`
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'versiones_matriz'
+                );
+            `);
+            
+            if (!checkTable.rows[0].exists) {
+                console.log('⚠️ Tabla versiones_matriz no existe, devolviendo array vacío');
+                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify([]));
+                return;
+            }
+            
+            const result = await pool.query(`
+                SELECT id, version, descripcion, fecha_vigencia, activa, 
+                    creado_por, creado_en, publicado_por, publicado_en
+                FROM versiones_matriz 
+                ORDER BY creado_en DESC
+            `);
+            
+            console.log(`✅ ${result.rows.length} versiones encontradas`);
+            
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
+            
         } catch (error) {
-            console.error('Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
+            console.error('❌ Error en /api/matriz/versiones:', error);
+            // En caso de error, devolver array vacío en lugar de error 500
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify([]));
         }
         return;
     }
@@ -4665,7 +5198,7 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         return;
     }
 
-        // ======================================================
+    // ======================================================
     // API - ESTRUCTURA DE EVALUACIÓN (NUEVA MATRIZ CONFIGURABLE)
     // ======================================================
 
@@ -4819,6 +5352,218 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         return;
     }    
 
+    // ======================================================
+    // API - MATRIZ VERSIONADA (NUEVO SISTEMA DE VERSIONADO)
+    // ======================================================
+
+    // ---------- OBTENER VERSIÓN ACTIVA ----------
+    if (ruta === '/api/matriz/versiones/activa' && metodo === 'GET') {
+        console.log('[API] GET /api/matriz/versiones/activa');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        try {
+            const result = await pool.query(`
+                SELECT * FROM versiones_matriz WHERE activa = true LIMIT 1
+            `);
+            
+            if (result.rows.length === 0) {
+                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
+                return;
+            }
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows[0]));
+            
+        } catch (error) {
+            console.error('Error en /api/matriz/versiones/activa:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+        return;
+    }
+
+    // ---------- OBTENER VERSIÓN POR FECHA ----------
+    if (ruta === '/api/matriz/versiones/por-fecha' && metodo === 'GET') {
+        console.log('[API] GET /api/matriz/versiones/por-fecha');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        const { fecha } = urlParseada.query;
+        if (!fecha) {
+            respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Fecha requerida' }));
+            return;
+        }
+        
+        try {
+            const result = await pool.query(`
+                SELECT * FROM versiones_matriz 
+                WHERE fecha_vigencia <= $1 
+                ORDER BY fecha_vigencia DESC 
+                LIMIT 1
+            `, [fecha]);
+            
+            if (result.rows.length === 0) {
+                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'No hay versión para esta fecha' }));
+                return;
+            }
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows[0]));
+            
+        } catch (error) {
+            console.error('Error en /api/matriz/versiones/por-fecha:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+        return;
+    }
+
+    // ---------- OBTENER ESTRUCTURA COMPLETA DE UNA VERSIÓN ----------
+    if (ruta.match(/^\/api\/matriz\/versiones\/\d+\/estructura$/) && metodo === 'GET') {
+        console.log('[API] GET /api/matriz/versiones/:id/estructura');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        // Extraer ID de la URL: /api/matriz/versiones/3/estructura
+        const parts = ruta.split('/');
+        // parts = ['', 'api', 'matriz', 'versiones', '3', 'estructura']
+        const versionId = parseInt(parts[4]);
+        
+        if (!versionId || isNaN(versionId)) {
+            respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'ID de versión inválido' }));
+            return;
+        }
+        
+        console.log(`📡 Obteniendo estructura de versión ID: ${versionId}`);
+        
+        try {
+            // 1. Obtener la versión
+            const versionResult = await pool.query(
+                'SELECT * FROM versiones_matriz WHERE id = $1',
+                [versionId]
+            );
+            
+            if (versionResult.rows.length === 0) {
+                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'Versión no encontrada' }));
+                return;
+            }
+            
+            const version = versionResult.rows[0];
+            console.log(`✅ Versión encontrada: ${version.version}`);
+            
+            // 2. Obtener frentes de la versión
+            const frentesResult = await pool.query(`
+                SELECT id, codigo, nombre, peso_maximo, orden 
+                FROM version_frentes 
+                WHERE version_id = $1 AND activo = true 
+                ORDER BY orden
+            `, [versionId]);
+            
+            console.log(`   📋 Frentes encontrados: ${frentesResult.rows.length}`);
+            
+            const estructura = {
+                version: version,
+                frentes: []
+            };
+            
+            for (const frente of frentesResult.rows) {
+                // 3. Obtener atributos del frente
+                const atributosResult = await pool.query(`
+                    SELECT id, nombre, peso_maximo, orden 
+                    FROM version_atributos 
+                    WHERE version_frente_id = $1 AND activo = true 
+                    ORDER BY orden
+                `, [frente.id]);
+                
+                console.log(`      📋 Atributos para ${frente.codigo}: ${atributosResult.rows.length}`);
+                
+                const frenteData = {
+                    ...frente,
+                    atributos: []
+                };
+                
+                for (const attr of atributosResult.rows) {
+                    // 4. Obtener sub-motivos del atributo
+                    const subMotivosResult = await pool.query(`
+                        SELECT id, codigo, descripcion, peso_individual, orden 
+                        FROM version_sub_motivos 
+                        WHERE version_atributo_id = $1 AND activo = true 
+                        ORDER BY orden
+                    `, [attr.id]);
+                    
+                    frenteData.atributos.push({
+                        ...attr,
+                        sub_motivos: subMotivosResult.rows
+                    });
+                }
+                
+                estructura.frentes.push(frenteData);
+            }
+            
+            console.log(`✅ Estructura completada: ${estructura.frentes.length} frentes`);
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(estructura));
+            
+        } catch (error) {
+            console.error('❌ Error obteniendo estructura:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+        return;
+    }
+
+    // ---------- OBTENER VERSIONES DE MATRIZ ----------
+    if (ruta === '/api/matriz/versiones' && metodo === 'GET') {
+        console.log('[API] GET /api/matriz/versiones');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        try {
+            const result = await pool.query(`
+                SELECT id, version, descripcion, fecha_vigencia, activa, creado_por, creado_en, publicado_por, publicado_en
+                FROM versiones_matriz 
+                ORDER BY creado_en DESC
+            `);
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows));
+            
+        } catch (error) {
+            console.error('Error en /api/matriz/versiones:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+        return;
+    }
+    
+    
     // ======================================================
     // VISTAS HTML
     // ======================================================
