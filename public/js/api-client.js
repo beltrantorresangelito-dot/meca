@@ -1740,20 +1740,41 @@ const API = (function() {
         }
     }
 
-    /**
-     * crearAtributo - Crea un nuevo atributo
-     * @param {Object} data - Datos del atributo
-     * @returns {Object} Atributo creado
-     */
+    // ======================================================
+    // CREAR ATRIBUTO - USAR /api/query
+    // ======================================================
     async function crearAtributo(data) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/matriz/atributos', {
+        
+        // 🔴 CAMBIAR: Usar /api/query en lugar de /api/matriz/atributos
+        const response = await fetch('/api/query', {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                table: 'version_atributos',
+                operation: 'insert',
+                data: {
+                    version_frente_id: data.frente_id,
+                    nombre: data.nombre,
+                    peso_maximo: data.peso_maximo,
+                    orden: data.orden || 0,
+                    activo: data.activo !== undefined ? data.activo : true,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }
+            })
         });
-        if (!response.ok) throw new Error('Error al crear atributo');
-        return await response.json();
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al crear atributo');
+        }
+        
+        const result = await response.json();
+        return result.data && result.data.length > 0 ? result.data[0] : null;
     }
 
     // ======================================================
@@ -1794,19 +1815,44 @@ const API = (function() {
         return result.data && result.data.length > 0 ? result.data[0] : null;
     }
 
-    /**
-     * eliminarAtributo - Elimina un atributo
-     * @param {number} id - ID del atributo
-     * @returns {Object} Resultado de la operación
-     */
+    // ======================================================
+    // ELIMINAR ATRIBUTO - USAR /api/query
+    // ======================================================
     async function eliminarAtributo(id) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`/api/matriz/atributos/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
+        
+        const response = await fetch('/api/query', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                table: 'version_atributos',
+                operation: 'delete',
+                filters: [
+                    { type: 'eq', column: 'id', value: parseInt(id) }
+                ]
+            })
         });
-        if (!response.ok) throw new Error('Error al eliminar atributo');
-        return await response.json();
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al eliminar atributo');
+        }
+        
+        const result = await response.json();
+        
+        if (result.error) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            success: true,
+            message: 'Atributo eliminado correctamente',
+            data: result.data,
+            count: result.count
+        };
     }
 
     // ======================================================
