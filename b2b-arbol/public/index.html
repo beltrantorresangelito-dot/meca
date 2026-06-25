@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Árbol de Decisiones B2B</title>
+
+    <!-- ============================================================
+    HOJAS DE ESTILO EXTERNAS
+    ============================================================ -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- ============================================================
+    LIBRERÍA PARA LEER EXCEL (SheetJS)
+    ============================================================ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+    </script>
+</head>
+<body>
+
+    <!-- ============================================================
+    LOADING OVERLAY (se oculta al cargar)
+    ============================================================ -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Cargando flujo desde el servidor...</p>
+        <div class="sub-msg" id="loadingSubMsg">Conectando con la API del Árbol B2B</div>
+    </div>
+
+    <!-- ============================================================
+    APP PRINCIPAL
+    ============================================================ -->
+    <div class="app-container">
+
+        <!-- ===================== HEADER ===================== -->
+        <header class="header">
+            <div class="header-top">
+                <h1 class="title">
+                    <i class="fas fa-sitemap"></i>
+                    Árbol de Decisiones B2B
+                    <span class="version">v2.0</span>
+                </h1>
+                <div class="header-info">
+                    <span class="badge badge-blue">
+                        <i class="fas fa-shield-alt"></i> Validación Fraude
+                    </span>
+                    <span class="badge badge-green" id="sourceBadge">
+                        <i class="fas fa-server"></i> Servidor
+                    </span>
+                    <span class="badge badge-gray">
+                        <i class="far fa-clock"></i> <span id="sessionTime">00:00</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- ===== CONFIGURACIÓN ===== -->
+            <div class="config-section">
+                <span class="label">
+                    <i class="fas fa-link"></i> API Server:
+                </span>
+                <input type="text" id="apiUrl"
+                placeholder="http://servidor:8081/b2b-api/flujo"
+                value="/b2b-api/flujo" />
+                <button id="btnConnect" class="btn btn-primary">
+                    <i class="fas fa-plug"></i> Conectar
+                </button>
+                <button id="btnUseDefault" class="btn btn-warning">
+                    <i class="fas fa-undo"></i> Flujo por defecto
+                </button>
+                <span id="statusBadge" class="badge badge-orange">
+                    <i class="fas fa-circle"></i> Desconectado
+                </span>
+            </div>
+
+            <!-- ===== PROGRESO ===== -->
+            <div class="progress-container">
+                <div class="phase-indicators">
+                    <div class="phase" data-phase="fraude">
+                        <span>🔍</span> Desk Review
+                    </div>
+                    <span class="phase-arrow">→</span>
+                    <div class="phase" data-phase="contacto">
+                        <span>📞</span> Contacto
+                    </div>
+                    <span class="phase-arrow">→</span>
+                    <div class="phase" data-phase="gestion">
+                        <span>📋</span> Gestión AxB
+                    </div>
+                    <span class="phase-arrow">→</span>
+                    <div class="phase" data-phase="cierre">
+                        <span>🏁</span> Cierre
+                    </div>
+                </div>
+                <div class="step-stats">
+                    <span class="stat">
+                        <i class="fas fa-check-circle" style="color:#34a853;"></i>
+                        <span id="completedCount">0</span>
+                    </span>
+                    <span class="stat">
+                        <i class="fas fa-route"></i>
+                        <span id="pathLength">0</span> pasos
+                    </span>
+                    <span class="stat">
+                        <i class="fas fa-clock"></i>
+                        <span id="elapsedTime">00:00</span>
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <!-- ===================== MAIN ===================== -->
+        <main class="main-content">
+
+            <!-- ===== SIDEBAR ===== -->
+            <aside class="sidebar">
+
+                <!-- Progreso del Caso -->
+                <div class="sidebar-card">
+                    <h3><i class="fas fa-tasks"></i> Progreso del Caso</h3>
+                    <div class="progress-circle">
+                        <svg viewBox="0 0 36 36">
+                            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none" stroke="#e8eaed" stroke-width="3" />
+                            <path id="progressArc"
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                            fill="none" stroke="#1a73e8" stroke-width="3" stroke-dasharray="0, 100" />
+                        </svg>
+                        <div class="progress-text">
+                            <span id="progressPercent">0%</span>
+                            <small>completado</small>
+                        </div>
+                    </div>
+                    <div class="progress-detail">
+                        <strong id="currentPhaseLabel">Desk Review</strong>
+                        <span id="phaseStatus">· En curso</span>
+                    </div>
+                </div>
+
+                <!-- Ruta Recorrida -->
+                <div class="sidebar-card">
+                    <h3><i class="fas fa-history"></i> Ruta Recorrida</h3>
+                    <div class="path-history" id="pathHistory">
+                        <div class="empty-message">Aún no hay pasos registrados</div>
+                    </div>
+                </div>
+
+                <!-- Cierre de Caso -->
+                <div class="sidebar-card">
+                    <h3><i class="fas fa-flag-checkered"></i> Cierre de Caso</h3>
+                    <div class="closure-field">
+                        <label>Resultado</label>
+                        <select id="closureResult" disabled>
+                            <option value="">Seleccionar...</option>
+                            <option value="falso-positivo">✅ Falso Positivo</option>
+                            <option value="fraude-suplantacion">🔴 Fraude por Suplantación</option>
+                            <option value="fraude-suscripcion">🔴 Fraude por Suscripción</option>
+                            <option value="posible-fraude">🟡 Posible Fraude</option>
+                            <option value="axb">🟡 AxB</option>
+                            <option value="cierre-masivo">📦 Cierre Masivo</option>
+                        </select>
+                    </div>
+                    <div class="closure-field">
+                        <label>Acción</label>
+                        <select id="closureAction" disabled>
+                            <option value="">Seleccionar...</option>
+                            <option value="no-cancelar">✅ No Cancelar</option>
+                            <option value="cancelar">❌ Cancelar</option>
+                            <option value="suspender">⏸️ Suspender</option>
+                        </select>
+                    </div>
+                    <button id="applyClosure" class="btn-closure" disabled>
+                        <i class="fas fa-save"></i> Aplicar Cierre
+                    </button>
+                </div>
+            </aside>
+
+            <!-- ===== FLOW (PASO ACTUAL) ===== -->
+            <section class="flow-container">
+                <div id="stepCard" class="step-card">
+                    <div class="loading-placeholder">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Cargando paso...</p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- ===================== FOOTER ===================== -->
+        <footer class="footer">
+            <div class="footer-controls">
+                <button id="btnPrevious" class="btn btn-secondary" disabled>
+                    <i class="fas fa-arrow-left"></i> Anterior
+                </button>
+                <button id="btnReset" class="btn btn-warning">
+                    <i class="fas fa-undo"></i> Reiniciar
+                </button>
+                <button id="btnSaveProgress" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+                <button id="btnExport" class="btn btn-success">
+                    <i class="fas fa-file-export"></i> Exportar
+                </button>
+            </div>
+            <div class="footer-info" id="lastAction">
+                <i class="fas fa-info-circle"></i> Sigue las instrucciones del paso actual
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- ============================================================
+    TOAST NOTIFICATIONS
+    ============================================================ -->
+    <div id="toast" class="toast"></div>
+
+    <!-- ============================================================
+    LÓGICA DE LA APLICACIÓN
+    ============================================================ -->
+    <script src="app.js"></script>
+</body>
+</html>

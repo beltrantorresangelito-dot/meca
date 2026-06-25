@@ -58,7 +58,7 @@ echo [3/3] Iniciando servidores...
 echo.
 echo ======================================================
 echo  🚀 SERVIDORES LISTOS
-echo  - MECA: http://localhost:3000
+echo  - MECA: http://localhost:8080
 echo  - B2B:  http://localhost:8081/b2b-api/status
 echo  - BD:   localhost:%PGPORT%
 echo ======================================================
