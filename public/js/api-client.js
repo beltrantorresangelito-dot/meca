@@ -2580,6 +2580,186 @@ const API = (function() {
         }
         return await response.json();
     }
+
+    // ======================================================
+    // API - REGLAS DE EVALUACIÓN
+    // ======================================================
+
+    /**
+     * getReglasEvaluacion - Obtiene las reglas de la versión activa
+     * @returns {Array} Lista de reglas
+     */
+    async function getReglasEvaluacion() {
+        const token = localStorage.getItem('meca_token');
+        
+        try {
+            // 1. Obtener versión activa
+            const versionActiva = await getVersionActiva();
+            if (!versionActiva) {
+                console.warn('⚠️ No hay versión activa para cargar reglas');
+                return [];
+            }
+            
+            // 2. Obtener reglas de esa versión
+            const response = await fetch(`/api/reglas-evaluacion/version/${versionActiva.id}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                if (response.status === 404) return [];
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+            
+            const reglas = await response.json();
+            console.log(`📋 Reglas cargadas para versión ${versionActiva.version}: ${reglas.length}`);
+            return reglas;
+            
+        } catch (error) {
+            console.error('❌ Error cargando reglas:', error);
+            return [];
+        }
+    }
+
+    // ======================================================
+// API - REGLAS DE EVALUACIÓN (CRUD)
+// ======================================================
+
+/**
+ * getReglasByVersion - Obtiene reglas de una versión específica
+ * @param {number} versionId - ID de la versión
+ * @returns {Array} Lista de reglas
+ */
+async function getReglasByVersion(versionId) {
+    const token = localStorage.getItem('meca_token');
+    
+    try {
+        const response = await fetch(`/api/reglas-evaluacion/version/${versionId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            if (response.status === 404) return [];
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('❌ Error obteniendo reglas:', error);
+        return [];
+    }
+}
+
+/**
+ * crearRegla - Crea una nueva regla
+ * @param {Object} data - Datos de la regla
+ * @returns {Object} Regla creada
+ */
+async function crearRegla(data) {
+    const token = localStorage.getItem('meca_token');
+    
+    // 🔴 Asegurar que los campos JSON sean válidos
+    const bodyData = {
+        version_id: data.version_id,
+        submotivo_origen: data.submotivo_origen,
+        bloque_origen: data.bloque_origen,
+        atributo_origen: data.atributo_origen,
+        valor_condicion: data.valor_condicion || '0',
+        accion_tipo: data.accion_tipo || 'marcar_no_aplica',
+        accion_valor: data.accion_valor || 'NA',
+        submotivos_afectados: data.submotivos_afectados || null,
+        excepciones: data.excepciones || null,
+        orden: data.orden || 0,
+        activo: data.activo !== false
+    };
+    
+    console.log('📤 Enviando a /api/reglas-evaluacion:', JSON.stringify(bodyData, null, 2));
+    
+    const response = await fetch('/api/reglas-evaluacion', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bodyData)
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        console.error('❌ Error del servidor:', error);
+        throw new Error(error.error || 'Error al crear regla');
+    }
+    
+    return await response.json();
+}
+
+/**
+ * actualizarRegla - Actualiza una regla existente
+ * @param {number} id - ID de la regla
+ * @param {Object} data - Datos a actualizar
+ * @returns {Object} Regla actualizada
+ */
+async function actualizarRegla(id, data) {
+    const token = localStorage.getItem('meca_token');
+    
+    const bodyData = {
+        submotivo_origen: data.submotivo_origen,
+        bloque_origen: data.bloque_origen,
+        atributo_origen: data.atributo_origen,
+        valor_condicion: data.valor_condicion || '0',
+        accion_tipo: data.accion_tipo || 'marcar_no_aplica',
+        accion_valor: data.accion_valor || 'NA',
+        submotivos_afectados: data.submotivos_afectados || null,
+        excepciones: data.excepciones || null,
+        orden: data.orden || 0,
+        activo: data.activo !== false
+    };
+    
+    const response = await fetch(`/api/reglas-evaluacion/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bodyData)
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al actualizar regla');
+    }
+    
+    return await response.json();
+}
+
+/**
+ * eliminarRegla - Elimina una regla
+ * @param {number} id - ID de la regla
+ * @returns {Object} Resultado de la operación
+ */
+async function eliminarRegla(id) {
+    const token = localStorage.getItem('meca_token');
+    
+    const response = await fetch(`/api/reglas-evaluacion/${id}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al eliminar regla');
+    }
+    
+    return await response.json();
+}
     
     // ======================================================
     // API PÚBLICA - Exportación de todos los métodos
@@ -2698,6 +2878,7 @@ const API = (function() {
         publicarVersion,
         activarVersion,
         eliminarVersion,
+        getReglasEvaluacion,
 
         // ==============================================
         // EXPORTACIONES
@@ -2762,6 +2943,12 @@ const API = (function() {
         // UTILIDADES
         // ==============================================
         hashSHA256,
+
+        //reglas
+        getReglasByVersion,
+        crearRegla,
+        actualizarRegla,
+        eliminarRegla,
 
         // Nuevas funciones de matriz versionada
         getVersionActiva,

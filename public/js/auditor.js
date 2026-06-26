@@ -1475,16 +1475,15 @@ function convertirFecha(fechaStr) {
 // ----------------------------------------------------------------------
 async function finalizarAuditoria() {
     // ======================================================
-    // 3a. VALIDAR MODO EDICIÓN
+    // 1. VALIDAR MODO EDICIÓN
     // ======================================================
-    // 📌 Si estamos editando una evaluación existente, usar función específica
     if (modoEdicionActivo && idEvaluacionEditando) {
         await actualizarEvaluacionExistente();
         return;
     }
 
     // ======================================================
-    // 3b. VALIDAR AUDITORÍA ACTIVA
+    // 2. VALIDAR AUDITORÍA ACTIVA
     // ======================================================
     if (!auditando) {
         alert('⚠️ No hay una auditoría activa.');
@@ -1492,10 +1491,8 @@ async function finalizarAuditoria() {
     }
 
     // ======================================================
-    // 3c. VALIDACIONES INICIALES
+    // 3. VALIDACIONES INICIALES
     // ======================================================
-
-    // Obtener evaluador (prioridad: hiddenAuditor > usuarioActual > select)
     let evaluador;
     if (usuarioActual && usuarioActual.rol === 'AUDITOR') {
         const hiddenAuditor = document.getElementById('hiddenAuditor');
@@ -1508,23 +1505,17 @@ async function finalizarAuditoria() {
         evaluador = document.getElementById('evalEvaluador')?.value;
     }
 
-    // Validar campos obligatorios
     const ticketPSI = document.getElementById('evalTicketPSI')?.value;
-    const agente = document.getElementById('evalAgente')?.value;
+    const agenteInput = document.getElementById('evalAgenteInput');
+    const agente = agenteInput?.value || document.getElementById('evalAgente')?.value;
     const fechaRaw = document.getElementById('evalFecha')?.value;
     const idLlamada = document.getElementById('evalIdLlamada')?.value;
 
-    // Priorizar el input de búsqueda para el agente
-    const agenteInput = document.getElementById('evalAgenteInput');
-    const agenteSeleccionado = agenteInput?.value || agente;
-
-    // Verificar que todos los campos estén completos
-    if (!evaluador || !ticketPSI || !agenteSeleccionado || !fechaRaw || !idLlamada) {
+    if (!evaluador || !ticketPSI || !agente || !fechaRaw || !idLlamada) {
         alert('⚠️ Complete todos los campos obligatorios: Auditor, Ticket PSI, Agente, Fecha e ID Llamada');
         return;
     }
 
-    // Validar que la fecha sea válida
     const fechaObj = new Date(fechaRaw);
     if (isNaN(fechaObj.getTime())) {
         alert('❌ La fecha seleccionada no es válida.');
@@ -1532,32 +1523,27 @@ async function finalizarAuditoria() {
     }
 
     // ======================================================
-    // 3d. VALIDAR SELECTS COMPLETOS
-    // ======================================================
-    // 📌 Verificar que todos los selects tengan un valor seleccionado
-    // 📌 Resaltar en rojo los selects vacíos
+    // 4. VALIDAR SELECTS COMPLETOS
     // ======================================================
     const todosLosSelects = document.querySelectorAll('.cumple-select');
     const selectsVacios = [];
 
     todosLosSelects.forEach(select => {
-        // Si no está deshabilitado y no tiene valor
         if (!select.disabled && (!select.value || select.value === '')) {
             selectsVacios.push(select);
-            select.style.border = '2px solid var(--danger)';      // Borde rojo
-            select.style.backgroundColor = '#fff0f0';              // Fondo rojo claro
+            select.style.border = '2px solid var(--danger)';
+            select.style.backgroundColor = '#fff0f0';
         }
     });
 
     if (selectsVacios.length > 0) {
         alert(`⚠️ Faltan ${selectsVacios.length} campos por evaluar. Complete todos los campos.`);
-        // Scroll al primer select vacío
         selectsVacios[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
     }
 
     // ======================================================
-    // 3e. VALIDAR TICKET DUPLICADO
+    // 5. VALIDAR TICKET DUPLICADO
     // ======================================================
     const esDuplicado = await validarTicketNoDuplicado(ticketPSI);
     if (esDuplicado) {
@@ -1570,164 +1556,165 @@ async function finalizarAuditoria() {
     }
 
     // ======================================================
-    // 3f. DETENER TEMPORIZADOR Y CALCULAR RESULTADOS
+    // 6. DETENER TEMPORIZADOR
     // ======================================================
     if (temporizadorInterval) {
         clearInterval(temporizadorInterval);
         temporizadorInterval = null;
     }
 
-    // Marcar fin de auditoría
     tiempoFin = new Date();
     const tiempoTotalSegundos = Math.floor((tiempoFin - tiempoInicio) / 1000);
     const tiempoFormateado = formatearTiempo(tiempoTotalSegundos);
 
-    // Calcular resultados usando funciones específicas
-    const totalENC = recalcularTotalENC();           // ENC (Cliente)
-    const totalECUF = actualizarResultadoECUF();     // ECUF (Negocio)
-    const totalECN = actualizarResultadoECN();       // ECN (Proceso)
-    const notaFinal = totalENC + totalECUF + totalECN;
+    // ======================================================
+    // 7. CALCULAR RESULTADOS (DINÁMICO)
+    // ======================================================
+    // 🔴 🔴 🔴 CLAVE: Recalcular TODOS los frentes dinámicamente
+    const frentes = document.querySelectorAll('.frente-container');
+    let totalGeneral = 0;
+    const detalles = [];
 
-    // Determinar rango según nota final
+    frentes.forEach(frenteContainer => {
+        const frenteCodigo = frenteContainer.dataset.frente;
+        if (!frenteCodigo) return;
+        
+        // Recalcular el frente y obtener su total
+        const totalFrente = recalcularFrente(frenteCodigo);
+        totalGeneral += totalFrente;
+        
+        // Recolectar detalles de este frente
+        const selects = frenteContainer.querySelectorAll('.cumple-select');
+        selects.forEach(select => {
+            if (select.value) {
+                detalles.push({
+                    bloque: select.dataset.bloque,
+                    atributo: select.dataset.atributo,
+                    submotivo: select.dataset.submotivo,
+                    peso: parseFloat(select.dataset.peso),
+                    cumple: select.value === '1' || select.value === 'NA'
+                });
+            }
+        });
+    });
+
+    // Determinar rango (SOLO para guardar en BD, NO se muestra al auditor)
     let rango = '';
-    if (notaFinal >= 97) rango = 'Excelente';
-    else if (notaFinal >= 90) rango = 'Bien';
-    else if (notaFinal >= 85) rango = 'Regular';
+    if (totalGeneral >= 97) rango = 'Excelente';
+    else if (totalGeneral >= 90) rango = 'Bien';
+    else if (totalGeneral >= 85) rango = 'Regular';
     else rango = 'Bajo';
 
     // ======================================================
-    // 3g. CONSTRUIR DETALLES DE EVALUACIÓN
+    // 8. CONSTRUIR DETALLES DE EVALUACIÓN
     // ======================================================
-    const detalles = [];
-
-    todosLosSelects.forEach(select => {
-        if (select.value) {
-            detalles.push({
-                bloque: select.dataset.bloque,        // Ej: "ECUF", "ECN"
-                atributo: select.dataset.atributo,    // Ej: "SONDEO"
-                submotivo: select.dataset.submotivo,  // Ej: "Identifica_Responsable_de_Pago"
-                peso: parseFloat(select.dataset.peso), // Peso del item
-                cumple: select.value === '1' || select.value === 'NA'  // NA = Cumple
-            });
-        }
-    });
-
-    // Crear fecha formateada para mostrar (DD/MM/YYYY HH:MM)
     const fechaFormateada = `${fechaObj.getDate().toString().padStart(2, '0')}/${(fechaObj.getMonth() + 1).toString().padStart(2, '0')}/${fechaObj.getFullYear()} ${fechaObj.getHours().toString().padStart(2, '0')}:${fechaObj.getMinutes().toString().padStart(2, '0')}`;
 
     // ======================================================
-    // 3h. CONSTRUIR OBJETO EVALUACIÓN
+    // 9. CONSTRUIR OBJETO EVALUACIÓN
     // ======================================================
     const evaluacion = {
         id: Date.now(),
         timestamp: fechaObj.getTime(),
         evaluador: evaluador,
         ticketPSI: ticketPSI,
-        agente: agenteSeleccionado,
+        agente: agente,
         fecha: fechaRaw,
         fechaFormateada: fechaFormateada,
         idLlamada: idLlamada,
         fechaDescarga: convertirFecha(document.getElementById('evalFechaDescargaAudio')?.value),
-        totalENC: totalENC,
-        totalECUF: totalECUF,
-        totalECN: totalECN.toFixed(1),
-        notaFinal: notaFinal.toFixed(1),
+        totalENC: 0, // Ya no se usa individualmente
+        totalECUF: 0,
+        totalECN: 0,
+        notaFinal: totalGeneral.toFixed(1),
         rango: rango,
         detalles: detalles,
         fechaRegistro: new Date().toLocaleString('es-ES'),
         tiempoAuditoria: tiempoTotalSegundos,
         tiempoAuditoriaFormateado: tiempoFormateado,
         fechaInicioAuditoria: tiempoInicio.toISOString(),
-        fechaFinAuditoria: tiempoFin.toISOString(),  
-        // 🔴 NUEVO: Guardar el ID de la versión utilizada
+        fechaFinAuditoria: tiempoFin.toISOString(),
         versionMatrizId: window.versionMatrizActualId || null
     };
 
     // ======================================================
-    // 3i. GUARDAR EN LA BASE DE DATOS
+    // 10. GUARDAR EN LA BASE DE DATOS
     // ======================================================
     const btnFinalizar = document.getElementById('btnFinalizar');
     let evaluacionGuardada = false;
 
     try {
         console.log('💾 Guardando evaluación en API...');
-        
-        // Llamar a la API para guardar
         await API.guardarEvaluacion(evaluacion);
-        
         console.log('✅ Evaluación guardada correctamente');
         evaluacionGuardada = true;
 
-        // Mostrar mensaje de éxito con resultados
+        // Mostrar mensaje de éxito (SOLO números, sin rango)
         let mensajeExito = `📊 RESULTADOS DE EVALUACIÓN:\n\n`;
         mensajeExito += `📅 Fecha: ${fechaFormateada}\n`;
         mensajeExito += `🎫 Ticket PSI: ${ticketPSI}\n`;
-        mensajeExito += `✅ ENC: ${totalENC}/15%\n`;
-        mensajeExito += `⚠️ ECUF: ${totalECUF}/15%\n`;
-        mensajeExito += `💰 ECN: ${totalECN}/70%\n`;
+        
+        // Mostrar cada frente con su puntaje
+        frentes.forEach(frenteContainer => {
+            const frenteCodigo = frenteContainer.dataset.frente;
+            if (!frenteCodigo) return;
+            const header = frenteContainer.querySelector('.frente-titulo span');
+            const nombreFrente = header ? header.textContent.trim() : frenteCodigo;
+            const resultadoElement = document.getElementById(`resultadoFrente_${frenteCodigo}`);
+            const total = resultadoElement ? parseFloat(resultadoElement.textContent?.replace('%', '') || 0) : 0;
+            const badge = frenteContainer.querySelector('.frente-badge');
+            const pesoMaximo = badge ? parseFloat(badge.textContent?.replace('%', '') || 100) : 100;
+            mensajeExito += `📌 ${nombreFrente}: ${total}/${pesoMaximo}%\n`;
+        });
+        
         mensajeExito += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        mensajeExito += `🎯 NOTA FINAL: ${notaFinal.toFixed(1)}% (${rango})\n`;
+        mensajeExito += `🎯 NOTA FINAL: ${totalGeneral.toFixed(1)}%\n`;
         mensajeExito += `⏱️ TIEMPO: ${tiempoFormateado}\n`;
         mensajeExito += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        mensajeExito += `✅ GUARDADO EN LA NUBE CORRECTAMENTE`;
+        mensajeExito += `✅ GUARDADO CORRECTAMENTE`;
 
         alert(mensajeExito);
 
     } catch (error) {
         console.error('❌ Error al guardar en la base de datos:', error);
-
-        // Mostrar mensaje de error
         let mensajeError = `❌ ERROR AL GUARDAR LA EVALUACIÓN\n\n`;
         mensajeError += `Motivo: ${error.message}\n\n`;
         mensajeError += `La evaluación NO se ha guardado.\n`;
         mensajeError += `Complete todos los campos y vuelva a intentar.`;
 
         alert(mensajeError);
-
-        // Resetear auditoría y restaurar botones
         resetearAuditoria();
-
         const btnAuditarFinal = document.getElementById('btnAuditar');
         if (btnAuditarFinal) {
             btnAuditarFinal.disabled = false;
             btnAuditarFinal.style.opacity = '1';
             btnAuditarFinal.style.cursor = 'pointer';
         }
-
         if (btnFinalizar) {
             btnFinalizar.innerHTML = '⏱️ Finalizar y Guardar';
         }
-
         return;
     }
 
     // ======================================================
-    // 3j. ACTUALIZAR ESCUCHA SI FUE GESTIONADA
-    // ======================================================
-    // 📌 Si la auditoría vino de una escucha, marcarla como gestionada
+    // 11. ACTUALIZAR ESCUCHA SI FUE GESTIONADA
     // ======================================================
     if (evaluacionGuardada && window.gestionEscuchaActiva && window.idEscuchaGestionando) {
         await API.marcarEscuchaGestionada(window.idEscuchaGestionando);
-        
         console.log('✅ Escucha marcada como gestionada');
-
-        // Limpiar estado de gestión
         window.gestionEscuchaActiva = false;
         window.idEscuchaGestionando = null;
-
-        // Recargar escuchas y cambiar a esa pestaña
         await cargarMisEscuchas();
         showTab('misEscuchas', null);
     }
 
     // ======================================================
-    // 3k. LIMPIAR Y RESETEAR FORMULARIO
+    // 12. LIMPIAR Y RESETEAR FORMULARIO
     // ======================================================
     limpiarFormularioCompleto();
     resetearAuditoria();
     await actualizarContadorHeader();
 
-    // Deshabilitar botón Auditar hasta nueva selección
     const btnAuditarFinal = document.getElementById('btnAuditar');
     if (btnAuditarFinal) {
         btnAuditarFinal.disabled = true;
@@ -1735,12 +1722,10 @@ async function finalizarAuditoria() {
         btnAuditarFinal.style.cursor = 'not-allowed';
     }
 
-    // Restaurar texto del botón Finalizar
     if (btnFinalizar) {
         btnFinalizar.innerHTML = '⏱️ Finalizar y Guardar';
     }
 
-    // Ocultar elementos de gestión de escucha
     const btnCancelarGestion = document.getElementById('btnCancelarGestion');
     if (btnCancelarGestion) {
         btnCancelarGestion.style.display = 'none';
@@ -1751,7 +1736,6 @@ async function finalizarAuditoria() {
         seccionPSI.style.display = 'none';
     }
 
-    // Limpiar estado de gestión
     window.gestionEscuchaActiva = false;
     window.idEscuchaGestionando = null;
 }
@@ -2716,76 +2700,7 @@ function habilitarFormularioParaAuditoria() {
     if (btnLimpiar) btnLimpiar.style.display = 'inline-flex';
 }
 
-// ======================================================
-// BLOQUE 9: FUNCIONES DE CÁLCULO - ERRORES NO CRÍTICOS (ENC)
-// ======================================================
-// 
-// 📌 PROPÓSITO: Calcular puntajes de cada frente (ENC, ECUF, ECN)
-// 📌 ESTRUCTURA:
-//    1. actualizarResultadoAtributo() - Punto de entrada principal
-//    2. manejarGrupoCritico() - Versión antigua (con penalización de grupo)
-//    3. manejarGrupoCriticoECUF() - Versión nueva (items independientes)
-//    4. manejarGrupoCriticoECN() - Versión nueva (items independientes)
-//    5. actualizarTotalAtributoECUF() - Suma ponderada por atributo
-// ======================================================
 
-// ======================================================
-// 1. FUNCIÓN: actualizarResultadoAtributo()
-// ======================================================
-// 📌 PROPÓSITO: Actualizar el resultado cuando un select cambia
-// 📌 PARÁMETROS: select (elemento DOM), atributo (string)
-// 📌 FLUJO: Determina el bloque (ENC, ECUF, ECN) y llama a la función correspondiente
-// ======================================================
-
-function actualizarResultadoAtributo(select, atributo) {
-    // Obtener el bloque al que pertenece el select
-    const bloque = select.dataset.bloque;
-
-    // ======================================================
-    // 1a. BLOQUE ENC (Cliente) - Error No Crítico
-    // ======================================================
-    // 📌 Cada item es independiente (suma individual)
-    // 📌 No hay penalización de grupo
-    // ======================================================
-    if (bloque === 'ENC') {
-        const submotivo = select.dataset.submotivo;
-        const peso = parseFloat(select.dataset.peso);
-        const valor = select.value === '1' ? peso : 0;
-
-        // Actualizar indicador visual de peso
-        const pesoElement = document.getElementById(`peso-${submotivo}`);
-        if (pesoElement) {
-            pesoElement.textContent = valor + '%';
-            pesoElement.style.color = valor > 0 ? 'var(--ok)' : (select.value === '0' ? 'var(--danger)' : '');
-        }
-
-        // Recalcular todo el bloque ENC
-        recalcularAtributoENC(atributo);
-        return;
-    }
-
-    // ======================================================
-    // 1b. BLOQUE ECUF (Negocio) - Error Crítico
-    // ======================================================
-    // 📌 Cada item es independiente (suma individual)
-    // 📌 No hay penalización de grupo (CORREGIDO)
-    // ======================================================
-    if (bloque === 'ECUF') {
-        manejarGrupoCriticoECUF(select);
-        return;
-    }
-
-    // ======================================================
-    // 1c. BLOQUE ECN (Proceso) - Error Crítico
-    // ======================================================
-    // 📌 Cada item es independiente (suma individual)
-    // 📌 No hay penalización de grupo (CORREGIDO)
-    // ======================================================
-    if (bloque === 'ECN') {
-        manejarGrupoCriticoECN(select);
-        return;
-    }
-}
 
 // ======================================================
 // 2. FUNCIÓN: manejarGrupoCritico()
@@ -2904,43 +2819,34 @@ function manejarGrupoCritico(selectActual) {
 // ======================================================
 
 function manejarGrupoCriticoECUF(selectActual) {
-    // Obtener datos del select
     const atributo = selectActual.dataset.atributo;
     const valorActual = selectActual.value;
     const submotivo = selectActual.dataset.submotivo;
     const pesoElement = document.getElementById(`peso-${submotivo}`);
-
-    // ======================================================
-    // 3a. ACTUALIZAR INDICADOR VISUAL DE PESO
-    // ======================================================
+    
+    // 🔴 ACTUALIZAR PESO VISUAL (NA = Cumple, pero con color gris)
     if (pesoElement) {
+        const peso = parseFloat(selectActual.dataset.peso);
         if (valorActual === '1') {
-            // ✅ Cumple: muestra el peso completo en verde
-            pesoElement.textContent = `${selectActual.dataset.peso}%`;
+            pesoElement.textContent = `${peso}%`;
             pesoElement.style.color = 'var(--ok)';
+        } else if (valorActual === 'NA') {
+            // 🔴 CLAVE: NA muestra el peso pero en gris
+            pesoElement.textContent = `${peso}%`;
+            pesoElement.style.color = 'var(--muted)';
         } else if (valorActual === '0') {
-            // ❌ No Cumple: muestra 0% en rojo
             pesoElement.textContent = '0%';
             pesoElement.style.color = 'var(--danger)';
         } else {
-            // ⚪ Sin seleccionar: muestra 0% sin color
             pesoElement.textContent = '0%';
             pesoElement.style.color = '';
         }
     }
-
-    // ======================================================
-    // 3b. ACTUALIZAR TOTAL DEL ATRIBUTO
-    // ======================================================
-    // 📌 Recalcular la suma de todos los items del mismo atributo
+    
     actualizarTotalAtributoECUF(atributo);
-
-    // ======================================================
-    // 3c. RECALCULAR BLOQUE COMPLETO ECUF
-    // ======================================================
-    // 📌 Actualizar el resultado total del frente ECUF
     actualizarResultadoECUF();
 }
+
 
 // ======================================================
 // 4. FUNCIÓN: manejarGrupoCriticoECN()
@@ -2958,13 +2864,17 @@ function manejarGrupoCriticoECN(selectActual) {
     const pesoElement = document.getElementById(`peso-${submotivo}`);
 
     // ======================================================
-    // 4a. ACTUALIZAR INDICADOR VISUAL DE PESO
+    // ACTUALIZAR INDICADOR VISUAL DE PESO
     // ======================================================
     if (pesoElement) {
         if (valorActual === '1') {
             // ✅ Cumple: muestra el peso completo en verde
             pesoElement.textContent = `${selectActual.dataset.peso}%`;
             pesoElement.style.color = 'var(--ok)';
+        } else if (valorActual === 'NA') {
+            // 🔴 NUEVO: No Aplica - muestra el peso completo en gris
+            pesoElement.textContent = `${selectActual.dataset.peso}%`;
+            pesoElement.style.color = 'var(--muted)';
         } else if (valorActual === '0') {
             // ❌ No Cumple: muestra 0% en rojo
             pesoElement.textContent = '0%';
@@ -2977,15 +2887,15 @@ function manejarGrupoCriticoECN(selectActual) {
     }
 
     // ======================================================
-    // 4b. ACTUALIZAR TOTAL DEL ATRIBUTO
+    // RECALCULAR TOTAL DEL ATRIBUTO
     // ======================================================
-    // 📌 Recalcular la suma de todos los items del mismo atributo
-    actualizarTotalAtributoECN(atributo);
+    // 🔴 IMPORTANTE: Usar la función que recalcula el atributo
+    // No llamar a manejarGrupoCriticoECN nuevamente
+    recalcularTotalAtributo('ECN', atributo);
 
     // ======================================================
-    // 4c. RECALCULAR BLOQUE COMPLETO ECN
+    // RECALCULAR BLOQUE COMPLETO ECN
     // ======================================================
-    // 📌 Actualizar el resultado total del frente ECN
     actualizarResultadoECN();
 }
 
@@ -2999,82 +2909,80 @@ function manejarGrupoCriticoECN(selectActual) {
 // ======================================================
 
 function actualizarTotalAtributoECUF(atributo) {
-    let pesoTotal = 0;      // Peso máximo posible del atributo
-    let pesoObtenido = 0;   // Peso obtenido según selecciones
-
-    // Buscar todos los selects del atributo específico en ECUF
+    let pesoTotal = 0;
+    let pesoObtenido = 0;
+    
     const selects = document.querySelectorAll(
         `.cumple-select[data-bloque="ECUF"][data-atributo="${atributo}"]`
     );
-
-    // ======================================================
-    // 5a. SUMAR PESOS DE TODOS LOS ITEMS
-    // ======================================================
+    
     selects.forEach(select => {
         const peso = parseFloat(select.dataset.peso);
         pesoTotal += peso;
-
-        // Cada item suma INDEPENDIENTEMENTE (sin penalización)
-        if (select.value === '1') {
+        // 🔴 NA CUENTA COMO CUMPLE
+        if (select.value === '1' || select.value === 'NA') {
             pesoObtenido += peso;
         }
     });
-
-    // ======================================================
-    // 5b. MAPEAR ATRIBUTOS A IDs DE RESULTADO
-    // ======================================================
+    
     const mapaIDs = {
         'CORTE / ABANDONO DE LLAMADA': 'resultadoCorte',
         'RESPETO AL CLIENTE': 'resultadoRespeto',
         'BRINDA INFORMACION': 'resultadoInformacion'
     };
-
+    
     const resultadoId = mapaIDs[atributo];
     if (resultadoId) {
         const resultadoElement = document.getElementById(resultadoId);
         if (resultadoElement) {
-            // Mostrar formato: "obtenido/total%"
             resultadoElement.textContent = `${pesoObtenido}/${pesoTotal}%`;
+            resultadoElement.style.color = pesoObtenido === pesoTotal ? 'var(--ok)' : 
+                                            pesoObtenido > 0 ? 'var(--warning)' : 'var(--danger)';
+        }
+    }
+}
 
-            // Cambiar color según resultado
-            if (pesoObtenido === pesoTotal) {
-                // ✅ Todos los items cumplen
-                resultadoElement.style.color = 'var(--ok)';
-            } else if (pesoObtenido > 0) {
-                // 🟡 Algunos items cumplen
-                resultadoElement.style.color = 'var(--warning)';
-            } else {
-                // 🔴 Ningún item cumple
-                resultadoElement.style.color = 'var(--danger)';
-            }
+function actualizarTotalAtributoECN(atributo) {
+    let pesoTotal = 0;
+    let pesoObtenido = 0;
+    
+    const selects = document.querySelectorAll(
+        `.cumple-select[data-bloque="ECN"][data-atributo="${atributo}"]`
+    );
+    
+    selects.forEach(select => {
+        const peso = parseFloat(select.dataset.peso);
+        pesoTotal += peso;
+        // 🔴 NA CUENTA COMO CUMPLE
+        if (select.value === '1' || select.value === 'NA') {
+            pesoObtenido += peso;
+        }
+    });
+    
+    const mapaIDs = {
+        'SONDEO': 'resultadoSondeo',
+        'NEGOCIACION Y REBATE': 'resultadoNegociacion',
+        'MOTIVO DE NO PAGO': 'resultadoMotivoNoPago',
+        'LUGARES DE PAGO': 'resultadoLugaresPago',
+        'CIERRE': 'resultadoCierre',
+        'IMAGEN CORPORATIVA': 'resultadoImagen',
+        'TIPIFICACION': 'resultadoTipificacion'
+    };
+    
+    const resultadoId = mapaIDs[atributo];
+    if (resultadoId) {
+        const resultadoElement = document.getElementById(resultadoId);
+        if (resultadoElement) {
+            resultadoElement.textContent = `${pesoObtenido}/${pesoTotal}%`;
+            resultadoElement.style.color = pesoObtenido === pesoTotal ? 'var(--ok)' : 
+                                            pesoObtenido > 0 ? 'var(--warning)' : 'var(--danger)';
         }
     }
 }
 
 
 
-// ======================================================
-// BLOQUE 10: FUNCIONES DE CÁLCULO DE TOTALES
-// ======================================================
-// 
-// 📌 PROPÓSITO: Calcular los totales de cada frente (ENC, ECUF, ECN)
-// 📌 ESTRUCTURA:
-//    1. actualizarTotalAtributoECN() - Total por atributo en ECN
-//    2. recalcularAtributoENC() - Recalcula un atributo ENC específico
-//    3. recalcularTotalENC() - Total del frente ENC
-//    4. recalcularTotalENCDesdeContainer() - ENC desde contenedor específico
-//    5. actualizarResultadoECUF() - Total del frente ECUF
-//    6. recalcularTotalECUFDesdeContainer() - ECUF desde contenedor específico
-// ======================================================
 
-// ======================================================
-// 1. FUNCIÓN: actualizarTotalAtributoECN()
-// ======================================================
-// 📌 PROPÓSITO: Calcular el total de un atributo específico de ECN
-// 📌 PARÁMETROS: atributo (string) - nombre del atributo
-// 📌 CARACTERÍSTICA: Cada item es INDEPENDIENTE (sin penalización de grupo)
-// 📌 ACTUALIZA: Elemento de resultado correspondiente
-// ======================================================
 
 function actualizarTotalAtributoECN(atributo) {
     let pesoTotal = 0;      // Peso máximo posible del atributo
@@ -3143,106 +3051,33 @@ function actualizarTotalAtributoECN(atributo) {
 // ======================================================
 
 function recalcularAtributoENC(atributo) {
-    let totalPeso = 0;      // Peso máximo posible del atributo
-    let totalObtenido = 0;  // Peso obtenido según selecciones
-
-    // Buscar todos los selects del atributo específico en ENC
+    let totalPeso = 0;
+    let totalObtenido = 0;
+    
     const selects = document.querySelectorAll(
         `.cumple-select[data-bloque="ENC"][data-atributo="${atributo}"]`
     );
-
-    // ======================================================
-    // 2a. SUMAR PESOS DE TODOS LOS ITEMS
-    // ======================================================
+    
     selects.forEach(select => {
         const peso = parseFloat(select.dataset.peso);
         totalPeso += peso;
-        if (select.value === '1') {
+        // 🔴 NA CUENTA COMO CUMPLE
+        if (select.value === '1' || select.value === 'NA') {
             totalObtenido += peso;
         }
     });
-
-    // ======================================================
-    // 2b. MAPEAR ATRIBUTOS A IDs DE RESULTADO
-    // ======================================================
-    let resultadoElement;
-    switch (atributo) {
-        case 'PROTOCOLOS DE ATENCION':
-            resultadoElement = document.getElementById('resultadoProtocolos');
-            break;
-        case 'ESCUCHA ACTIVA':
-            resultadoElement = document.getElementById('resultadoEscuchaActiva');
-            break;
-        case 'GESTION DE ESPERA':
-            resultadoElement = document.getElementById('resultadoGestionEspera');
-            break;
-        case 'LENGUAJE Y COMUNICACIÓN':
-            resultadoElement = document.getElementById('resultadoLenguaje');
-            break;
-        default:
-            console.log('Atributo no reconocido:', atributo);
-            return;
-    }
-
-    // ======================================================
-    // 2c. ACTUALIZAR RESULTADO VISUAL
-    // ======================================================
+    
+    // Actualizar resultado del atributo
+    const atributoId = atributo.toLowerCase().replace(/[áéíóúñ\s\/]+/g, '_');
+    const resultadoElement = document.getElementById(`resultado_${atributoId}`);
     if (resultadoElement) {
         resultadoElement.textContent = `${totalObtenido}/${totalPeso}%`;
+        resultadoElement.style.color = totalObtenido === totalPeso ? 'var(--ok)' : 
+                                        totalObtenido > 0 ? 'var(--warning)' : 'var(--danger)';
     }
-
-    // ======================================================
-    // 2d. RECALCULAR TOTAL DEL FRENTE ENC
-    // ======================================================
-    recalcularTotalENC();
 }
 
-// ======================================================
-// 3. FUNCIÓN: recalcularTotalENC()
-// ======================================================
-// 📌 PROPÓSITO: Calcular el total del frente ENC (Cliente)
-// 📌 MECANISMO: Suma todos los atributos del frente ENC
-// 📌 ACTUALIZA: Elemento de resultado del frente ENC
-// 📌 RETORNO: Total obtenido (número)
-// ======================================================
 
-function recalcularTotalENC() {
-    // Buscar el contenedor del frente ENC
-    const frenteENC = document.querySelector('.frente-container[data-frente="ENC"]');
-    if (!frenteENC) return 0;
-    
-    let totalObtenido = 0;
-    
-    // Recorrer todos los atributos dentro del frente ENC
-    const atributos = frenteENC.querySelectorAll('.atributo-card');
-    
-    atributos.forEach(atributo => {
-        // Buscar el span de resultado dentro del atributo
-        const resultadoSpan = atributo.querySelector('[id^="resultado_"]');
-        if (resultadoSpan) {
-            // Extraer el número obtenido (antes del '/')
-            const obtenido = parseInt(resultadoSpan.textContent.split('/')[0]) || 0;
-            totalObtenido += obtenido;
-        }
-    });
-    
-    // Actualizar el resultado del frente ENC
-    const resultadoFrente = document.getElementById('resultadoFrente_ENC');
-    if (resultadoFrente) {
-        resultadoFrente.textContent = totalObtenido + '%';
-        
-        // Cambiar color según el total
-        if (totalObtenido >= 12) {
-            resultadoFrente.style.color = 'var(--ok)';        // Verde - Bueno
-        } else if (totalObtenido >= 9) {
-            resultadoFrente.style.color = 'var(--warning)';   // Naranja - Regular
-        } else {
-            resultadoFrente.style.color = 'var(--danger)';    // Rojo - Crítico
-        }
-    }
-    
-    return totalObtenido;
-}
 
 // ======================================================
 // 4. FUNCIÓN: recalcularTotalENCDesdeContainer()
@@ -3295,43 +3130,7 @@ function recalcularTotalENCDesdeContainer(container) {
 // 📌 RETORNO: Total obtenido (número)
 // ======================================================
 
-function actualizarResultadoECUF() {
-    // Buscar el contenedor del frente ECUF
-    const frenteECUF = document.querySelector('.frente-container[data-frente="ECUF"]');
-    if (!frenteECUF) return 0;
-    
-    let totalObtenido = 0;
-    
-    // Recorrer todos los atributos dentro del frente ECUF
-    const atributos = frenteECUF.querySelectorAll('.atributo-card');
-    
-    atributos.forEach(atributo => {
-        // Buscar el span de resultado dentro del atributo
-        const resultadoSpan = atributo.querySelector('[id^="resultado_"]');
-        if (resultadoSpan) {
-            // Extraer el número obtenido (antes del '/')
-            const obtenido = parseInt(resultadoSpan.textContent.split('/')[0]) || 0;
-            totalObtenido += obtenido;
-        }
-    });
-    
-    // Actualizar el resultado del frente ECUF
-    const resultadoFrente = document.getElementById('resultadoFrente_ECUF');
-    if (resultadoFrente) {
-        resultadoFrente.textContent = totalObtenido + '%';
-        
-        // Cambiar color según el total
-        if (totalObtenido >= 12) {
-            resultadoFrente.style.color = 'var(--ok)';        // Verde - Bueno
-        } else if (totalObtenido >= 9) {
-            resultadoFrente.style.color = 'var(--warning)';   // Naranja - Regular
-        } else {
-            resultadoFrente.style.color = 'var(--danger)';    // Rojo - Crítico
-        }
-    }
-    
-    return totalObtenido;
-}
+
 
 // ======================================================
 // 6. FUNCIÓN: recalcularTotalECUFDesdeContainer()
@@ -3452,56 +3251,7 @@ function actualizarResultadosAtributosECUF() {
     }
 }
 
-// ======================================================
-// 2. FUNCIÓN: actualizarResultadoECN()
-// ======================================================
-// 📌 PROPÓSITO: Calcular el total del frente ECN (Proceso)
-// 📌 MECANISMO: Suma todos los atributos del frente ECN
-// 📌 ACTUALIZA: Elemento de resultado del frente ECN
-// 📌 UMBRALES:
-//    - Verde (✅): ≥ 56 puntos (80% o más)
-//    - Naranja (⚠️): 42-55 puntos (60-80%)
-//    - Rojo (🔴): < 42 puntos (menos del 60%)
-// 📌 RETORNO: Total obtenido (número)
-// ======================================================
 
-function actualizarResultadoECN() {
-    // Buscar el contenedor del frente ECN
-    const frenteECN = document.querySelector('.frente-container[data-frente="ECN"]');
-    if (!frenteECN) return 0;
-    
-    let totalObtenido = 0;
-    
-    // Recorrer todos los atributos dentro del frente ECN
-    const atributos = frenteECN.querySelectorAll('.atributo-card');
-    
-    atributos.forEach(atributo => {
-        // Buscar el span de resultado dentro del atributo
-        const resultadoSpan = atributo.querySelector('[id^="resultado_"]');
-        if (resultadoSpan) {
-            // Extraer el número obtenido (antes del '/')
-            const obtenido = parseInt(resultadoSpan.textContent.split('/')[0]) || 0;
-            totalObtenido += obtenido;
-        }
-    });
-    
-    // Actualizar el resultado del frente ECN
-    const resultadoFrente = document.getElementById('resultadoFrente_ECN');
-    if (resultadoFrente) {
-        resultadoFrente.textContent = totalObtenido + '%';
-        
-        // Cambiar color según el total
-        if (totalObtenido >= 56) {
-            resultadoFrente.style.color = 'var(--ok)';        // Verde - Bueno
-        } else if (totalObtenido >= 42) {
-            resultadoFrente.style.color = 'var(--warning)';   // Naranja - Regular
-        } else {
-            resultadoFrente.style.color = 'var(--danger)';    // Rojo - Crítico
-        }
-    }
-    
-    return totalObtenido;
-}
 
 // ======================================================
 // 3. FUNCIÓN: recalcularTotalECNDesdeContainer()
@@ -3707,42 +3457,42 @@ function actualizarResultadosAtributosECN() {
 // ======================================================
 
 function calcularResultados() {
-    // ======================================================
-    // 1a. CALCULAR TOTALES DE CADA FRENTE
-    // ======================================================
-    const totalENC = recalcularTotalENC();        // Frente Cliente (30%)
-    const totalECUF = actualizarResultadoECUF();  // Frente Negocio (30%)
-    const totalECN = actualizarResultadoECN();    // Frente Proceso (40%)
-
-    // ======================================================
-    // 1b. CALCULAR NOTA FINAL
-    // ======================================================
-    const notaFinal = totalENC + totalECUF + totalECN;
-
-    // ======================================================
-    // 1c. CONSTRUIR MENSAJE DE RESULTADOS
-    // ======================================================
-    let mensaje = `📊 RESULTADOS DE EVALUACIÓN:\n\n`;
-    mensaje += `✅ Errores No Críticos (ENC): ${totalENC}/30%\n`;
-    mensaje += `⚠️ Errores Críticos Usuario (ECUF): ${totalECUF}/30%\n`;
-    mensaje += `💰 Errores Críticos Negocio (ECN): ${totalECN}/40%\n`;
-    mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    mensaje += `🎯 NOTA FINAL: ${notaFinal}%\n`;
-
-    // ======================================================
-    // 1d. DETERMINAR RANGO
-    // ======================================================
-    if (notaFinal >= 97) mensaje += `⭐ Rango: EXCELENTE`;
-    else if (notaFinal >= 90) mensaje += `👍 Rango: BIEN`;
-    else if (notaFinal >= 85) mensaje += `🆗 Rango: REGULAR`;
-    else mensaje += `🔴 Rango: BAJO`;
-
-    // ======================================================
-    // 1e. MOSTRAR RESULTADOS
-    // ======================================================
+    const frentes = document.querySelectorAll('.frente-container');
+    
+    if (frentes.length === 0) {
+        alert('⚠️ No hay frentes de evaluación disponibles');
+        return 0;
+    }
+    
+    let mensaje = '📊 RESULTADOS DE EVALUACIÓN:\n\n';
+    let totalGeneral = 0;
+    let resultados = {};
+    
+    frentes.forEach(frenteContainer => {
+        const frenteCodigo = frenteContainer.dataset.frente;
+        if (!frenteCodigo) return;
+        
+        const header = frenteContainer.querySelector('.frente-titulo span');
+        const nombreFrente = header ? header.textContent.trim() : frenteCodigo;
+        const resultadoElement = document.getElementById(`resultadoFrente_${frenteCodigo}`);
+        const total = resultadoElement ? parseFloat(resultadoElement.textContent?.replace('%', '') || 0) : 0;
+        const badge = frenteContainer.querySelector('.frente-badge');
+        const pesoMaximo = badge ? parseFloat(badge.textContent?.replace('%', '') || 100) : 100;
+        
+        resultados[frenteCodigo] = { total, pesoMaximo, nombre: nombreFrente };
+        totalGeneral += total;
+    });
+    
+    for (const [codigo, data] of Object.entries(resultados)) {
+        mensaje += `📌 ${data.nombre}: ${data.total}/${data.pesoMaximo}%\n`;
+    }
+    
+    mensaje += '━━━━━━━━━━━━━━━━━━━━━━━━\n';
+    mensaje += `🎯 NOTA FINAL: ${totalGeneral.toFixed(1)}%`;
+    
     alert(mensaje);
-
-    return notaFinal;
+    
+    return totalGeneral;
 }
 
 // ======================================================
@@ -3812,10 +3562,18 @@ function obtenerCuartil(nota) {
 // ======================================================
 
 function calcularTodo() {
-    // Actualizar todos los bloques de evaluación
-    recalcularTotalENC();        // Frente Cliente (ENC)
-    actualizarResultadoECUF();   // Frente Negocio (ECUF)
-    actualizarResultadoECN();    // Frente Proceso (ECN)
+    console.log('🔄 Recalculando TODOS los frentes...');
+    
+    const frentes = document.querySelectorAll('.frente-container');
+    
+    frentes.forEach(frenteContainer => {
+        const frenteCodigo = frenteContainer.dataset.frente;
+        if (frenteCodigo) {
+            recalcularFrente(frenteCodigo);
+        }
+    });
+    
+    recalcularNotaFinalGlobal();
 }
 
 // ======================================================
@@ -4608,23 +4366,54 @@ function construirAlertasOperativas(evaluaciones, ranking, topSubmotivos) {
 // ======================================================
 
 function toggleFrente(frente) {
-    // Obtener elementos del DOM
-    const contenido = document.getElementById(`frente-${frente}`);
-    const icono = document.getElementById(`icono-${frente}`);
-
+    console.log(`🔄 toggleFrente: ${frente}`);
+    
+    // 🔴 Buscar contenido con ambos formatos de ID
+    let contenido = document.getElementById(`frente-${frente}`);  // Formato con guión
+    if (!contenido) {
+        contenido = document.getElementById(`frente_${frente}`);  // Formato con guión bajo
+    }
+    
+    // Si no se encuentra por ID, buscar por data-frente
+    if (!contenido) {
+        const contenedor = document.querySelector(`.frente-container[data-frente="${frente}"]`);
+        if (contenedor) {
+            contenido = contenedor.querySelector('.frente-contenido');
+        }
+    }
+    
+    if (!contenido) {
+        console.warn(`⚠️ No se encontró el contenido del frente ${frente}`);
+        return;
+    }
+    
+    // Buscar icono
+    let icono = document.getElementById(`icono-${frente}`);
+    if (!icono) {
+        icono = document.getElementById(`icono_${frente}`);
+    }
+    if (!icono) {
+        const contenedor = contenido.closest('.frente-container');
+        if (contenedor) {
+            icono = contenedor.querySelector('.frente-expand-icon');
+        }
+    }
+    
+    // Alternar estado
     if (contenido.classList.contains('collapsed')) {
         // Expandir
         contenido.classList.remove('collapsed');
-        icono.textContent = '▼';
+        if (icono) icono.textContent = '▼';
         localStorage.setItem(`frente_${frente}_collapsed`, 'false');
+        console.log(`   ${frente}: expandido ✅`);
     } else {
         // Contraer
         contenido.classList.add('collapsed');
-        icono.textContent = '▶';
+        if (icono) icono.textContent = '▶';
         localStorage.setItem(`frente_${frente}_collapsed`, 'true');
+        console.log(`   ${frente}: contraído ✅`);
     }
 }
-
 // ======================================================
 // 5. FUNCIÓN: restaurarFrentes()
 // ======================================================
@@ -4902,6 +4691,39 @@ async function cerrarSesion(event) {
 }
 
 // ======================================================
+// CARGAR REGLAS DE EVALUACIÓN (VERSIÓN COMPLETA)
+// ======================================================
+
+let reglasEvaluacionGlobal = [];
+
+async function cargarReglasEvaluacion() {
+    try {
+        console.log('📋 Cargando reglas de evaluación...');
+        reglasEvaluacionGlobal = await API.getReglasEvaluacion();
+        console.log(`✅ ${reglasEvaluacionGlobal.length} reglas cargadas`);
+        
+        if (reglasEvaluacionGlobal.length > 0) {
+            console.log('📋 Reglas cargadas:');
+            reglasEvaluacionGlobal.forEach((r, i) => {
+                console.log(`   ${i+1}. ${r.submotivo_origen} → ${r.accion_tipo} (${r.bloque_origen})`);
+                if (r.excepciones) {
+                    console.log(`      Excepciones: ${JSON.stringify(r.excepciones)}`);
+                }
+                if (r.submotivos_afectados) {
+                    console.log(`      Afectados: ${JSON.stringify(r.submotivos_afectados)}`);
+                }
+            });
+        }
+        
+        return reglasEvaluacionGlobal;
+    } catch (error) {
+        console.error('❌ Error cargando reglas:', error);
+        reglasEvaluacionGlobal = [];
+        return [];
+    }
+}
+
+// ======================================================
 // 4. INICIALIZACIÓN - window.onload
 // ======================================================
 // 📌 PROPÓSITO: Punto de entrada principal del módulo auditor
@@ -4965,6 +4787,16 @@ window.onload = async function () {
     // ======================================================
     if (typeof generarFormularioDinamico === 'function') {
         await generarFormularioDinamico();
+    }
+    
+    // ======================================================
+    // 🔴 NUEVO: CARGAR REGLAS DE EVALUACIÓN
+    // ======================================================
+    if (typeof cargarReglasEvaluacion === 'function') {
+        await cargarReglasEvaluacion();
+        console.log('✅ Reglas de evaluación cargadas');
+    } else {
+        console.warn('⚠️ cargarReglasEvaluacion no está definida');
     }
     
     // ======================================================
@@ -6398,21 +6230,15 @@ function limpiarFormularioDespuesDeGuardar() {
 // ======================================================
 
 function manejarClienteCortaLlamada(select) {
-    // ======================================================
-    // 5a. OBTENER VALOR Y TEXTO SELECCIONADO
-    // ======================================================
     const valor = select.value;
     const textoSeleccionado = select.options[select.selectedIndex]?.text;
     const esNoCumple = (valor === '0' && textoSeleccionado === 'No Cumple');
-
     const todosLosSelects = document.querySelectorAll('.cumple-select');
 
-    // ======================================================
-    // 5b. CASO: NO CUMPLE
-    // ======================================================
     if (esNoCumple) {
         let camposModificados = 0;
         let camposExcluidos = 0;
+        const excepciones = ['Brinda Speech de saludo/despedida', 'No generar cierre incorrecto', 'No presenta datos incompletos o incorrectos en PSI'];
 
         todosLosSelects.forEach(otroSelect => {
             if (otroSelect !== select) {
@@ -6420,20 +6246,12 @@ function manejarClienteCortaLlamada(select) {
                 const labelSpan = parentRow ? parentRow.querySelector('span:first-child') : null;
                 const textoCampo = labelSpan ? labelSpan.innerText : '';
 
-                // ======================================================
-                // EXCEPCIONES: Campos que NO se modifican
-                // ======================================================
-                const esExcluido =
-                    textoCampo.includes('Brinda Speech de saludo/despedida') ||
-                    textoCampo.includes('No generar cierre incorrecto o por motivo que no corresponde') ||
-                    textoCampo.includes('No presenta datos incompletos o incorrectos en PSI');
-
+                const esExcluido = excepciones.some(exc => textoCampo.includes(exc));
                 if (esExcluido) {
                     camposExcluidos++;
-                    return; // Saltar este campo
+                    return;
                 }
 
-                // Buscar opción "No Aplica" (value="1")
                 for (let i = 0; i < otroSelect.options.length; i++) {
                     if (otroSelect.options[i].text === 'No Aplica') {
                         otroSelect.selectedIndex = i;
@@ -6442,50 +6260,30 @@ function manejarClienteCortaLlamada(select) {
                     }
                 }
 
-                // Disparar evento change para actualizar cálculos
                 const evento = new Event('change');
                 otroSelect.dispatchEvent(evento);
                 otroSelect.disabled = true;
             }
         });
 
-        // ======================================================
-        // 5c. MOSTRAR ALERTA CON EXCEPCIONES
-        // ======================================================
-        alert(`⚠️ Cliente NO permitió continuar la llamada.\n\n` +
-            `Se han marcado automáticamente ${camposModificados} campos como "No Aplica".\n\n` +
-            `✅ Campos EXCLUIDOS (no se modificaron):\n` +
-            `   • Brinda Speech de saludo/despedida (3%)\n` +
-            `   • No generar cierre incorrecto (1%)\n` +
-            `   • No presenta datos incompletos en PSI (2%)\n\n` +
-            `📝 Los campos marcados como "No Aplica" NO afectan la calificación final.`);
+        alert(`⚠️ Cliente NO permitió continuar la llamada.\n\nSe han marcado automáticamente ${camposModificados} campos como "No Aplica".\n\n✅ Campos EXCLUIDOS (no se modificaron):\n   • Brinda Speech de saludo/despedida\n   • No generar cierre incorrecto\n   • No presenta datos incompletos en PSI\n\n📝 Los campos marcados como "No Aplica" NO afectan la calificación final.`);
 
-        // ======================================================
-        // 5d. RESALTAR FORMULARIO (advertencia)
-        // ======================================================
         const formularioCard = document.querySelector('.card');
         if (formularioCard) {
             formularioCard.style.border = '2px solid var(--warning)';
             formularioCard.style.backgroundColor = '#fffef7';
         }
 
-    // ======================================================
-    // 5e. CASO: REHABILITAR CAMPOS
-    // ======================================================
     } else if (valor === '' || (valor === '1' && textoSeleccionado !== 'Cumple')) {
         let algunoHabilitado = false;
 
         todosLosSelects.forEach(otroSelect => {
             if (otroSelect !== select && otroSelect.disabled) {
-                // Verificar si fue deshabilitado por la regla
                 const parentRow = otroSelect.closest('.eval-row');
                 const labelSpan = parentRow ? parentRow.querySelector('span:first-child') : null;
                 const textoCampo = labelSpan ? labelSpan.innerText : '';
-
-                const esExcluido =
-                    textoCampo.includes('Brinda Speech de saludo/despedida') ||
-                    textoCampo.includes('No generar cierre incorrecto o por motivo que no corresponde') ||
-                    textoCampo.includes('No presenta datos incompletos o incorrectos en PSI');
+                const excepciones = ['Brinda Speech de saludo/despedida', 'No generar cierre incorrecto', 'No presenta datos incompletos o incorrectos en PSI'];
+                const esExcluido = excepciones.some(exc => textoCampo.includes(exc));
 
                 if (!esExcluido) {
                     otroSelect.disabled = false;
@@ -6507,31 +6305,13 @@ function manejarClienteCortaLlamada(select) {
         }
     }
 
-    // ======================================================
-    // 5f. ACTUALIZAR PESO VISUAL DEL CAMPO ACTUAL
-    // ======================================================
-    const submotivo = select.dataset.submotivo;
-    const pesoElement = document.getElementById(`peso-${submotivo}`);
-    if (pesoElement) {
-        if (valor === '1' && textoSeleccionado === 'Cumple') {
-            pesoElement.textContent = `${select.dataset.peso}%`;
-            pesoElement.style.color = 'var(--ok)';
-        } else if (valor === '0') {
-            pesoElement.textContent = '0%';
-            pesoElement.style.color = 'var(--danger)';
-        } else {
-            pesoElement.textContent = '0%';
-            pesoElement.style.color = '';
-        }
-    }
-
-    // ======================================================
-    // 5g. RECALCULAR RESULTADOS
-    // ======================================================
-    recalcularAtributoENC('PROTOCOLOS DE ATENCION');
-    recalcularTotalENC();
-    actualizarResultadoECUF();
-    actualizarResultadoECN();
+    // Recalcular todo dinámicamente
+    recalcularSubmotivo(select);
+    const bloque = select.dataset.bloque;
+    const atributo = select.dataset.atributo;
+    recalcularAtributoDinamico(bloque, atributo);
+    recalcularFrente(bloque);
+    recalcularNotaFinalGlobal();
 }
 
 // ======================================================
@@ -6790,16 +6570,13 @@ async function editarEvaluacion(id) {
 function cargarDatosEvaluacionEnFormulario(evaluacion) {
     console.log('📝 Cargando datos de evaluación para edición:', evaluacion);
 
-    // ======================================================
-    // 3a. CARGAR CAMPOS BÁSICOS
-    // ======================================================
+    // Cargar campos básicos (sin cambios)
     const ticketPSIInput = document.getElementById('evalTicketPSI');
     const agenteInput = document.getElementById('evalAgenteInput');
     const agenteHidden = document.getElementById('evalAgente');
     const fechaInput = document.getElementById('evalFecha');
     const idLlamadaInput = document.getElementById('evalIdLlamada');
 
-    // Ticket PSI
     if (ticketPSIInput) {
         ticketPSIInput.value = evaluacion.ticketPSI || '';
         ticketPSIInput.readOnly = true;
@@ -6807,7 +6584,6 @@ function cargarDatosEvaluacionEnFormulario(evaluacion) {
         ticketPSIInput.style.backgroundColor = '#f0f0f0';
     }
 
-    // Agente (input visible + hidden)
     if (agenteInput) {
         agenteInput.value = evaluacion.agente || '';
         agenteInput.disabled = true;
@@ -6818,7 +6594,6 @@ function cargarDatosEvaluacionEnFormulario(evaluacion) {
         agenteHidden.value = evaluacion.agente || '';
     }
 
-    // ID Llamada
     if (idLlamadaInput) {
         idLlamadaInput.value = evaluacion.idLlamada || '';
         idLlamadaInput.readOnly = true;
@@ -6826,77 +6601,27 @@ function cargarDatosEvaluacionEnFormulario(evaluacion) {
         idLlamadaInput.style.backgroundColor = '#f0f0f0';
     }
 
-    // ======================================================
-    // 3b. CARGAR FECHA (CORREGIDO)
-    // ======================================================
     if (fechaInput && evaluacion.fecha) {
-        console.log('📅 Fecha original desde BD:', evaluacion.fecha);
-        console.log('📅 fechaFormateada desde BD:', evaluacion.fechaFormateada);
-
         let fechaParaInput = '';
-
-        // Intentar desde fechaFormateada (DD/MM/YYYY HH:MM)
         if (evaluacion.fechaFormateada && evaluacion.fechaFormateada.includes('/')) {
             const partes = evaluacion.fechaFormateada.split(' ');
-            const fechaParte = partes[0]; // DD/MM/YYYY
-            const horaParte = partes[1] || '00:00'; // HH:MM
-
+            const fechaParte = partes[0];
+            const horaParte = partes[1] || '00:00';
             const [dia, mes, anio] = fechaParte.split('/');
             if (dia && mes && anio) {
                 fechaParaInput = `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}T${horaParte}`;
             }
         }
-        // Intentar con fecha ISO
-        else if (evaluacion.fecha && typeof evaluacion.fecha === 'string') {
-            if (evaluacion.fecha.includes('T')) {
-                fechaParaInput = evaluacion.fecha.substring(0, 16);
-            } else if (evaluacion.fecha.includes('/')) {
-                const partes = evaluacion.fecha.split(' ');
-                const fechaParte = partes[0].split('/');
-                const horaParte = partes[1] || '00:00';
-
-                if (fechaParte.length === 3) {
-                    const dia = fechaParte[0].padStart(2, '0');
-                    const mes = fechaParte[1].padStart(2, '0');
-                    const anio = fechaParte[2];
-                    const horaMin = horaParte.substring(0, 5);
-                    fechaParaInput = `${anio}-${mes}-${dia}T${horaMin}`;
-                }
-            }
-        }
-
-        // Fallback: crear Date
-        if (!fechaParaInput) {
-            try {
-                const date = new Date(evaluacion.fecha);
-                if (!isNaN(date.getTime())) {
-                    const anio = date.getFullYear();
-                    const mes = String(date.getMonth() + 1).padStart(2, '0');
-                    const dia = String(date.getDate()).padStart(2, '0');
-                    const horas = String(date.getHours()).padStart(2, '0');
-                    const minutos = String(date.getMinutes()).padStart(2, '0');
-                    fechaParaInput = `${anio}-${mes}-${dia}T${horas}:${minutos}`;
-                }
-            } catch (e) {
-                console.error('Error parseando fecha:', e);
-            }
-        }
-
-        console.log('📅 Fecha final para input:', fechaParaInput);
-
         if (fechaParaInput) {
             fechaInput.value = fechaParaInput;
             fechaInput.disabled = false;
             fechaInput.style.backgroundColor = '#fcfdfe';
         } else {
             fechaInput.value = formatDateForInput(new Date());
-            console.warn('⚠️ No se pudo obtener la fecha guardada, usando fecha actual');
         }
     }
 
-    // ======================================================
-    // 3c. LIMPIAR SELECTS Y RESULTADOS
-    // ======================================================
+    // Limpiar todos los selects
     const todosLosSelects = document.querySelectorAll('.cumple-select');
     todosLosSelects.forEach(select => {
         select.value = '';
@@ -6912,69 +6637,42 @@ function cargarDatosEvaluacionEnFormulario(evaluacion) {
         peso.style.color = '';
     });
 
-    // Limpiar resultados
-    const resultados = [
-        'resultadoProtocolos', 'resultadoEscuchaActiva', 'resultadoGestionEspera', 'resultadoLenguaje',
-        'resultadoCorte', 'resultadoRespeto', 'resultadoInformacion',
-        'resultadoSondeo', 'resultadoNegociacion', 'resultadoMotivoNoPago',
-        'resultadoLugaresPago', 'resultadoCierre', 'resultadoImagen', 'resultadoTipificacion',
-        'resultadoENC', 'resultadoECUF', 'resultadoECN',
-        'resultadoFrenteCliente', 'resultadoFrenteNegocio', 'resultadoFrenteProceso'
-    ];
-    resultados.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            if (id.includes('resultado') && !id.includes('ENC') && !id.includes('ECUF') && !id.includes('ECN')) {
-                el.textContent = '0/0%';
-            } else {
-                el.textContent = '0%';
-            }
+    // Limpiar resultados de atributos
+    const resultados = document.querySelectorAll('[id^="resultado_"]');
+    resultados.forEach(el => {
+        if (el.id.includes('resultadoFrente_')) {
+            el.textContent = '0%';
+        } else {
+            el.textContent = '0/0%';
         }
     });
 
-    // ======================================================
-    // 3d. CARGAR DETALLES
-    // ======================================================
+    // Cargar detalles de la evaluación
     if (evaluacion.detalles && evaluacion.detalles.length > 0) {
         evaluacion.detalles.forEach(detalle => {
             const select = document.querySelector(
                 `.cumple-select[data-bloque="${detalle.bloque}"][data-submotivo="${detalle.submotivo}"]`
             );
-
             if (select) {
                 const valor = (detalle.cumple === true || detalle.cumple === 'true' || detalle.cumple === 1 || detalle.cumple === '1') ? '1' : '0';
                 select.value = valor;
-
                 const evento = new Event('change', { bubbles: true });
                 select.dispatchEvent(evento);
-
-                const pesoElement = document.getElementById(`peso-${detalle.submotivo}`);
-                if (pesoElement) {
-                    if (valor === '1') {
-                        pesoElement.textContent = `${detalle.peso}%`;
-                        pesoElement.style.color = 'var(--ok)';
-                    } else {
-                        pesoElement.textContent = '0%';
-                        pesoElement.style.color = 'var(--danger)';
-                    }
-                }
-            } else {
-                console.warn('No se encontró select para:', detalle.bloque, detalle.submotivo);
             }
         });
     }
 
-    // ======================================================
-    // 3e. RECALCULAR RESULTADOS
-    // ======================================================
+    // Recalcular todo dinámicamente
     setTimeout(() => {
-        recalcularTotalENC();
-        actualizarResultadoECUF();
-        actualizarResultadoECN();
-        console.log('✅ Resultados recalculados');
+        const frentes = document.querySelectorAll('.frente-container');
+        frentes.forEach(frenteContainer => {
+            const frenteCodigo = frenteContainer.dataset.frente;
+            if (frenteCodigo) {
+                recalcularFrente(frenteCodigo);
+            }
+        });
+        recalcularNotaFinalGlobal();
     }, 100);
-
-    console.log('✅ Datos cargados en el formulario correctamente');
 }
 
 // ======================================================
@@ -7006,29 +6704,19 @@ function cargarDatosEvaluacionEnFormulario(evaluacion) {
 // ======================================================
 
 async function actualizarEvaluacionExistente() {
-    // ======================================================
-    // 1a. VALIDAR QUE HAY UNA EDICIÓN ACTIVA
-    // ======================================================
     if (!modoEdicionActivo || !idEvaluacionEditando) {
         alert('⚠️ No hay una edición activa');
         return;
     }
 
-    // ======================================================
-    // 1b. OBTENER EVALUADOR
-    // ======================================================
     let evaluador;
     if (usuarioActual && usuarioActual.rol === 'AUDITOR') {
         evaluador = usuarioActual.nombre_completo;
     } else {
-        // Para admin/supervisor, usar el select
         const selectEvaluador = document.getElementById('evalEvaluador');
         evaluador = selectEvaluador?.value;
     }
 
-    // ======================================================
-    // 1c. VALIDAR CAMPOS OBLIGATORIOS
-    // ======================================================
     const ticketPSI = document.getElementById('evalTicketPSI')?.value;
     const agenteInput = document.getElementById('evalAgenteInput');
     const agente = agenteInput?.value;
@@ -7040,12 +6728,8 @@ async function actualizarEvaluacionExistente() {
         return;
     }
 
-    // ======================================================
-    // 1d. VALIDAR SELECTS COMPLETOS
-    // ======================================================
     const todosLosSelects = document.querySelectorAll('.cumple-select');
     const selectsVacios = [];
-
     todosLosSelects.forEach(select => {
         if (!select.disabled && (!select.value || select.value === '')) {
             selectsVacios.push(select);
@@ -7060,23 +6744,24 @@ async function actualizarEvaluacionExistente() {
         return;
     }
 
-    // ======================================================
-    // 1e. CALCULAR RESULTADOS
-    // ======================================================
-    const totalENC = recalcularTotalENC();
-    const totalECUF = actualizarResultadoECUF();
-    const totalECN = actualizarResultadoECN();
-    const notaFinal = totalENC + totalECUF + totalECN;
+    // Recalcular todos los frentes dinámicamente
+    const frentes = document.querySelectorAll('.frente-container');
+    let totalGeneral = 0;
+    frentes.forEach(frenteContainer => {
+        const frenteCodigo = frenteContainer.dataset.frente;
+        if (frenteCodigo) {
+            totalGeneral += recalcularFrente(frenteCodigo);
+        }
+    });
 
+    const notaFinal = totalGeneral;
     let rango = '';
     if (notaFinal >= 97) rango = 'Excelente';
     else if (notaFinal >= 90) rango = 'Bien';
     else if (notaFinal >= 85) rango = 'Regular';
     else rango = 'Bajo';
 
-    // ======================================================
-    // 1f. OBTENER DETALLES ACTUALIZADOS
-    // ======================================================
+    // Obtener detalles
     const detalles = [];
     todosLosSelects.forEach(select => {
         if (select.value) {
@@ -7090,23 +6775,15 @@ async function actualizarEvaluacionExistente() {
         }
     });
 
-    // ======================================================
-    // 1g. CREAR FECHA FORMATEADA
-    // ======================================================
     const fechaObj = new Date(fechaRaw);
     const fechaFormateada = `${fechaObj.getDate().toString().padStart(2, '0')}/${(fechaObj.getMonth() + 1).toString().padStart(2, '0')}/${fechaObj.getFullYear()} ${fechaObj.getHours().toString().padStart(2, '0')}:${fechaObj.getMinutes().toString().padStart(2, '0')}`;
 
-    // ======================================================
-    // 1h. ACTUALIZAR EN BASE DE DATOS
-    // ======================================================
     try {
         const client = getDB();
-
         if (!client || typeof client.from !== 'function') {
             throw new Error('Base de datos no disponible');
         }
 
-        // Obtener la evaluación original para saber el contador de ediciones
         const { data: evaluacionOriginal } = await client
             .from('evaluaciones')
             .select('veces_editado')
@@ -7115,15 +6792,13 @@ async function actualizarEvaluacionExistente() {
 
         const nuevasEdiciones = (evaluacionOriginal?.veces_editado || 0) + 1;
 
-        // ======================================================
-        // ACTUALIZAR EVALUACIÓN
-        // ======================================================
+        // 🔴 USAR EL TOTAL GENERAL DINÁMICO
         const { error: updateError } = await client
             .from('evaluaciones')
             .update({
-                total_enc: totalENC,
-                total_ecuf: totalECUF,
-                total_ecn: totalECN.toFixed(1),
+                total_enc: 0, // Ya no se usa, se calcula dinámicamente
+                total_ecuf: 0,
+                total_ecn: 0,
                 nota_final: notaFinal.toFixed(1),
                 rango: rango,
                 fecha: fechaRaw,
@@ -7135,17 +6810,11 @@ async function actualizarEvaluacionExistente() {
 
         if (updateError) throw updateError;
 
-        // ======================================================
-        // ELIMINAR DETALLES VIEJOS
-        // ======================================================
         await client
             .from('detalles_evaluacion')
             .delete()
             .eq('evaluacion_id', idEvaluacionEditando);
 
-        // ======================================================
-        // GUARDAR NUEVOS DETALLES
-        // ======================================================
         const detallesParaInsertar = detalles.map(d => ({
             evaluacion_id: idEvaluacionEditando,
             bloque: d.bloque,
@@ -7159,9 +6828,6 @@ async function actualizarEvaluacionExistente() {
             .from('detalles_evaluacion')
             .insert(detallesParaInsertar);
 
-        // ======================================================
-        // 1i. MOSTRAR CONFIRMACIÓN Y LIMPIAR
-        // ======================================================
         alert(`✅ Evaluación actualizada correctamente\n\n🎯 Nueva nota: ${notaFinal.toFixed(1)}% (${rango})\n✏️ Veces editado: ${nuevasEdiciones}`);
 
         await actualizarContadorHeader();
@@ -8082,29 +7748,26 @@ async function generarFormularioDinamico() {
     if (!container) return false;
     
     try {
-        // ======================================================
-        // 4a. CARGAR ESTRUCTURA
-        // ======================================================
+        // 1. Cargar estructura
         const estructura = await cargarEstructuraEvaluacion();
         if (!estructura || !estructura.frentes || estructura.frentes.length === 0) {
             container.innerHTML = '<div style="color: orange; padding: 20px;">⚠️ No hay estructura de evaluación disponible</div>';
             return false;
         }
         
+        // 2. Cargar reglas (si no están cargadas)
+        if (!reglasEvaluacionGlobal || reglasEvaluacionGlobal.length === 0) {
+            await cargarReglasEvaluacion();
+        }
+        
         let html = '';
         
-        // ======================================================
-        // 4b. GENERAR FRENTES
-        // ======================================================
+        // 3. Generar frentes
         for (const frente of estructura.frentes) {
-            // Determinar clase CSS según código
             const frenteClass = frente.codigo === 'ENC' ? 'cliente' : 
                                (frente.codigo === 'ECUF' ? 'negocio' : 'proceso');
             
-            // Leer estado colapsado desde localStorage
             const collapsed = localStorage.getItem(`frente_${frente.codigo}_collapsed`) === 'true';
-            
-            // Icono según código
             const icono = frente.codigo === 'ENC' ? '👥' : 
                          (frente.codigo === 'ECUF' ? '💰' : '⚙️');
             
@@ -8125,11 +7788,8 @@ async function generarFormularioDinamico() {
                     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
             `;
             
-            // ======================================================
-            // 4c. GENERAR ATRIBUTOS
-            // ======================================================
+            // 4. Generar atributos
             for (const atributo of frente.atributos) {
-                // ID único para el atributo (sin acentos, espacios ni caracteres especiales)
                 const atributoId = atributo.nombre.toLowerCase().replace(/[áéíóúñ\s\/]+/g, '_');
                 
                 html += `
@@ -8141,10 +7801,9 @@ async function generarFormularioDinamico() {
                         <div>
                 `;
                 
-                // ======================================================
-                // 4d. GENERAR SUBMOTIVOS (con sus selects)
-                // ======================================================
+                // 5. Generar sub-motivos con sus selects
                 for (const sub of atributo.sub_motivos) {
+                    // 🔴 AGREGAR DATA-ATRIBUTOS PARA REGLAS
                     html += `
                         <div class="eval-row" data-submotivo="${sub.codigo}">
                             <span>${sub.descripcion} (${sub.peso_individual}%)</span>
@@ -8153,8 +7812,9 @@ async function generarFormularioDinamico() {
                                     data-atributo="${atributo.nombre}"
                                     data-submotivo="${sub.codigo}"
                                     data-peso="${sub.peso_individual}"
+                                    data-version-id="${estructura.version.id}"
                                     disabled
-                                    onchange="actualizarResultadoDinamico(this)">
+                                    onchange="manejarCambioSelectConReglas(this)">
                                 <option value="">Seleccione</option>
                                 <option value="1">Cumple</option>
                                 <option value="0">No Cumple</option>
@@ -8175,12 +7835,13 @@ async function generarFormularioDinamico() {
             `;
         }
         
-        // ======================================================
-        // 4e. INSERTAR EN EL DOM
-        // ======================================================
+        // 6. Insertar en el DOM
         container.innerHTML = html;
         
-        console.log('✅ Formulario generado dinámicamente con selects deshabilitados');
+        // 7. Conectar eventos a los selects (para compatibilidad con funciones existentes)
+        conectarEventosSelects();
+        
+        console.log('✅ Formulario generado dinámicamente con reglas');
         return true;
         
     } catch (error) {
@@ -8189,6 +7850,272 @@ async function generarFormularioDinamico() {
         return false;
     }
 }
+
+// ======================================================
+// MANEJAR CAMBIO EN SELECT CON REGLAS (VERSIÓN COMPLETA)
+// ======================================================
+
+function manejarCambioSelectConReglas(select) {
+    console.log('🔄 [REGLAS] Select cambiado:', {
+        bloque: select.dataset.bloque,
+        atributo: select.dataset.atributo,
+        submotivo: select.dataset.submotivo,
+        valor: select.value,
+        texto: select.options[select.selectedIndex]?.text
+    });
+    
+    const reglasAplicables = reglasEvaluacionGlobal.filter(regla => {
+        const coincideSubmotivo = !regla.submotivo_origen || select.dataset.submotivo === regla.submotivo_origen;
+        const coincideBloque = !regla.bloque_origen || select.dataset.bloque === regla.bloque_origen;
+        const coincideAtributo = !regla.atributo_origen || select.dataset.atributo === regla.atributo_origen;
+        return coincideSubmotivo && coincideBloque && coincideAtributo;
+    });
+    
+    if (reglasAplicables.length === 0) {
+        console.log('   ℹ️ No hay reglas definidas para este select');
+        if (typeof actualizarResultadoAtributo === 'function') {
+            actualizarResultadoAtributo(select, select.dataset.atributo);
+        }
+        return;
+    }
+    
+    console.log(`   📋 Reglas aplicables: ${reglasAplicables.length}`);
+    
+    for (const regla of reglasAplicables) {
+        ejecutarReglaConRehabilitacion(regla, select);
+    }
+    
+    // Recalcular todo dinámicamente
+    setTimeout(() => {
+        const frentes = document.querySelectorAll('.frente-container');
+        frentes.forEach(frenteContainer => {
+            const frenteCodigo = frenteContainer.dataset.frente;
+            if (frenteCodigo) {
+                recalcularFrente(frenteCodigo);
+            }
+        });
+        recalcularNotaFinalGlobal();
+    }, 100);
+}
+
+
+
+// ======================================================
+// EJECUTAR UNA REGLA (VERSIÓN COMPLETA)
+// ======================================================
+
+function ejecutarReglaConRehabilitacion(regla, selectOrigen) {
+    console.log(`   ⚡ Ejecutando regla: "${regla.submotivo_origen}" → ${regla.accion_tipo}`);
+    
+    const todosLosSelects = document.querySelectorAll('.cumple-select');
+    const valorActual = selectOrigen.value;
+    const valorCondicion = regla.valor_condicion;
+    
+    const condicionSeCumple = (valorActual === valorCondicion);
+    console.log(`   📌 Condición se cumple? ${condicionSeCumple} (${valorActual} === ${valorCondicion})`);
+    
+    let excepciones = [];
+    let submotivosAfectados = null;
+    
+    try {
+        if (regla.excepciones) {
+            excepciones = typeof regla.excepciones === 'string' 
+                ? JSON.parse(regla.excepciones) 
+                : regla.excepciones;
+        }
+        if (regla.submotivos_afectados) {
+            submotivosAfectados = typeof regla.submotivos_afectados === 'string' 
+                ? JSON.parse(regla.submotivos_afectados) 
+                : regla.submotivos_afectados;
+        }
+    } catch (e) {
+        console.warn('   ⚠️ Error parseando JSON de regla:', e);
+    }
+    
+    console.log(`   📌 Excepciones: ${excepciones.join(', ') || 'ninguna'}`);
+    console.log(`   📌 Afectados: ${submotivosAfectados ? submotivosAfectados.join(', ') : 'todos'}`);
+    
+    // CASO 1: CONDICIÓN NO SE CUMPLE → REHABILITAR
+    if (!condicionSeCumple) {
+        console.log(`   🔓 Condición ya no se cumple. Rehabilitando campos...`);
+        
+        let rehabilitados = 0;
+        
+        todosLosSelects.forEach(otroSelect => {
+            if (otroSelect === selectOrigen) return;
+            
+            const submotivo = otroSelect.dataset.submotivo;
+            const fueAfectado = submotivosAfectados ? submotivosAfectados.includes(submotivo) : true;
+            
+            if (!fueAfectado) return;
+            if (excepciones.includes(submotivo)) {
+                console.log(`      ⏭️ Excepción (no rehabilitado): ${submotivo}`);
+                return;
+            }
+            
+            if (otroSelect.disabled || otroSelect.value === 'NA') {
+                otroSelect.disabled = false;
+                otroSelect.style.backgroundColor = '#fcfdfe';
+                otroSelect.value = '';
+                rehabilitados++;
+                
+                const pesoElement = document.getElementById(`peso-${submotivo}`);
+                if (pesoElement) {
+                    pesoElement.textContent = '0%';
+                    pesoElement.style.color = '';
+                }
+                
+                const evento = new Event('change', { bubbles: true });
+                otroSelect.dispatchEvent(evento);
+            }
+        });
+        
+        console.log(`   ✅ ${rehabilitados} campos rehabilitados`);
+        
+        // Recalcular todo dinámicamente
+        setTimeout(() => {
+            const frentes = document.querySelectorAll('.frente-container');
+            frentes.forEach(frenteContainer => {
+                const frenteCodigo = frenteContainer.dataset.frente;
+                if (frenteCodigo) {
+                    recalcularFrente(frenteCodigo);
+                }
+            });
+            recalcularNotaFinalGlobal();
+        }, 200);
+        
+        return;
+    }
+    
+    // CASO 2: CONDICIÓN SE CUMPLE → EJECUTAR ACCIÓN
+    console.log(`   🔒 Condición se cumple. Ejecutando acción: ${regla.accion_tipo}`);
+    
+    switch (regla.accion_tipo) {
+        case 'marcar_no_aplica':
+            let marcados = 0;
+            
+            todosLosSelects.forEach(otroSelect => {
+                if (otroSelect === selectOrigen) return;
+                
+                const submotivo = otroSelect.dataset.submotivo;
+                if (excepciones.includes(submotivo)) {
+                    console.log(`      ⏭️ Excepción: ${submotivo}`);
+                    return;
+                }
+                if (submotivosAfectados && !submotivosAfectados.includes(submotivo)) {
+                    return;
+                }
+                
+                let tieneNA = false;
+                for (let i = 0; i < otroSelect.options.length; i++) {
+                    if (otroSelect.options[i].value === 'NA') {
+                        otroSelect.selectedIndex = i;
+                        tieneNA = true;
+                        break;
+                    }
+                }
+                
+                if (tieneNA) {
+                    otroSelect.disabled = true;
+                    otroSelect.style.backgroundColor = '#f0f0f0';
+                    marcados++;
+                    console.log(`      ✅ Marcado como NA: ${submotivo}`);
+                    
+                    const peso = parseFloat(otroSelect.dataset.peso);
+                    const pesoElement = document.getElementById(`peso-${submotivo}`);
+                    if (pesoElement) {
+                        pesoElement.textContent = `${peso}%`;
+                        pesoElement.style.color = 'var(--muted)';
+                    }
+                    
+                    if (typeof actualizarResultadoAtributo === 'function') {
+                        actualizarResultadoAtributo(otroSelect, otroSelect.dataset.atributo);
+                    }
+                }
+            });
+            
+            console.log(`   ✅ ${marcados} campos marcados como NA`);
+            break;
+            
+        case 'deshabilitar':
+            let deshabilitados = 0;
+            
+            todosLosSelects.forEach(otroSelect => {
+                if (otroSelect === selectOrigen) return;
+                
+                const submotivo = otroSelect.dataset.submotivo;
+                if (excepciones.includes(submotivo)) {
+                    console.log(`      ⏭️ Excepción: ${submotivo}`);
+                    return;
+                }
+                if (submotivosAfectados && !submotivosAfectados.includes(submotivo)) {
+                    return;
+                }
+                
+                otroSelect.disabled = true;
+                otroSelect.style.backgroundColor = '#f0f0f0';
+                deshabilitados++;
+                console.log(`      🔒 Deshabilitado: ${submotivo}`);
+            });
+            
+            console.log(`   ✅ ${deshabilitados} campos deshabilitados`);
+            break;
+            
+        case 'habilitar':
+            let habilitados = 0;
+            
+            todosLosSelects.forEach(otroSelect => {
+                if (otroSelect === selectOrigen) return;
+                
+                const submotivo = otroSelect.dataset.submotivo;
+                if (excepciones.includes(submotivo)) {
+                    console.log(`      ⏭️ Excepción: ${submotivo}`);
+                    return;
+                }
+                if (submotivosAfectados && !submotivosAfectados.includes(submotivo)) {
+                    return;
+                }
+                
+                if (otroSelect.disabled) {
+                    otroSelect.disabled = false;
+                    otroSelect.style.backgroundColor = '#fcfdfe';
+                    
+                    if (otroSelect.value === 'NA') {
+                        otroSelect.value = '';
+                    }
+                    habilitados++;
+                    console.log(`      🔓 Habilitado: ${submotivo}`);
+                    
+                    const pesoElement = document.getElementById(`peso-${submotivo}`);
+                    if (pesoElement) {
+                        pesoElement.textContent = '0%';
+                        pesoElement.style.color = '';
+                    }
+                    
+                    if (typeof actualizarResultadoAtributo === 'function') {
+                        actualizarResultadoAtributo(otroSelect, otroSelect.dataset.atributo);
+                    }
+                }
+            });
+            
+            console.log(`   ✅ ${habilitados} campos habilitados`);
+            break;
+    }
+    
+    // Recalcular todo dinámicamente
+    setTimeout(() => {
+        const frentes = document.querySelectorAll('.frente-container');
+        frentes.forEach(frenteContainer => {
+            const frenteCodigo = frenteContainer.dataset.frente;
+            if (frenteCodigo) {
+                recalcularFrente(frenteCodigo);
+            }
+        });
+        recalcularNotaFinalGlobal();
+    }, 200);
+}
+
+
 
 // ======================================================
 // 5. FUNCIÓN: conectarEventosSelects()
@@ -8200,14 +8127,14 @@ async function generarFormularioDinamico() {
 function conectarEventosSelects() {
     const selects = document.querySelectorAll('.cumple-select');
     selects.forEach(select => {
-        // Remover eventos anteriores para evitar duplicados
-        select.removeEventListener('change', actualizarResultadoDinamico);
-        
+        // Remover eventos anteriores
+        select.removeEventListener('change', manejarCambioSelectConReglas);
         // Agregar nuevo evento
         select.addEventListener('change', function() {
-            actualizarResultadoDinamico(this);
+            manejarCambioSelectConReglas(this);
         });
     });
+    console.log(`✅ Eventos conectados a ${selects.length} selects`);
 }
 
 // ======================================================
@@ -8237,62 +8164,7 @@ function toggleFrenteDinamico(frenteCodigo) {
     }
 }
 
-// ======================================================
-// 7. FUNCIÓN: recalcularTotalAtributo()
-// ======================================================
-// 📌 PROPÓSITO: Recalcular el total de un atributo específico
-// 📌 PARÁMETROS: 
-//    - bloque (string) - Código del frente (ENC, ECUF, ECN)
-//    - atributo (string) - Nombre del atributo
-// 📌 RETORNO: totalObtenido (número)
-// 📌 NOTA: NA (No Aplica) también suma el peso
-// ======================================================
 
-function recalcularTotalAtributo(bloque, atributo) {
-    // ======================================================
-    // 7a. OBTENER SELECTS DEL ATRIBUTO
-    // ======================================================
-    const selects = document.querySelectorAll(
-        `.cumple-select[data-bloque="${bloque}"][data-atributo="${atributo}"]`
-    );
-    
-    let totalPeso = 0;      // Peso máximo posible
-    let totalObtenido = 0;  // Peso obtenido según selecciones
-    
-    // ======================================================
-    // 7b. SUMAR PESOS
-    // ======================================================
-    selects.forEach(select => {
-        const peso = parseFloat(select.dataset.peso);
-        totalPeso += peso;
-        
-        // 🔴 MODIFICADO: NA (No Aplica) también suma el peso
-        if (select.value === '1' || select.value === 'NA') {
-            totalObtenido += peso;
-        }
-    });
-    
-    // ======================================================
-    // 7c. ACTUALIZAR ELEMENTO DE RESULTADO
-    // ======================================================
-    const atributoId = atributo.toLowerCase().replace(/[áéíóúñ\s\/]+/g, '_');
-    const resultadoElement = document.getElementById(`resultado_${atributoId}`);
-    
-    if (resultadoElement) {
-        resultadoElement.textContent = `${totalObtenido}/${totalPeso}%`;
-        
-        // Cambiar color según resultado
-        if (totalObtenido === totalPeso) {
-            resultadoElement.style.color = 'var(--ok)';        // Verde - Todo cumple
-        } else if (totalObtenido > 0) {
-            resultadoElement.style.color = 'var(--warning)';   // Naranja - Parcial
-        } else {
-            resultadoElement.style.color = 'var(--danger)';    // Rojo - Nada cumple
-        }
-    }
-    
-    return totalObtenido;
-}
 
 // ======================================================
 // BLOQUE 25: CÁLCULO DE FRENTES, NOTA FINAL Y MODALES DE CONTRASEÑA
@@ -8372,45 +8244,288 @@ function recalcularTotalFrente(bloque) {
 }
 
 // ======================================================
-// 2. FUNCIÓN: recalcularNotaFinalGlobal()
+// SISTEMA DE CÁLCULO DINÁMICO (FUTURO-PROOF)
 // ======================================================
-// 📌 PROPÓSITO: Calcular la nota final sumando los tres frentes
-// 📌 FUENTE: resultadoFrente_ENC, resultadoFrente_ECUF, resultadoFrente_ECN
-// 📌 ACTUALIZA: Elemento 'notaFinalGlobal'
-// 📌 RETORNO: notaTotal (número)
+// 📌 PROPÓSITO: Calcular puntajes sin hardcodear nombres de frentes
+// 📌 CARACTERÍSTICAS: 
+//    1. Detecta automáticamente los frentes del DOM
+//    2. Detecta automáticamente atributos y submotivos
+//    3. Funciona con CUALQUIER estructura de matriz
 // ======================================================
 
-function recalcularNotaFinalGlobal() {
-    // ======================================================
-    // 2a. OBTENER LOS TOTALES DE CADA FRENTE
-    // ======================================================
-    const enc = parseFloat(document.getElementById('resultadoFrente_ENC')?.textContent || 0);
-    const ecuf = parseFloat(document.getElementById('resultadoFrente_ECUF')?.textContent || 0);
-    const ecn = parseFloat(document.getElementById('resultadoFrente_ECN')?.textContent || 0);
+// ======================================================
+// 1. OBTENER ESTRUCTURA DINÁMICA
+// ======================================================
+
+function obtenerEstructuraEvaluacion() {
+    const estructura = {};
     
-    // ======================================================
-    // 2b. CALCULAR NOTA TOTAL
-    // ======================================================
-    const notaTotal = enc + ecuf + ecn;
+    // Detectar todos los frentes
+    const frentes = document.querySelectorAll('.frente-container');
     
-    // ======================================================
-    // 2c. ACTUALIZAR ELEMENTO DE NOTA FINAL
-    // ======================================================
-    const notaFinalSpan = document.getElementById('notaFinalGlobal');
-    if (notaFinalSpan) {
-        notaFinalSpan.textContent = `${notaTotal.toFixed(1)}%`;
+    frentes.forEach(frenteContainer => {
+        const frenteCodigo = frenteContainer.dataset.frente;
+        if (!frenteCodigo) return;
         
-        // Cambiar color según el rango de nota
-        if (notaTotal >= 90) {
-            notaFinalSpan.style.color = '#1a7f37';        // Verde - Excelente
-        } else if (notaTotal >= 70) {
-            notaFinalSpan.style.color = '#f39c12';        // Naranja - Regular
+        estructura[frenteCodigo] = {
+            codigo: frenteCodigo,
+            atributos: {}
+        };
+        
+        // Detectar todos los atributos de este frente
+        const atributoCards = frenteContainer.querySelectorAll('.atributo-card');
+        
+        atributoCards.forEach(card => {
+            const atributoNombre = card.dataset.atributo;
+            if (!atributoNombre) return;
+            
+            estructura[frenteCodigo].atributos[atributoNombre] = {
+                nombre: atributoNombre,
+                submotivos: []
+            };
+            
+            // Detectar todos los submotivos de este atributo
+            const selects = card.querySelectorAll('.cumple-select');
+            
+            selects.forEach(select => {
+                const submotivo = select.dataset.submotivo;
+                if (!submotivo) return;
+                
+                estructura[frenteCodigo].atributos[atributoNombre].submotivos.push({
+                    codigo: submotivo,
+                    peso: parseFloat(select.dataset.peso) || 0,
+                    valor: select.value
+                });
+            });
+        });
+    });
+    
+    return estructura;
+}
+
+// ======================================================
+// 2. RECALCULAR FRENTE (DINÁMICO)
+// ======================================================
+
+function recalcularFrente(frenteCodigo) {
+    console.log(`📊 Recalculando frente: ${frenteCodigo}`);
+    
+    // Buscar el contenedor del frente
+    const frenteContainer = document.querySelector(`.frente-container[data-frente="${frenteCodigo}"]`);
+    if (!frenteContainer) {
+        console.warn(`⚠️ No se encontró el frente ${frenteCodigo}`);
+        return 0;
+    }
+    
+    let totalObtenido = 0;
+    let totalPeso = 0;
+    
+    // Recorrer todos los selects de este frente
+    const selects = frenteContainer.querySelectorAll('.cumple-select');
+    
+    selects.forEach(select => {
+        const peso = parseFloat(select.dataset.peso) || 0;
+        const valor = select.value;
+        
+        totalPeso += peso;
+        
+        // 🔴 NA CUENTA COMO CUMPLE (1)
+        if (valor === '1' || valor === 'NA') {
+            totalObtenido += peso;
+        }
+    });
+    
+    // Actualizar el resultado del frente
+    const resultadoElement = document.getElementById(`resultadoFrente_${frenteCodigo}`);
+    if (resultadoElement) {
+        resultadoElement.textContent = `${totalObtenido}%`;
+        
+        // Cambiar color según el total (opcional, usa los umbrales que quieras)
+        const porcentaje = totalPeso > 0 ? (totalObtenido / totalPeso) * 100 : 0;
+        if (porcentaje >= 90) {
+            resultadoElement.style.color = 'var(--ok)';
+        } else if (porcentaje >= 80) {
+            resultadoElement.style.color = 'var(--warning)';
         } else {
-            notaFinalSpan.style.color = '#d93025';        // Rojo - Bajo
+            resultadoElement.style.color = 'var(--danger)';
         }
     }
     
-    return notaTotal;
+    return totalObtenido;
+}
+
+// ======================================================
+// 3. RECALCULAR ATRIBUTO (DINÁMICO)
+// ======================================================
+
+function recalcularAtributoDinamico(frenteCodigo, atributoNombre) {
+    console.log(`📊 Recalculando atributo: ${frenteCodigo} - ${atributoNombre}`);
+    
+    // Buscar el atributo específico
+    const frenteContainer = document.querySelector(`.frente-container[data-frente="${frenteCodigo}"]`);
+    if (!frenteContainer) return 0;
+    
+    const atributoCard = frenteContainer.querySelector(`.atributo-card[data-atributo="${atributoNombre}"]`);
+    if (!atributoCard) {
+        console.warn(`⚠️ No se encontró el atributo ${atributoNombre}`);
+        return 0;
+    }
+    
+    let totalObtenido = 0;
+    let totalPeso = 0;
+    
+    // Recorrer todos los selects de este atributo
+    const selects = atributoCard.querySelectorAll('.cumple-select');
+    
+    selects.forEach(select => {
+        const peso = parseFloat(select.dataset.peso) || 0;
+        const valor = select.value;
+        
+        totalPeso += peso;
+        
+        // 🔴 NA CUENTA COMO CUMPLE (1)
+        if (valor === '1' || valor === 'NA') {
+            totalObtenido += peso;
+        }
+    });
+    
+    // Actualizar el resultado del atributo
+    const atributoId = atributoNombre.toLowerCase()
+        .replace(/[áéíóú]/g, match => {
+            const acentos = { 'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u' };
+            return acentos[match] || match;
+        })
+        .replace(/[^a-z0-9_]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+    
+    const resultadoElement = document.getElementById(`resultado_${atributoId}`);
+    if (resultadoElement) {
+        resultadoElement.textContent = `${totalObtenido}/${totalPeso}%`;
+        
+        if (totalObtenido === totalPeso) {
+            resultadoElement.style.color = 'var(--ok)';
+        } else if (totalObtenido > 0) {
+            resultadoElement.style.color = 'var(--warning)';
+        } else {
+            resultadoElement.style.color = 'var(--danger)';
+        }
+    }
+    
+    return totalObtenido;
+}
+
+// ======================================================
+// 4. RECALCULAR SUBMOTIVO (DINÁMICO)
+// ======================================================
+
+function recalcularSubmotivo(select) {
+    const submotivo = select.dataset.submotivo;
+    const peso = parseFloat(select.dataset.peso) || 0;
+    const valor = select.value;
+    
+    const pesoElement = document.getElementById(`peso-${submotivo}`);
+    
+    if (pesoElement) {
+        if (valor === '1') {
+            pesoElement.textContent = `${peso}%`;
+            pesoElement.style.color = 'var(--ok)';
+        } else if (valor === 'NA') {
+            pesoElement.textContent = `${peso}%`;
+            pesoElement.style.color = 'var(--muted)';
+        } else if (valor === '0') {
+            pesoElement.textContent = '0%';
+            pesoElement.style.color = 'var(--danger)';
+        } else {
+            pesoElement.textContent = '0%';
+            pesoElement.style.color = '';
+        }
+    }
+    
+    return valor === '1' || valor === 'NA' ? peso : 0;
+}
+
+// ======================================================
+// 5. RECALCULAR TODOS LOS FRENTES (DINÁMICO)
+// ======================================================
+
+function recalcularTodosLosFrentes() {
+    console.log('🔄 Recalculando TODOS los frentes...');
+    
+    const frentes = document.querySelectorAll('.frente-container');
+    let totalGeneral = 0;
+    const resultados = {};
+    
+    frentes.forEach(frenteContainer => {
+        const frenteCodigo = frenteContainer.dataset.frente;
+        if (!frenteCodigo) return;
+        
+        const total = recalcularFrente(frenteCodigo);
+        resultados[frenteCodigo] = total;
+        totalGeneral += total;
+    });
+    
+    // Actualizar nota final
+    recalcularNotaFinalGlobal();
+    
+    console.log('📊 Resultados:', resultados);
+    console.log(`📊 NOTA FINAL: ${totalGeneral}%`);
+    
+    return resultados;
+}
+
+// ======================================================
+// 6. ACTUALIZAR RESULTADO ATRIBUTO (DINÁMICO) - Reemplaza la función existente
+// ======================================================
+
+function actualizarResultadoAtributo(select, atributo) {
+    const bloque = select.dataset.bloque;
+    const submotivo = select.dataset.submotivo;
+    const peso = parseFloat(select.dataset.peso);
+    const valor = select.value;
+    
+    // 1. Actualizar peso del submotivo
+    recalcularSubmotivo(select);
+    
+    // 2. Recalcular atributo
+    recalcularAtributoDinamico(bloque, atributo);
+    
+    // 3. Recalcular frente
+    recalcularFrente(bloque);
+    
+    // 4. Recalcular nota final
+    recalcularNotaFinalGlobal();
+}
+
+// ======================================================
+// 7. NOTA FINAL DINÁMICA (SIEMPRE BLANCA)
+// ======================================================
+
+function recalcularNotaFinalGlobal() {
+    // Obtener TODOS los frentes dinámicamente
+    const frentes = document.querySelectorAll('.frente-container');
+    let totalGeneral = 0;
+    
+    frentes.forEach(frenteContainer => {
+        const frenteCodigo = frenteContainer.dataset.frente;
+        if (!frenteCodigo) return;
+        
+        const resultadoElement = document.getElementById(`resultadoFrente_${frenteCodigo}`);
+        if (resultadoElement) {
+            const valor = parseFloat(resultadoElement.textContent?.replace('%', '') || 0);
+            totalGeneral += valor;
+        }
+    });
+    
+    // Actualizar nota final
+    const notaFinalSpan = document.getElementById('notaFinalGlobal');
+    if (notaFinalSpan) {
+        notaFinalSpan.textContent = `${totalGeneral.toFixed(1)}%`;
+        // 🔴 COLOR SIEMPRE BLANCO (imparcialidad)
+        notaFinalSpan.style.color = '#ffffff';
+    }
+    
+    return totalGeneral;
 }
 
 // ======================================================
@@ -8426,58 +8541,37 @@ function recalcularNotaFinalGlobal() {
 // ======================================================
 
 function actualizarResultadoDinamico(select) {
-    // ======================================================
-    // 3a. OBTENER DATOS DEL SELECT
-    // ======================================================
     const bloque = select.dataset.bloque;
     const atributo = select.dataset.atributo;
     const submotivo = select.dataset.submotivo;
     const peso = parseFloat(select.dataset.peso);
     const valor = select.value;
     
-    // ======================================================
-    // 3b. ACTUALIZAR PESO VISUAL
-    // ======================================================
+    // Actualizar peso del submotivo
     const pesoElement = document.getElementById(`peso-${submotivo}`);
     if (pesoElement) {
         if (valor === '1') {
-            // ✅ Cumple: muestra el peso completo en verde
             pesoElement.textContent = `${peso}%`;
             pesoElement.style.color = 'var(--ok)';
-        } else if (valor === '0') {
-            // ❌ No Cumple: muestra 0% en rojo
-            pesoElement.textContent = '0%';
-            pesoElement.style.color = 'var(--danger)';
         } else if (valor === 'NA') {
-            // 🔴 NUEVO: No Aplica - suma igual que Cumple, pero en gris
             pesoElement.textContent = `${peso}%`;
             pesoElement.style.color = 'var(--muted)';
+        } else if (valor === '0') {
+            pesoElement.textContent = '0%';
+            pesoElement.style.color = 'var(--danger)';
         } else {
-            // ⚪ Sin selección: muestra 0% sin color
             pesoElement.textContent = '0%';
             pesoElement.style.color = '';
         }
     }
     
-    // ======================================================
-    // 3c. RECALCULAR TOTAL DEL ATRIBUTO
-    // ======================================================
-    recalcularTotalAtributo(bloque, atributo);
+    // Recalcular atributo
+    recalcularAtributoDinamico(bloque, atributo);
     
-    // ======================================================
-    // 3d. RECALCULAR TOTAL DEL FRENTE
-    // ======================================================
-    if (bloque === 'ENC') {
-        recalcularTotalENC();
-    } else if (bloque === 'ECUF') {
-        actualizarResultadoECUF();
-    } else if (bloque === 'ECN') {
-        actualizarResultadoECN();
-    }
+    // Recalcular frente
+    recalcularFrente(bloque);
     
-    // ======================================================
-    // 3e. RECALCULAR NOTA FINAL
-    // ======================================================
+    // Recalcular nota final
     recalcularNotaFinalGlobal();
 }
 
@@ -8920,6 +9014,8 @@ function actualizarHeaderConUsuario() {
         }
     }
 }
+
+
 
 // Escuchar evento personalizado cuando el header se carga
 document.addEventListener('headerLoaded', function() {

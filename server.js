@@ -3677,6 +3677,8 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     return;
 }
 
+
+
     // ======================================================
     // API - MATRIZ - OBTENER VERSIONES (CORREGIDO)
     // ======================================================
@@ -5563,6 +5565,357 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
         return;
     }
     
+
+    // ======================================================
+// API - REGLAS DE EVALUACIÓN POR VERSIÓN
+// ======================================================
+
+if (ruta.match(/^\/api\/reglas-evaluacion\/version\/\d+$/) && metodo === 'GET') {
+    console.log('[API] GET /api/reglas-evaluacion/version/:id');
+    
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+        return;
+    }
+    
+    const versionId = parseInt(ruta.split('/').pop());
+    
+    try {
+        // Verificar si la tabla existe
+        const checkTable = await pool.query(`
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'reglas_evaluacion'
+            );
+        `);
+        
+        if (!checkTable.rows[0].exists) {
+            console.log('⚠️ Tabla reglas_evaluacion no existe, devolviendo array vacío');
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify([]));
+            return;
+        }
+        
+        const result = await pool.query(`
+            SELECT 
+                id,
+                version_id,
+                submotivo_origen,
+                bloque_origen,
+                atributo_origen,
+                valor_condicion,
+                accion_tipo,
+                accion_valor,
+                submotivos_afectados,
+                excepciones,
+                orden,
+                activo
+            FROM reglas_evaluacion 
+            WHERE version_id = $1 AND activo = true 
+            ORDER BY orden
+        `, [versionId]);
+        
+        console.log(`✅ ${result.rows.length} reglas encontradas para versión ${versionId}`);
+        
+        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify(result.rows));
+        
+    } catch (error) {
+        console.error('❌ Error en /api/reglas-evaluacion/version/:id:', error);
+        // En caso de error, devolver array vacío
+        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify([]));
+    }
+    return;
+}
+
+// ======================================================
+// API - REGLAS DE EVALUACIÓN - CRUD
+// ======================================================
+
+// GET - Obtener todas las reglas (para administración)
+if (ruta === '/api/reglas-evaluacion' && metodo === 'GET') {
+    console.log('[API] GET /api/reglas-evaluacion');
+    
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+        return;
+    }
+    
+    try {
+        const result = await pool.query(`
+            SELECT 
+                re.*,
+                vm.version as version_nombre
+            FROM reglas_evaluacion re
+            JOIN versiones_matriz vm ON re.version_id = vm.id
+            ORDER BY vm.id, re.orden
+        `);
+        
+        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify(result.rows));
+        
+    } catch (error) {
+        console.error('Error:', error);
+        respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify([]));
+    }
+    return;
+}
+
+// POST - Crear nueva regla
+if (ruta === '/api/reglas-evaluacion' && metodo === 'POST') {
+    console.log('[API] POST /api/reglas-evaluacion');
+    
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+        return;
+    }
+    
+    let body = '';
+    peticion.on('data', chunk => body += chunk);
+    peticion.on('end', async () => {
+        try {
+            const data = JSON.parse(body);
+            
+            // 🔴 Asegurar que los campos JSON sean válidos
+            const submotivosAfectados = data.submotivos_afectados ? JSON.stringify(data.submotivos_afectados) : null;
+            const excepciones = data.excepciones ? JSON.stringify(data.excepciones) : null;
+            
+            console.log('📝 Insertando regla:', {
+                version_id: data.version_id,
+                submotivo_origen: data.submotivo_origen,
+                accion_tipo: data.accion_tipo,
+                submotivos_afectados: submotivosAfectados,
+                excepciones: excepciones
+            });
+            
+            const result = await pool.query(`
+                INSERT INTO reglas_evaluacion (
+                    version_id,
+                    submotivo_origen,
+                    bloque_origen,
+                    atributo_origen,
+                    valor_condicion,
+                    accion_tipo,
+                    accion_valor,
+                    submotivos_afectados,
+                    excepciones,
+                    orden,
+                    activo,
+                    created_at,
+                    updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, NOW(), NOW())
+                RETURNING *
+            `, [
+                data.version_id,
+                data.submotivo_origen,
+                data.bloque_origen,
+                data.atributo_origen,
+                data.valor_condicion || '0',
+                data.accion_tipo || 'marcar_no_aplica',
+                data.accion_valor || 'NA',
+                submotivosAfectados,
+                excepciones,
+                data.orden || 0,
+                data.activo !== false
+            ]);
+            
+            console.log(`✅ Regla creada: ${data.submotivo_origen} → ${data.accion_tipo}`);
+            
+            respuesta.writeHead(201, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows[0]));
+            
+        } catch (error) {
+            console.error('❌ Error creando regla:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+    });
+    return;
+}
+
+// PUT - Actualizar regla
+if (ruta.match(/^\/api\/reglas-evaluacion\/\d+$/) && metodo === 'PUT') {
+    console.log('[API] PUT /api/reglas-evaluacion/:id');
+    
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+        return;
+    }
+    
+    const id = parseInt(ruta.split('/').pop());
+    
+    let body = '';
+    peticion.on('data', chunk => body += chunk);
+    peticion.on('end', async () => {
+        try {
+            const data = JSON.parse(body);
+            
+            // 🔴 Asegurar que los campos JSON sean válidos
+            const submotivosAfectados = data.submotivos_afectados ? JSON.stringify(data.submotivos_afectados) : null;
+            const excepciones = data.excepciones ? JSON.stringify(data.excepciones) : null;
+            
+            console.log('📝 Actualizando regla ID:', id);
+            console.log('   submotivo_origen:', data.submotivo_origen);
+            console.log('   submotivos_afectados:', submotivosAfectados);
+            console.log('   excepciones:', excepciones);
+            
+            const result = await pool.query(`
+                UPDATE reglas_evaluacion 
+                SET 
+                    submotivo_origen = $1,
+                    bloque_origen = $2,
+                    atributo_origen = $3,
+                    valor_condicion = $4,
+                    accion_tipo = $5,
+                    accion_valor = $6,
+                    submotivos_afectados = $7::jsonb,
+                    excepciones = $8::jsonb,
+                    orden = $9,
+                    activo = $10,
+                    updated_at = NOW()
+                WHERE id = $11
+                RETURNING *
+            `, [
+                data.submotivo_origen,
+                data.bloque_origen,
+                data.atributo_origen,
+                data.valor_condicion || '0',
+                data.accion_tipo || 'marcar_no_aplica',
+                data.accion_valor || 'NA',
+                submotivosAfectados,
+                excepciones,
+                data.orden || 0,
+                data.activo !== false,
+                id
+            ]);
+            
+            if (result.rows.length === 0) {
+                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'Regla no encontrada' }));
+                return;
+            }
+            
+            console.log(`✅ Regla actualizada: ${data.submotivo_origen} → ${data.accion_tipo} (ID: ${id})`);
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows[0]));
+            
+        } catch (error) {
+            console.error('❌ Error actualizando regla:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+    });
+    return;
+}
+
+
+// DELETE - Eliminar regla
+if (ruta.match(/^\/api\/reglas-evaluacion\/\d+$/) && metodo === 'DELETE') {
+    console.log('[API] DELETE /api/reglas-evaluacion/:id');
+    
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+        return;
+    }
+    
+    const id = parseInt(ruta.split('/').pop());
+    
+    try {
+        const result = await pool.query(`
+            DELETE FROM reglas_evaluacion WHERE id = $1 RETURNING id
+        `, [id]);
+        
+        if (result.rows.length === 0) {
+            respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Regla no encontrada' }));
+            return;
+        }
+        
+        console.log(`✅ Regla eliminada: ID ${id}`);
+        
+        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ 
+            success: true, 
+            message: 'Regla eliminada correctamente',
+            id: id
+        }));
+        
+    } catch (error) {
+        console.error('❌ Error eliminando regla:', error);
+        respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: error.message }));
+    }
+    return;
+}
+
+// ======================================================
+// GET /api/reglas-evaluacion/version/:id - CORREGIDO
+// ======================================================
+
+if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
+    console.log('[API] GET /api/reglas-evaluacion/version/:id');
+    
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+        return;
+    }
+    
+    const parts = ruta.split('/');
+    const versionId = parseInt(parts[parts.length - 1]);
+    
+    if (!versionId || isNaN(versionId)) {
+        respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'ID de versión inválido' }));
+        return;
+    }
+    
+    try {
+        const result = await pool.query(`
+            SELECT 
+                id,
+                version_id,
+                submotivo_origen,
+                bloque_origen,
+                atributo_origen,
+                valor_condicion,
+                accion_tipo,
+                accion_valor,
+                submotivos_afectados,
+                excepciones,
+                orden,
+                activo
+            FROM reglas_evaluacion 
+            WHERE version_id = $1 AND activo = true 
+            ORDER BY orden
+        `, [versionId]);
+        
+        console.log(`✅ ${result.rows.length} reglas encontradas para versión ${versionId}`);
+        
+        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify(result.rows));
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: error.message }));
+    }
+    return;
+}
     
     // ======================================================
     // VISTAS HTML

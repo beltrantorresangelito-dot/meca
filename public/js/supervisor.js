@@ -255,6 +255,154 @@ function obtenerMatrizDominante(evaluaciones) {
 }
 
 // ======================================================
+// SISTEMA DE CUARTILES (FUTURO-PROOF) - VERSIÓN POSTGRESQL
+// ======================================================
+
+// Variables de caché
+let cacheCuartiles = null;
+let cacheCuartilesTimestamp = null;
+const CACHE_CUARTILES_DURACION = 5 * 60 * 1000;
+
+// Criterios por defecto (fallback)
+function obtenerCriteriosPorDefecto() {
+    return [
+        { cuartil: 'Q1', nombre: 'Excelente', limite_inferior: 97, limite_superior: 100, color_hex: '#1a7f37', icono: '🏆', orden: 1 },
+        { cuartil: 'Q2', nombre: 'Bueno', limite_inferior: 90, limite_superior: 96.99, color_hex: '#019DF4', icono: '📈', orden: 2 },
+        { cuartil: 'Q3', nombre: 'Regular', limite_inferior: 85, limite_superior: 89.99, color_hex: '#f39c12', icono: '⚠️', orden: 3 },
+        { cuartil: 'Q4', nombre: 'Riesgo', limite_inferior: 0, limite_superior: 84.99, color_hex: '#d93025', icono: '🔴', orden: 4 }
+    ];
+}
+
+// Obtener criterios desde PostgreSQL
+async function obtenerCriteriosCuartiles(forzarRecarga = false) {
+    const ahora = Date.now();
+    
+    // Usar caché si es válido
+    if (!forzarRecarga && cacheCuartiles && cacheCuartilesTimestamp && 
+        (ahora - cacheCuartilesTimestamp) < CACHE_CUARTILES_DURACION) {
+        console.log('📦 Usando caché de criterios de cuartiles');
+        return cacheCuartiles;
+    }
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        if (!token) {
+            console.warn('⚠️ No hay token, usando criterios por defecto');
+            return obtenerCriteriosPorDefecto();
+        }
+        
+        // 🔴 CONSULTA - SIN orderBy (igual que en el diagnóstico que funcionó)
+        const response = await fetch('/api/query', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                table: 'criterios_cuartiles',
+                operation: 'select',
+                selectFields: '*',
+                filters: [
+                    { type: 'eq', column: 'activo', value: true }
+                ]
+                // 🔴 SIN orderBy - lo hacemos en JavaScript
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            console.warn('⚠️ Error consultando criterios:', error);
+            return obtenerCriteriosPorDefecto();
+        }
+        
+        const result = await response.json();
+        let data = result.data || [];
+        
+        if (data.length === 0) {
+            console.warn('⚠️ No hay criterios en BD, usando defecto');
+            return obtenerCriteriosPorDefecto();
+        }
+        
+        // 🔴 ORDENAR EN JAVASCRIPT por 'orden'
+        data = data.sort((a, b) => {
+            const ordenA = parseInt(a.orden) || 0;
+            const ordenB = parseInt(b.orden) || 0;
+            return ordenA - ordenB;
+        });
+        
+        // Filtrar por fecha de vigencia en JavaScript
+        const hoy = new Date().toISOString().split('T')[0];
+        const filtrados = data.filter(c => {
+            if (!c.fecha_vigencia_hasta) return true;
+            return c.fecha_vigencia_hasta >= hoy;
+        });
+        
+        if (filtrados.length === 0) {
+            console.warn('⚠️ No hay criterios vigentes, usando defecto');
+            return obtenerCriteriosPorDefecto();
+        }
+        
+        cacheCuartiles = filtrados;
+        cacheCuartilesTimestamp = ahora;
+        console.log(`✅ ${filtrados.length} criterios de cuartiles cargados desde PostgreSQL`);
+        console.log('📋 Criterios:', filtrados.map(c => `${c.cuartil}: ${c.limite_inferior}-${c.limite_superior}`).join(', '));
+        return filtrados;
+        
+    } catch (error) {
+        console.error('Error cargando criterios de cuartiles:', error);
+        return obtenerCriteriosPorDefecto();
+    }
+}
+
+// Obtener cuartil por nota
+async function obtenerCuartilPorNota(nota, criterios = null) {
+    if (!criterios) {
+        criterios = await obtenerCriteriosCuartiles(false);
+    }
+    
+    for (const criterio of criterios) {
+        if (nota >= criterio.limite_inferior && nota <= criterio.limite_superior) {
+            return {
+                cuartil: criterio.cuartil,
+                nombre: criterio.nombre,
+                color: criterio.color_hex,
+                icono: criterio.icono,
+                limite_inferior: criterio.limite_inferior,
+                limite_superior: criterio.limite_superior
+            };
+        }
+    }
+    
+    return {
+        cuartil: 'Q4',
+        nombre: 'Riesgo',
+        color: '#d93025',
+        icono: '🔴',
+        limite_inferior: 0,
+        limite_superior: 84.99
+    };
+}
+
+// Obtener cuartil (versión async)
+async function obtenerCuartil(nota) {
+    const resultado = await obtenerCuartilPorNota(nota, null);
+    return resultado.cuartil;
+}
+
+// Calcular cuartil individual
+async function calcularCuartilIndividual(promedio) {
+    const resultado = await obtenerCuartilPorNota(promedio, null);
+    return resultado.cuartil;
+}
+
+// Invalidar caché
+function invalidarCacheCuartiles() {
+    cacheCuartiles = null;
+    cacheCuartilesTimestamp = null;
+    console.log('🗑️ Caché de cuartiles invalidada');
+}
+
+// ======================================================
 // CARGAR PESTAÑAS DISPONIBLES (GLOBAL)
 // ======================================================
 async function cargarPestanasDisponiblesGlobal() {
@@ -2202,7 +2350,7 @@ const MAPEO_ACCIONES_PDA = {
             return;
         }
 
-        const ranking = construirRankingAgentes(evaluacionesFiltradas);
+        const ranking = await construirRankingAgentes(evaluacionesFiltradas);
         
         // 🔴 ACTUALIZAR rankingOriginalCompleto con los cuartiles CORRECTOS
         rankingOriginalCompleto = ranking;
@@ -2597,7 +2745,7 @@ async function generarReportes() {
     if (kpiPorcentajeQuiebresDetalle) kpiPorcentajeQuiebresDetalle.textContent = quiebresCount + ' de ' + totalEval + ' evaluaciones';
 
     // Ranking de agentes
-    const ranking = construirRankingAgentes(evaluaciones);
+    const ranking = await construirRankingAgentes(evaluaciones);
     const cobertura = calcularCobertura(evaluaciones, ranking);
     const coberturaElem = document.getElementById('kpiCobertura');
     const coberturaDetalle = document.getElementById('kpiCoberturaDetalle');
@@ -2909,7 +3057,7 @@ async function calcularIndicadoresPorMes(evaluaciones, mesesData) {
         const totalGestores = gestoresSet.size;
         
         // ========== RANKING Y CUARTILES ==========
-        const ranking = construirRankingAgentes(evaluacionesMes);
+        const ranking = await construirRankingAgentes(evaluacionesMes);
         const q1 = ranking.filter(a => a.cuartil === 'Q1').length;
         const q2 = ranking.filter(a => a.cuartil === 'Q2').length;
         const q3 = ranking.filter(a => a.cuartil === 'Q3').length;
@@ -5028,9 +5176,8 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
     // ===== FIN FUNCIÓN: generarEvolutivoQuiebresAgrupado ====================
     
-    // ===== 13. INICIO FUNCIÓN: generarEvolutivoCuartiles ====================
-        // ===== 13. INICIO FUNCIÓN: generarEvolutivoCuartiles (VERSIÓN BARRAS APILADAS 100% CON LEYENDA MEJORADA) =====
-    function generarEvolutivoCuartiles(evaluacionesFiltradas, datosAgrupados, periodo) {
+    // ===== 13. INICIO FUNCIÓN: generarEvolutivoCuartiles (VERSIÓN BARRAS APILADAS 100% CON LEYENDA MEJORADA) =====
+    async function generarEvolutivoCuartiles(evaluacionesFiltradas, datosAgrupados, periodo) {
         console.log('📊 generarEvolutivoCuartiles - VERSIÓN BARRAS APILADAS 100%');
 
         const canvas = document.getElementById('chartEvolutivoCuartiles');
@@ -5159,7 +5306,7 @@ async function actualizarTablaEvolutivaIndicadores() {
         for (const periodoData of periodosOrdenados) {
             if (periodoData.evaluaciones.length > 0) {
                 // Construir ranking para este período específico
-                const rankingPeriodo = construirRankingAgentes(periodoData.evaluaciones);
+                const rankingPeriodo = await construirRankingAgentes(periodoData.evaluaciones);
                 
                 const q1 = rankingPeriodo.filter(a => a.cuartil === 'Q1').length;
                 const q2 = rankingPeriodo.filter(a => a.cuartil === 'Q2').length;
@@ -5489,8 +5636,8 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
     // ===== FIN FUNCIÓN: mostrarMensajeSinDatosEnCanvasCuartiles =============
     
-        // ===== 15. INICIO FUNCIÓN: generarGraficoComparativaAgrupado (VERSIÓN SIN TOTAL EN LEYENDA) =====
-    function generarGraficoComparativaAgrupado(evaluacionesFiltradas) {
+    // ===== 15. INICIO FUNCIÓN: generarGraficoComparativaAgrupado (VERSIÓN SIN TOTAL EN LEYENDA) =====
+    async function generarGraficoComparativaAgrupado(evaluacionesFiltradas) {
         console.log('📊 generarGraficoComparativaAgrupado - VERSIÓN EVOLUTIVA POR MESES');
 
         const canvas = document.getElementById('chartComparativa');
@@ -5547,7 +5694,7 @@ async function actualizarTablaEvolutivaIndicadores() {
         for (const periodoData of datosAgrupados) {
             if (periodoData.evaluaciones.length > 0) {
                 // Construir ranking para este período específico
-                const rankingPeriodo = construirRankingAgentes(periodoData.evaluaciones);
+                const rankingPeriodo = await construirRankingAgentes(periodoData.evaluaciones);
                 
                 // Calcular promedios por cuartil
                 const q1Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q1');
@@ -8034,7 +8181,7 @@ function exportarAgentesJerarquiaCSV(tipo, key) {
         const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
 
         // Actualizar ranking de agentes con los datos filtrados
-        const ranking = construirRankingAgentes(evaluacionesFiltradas);
+        const ranking = await construirRankingAgentes(evaluacionesFiltradas);
         rankingCompletoGlobal = ranking;
         actualizarTablaRanking(ranking);
 
@@ -8164,7 +8311,7 @@ function exportarAgentesJerarquiaCSV(tipo, key) {
             await actualizarKPIsConFiltro(evaluacionesFiltradas);
             
             // 2. Actualizar ranking
-            const ranking = construirRankingAgentes(evaluacionesFiltradas);
+            const ranking = await construirRankingAgentes(evaluacionesFiltradas);
             rankingCompletoGlobal = ranking;
             await actualizarTablaRanking(ranking);
             
@@ -8341,7 +8488,7 @@ function exportarAgentesJerarquiaCSV(tipo, key) {
     // ======================================================
     await cargarResumenPorLider();
 
-    const rankingCompleto = construirRankingAgentes(evaluacionesCompletas);
+    const rankingCompleto = await construirRankingAgentes(evaluacionesCompletas);
     rankingCompletoGlobal = rankingCompleto;
     actualizarTablaRanking(rankingCompleto);
 
@@ -9353,7 +9500,7 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         // ======================================================
         // 6. Ranking de agentes (para cálculos de cuartiles)
         // ======================================================
-        const ranking = construirRankingAgentes(evaluacionesFiltradas);
+        const ranking = await construirRankingAgentes(evaluacionesFiltradas);
         const totalAgentes = ranking.length;
         
         const q1 = ranking.filter(a => a.cuartil === 'Q1').length;
@@ -10356,7 +10503,7 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     };
 
     // ===== 1. INICIO FUNCIÓN: construirRankingAgentes (CORREGIDO) =====
-function construirRankingAgentes(evaluaciones) {
+async function construirRankingAgentes(evaluaciones) {
     if (!evaluaciones || evaluaciones.length === 0) {
         return [];
     }
@@ -10381,9 +10528,6 @@ function construirRankingAgentes(evaluaciones) {
             };
         }
 
-        // 🔴 🔴 🔴 SOLO CAMBIA ESTAS 4 LÍNEAS 🔴 🔴 🔴
-        // De: const nota = parseFloat(e.nota_final) || 0;
-        // A:
         const nota = parseFloat(e.notaFinal || e.nota_final || 0);
         const totalENC = parseFloat(e.totalENC || e.total_enc || 0);
         const totalECUF = parseFloat(e.totalECUF || e.total_ecuf || 0);
@@ -10402,16 +10546,24 @@ function construirRankingAgentes(evaluaciones) {
         if (nota < 85) agentes[nombre].bajos++;
     }
 
-    const resultado = Object.values(agentes)
-        .map(a => ({
+    // 🔴 🔴 🔴 PARTE CORREGIDA 🔴 🔴 🔴
+    const resultado = [];
+    
+    for (const a of Object.values(agentes)) {
+        const promedio = a.count > 0 ? Number((a.suma / a.count).toFixed(1)) : 0;
+        const cuartil = await obtenerCuartil(promedio);
+        
+        resultado.push({
             ...a,
-            promedio: a.count > 0 ? Number((a.suma / a.count).toFixed(1)) : 0,
+            promedio: promedio,
             promedioENC: a.count > 0 ? Number((a.enc / a.count).toFixed(1)) : 0,
             promedioECUF: a.count > 0 ? Number((a.ecuf / a.count).toFixed(1)) : 0,
             promedioECN: a.count > 0 ? Number((a.ecn / a.count).toFixed(1)) : 0,
-            cuartil: obtenerCuartil(Number((a.suma / a.count).toFixed(1)))
-        }))
-        .sort((a, b) => b.promedio - a.promedio);
+            cuartil: cuartil
+        });
+    }
+
+    resultado.sort((a, b) => b.promedio - a.promedio);
 
     return resultado;
 }
@@ -10452,7 +10604,7 @@ async function cargarRankingAgentesCompleto() {
     await cargarMesesDisponiblesRanking();
 
     const evaluaciones = window.evaluacionesGlobales || [];
-    const rankingSinCuartiles = construirRankingAgentes(evaluaciones);
+    const rankingSinCuartiles = await construirRankingAgentes(evaluaciones);
     
     // 🔴 🔴 🔴 SOLO AGREGA ESTA LÍNEA 🔴 🔴 🔴
     window.rankingOriginalCompleto = calcularCuartilesGlobales(rankingSinCuartiles);
@@ -10473,6 +10625,13 @@ async function cargarRankingAgentesCompleto() {
 
     // ===== 4. INICIO FUNCIÓN: Tabla Evolución de Cuartiles por Gestor =======
     // ========== 4.1 Función principal para cargar la tabla evolutiva (CORREGIDO) ==========
+// ======================================================
+// FUNCIÓN: cargarEvolucionCuartilesPorGestor (VERSIÓN CORREGIDA)
+// ======================================================
+// 📌 PROPÓSITO: Cargar la tabla evolutiva de cuartiles por gestor
+// 📌 🔴 CORREGIDO: Usa await para obtener cuartiles desde BD
+// ======================================================
+
 async function cargarEvolucionCuartilesPorGestor() {
     console.log('📊 Cargando evolución de cuartiles por gestor...');
     
@@ -10481,21 +10640,34 @@ async function cargarEvolucionCuartilesPorGestor() {
     
     container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Calculando evolución de cuartiles...</div>';
     
+    // 🔴 VERIFICAR QUE HAY EVALUACIONES
+    if (!window.evaluacionesGlobales || window.evaluacionesGlobales.length === 0) {
+        console.log('🔄 No hay evaluaciones cargadas. Intentando cargar...');
+        try {
+            await cargarEvaluacionesDesdePostgreSQL();
+        } catch (error) {
+            console.error('❌ Error cargando evaluaciones:', error);
+        }
+    }
+    
     const evaluaciones = window.evaluacionesGlobales || [];
     if (evaluaciones.length === 0) {
         container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay evaluaciones para mostrar</div>';
         return;
     }
     
+    // Obtener período y cantidad
     const periodo = document.getElementById('selectPeriodoEvolucion')?.value || 'mes';
     const cantidadPeriodos = parseInt(document.getElementById('selectCantidadPeriodos')?.value || '6');
     
+    // Obtener gestores únicos
     const gestoresSet = new Set();
     evaluaciones.forEach(e => {
         if (e.agente) gestoresSet.add(e.agente);
     });
     const gestores = Array.from(gestoresSet).sort();
     
+    // Calcular períodos
     const periodosInfo = calcularPeriodosRango(evaluaciones, periodo, cantidadPeriodos);
     const periodosLabels = periodosInfo.labels;
     const mapaPeriodos = periodosInfo.mapa;
@@ -10505,6 +10677,7 @@ async function cargarEvolucionCuartilesPorGestor() {
         return;
     }
     
+    // Construir matriz de cuartiles
     const matrizCuartiles = {};
     
     for (const gestor of gestores) {
@@ -10513,10 +10686,6 @@ async function cargarEvolucionCuartilesPorGestor() {
         
         for (const periodoLabel of periodosLabels) {
             const periodoKey = mapaPeriodos[periodoLabel];
-            
-            // 🔴 🔴 🔴 CORRECCIÓN CLAVE: Usar la función de filtrado correctamente
-            // periodoKey ahora es "YYYY-MM" (ej: "2026-04" para trimestre)
-            // filtrarEvaluacionesPorPeriodo espera "YYYY-MM" y tipo "trimestre"
             const evaluacionesPeriodo = filtrarEvaluacionesPorPeriodo(evalGestor, periodoKey, periodo);
             
             if (evaluacionesPeriodo.length === 0) {
@@ -10524,7 +10693,10 @@ async function cargarEvolucionCuartilesPorGestor() {
             } else {
                 const sumaNotas = evaluacionesPeriodo.reduce((sum, e) => sum + (e.notaFinal || 0), 0);
                 const promedio = sumaNotas / evaluacionesPeriodo.length;
-                const cuartil = obtenerCuartil(promedio);
+                
+                // 🔴 🔴 🔴 CLAVE: await para obtener el cuartil desde BD 🔴 🔴 🔴
+                const cuartil = await obtenerCuartil(promedio);
+                
                 matrizCuartiles[gestor][periodoLabel] = {
                     cuartil: cuartil,
                     evaluaciones: evaluacionesPeriodo.length,
@@ -10534,9 +10706,43 @@ async function cargarEvolucionCuartilesPorGestor() {
         }
     }
     
+    // Calcular tendencias
     const tendencias = calcularTendenciasGestores(matrizCuartiles, periodosLabels);
+    
+    // Generar tabla
     generarTablaEvolucionCuartiles(container, matrizCuartiles, periodosLabels, gestores, tendencias);
 }
+
+// ======================================================
+// FUNCIÓN: getCuartilHTML()
+// ======================================================
+// 📌 PROPÓSITO: Generar HTML para badge de cuartil
+// ======================================================
+
+function getCuartilHTML(cuartil) {
+    if (!cuartil || cuartil === '-' || cuartil === 'undefined' || cuartil === 'null') {
+        return '<span style="color: #adb5bd;">—</span>';
+    }
+    
+    const config = {
+        'Q1': { color: '#1a7f37', texto: '🏆 Q1' },
+        'Q2': { color: '#019DF4', texto: '📈 Q2' },
+        'Q3': { color: '#f39c12', texto: '⚠️ Q3' },
+        'Q4': { color: '#d93025', texto: '🔴 Q4' }
+    };
+    
+    const c = config[cuartil];
+    if (!c) {
+        return `<span style="background: #6c757d; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px;">❓ ${cuartil}</span>`;
+    }
+    
+    return `<span style="background: ${c.color}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; white-space: nowrap;">
+        ${c.texto}
+    </span>`;
+}
+
+// Exponer globalmente
+window.getCuartilHTML = getCuartilHTML;
 
     // ========== 4.2 Calcular períodos disponibles (CORREGIDO) ==========
 function calcularPeriodosRango(evaluaciones, periodo, cantidad) {
@@ -10727,37 +10933,47 @@ function calcularPeriodosRango(evaluaciones, periodo, cantidad) {
     }
 
     // ========== 4.5 Generar tabla HTML (CORREGIDO) ==========
-function generarTablaEvolucionCuartiles(container, matrizCuartiles, periodosLabels, gestores, tendencias) {
-    const ultimoPeriodo = periodosLabels[periodosLabels.length - 1];
-    const gestoresOrdenados = [...gestores].sort((a, b) => {
-        const cuartilA = matrizCuartiles[a][ultimoPeriodo]?.cuartil || 'Z';
-        const cuartilB = matrizCuartiles[b][ultimoPeriodo]?.cuartil || 'Z';
+    function generarTablaEvolucionCuartiles(container, matrizCuartiles, periodosLabels, gestores, tendencias) {
+        const ultimoPeriodo = periodosLabels[periodosLabels.length - 1];
+        const gestoresOrdenados = [...gestores].sort((a, b) => {
+            const cuartilA = matrizCuartiles[a][ultimoPeriodo]?.cuartil || 'Z';
+            const cuartilB = matrizCuartiles[b][ultimoPeriodo]?.cuartil || 'Z';
+            
+            if (cuartilA === 'Q4' && cuartilB !== 'Q4') return -1;
+            if (cuartilA !== 'Q4' && cuartilB === 'Q4') return 1;
+            return a.localeCompare(b);
+        });
         
-        if (cuartilA === 'Q4' && cuartilB !== 'Q4') return -1;
-        if (cuartilA !== 'Q4' && cuartilB === 'Q4') return 1;
-        return a.localeCompare(b);
-    });
-    
-    const getCuartilHTML = (cuartil, evaluaciones) => {
-        if (cuartil === '-') return '<span style="color: #adb5bd;">—</span>';
-        
-        const config = {
-            'Q1': { color: '#1a7f37', texto: '🏆 Q1' },
-            'Q2': { color: '#019DF4', texto: '📈 Q2' },
-            'Q3': { color: '#f39c12', texto: '⚠️ Q3' },
-            'Q4': { color: '#d93025', texto: '🔴 Q4' }
+        // 🔴 🔴 🔴 FUNCIÓN CORREGIDA 🔴 🔴 🔴
+        const getCuartilHTML = (cuartil, evaluaciones) => {
+            // Si no hay cuartil o es '-', mostrar vacío
+            if (!cuartil || cuartil === '-') {
+                return '<span style="color: #adb5bd;">—</span>';
+            }
+            
+            const config = {
+                'Q1': { color: '#1a7f37', texto: '🏆 Q1' },
+                'Q2': { color: '#019DF4', texto: '📈 Q2' },
+                'Q3': { color: '#f39c12', texto: '⚠️ Q3' },
+                'Q4': { color: '#d93025', texto: '🔴 Q4' }
+            };
+            
+            // 🔴 Verificar si el cuartil existe en la configuración
+            const c = config[cuartil];
+            if (!c) {
+                // Si no existe, mostrar el cuartil con color genérico
+                return `<span style="background: #6c757d; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; white-space: nowrap;">❓ ${cuartil}</span>`;
+            }
+            
+            const badge = `<span style="background: ${c.color}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; white-space: nowrap;">
+                ${c.texto}
+            </span>`;
+            
+            if (evaluaciones > 0) {
+                return `<div title="${evaluaciones} evaluación(es) en este período">${badge}</div>`;
+            }
+            return badge;
         };
-        
-        const c = config[cuartil];
-        const badge = `<span style="background: ${c.color}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block; white-space: nowrap;">
-            ${c.texto}
-        </span>`;
-        
-        if (evaluaciones > 0) {
-            return `<div title="${evaluaciones} evaluación(es) en este período">${badge}</div>`;
-        }
-        return badge;
-    };
     
     const minWidth = Math.max(500, 180 + (periodosLabels.length * 85));
     
@@ -11233,7 +11449,7 @@ function generarTablaEvolucionCuartiles(container, matrizCuartiles, periodosLabe
 
         if (!rankingOriginalCompleto || rankingOriginalCompleto.length === 0) {
             const evaluaciones = await API.getHistorial();
-            rankingOriginalCompleto = construirRankingAgentes(evaluaciones);
+            rankingOriginalCompleto = await construirRankingAgentes(evaluaciones);
         }
 
         let rankingFiltrado = [...rankingOriginalCompleto];
@@ -11308,7 +11524,7 @@ function generarTablaEvolucionCuartiles(container, matrizCuartiles, periodosLabe
                 console.warn('⚠️ No hay evaluaciones');
                 return;
             }
-            rankingOriginalCompleto = construirRankingAgentes(evaluaciones);
+            rankingOriginalCompleto = await construirRankingAgentes(evaluaciones);
         }
 
         // Obtener líder de cada agente desde la base de datos
@@ -11470,7 +11686,7 @@ function generarTablaEvolucionCuartiles(container, matrizCuartiles, periodosLabe
         });
         
         // 🔴 Usar la función CORRECTA para el ranking
-        const ranking = construirRankingAgentes(evaluaciones);
+        const ranking = await construirRankingAgentes(evaluaciones);
         
         // Crear mapa de cuartiles por agente
         const cuartilPorAgente = {};
@@ -11854,7 +12070,7 @@ async function mostrarResumenAgrupado(campoAgrupacion, titulo, icono) {
                 grupo.agentesSet.add(agente);
             }
             
-            const ranking = construirRankingAgentes(evaluacionesFiltradas);
+            const ranking = await construirRankingAgentes(evaluacionesFiltradas);
             const cuartilPorAgente = {};
             ranking.forEach(r => {
                 cuartilPorAgente[r.agente] = r.cuartil;
@@ -12078,7 +12294,6 @@ async function mostrarResumenAgrupado(campoAgrupacion, titulo, icono) {
     async function agruparEvaluacionesEnCiclos(agente) {
         console.log(`🔄 Agrupando evaluaciones de ${agente} en ciclos...`);
 
-        // Verificar caché
         const ahora = Date.now();
         const cacheEntry = ciclosCacheGlobal.get(agente);
         if (cacheEntry && (ahora - cacheEntry.timestamp) < CACHE_DURACION_CICLOS) {
@@ -12087,7 +12302,6 @@ async function mostrarResumenAgrupado(campoAgrupacion, titulo, icono) {
         }
 
         try {
-            // Obtener evaluaciones del agente desde window.evaluacionesGlobales
             const evaluacionesAgente = (window.evaluacionesGlobales || []).filter(e => e.agente === agente);
             
             if (!evaluacionesAgente || evaluacionesAgente.length === 0) {
@@ -12095,14 +12309,13 @@ async function mostrarResumenAgrupado(campoAgrupacion, titulo, icono) {
                 return [];
             }
 
-            // 🔴 PASO 1: Ordenar por fecha (ascendente - más antigua a más reciente)
             evaluacionesAgente.sort((a, b) => {
                 const fechaA = obtenerFechaEvaluacion(a);
                 const fechaB = obtenerFechaEvaluacion(b);
                 if (!fechaA && !fechaB) return 0;
                 if (!fechaA) return 1;
                 if (!fechaB) return -1;
-                return fechaA - fechaB; // Ascendente: antigua → reciente
+                return fechaA - fechaB;
             });
 
             const TAMANO_CICLO = 5;
@@ -12113,7 +12326,7 @@ async function mostrarResumenAgrupado(campoAgrupacion, titulo, icono) {
                 const numeroCiclo = Math.floor(i / TAMANO_CICLO) + 1;
 
                 let sumaNotas = 0, sumaENC = 0, sumaECUF = 0, sumaECN = 0;
-                let fechasObj = []; // Array de objetos Date para ordenamiento correcto
+                let fechasObj = [];
 
                 for (const evalItem of evaluacionesCiclo) {
                     sumaNotas += evalItem.notaFinal || 0;
@@ -12121,7 +12334,6 @@ async function mostrarResumenAgrupado(campoAgrupacion, titulo, icono) {
                     sumaECUF += evalItem.totalECUF || 0;
                     sumaECN += evalItem.totalECN || 0;
                     
-                    // Obtener fecha como objeto Date
                     const fechaObj = obtenerFechaEvaluacion(evalItem);
                     if (fechaObj) {
                         fechasObj.push({
@@ -12137,18 +12349,16 @@ async function mostrarResumenAgrupado(campoAgrupacion, titulo, icono) {
                 const promedioECUF = totalEvals > 0 ? (sumaECUF / totalEvals).toFixed(1) : 0;
                 const promedioECN = totalEvals > 0 ? (sumaECN / totalEvals).toFixed(1) : 0;
 
-                // 🔴 PASO 2: Ordenar fechas cronológicamente (ascendente: más antigua → más reciente)
                 fechasObj.sort((a, b) => a.fechaObj - b.fechaObj);
                 
-                // 🔴 PASO 3: Tomar la primera y última fecha correctamente ordenadas
                 const fechaInicio = fechasObj.length > 0 ? fechasObj[0].fechaStr : 'N/A';
                 const fechaFin = fechasObj.length > 0 ? fechasObj[fechasObj.length - 1].fechaStr : 'N/A';
 
-                // Determinar cuartil
-                let cuartil = 'Q4';
-                if (promedioFinal >= 97) cuartil = 'Q1';
-                else if (promedioFinal >= 90) cuartil = 'Q2';
-                else if (promedioFinal >= 85) cuartil = 'Q3';
+                // 🔴 🔴 🔴 AQUÍ ESTÁ EL CAMBIO 🔴 🔴 🔴
+                // ANTES: if (promedioFinal >= 97) cuartil = 'Q1';
+                // AHORA: Usar el sistema dinámico
+                const resultadoCuartil = await obtenerCuartilPorNota(parseFloat(promedioFinal));
+                const cuartil = resultadoCuartil.cuartil;
 
                 ciclos.push({
                     numero: numeroCiclo,
@@ -12165,13 +12375,9 @@ async function mostrarResumenAgrupado(campoAgrupacion, titulo, icono) {
                 });
             }
 
-            // Guardar en caché
             ciclosCacheGlobal.set(agente, { ciclos: ciclos, timestamp: ahora });
             
             console.log(`✅ ${ciclos.length} ciclos calculados para ${agente}`);
-            console.log(`   Ciclo #1: ${ciclos[0]?.fechaInicio} → ${ciclos[0]?.fechaFin}`);
-            console.log(`   Último ciclo: ${ciclos[ciclos.length-1]?.fechaInicio} → ${ciclos[ciclos.length-1]?.fechaFin}`);
-            
             return ciclos;
 
         } catch (error) {
@@ -12384,7 +12590,7 @@ async function verEvolucionCiclos(agente) {
     let agenteSeleccionadoActual = null;
     let dropdownVisible = false;
 
-    function cargarListaAgentesParaBusqueda() {
+    async function cargarListaAgentesParaBusqueda() {
         const evaluaciones = window.evaluacionesGlobales || [];
         const agentesSet = new Set();
 
@@ -12393,7 +12599,7 @@ async function verEvolucionCiclos(agente) {
         });
 
         // Obtener ranking para ordenar
-        const ranking = construirRankingAgentes(evaluaciones);
+        const ranking = await construirRankingAgentes(evaluaciones);
         const agentesQ4 = new Set(ranking.filter(a => a.cuartil === 'Q4').map(a => a.agente));
         const rankingMap = {};
         ranking.forEach(r => { rankingMap[r.agente] = r.promedio; });
@@ -12780,13 +12986,13 @@ async function verEvolucionCiclos(agente) {
     // ===== FIN FUNCIÓN: exportarHistorialAgenteCSV ==========================
 
     // ===== 33. INICIO FUNCIÓN: mostrarResumenAgente =======================
-    function mostrarResumenAgente(agente, evaluaciones) {
+    async function mostrarResumenAgente(agente, evaluaciones) {
         const total = evaluaciones.length;
         const sumaNotas = evaluaciones.reduce((sum, e) => sum + numeroSeguro(e.notaFinal), 0);
         const promedio = (sumaNotas / total).toFixed(1);
 
         // Calcular cuartil
-        const ranking = construirRankingAgentes(evaluaciones);
+        const ranking = await construirRankingAgentes(evaluaciones);
         const agenteRanking = ranking.find(r => r.agente === agente);
         const cuartil = agenteRanking?.cuartil || calcularCuartilIndividual(promedio);
 
@@ -13026,11 +13232,9 @@ async function verEvolucionCiclos(agente) {
     // ===== FIN FUNCIÓN: exportarTodosLosAgentesCSV ==========================
 
     // ===== 38. INICIO FUNCIÓN: calcularCuartilIndividual ====================
-    function calcularCuartilIndividual(promedio) {
-        if (promedio >= 90) return 'Q1';
-        if (promedio >= 80) return 'Q2';
-        if (promedio >= 70) return 'Q3';
-        return 'Q4';
+    async function calcularCuartilIndividual(promedio) {
+        const resultado = await obtenerCuartilPorNota(promedio);
+        return resultado.cuartil;
     }
     // ===== FIN FUNCIÓN: calcularCuartilIndividual ===========================
     
@@ -13599,7 +13803,7 @@ async function cargarMesesParaSelectorQ4() {
             if (filtroMesRankingActual && filtroMesRankingActual !== 'todos') {
                 const evaluaciones = await API.getHistorial();
                 const evaluacionesFiltradas = filtrarEvaluacionesPorMes(evaluaciones, filtroMesRankingActual);
-                ranking = construirRankingAgentes(evaluacionesFiltradas);
+                ranking = await construirRankingAgentes(evaluacionesFiltradas);
             }
             
             // Aplicar filtro de cuartil
@@ -13742,7 +13946,7 @@ async function cargarMesesParaSelectorQ4() {
                 fechaOriginal: e.fecha_formateada || e.fecha
             }));
 
-            const ranking = construirRankingAgentes(evaluacionesFormateadas);
+            const ranking = await construirRankingAgentes(evaluacionesFormateadas);
             const agentesQ4 = ranking.filter(a => a.cuartil === 'Q4');
 
             const select = document.getElementById('pdaAgente');
@@ -15493,7 +15697,7 @@ async function cargarMesesParaSelectorQ4() {
     }
 
     // ===== 19. INICIO FUNCIÓN: generarDocumentoHTML =======================
-    function generarDocumentoHTML(data) {
+    async function generarDocumentoHTML(data) {
         const {
             documentoId, fechaEmision, agente, periodoDesde, periodoHasta,
             totalEvals, promedioFinal, promedioENC, promedioECUF, promedioECN,
@@ -15501,9 +15705,12 @@ async function cargarMesesParaSelectorQ4() {
             fechaProximaEvaluacion
         } = data;
 
-        // Determinar estado y colores
-        const estadoFinal = promedioFinal >= 85 ? 'APRUEBA' : 'NO APRUEBA - Requiere Plan de Mejora';
-        const colorFinal = promedioFinal >= 85 ? '#28a745' : '#d93025';
+        // 🔴 Usar el sistema de cuartiles para determinar colores
+        const resultadoCuartilGeneral = await obtenerCuartilPorNota(promedioFinal);
+        const estadoFinal = resultadoCuartilGeneral.cuartil === 'Q1' || resultadoCuartilGeneral.cuartil === 'Q2' ? 'APRUEBA' : 'NO APRUEBA - Requiere Plan de Mejora';
+        const colorFinal = resultadoCuartilGeneral.color;
+
+        // Para los motivos, usar los mismos colores según su porcentaje
         const colorENC = pctENC >= 90 ? '#28a745' : '#d93025';
         const colorECUF = pctECUF >= 90 ? '#28a745' : '#d93025';
         const colorECN = pctECN >= 90 ? '#28a745' : '#d93025';
@@ -15803,113 +16010,128 @@ async function cargarMesesParaSelectorQ4() {
 
     // ===== 20. INICIO FUNCIÓN: generarDocumentoTexto ======================
     function generarDocumentoTexto(data) {
-        const {
-            documentoId, fechaEmision, agente, periodoDesde, periodoHasta,
-            totalEvals, promedioFinal, promedioENC, promedioECUF, promedioECN,
-            pctENC, pctECUF, pctECN, itemsCriticos, itemsNoCriticos,
-            fechaProximaEvaluacion
-        } = data;
+    const {
+        documentoId, fechaEmision, agente, periodoDesde, periodoHasta,
+        totalEvals, promedioFinal, promedioENC, promedioECUF, promedioECN,
+        pctENC, pctECUF, pctECN, itemsCriticos, itemsNoCriticos,
+        fechaProximaEvaluacion
+    } = data;
 
-        let texto = `
-        ╔═══════════════════════════════════════════════════════════════════════════════╗
-        ║                       NOTIFICACIÓN DE RESULTADOS                               ║
-        ║                 Plan de Desarrollo y Acción (PDA) - v1.0                       ║
-        ╠═══════════════════════════════════════════════════════════════════════════════╣
-        ║                                                                               ║
-        ║  📄 DOCUMENTO N°: ${documentoId.padEnd(50)}║
-        ║  📅 EMITIDO: ${fechaEmision.padEnd(53)}║
-        ║  👤 GESTOR: ${agente.padEnd(53)}║
-        ║  👤 EMITIDO POR: Mesa Calidad Cobranzas${' '.repeat(29)}║
-        ║                                                                               ║
-        ╠═══════════════════════════════════════════════════════════════════════════════╣
-        ║ 1. RESULTADOS DE EVALUACIONES                                                 ║
-        ╠═══════════════════════════════════════════════════════════════════════════════╣
-        ║                                                                               ║
-        ║  Período analizado: ${periodoDesde} al ${periodoHasta}${' '.repeat(33)}║
-        ║  Total escuchas: ${totalEvals}${' '.repeat(52)}║
-        ║                                                                               ║
-        ║  ┌───────────────┬───────────┬─────────┬───────────────────────┐             ║
-        ║  │  INDICADOR    │  PUNTAJE  │  META   │       ESTADO           │             ║
-        ║  ├───────────────┼───────────┼─────────┼───────────────────────┤             ║
-        ║  │ ENC (Cliente) │ ${promedioENC}/${obtenerPesosActuales().ENC} (${pctENC}%) │ ≥ 90%   │ ${pctENC >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
-        ║  │ ECUF (Negocio)│ ${promedioECUF}/${obtenerPesosActuales().ECUF} (${pctECUF}%) │ ≥ 90%   │ ${pctECUF >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
-        ║  │ ECN (Proceso) │ ${promedioECN}/${obtenerPesosActuales().ECN} (${pctECN}%) │ ≥ 90%   │ ${pctECN >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
-        ║  │ NOTA FINAL    │ ${promedioFinal}%        │ ≥ 85%   │ ${promedioFinal >= 85 ? '🟢 APRUEBA' : '🔴 NO APRUEBA'}${' '.repeat(9)}│             ║
-        ║  └───────────────┴───────────┴─────────┴───────────────────────┘             ║
-        ║                                                                               ║
-        ║  ▶ RESULTADO: ${promedioFinal >= 85 ? 'APRUEBA' : 'NO APROBADO - Requiere Plan de Mejora'}${' '.repeat(31)}║
-        ║                                                                               ║
-        ╠═══════════════════════════════════════════════════════════════════════════════╣
-        ║ 2. HALLAZGOS - ÍTEMS EVALUADOS COMO "NO CUMPLE"                               ║
-        ╠═══════════════════════════════════════════════════════════════════════════════╣
-        ║                                                                               ║
-        `;
-
-        itemsCriticos.forEach(item => {
-            texto += `
-        ║  🔴 ${item.submotivo.padEnd(54)}║
-        ║     • Bloque: ${(item.bloque || 'Sin bloque').padEnd(46)}║
-        ║     • Atributo: ${(item.atributo || 'Sin atributo').padEnd(44)}║
-        ║     • Ocurrencias: ${item.ocurrencias} veces${' '.repeat(40)}║
-        ║     • Peso: ${item.peso}%${' '.repeat(48)}║
-        ║                                                                               ║
-        `;
-        });
-
-        itemsNoCriticos.slice(0, 5).forEach(item => {
-            texto += `
-        ║  🟡 ${item.submotivo.padEnd(54)}║
-        ║     • Bloque: ${(item.bloque || 'Sin bloque').padEnd(46)}║
-        ║     • Atributo: ${(item.atributo || 'Sin atributo').padEnd(44)}║
-        ║     • Ocurrencias: ${item.ocurrencias} veces${' '.repeat(40)}║
-        ║     • Peso: ${item.peso}%${' '.repeat(48)}║
-        ║                                                                               ║
-        `;
-        });
-
-        texto += `
-        ╠═══════════════════════════════════════════════════════════════════════════════╣
-        ║ 3. EXPECTATIVA DE MEJORA                                                      ║
-        ╠═══════════════════════════════════════════════════════════════════════════════╣
-        ║                                                                               ║
-        ║  Para las próximas evaluaciones, se espera que el gestor demuestre mejora     ║
-        ║  en los siguientes aspectos:                                                  ║
-        ║                                                                               ║
-        `;
-
-        itemsCriticos.slice(0, 3).forEach(item => {
-            texto += `║  ✓ ${item.submotivo.padEnd(55)}║\n`;
-        });
-        if (itemsNoCriticos.length > 0) {
-            texto += `║  ✓ ${itemsNoCriticos[0].submotivo.padEnd(55)}║\n`;
+    // 🔴 Calcular estado usando el sistema de cuartiles (síncrono para este caso)
+    const criterios = obtenerCriteriosPorDefecto();
+    let resultadoCuartil = null;
+    for (const c of criterios) {
+        if (promedioFinal >= c.limite_inferior && promedioFinal <= c.limite_superior) {
+            resultadoCuartil = c;
+            break;
         }
-
-        texto += `
-        ║                                                                               ║
-        ║  ▶ META ESPERADA: Alcanzar nota mínima de 85%                                 ║
-        ║  ▶ PLAZO: Próximas 5 evaluaciones                                             ║
-        ║                                                                               ║
-        ╠═══════════════════════════════════════════════════════════════════════════════╣
-        ║ 4. PRÓXIMA VERIFICACIÓN                                                       ║
-        ╠═══════════════════════════════════════════════════════════════════════════════╣
-        ║                                                                               ║
-        ║  📅 Fecha estimada de nueva evaluación: ${(fechaProximaEvaluacion || 'Por definir').padEnd(30)}║
-        ║                                                                               ║
-        ║  ⚠️ NOTA: Esta es una NOTIFICACIÓN INFORMATIVA. El gestor deberá revisar      ║
-        ║  los hallazgos y ajustar su desempeño. No requiere firma ni compromiso        ║
-        ║  bilateral.                                                                   ║
-        ║                                                                               ║
-        ║  Si persisten las mismas fallas después de 2 evaluaciones, se escalará el     ║
-        ║  caso a Gerencia.                                                             ║
-        ║                                                                               ║
-        ╠═══════════════════════════════════════════════════════════════════════════════╣
-        ║  Documento generado automáticamente por Sistema MECA                          ║
-        ║  © Auditoría Calidad Cobranza - No requiere respuesta del gestor              ║
-        ╚═══════════════════════════════════════════════════════════════════════════════╝
-        `;
-
-        return texto;
     }
+    if (!resultadoCuartil) resultadoCuartil = criterios[3]; // Q4 por defecto
+
+    const esAprobado = resultadoCuartil.cuartil === 'Q1' || resultadoCuartil.cuartil === 'Q2';
+    const estadoFinal = esAprobado ? 'APRUEBA' : 'NO APROBADO - Requiere Plan de Mejora';
+    const estadoIcono = esAprobado ? '🟢' : '🔴';
+
+    let texto = `
+    ╔═══════════════════════════════════════════════════════════════════════════════╗
+    ║                       NOTIFICACIÓN DE RESULTADOS                               ║
+    ║                 Plan de Desarrollo y Acción (PDA) - v1.0                       ║
+    ╠═══════════════════════════════════════════════════════════════════════════════╣
+    ║                                                                               ║
+    ║  📄 DOCUMENTO N°: ${documentoId.padEnd(50)}║
+    ║  📅 EMITIDO: ${fechaEmision.padEnd(53)}║
+    ║  👤 GESTOR: ${agente.padEnd(53)}║
+    ║  👤 EMITIDO POR: Mesa Calidad Cobranzas${' '.repeat(29)}║
+    ║                                                                               ║
+    ╠═══════════════════════════════════════════════════════════════════════════════╣
+    ║ 1. RESULTADOS DE EVALUACIONES                                                 ║
+    ╠═══════════════════════════════════════════════════════════════════════════════╣
+    ║                                                                               ║
+    ║  Período analizado: ${periodoDesde} al ${periodoHasta}${' '.repeat(33)}║
+    ║  Total escuchas: ${totalEvals}${' '.repeat(52)}║
+    ║                                                                               ║
+    ║  ┌───────────────┬───────────┬─────────┬───────────────────────┐             ║
+    ║  │  INDICADOR    │  PUNTAJE  │  META   │       ESTADO           │             ║
+    ║  ├───────────────┼───────────┼─────────┼───────────────────────┤             ║
+    ║  │ ENC (Cliente) │ ${promedioENC}/${obtenerPesosActuales().ENC} (${pctENC}%) │ ≥ 90%   │ ${pctENC >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+    ║  │ ECUF (Negocio)│ ${promedioECUF}/${obtenerPesosActuales().ECUF} (${pctECUF}%) │ ≥ 90%   │ ${pctECUF >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+    ║  │ ECN (Proceso) │ ${promedioECN}/${obtenerPesosActuales().ECN} (${pctECN}%) │ ≥ 90%   │ ${pctECN >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+    ║  │ NOTA FINAL    │ ${promedioFinal}%        │ ≥ 85%   │ ${estadoIcono} ${estadoFinal}${' '.repeat(9)}│             ║
+    ║  └───────────────┴───────────┴─────────┴───────────────────────┘             ║
+    ║                                                                               ║
+    ║  ▶ RESULTADO: ${estadoFinal}${' '.repeat(31)}║
+    ║                                                                               ║
+    ╠═══════════════════════════════════════════════════════════════════════════════╣
+    ║ 2. HALLAZGOS - ÍTEMS EVALUADOS COMO "NO CUMPLE"                               ║
+    ╠═══════════════════════════════════════════════════════════════════════════════╣
+    ║                                                                               ║
+    `;
+
+    itemsCriticos.forEach(item => {
+        texto += `
+    ║  🔴 ${item.submotivo.padEnd(54)}║
+    ║     • Bloque: ${(item.bloque || 'Sin bloque').padEnd(46)}║
+    ║     • Atributo: ${(item.atributo || 'Sin atributo').padEnd(44)}║
+    ║     • Ocurrencias: ${item.ocurrencias} veces${' '.repeat(40)}║
+    ║     • Peso: ${item.peso}%${' '.repeat(48)}║
+    ║                                                                               ║
+    `;
+    });
+
+    itemsNoCriticos.slice(0, 5).forEach(item => {
+        texto += `
+    ║  🟡 ${item.submotivo.padEnd(54)}║
+    ║     • Bloque: ${(item.bloque || 'Sin bloque').padEnd(46)}║
+    ║     • Atributo: ${(item.atributo || 'Sin atributo').padEnd(44)}║
+    ║     • Ocurrencias: ${item.ocurrencias} veces${' '.repeat(40)}║
+    ║     • Peso: ${item.peso}%${' '.repeat(48)}║
+    ║                                                                               ║
+    `;
+    });
+
+    texto += `
+    ╠═══════════════════════════════════════════════════════════════════════════════╣
+    ║ 3. EXPECTATIVA DE MEJORA                                                      ║
+    ╠═══════════════════════════════════════════════════════════════════════════════╣
+    ║                                                                               ║
+    ║  Para las próximas evaluaciones, se espera que el gestor demuestre mejora     ║
+    ║  en los siguientes aspectos:                                                  ║
+    ║                                                                               ║
+    `;
+
+    itemsCriticos.slice(0, 3).forEach(item => {
+        texto += `║  ✓ ${item.submotivo.padEnd(55)}║\n`;
+    });
+    if (itemsNoCriticos.length > 0) {
+        texto += `║  ✓ ${itemsNoCriticos[0].submotivo.padEnd(55)}║\n`;
+    }
+
+    texto += `
+    ║                                                                               ║
+    ║  ▶ META ESPERADA: Alcanzar nota mínima de 85%                                 ║
+    ║  ▶ PLAZO: Próximas 5 evaluaciones                                             ║
+    ║                                                                               ║
+    ╠═══════════════════════════════════════════════════════════════════════════════╣
+    ║ 4. PRÓXIMA VERIFICACIÓN                                                       ║
+    ╠═══════════════════════════════════════════════════════════════════════════════╣
+    ║                                                                               ║
+    ║  📅 Fecha estimada de nueva evaluación: ${(fechaProximaEvaluacion || 'Por definir').padEnd(30)}║
+    ║                                                                               ║
+    ║  ⚠️ NOTA: Esta es una NOTIFICACIÓN INFORMATIVA. El gestor deberá revisar      ║
+    ║  los hallazgos y ajustar su desempeño. No requiere firma ni compromiso        ║
+    ║  bilateral.                                                                   ║
+    ║                                                                               ║
+    ║  Si persisten las mismas fallas después de 2 evaluaciones, se escalará el     ║
+    ║  caso a Gerencia.                                                             ║
+    ║                                                                               ║
+    ╠═══════════════════════════════════════════════════════════════════════════════╣
+    ║  Documento generado automáticamente por Sistema MECA                          ║
+    ║  © Auditoría Calidad Cobranza - No requiere respuesta del gestor              ║
+    ╚═══════════════════════════════════════════════════════════════════════════════╝
+    `;
+
+    return texto;
+}
     // ===== FIN FUNCIÓN: generarDocumentoTexto ==============================
 
     // ===== 21. INICIO FUNCIÓN: mostrarModalDocumentoProfesional ===========
@@ -21998,10 +22220,10 @@ async function cargarMesesParaSelectorQ4() {
     // ===== FIN FUNCIÓN: convertirFechaParaInput ============================
     
     // ===== 16. INICIO FUNCIÓN: resetearRankingCompleto =====================
-    function resetearRankingCompleto() {
+    async function resetearRankingCompleto() {
         const evaluaciones = window.evaluacionesGlobales || [];
         if (evaluaciones.length > 0) {
-            rankingCompletoGlobal = construirRankingAgentes(evaluaciones);
+            rankingCompletoGlobal = await construirRankingAgentes(evaluaciones);
             console.log(`✅ Ranking completo actualizado: ${rankingCompletoGlobal.length} gestores`);
         }
     }
@@ -28285,7 +28507,7 @@ async function cargarGestionPersonasGP() {
         console.log(`📅 Mes filtrado en Gestión de Personas: ${mesFiltro}`);
         
         // 🔴 NUEVO: Función para recalcular promedio solo con evaluaciones del mes filtrado
-        function recalcularPromedioPorMes(evaluacionesAgente, mesFiltro) {
+        async function recalcularPromedioPorMes(evaluacionesAgente, mesFiltro) {
             if (!mesFiltro || mesFiltro === 'todos') return null;
             
             const [anioFiltro, mesFiltroNum] = mesFiltro.split('-');
@@ -28307,12 +28529,20 @@ async function cargarGestionPersonasGP() {
             const sumaECUF = evalMes.reduce((sum, e) => sum + (e.totalECUF || e.total_ecuf || 0), 0);
             const sumaECN = evalMes.reduce((sum, e) => sum + (e.totalECN || e.total_ecn || 0), 0);
             
-            // Calcular cuartil según promedio del mes
             const promedio = sumaNotas / evalMes.length;
+            
+            // 🔴 🔴 🔴 DINÁMICO: Obtener criterios desde el sistema
+            // Usar obtenerCriteriosCuartiles() que es async y lee desde BD o caché
+            const criterios = await obtenerCriteriosCuartiles(false);
+            
+            // Determinar cuartil según el promedio usando los criterios dinámicos
             let cuartil = 'Q4';
-            if (promedio >= 97) cuartil = 'Q1';
-            else if (promedio >= 90) cuartil = 'Q2';
-            else if (promedio >= 85) cuartil = 'Q3';
+            for (const c of criterios) {
+                if (promedio >= c.limite_inferior && promedio <= c.limite_superior) {
+                    cuartil = c.cuartil;
+                    break;
+                }
+            }
             
             return {
                 promedio: promedio.toFixed(1),
@@ -28331,7 +28561,7 @@ async function cargarGestionPersonasGP() {
         
         // 🔴 NUEVO: Obtener TODAS las evaluaciones (sin filtro de mes) para el ranking
         // El ranking se usa solo para obtener el cuartil global y la lista de agentes
-        const ranking = construirRankingAgentes(evaluaciones);
+        const ranking = await construirRankingAgentes(evaluaciones);
         
         const liderPorAgente = {};
         const ubicacionPorAgente = {};
@@ -28350,7 +28580,7 @@ async function cargarGestionPersonasGP() {
             const todasEvaluacionesAgente = evaluaciones.filter(e => e.agente === gestor.agente);
             
             // 🔴 NUEVO: Recalcular promedio con el mes filtrado
-            const promedioMes = recalcularPromedioPorMes(todasEvaluacionesAgente, mesFiltro);
+            const promedioMes = await recalcularPromedioPorMes(todasEvaluacionesAgente, mesFiltro);
             
             // Si no tiene ciclos completos, usar datos del ranking
             if (ciclosCompletos.length === 0) {
@@ -28733,22 +28963,28 @@ function actualizarTablaGestionPersonasGP() {
     
     let html = '';
     
+    // 🔴 Obtener criterios para colores de cuartiles
+    const criterios = obtenerCriteriosPorDefecto();
+    const cuartilColors = {};
+    criterios.forEach(c => {
+        cuartilColors[c.cuartil] = c.color_hex;
+    });
+    const cuartilIcons = {};
+    criterios.forEach(c => {
+        cuartilIcons[c.cuartil] = c.icono || '📊';
+    });
+    
     for (const gestor of paginaGestores) {
         const estaExpandido = gestoresExpandidosGP.has(gestor.id);
         const expandIcon = estaExpandido ? '▼' : '▶';
         
-        // Color del cuartil
-        let cuartilHtml = '';
-        switch (gestor.cuartilGlobal) {
-            case 'Q1': cuartilHtml = '<span style="background: #1a7f37; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px;">🏆 Q1</span>'; break;
-            case 'Q2': cuartilHtml = '<span style="background: #019DF4; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px;">📈 Q2</span>'; break;
-            case 'Q3': cuartilHtml = '<span style="background: #f39c12; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px;">⚠️ Q3</span>'; break;
-            case 'Q4': cuartilHtml = '<span style="background: #d93025; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px;">🔴 Q4</span>'; break;
-            default: cuartilHtml = gestor.cuartilGlobal;
-        }
+        // 🔴 Usar colores dinámicos
+        const cuartilColor = cuartilColors[gestor.cuartilGlobal] || '#6c757d';
+        const cuartilIcono = cuartilIcons[gestor.cuartilGlobal] || '📊';
         
-        // Barras de progreso para ENC, ECUF, ECN
-        // 🔴 UNIFORME: encGlobal, ecufGlobal, ecnGlobal ya son porcentajes (0-100)
+        let cuartilHtml = `<span style="background: ${cuartilColor}; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px;">${cuartilIcono} ${gestor.cuartilGlobal}</span>`;
+        
+        // Barras de progreso
         const pctENC = Math.min(100, gestor.encGlobal);
         const pctECUF = Math.min(100, gestor.ecufGlobal);
         const pctECN = Math.min(100, gestor.ecnGlobal);
@@ -28790,10 +29026,9 @@ function actualizarTablaGestionPersonasGP() {
                 <td style="padding: 12px; text-align: center; font-weight: bold; color: var(--danger);">${gestor.totalErrores}</td>
                 <td style="padding: 12px; text-align: center; color: ${reincidenciaColor}; font-weight: bold;">${gestor.reincidencia}%</td>
                 <td style="padding: 12px;"><span style="color: ${gestor.tendencia.color};">${gestor.tendencia.icono} ${gestor.tendencia.texto}</span></td>
-            </table>
+            </tr>
         `;
         
-        // NIVEL 1: Tabla de ciclos históricos (expandido)
         if (estaExpandido && gestor.ciclos && gestor.ciclos.length > 0) {
             html += generarNivel1CiclosHistoricosGP(gestor);
         }
@@ -28812,14 +29047,12 @@ function actualizarTablaGestionPersonasGP() {
 // NIVEL 1: Generar tabla de ciclos históricos (CON FILTRO POR MES)
 // ======================================================
 function generarNivel1CiclosHistoricosGP(gestor) {
-    // Obtener el mes filtrado actual
     const filtroMes = document.getElementById('filtroMesGP')?.value || 'todos';
     const selectMes = document.getElementById('filtroMesGP');
     const nombreMesFiltro = selectMes?.options[selectMes.selectedIndex]?.text || 'Todos los períodos';
     
     let ciclosMostrar = [...gestor.ciclos].sort((a, b) => b.numero - a.numero);
     
-    // Filtrar por mes si es necesario
     if (filtroMes !== 'todos') {
         const [anioFiltro, mesFiltro] = filtroMes.split('-');
         ciclosMostrar = ciclosMostrar.filter(ciclo => {
@@ -28835,7 +29068,6 @@ function generarNivel1CiclosHistoricosGP(gestor) {
         });
     }
     
-    // Si no hay ciclos en el período seleccionado, mostrar mensaje
     if (ciclosMostrar.length === 0) {
         return `
             <tr class="fila-gestor-expandida-gp">
@@ -28848,7 +29080,15 @@ function generarNivel1CiclosHistoricosGP(gestor) {
         `;
     }
     
-    // Calcular estadísticas del período filtrado
+    // 🔴 Obtener criterios para colores de cuartiles
+    const criterios = obtenerCriteriosPorDefecto();
+    const cuartilColors = {};
+    const cuartilIcons = {};
+    criterios.forEach(c => {
+        cuartilColors[c.cuartil] = c.color_hex;
+        cuartilIcons[c.cuartil] = c.icono || '📊';
+    });
+    
     let sumaPromedios = 0;
     let totalErroresFiltrado = 0;
     let sumaENC = 0, sumaECUF = 0, sumaECN = 0;
@@ -28859,7 +29099,6 @@ function generarNivel1CiclosHistoricosGP(gestor) {
         sumaECUF += ciclo.promedioECUF;
         sumaECN += ciclo.promedioECN;
         
-        // Contar errores del ciclo
         for (const evalItem of ciclo.evaluaciones) {
             if (evalItem.detalles) {
                 for (const detalle of evalItem.detalles) {
@@ -28880,7 +29119,6 @@ function generarNivel1CiclosHistoricosGP(gestor) {
         <tr class="fila-gestor-expandida-gp">
             <td colspan="10" style="padding: 0;">
                 <div class="detalle-ciclos-gp" style="padding: 20px; background: #f8f9fa;">
-                    <!-- Encabezado con información del filtro -->
                     <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                         <div>
                             <strong>📋 HISTORIAL DE CICLOS COMPLETOS</strong>
@@ -28893,14 +29131,12 @@ function generarNivel1CiclosHistoricosGP(gestor) {
                         </div>
                     </div>
                     
-                    <!-- Resumen rápido del período -->
                     <div style="margin-bottom: 15px; display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; background: white; padding: 10px 15px; border-radius: 10px;">
                         <div><strong>🎯 ENC:</strong> ${promedioENCFiltrado}%</div>
                         <div><strong>⚠️ ECUF:</strong> ${promedioECUFFiltrado}%</div>
                         <div><strong>💰 ECN:</strong> ${promedioECNFiltrado}%</div>
                     </div>
                     
-                    <!-- Tabla de ciclos -->
                     <div class="table-container" style="max-height: 400px; overflow-y: auto;">
                         <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
                             <thead>
@@ -28920,16 +29156,10 @@ function generarNivel1CiclosHistoricosGP(gestor) {
     `;
     
     for (const ciclo of ciclosMostrar) {
-        let cuartilColor = '';
-        let cuartilIcono = '';
-        switch (ciclo.cuartil) {
-            case 'Q1': cuartilColor = '#1a7f37'; cuartilIcono = '🏆'; break;
-            case 'Q2': cuartilColor = '#019DF4'; cuartilIcono = '📈'; break;
-            case 'Q3': cuartilColor = '#f39c12'; cuartilIcono = '⚠️'; break;
-            case 'Q4': cuartilColor = '#d93025'; cuartilIcono = '🔴'; break;
-        }
+        // 🔴 Usar colores dinámicos
+        const cuartilColor = cuartilColors[ciclo.cuartil] || '#6c757d';
+        const cuartilIcono = cuartilIcons[ciclo.cuartil] || '📊';
         
-        // Contar errores del ciclo
         let erroresCiclo = 0;
         for (const evalItem of ciclo.evaluaciones) {
             if (evalItem.detalles) {
@@ -28968,8 +29198,6 @@ function generarNivel1CiclosHistoricosGP(gestor) {
                             </tbody>
                         </table>
                     </div>
-                    
-                    <!-- Resumen de errores frecuentes en el período -->
                     ${generarResumenErroresFrecuentesGP(ciclosMostrar, filtroMes !== 'todos' ? nombreMesFiltro : null)}
                 </div>
             </td>
@@ -29130,6 +29358,15 @@ function mostrarTabDetalleCicloGP(tab) {
 // TAB: Evaluaciones (con expandibles)
 // ======================================================
 function generarTabEvaluacionesGP(ciclo) {
+    // 🔴 Obtener criterios para colores de cuartiles
+    const criterios = obtenerCriteriosPorDefecto();
+    const cuartilColors = {};
+    const cuartilIcons = {};
+    criterios.forEach(c => {
+        cuartilColors[c.cuartil] = c.color_hex;
+        cuartilIcons[c.cuartil] = c.icono || '📊';
+    });
+    
     let html = `
         <div style="max-height: 500px; overflow-y: auto;">
             <div style="margin-bottom: 15px;">
@@ -29144,7 +29381,6 @@ function generarTabEvaluacionesGP(ciclo) {
         const nota = evalItem.notaFinal || 0;
         const notaColor = nota >= 85 ? '#28a745' : '#d93025';
         
-        // Recolectar errores de esta evaluación
         const errores = [];
         if (evalItem.detalles) {
             for (const detalle of evalItem.detalles) {
@@ -29277,7 +29513,7 @@ function generarTabErroresAgrupadosGP(ciclo) {
 // ======================================================
 // TAB: Análisis del ciclo
 // ======================================================
-function generarTabAnalisisGP(ciclo, gestor) {
+async function generarTabAnalisisGP(ciclo, gestor) {
     // Recolectar estadísticas
     let totalErrores = 0;
     let erroresPorBloque = { ENC: 0, ECUF: 0, ECN: 0 };
@@ -29291,7 +29527,6 @@ function generarTabAnalisisGP(ciclo, gestor) {
                     totalErrores++;
                     erroresPorSubmotivo[detalle.submotivo] = (erroresPorSubmotivo[detalle.submotivo] || 0) + 1;
                     
-                    // Clasificar por bloque
                     const bloque = detalle.bloque || '';
                     if (bloque === 'ENC' || bloque === 'Cliente') erroresPorBloque.ENC++;
                     else if (bloque === 'ECUF' || bloque === 'Negocio') erroresPorBloque.ECUF++;
@@ -29301,11 +29536,20 @@ function generarTabAnalisisGP(ciclo, gestor) {
         }
     }
     
-    // Error más crítico
     const errorCritico = Object.entries(erroresPorSubmotivo).sort((a, b) => b[1] - a[1])[0];
     const bloqueMasAfectado = Object.entries(erroresPorBloque).sort((a, b) => b[1] - a[1])[0];
     
-    // Recomendaciones
+    // 🔴 CORREGIDO: Usar obtenerCriteriosPorDefecto() SÍNCRONO (sin await)
+    const criterios = obtenerCriteriosPorDefecto();
+    let resultadoCuartil = null;
+    for (const c of criterios) {
+        if (ciclo.promedio >= c.limite_inferior && ciclo.promedio <= c.limite_superior) {
+            resultadoCuartil = c;
+            break;
+        }
+    }
+    if (!resultadoCuartil) resultadoCuartil = criterios[3];
+    
     let recomendaciones = [];
     if (errorCritico) {
         recomendaciones.push(`⚠️ Error más crítico: "${errorCritico[0]}" (${errorCritico[1]} ocurrencias)`);
@@ -29313,8 +29557,9 @@ function generarTabAnalisisGP(ciclo, gestor) {
     if (bloqueMasAfectado) {
         recomendaciones.push(`📂 Bloque más afectado: ${bloqueMasAfectado[0]} (${bloqueMasAfectado[1]} errores)`);
     }
-    if (ciclo.cuartil === 'Q4') {
-        recomendaciones.push('🔴 Ciclo en Q4 - Requiere PDA inmediato');
+    
+    if (resultadoCuartil.cuartil === 'Q4') {
+        recomendaciones.push(`🔴 Ciclo en Q4 (${resultadoCuartil.nombre}) - Requiere PDA inmediato`);
     } else if (ciclo.promedio < 85) {
         recomendaciones.push('⚠️ Promedio por debajo de 85% - Requiere seguimiento');
     } else if (ciclo.promedio >= 90) {
@@ -29329,7 +29574,7 @@ function generarTabAnalisisGP(ciclo, gestor) {
                     <div><strong>Total evaluaciones:</strong> ${ciclo.evaluaciones.length}</div>
                     <div><strong>Total errores:</strong> <span style="color: var(--danger);">${totalErrores}</span></div>
                     <div><strong>Promedio general:</strong> ${ciclo.promedio}%</div>
-                    <div><strong>Cuartil:</strong> ${ciclo.cuartil}</div>
+                    <div><strong>Cuartil:</strong> ${resultadoCuartil.cuartil} (${resultadoCuartil.nombre})</div>
                 </div>
                 <div class="card" style="padding: 15px;">
                     <h4 style="margin-bottom: 10px;">📈 Desempeño por Bloque</h4>
@@ -29360,7 +29605,7 @@ function generarTabAnalisisGP(ciclo, gestor) {
                 <ul style="margin-left: 20px;">
                     ${recomendaciones.map(r => `<li>${r}</li>`).join('')}
                 </ul>
-                ${ciclo.cuartil === 'Q4' ? `
+                ${resultadoCuartil.cuartil === 'Q4' ? `
                     <div style="margin-top: 15px;">
                         <button onclick="cerrarModalDetalleCicloGP(); generarPDAConDocumento('${escapeHtml(gestor)}', ${ciclo.numero})" 
                                 style="background: var(--warning); padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer;">
@@ -29717,6 +29962,12 @@ async function showTab(tabName, event) {
             }
         }
 
+        if (tabName === 'reglas') {
+            if (typeof inicializarReglasAdmin === 'function') {
+                await inicializarReglasAdmin();
+            }
+        }
+
         if (tabName === 'misSolicitudes') {
             if (typeof cargarMisSolicitudes === 'function') {
                 await cargarMisSolicitudes();
@@ -30009,20 +30260,23 @@ async function showTab(tabName, event) {
     // ===== FIN FUNCIÓN: numeroSeguro =======================================
     
     // ===== 13. INICIO FUNCIÓN: obtenerRango ================================
-    function obtenerRango(puntaje) {
-        if (puntaje >= 97) return { nombre: 'Excelente', color: 'var(--ok)', min: 97, max: 100 };
-        if (puntaje >= 90) return { nombre: 'Bien', color: '#019DF4', min: 90, max: 96 };
-        if (puntaje >= 85) return { nombre: 'Regular', color: 'var(--warning)', min: 85, max: 89 };
-        return { nombre: 'Bajo', color: 'var(--danger)', min: 0, max: 84 };
+    async function obtenerRango(puntaje) {
+        const resultado = await obtenerCuartilPorNota(puntaje);
+        // Mapear cuartil a rango
+        const rangos = {
+            'Q1': { nombre: 'Excelente', color: 'var(--ok)', min: 97, max: 100 },
+            'Q2': { nombre: 'Bien', color: '#019DF4', min: 90, max: 96 },
+            'Q3': { nombre: 'Regular', color: 'var(--warning)', min: 85, max: 89 },
+            'Q4': { nombre: 'Bajo', color: 'var(--danger)', min: 0, max: 84 }
+        };
+        return rangos[resultado.cuartil] || rangos['Q4'];
     }
     // ===== FIN FUNCIÓN: obtenerRango =======================================
 
     // ===== 14. INICIO FUNCIÓN: obtenerCuartil ==============================
-    function obtenerCuartil(nota) {
-        if (nota >= 97) return 'Q1';
-        if (nota >= 90) return 'Q2';
-        if (nota >= 85) return 'Q3';
-        return 'Q4';
+    async function obtenerCuartil(nota) {
+        const resultado = await obtenerCuartilPorNota(nota);
+        return resultado.cuartil;
     }
     // ===== FIN FUNCIÓN: obtenerCuartil =====================================
 
@@ -30962,7 +31216,7 @@ async function showTab(tabName, event) {
     // ===== FIN FUNCIÓN: obtenerFechaEvaluacion =============================
     
     // ===== 38. INICIO FUNCIÓN: actualizarAgentesQ4ConFiltro ================
-    function actualizarAgentesQ4ConFiltro(evaluacionesFiltradas) {
+    async function actualizarAgentesQ4ConFiltro(evaluacionesFiltradas) {
         const container = document.getElementById('agentesQ4Container');
         if (!container) return;
 
@@ -30979,7 +31233,7 @@ async function showTab(tabName, event) {
             return;
         }
 
-        const ranking = construirRankingAgentes(evaluacionesFiltradas);
+        const ranking = await construirRankingAgentes(evaluacionesFiltradas);
         const agentesQ4 = ranking.filter(a => a.cuartil === 'Q4');
 
         const totalQ4Elem = document.getElementById('totalQ4');
@@ -33725,7 +33979,737 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // ===== FIN FUNCIÓN: mostrarMensajeSinDatosEnGraficos ======================
 
-// ====================== CIERRE BLOQUE 15 =============================================
+
+// ======================================================
+// ADMINISTRACIÓN DE REGLAS (Supervisor)
+// ======================================================
+
+let reglasData = [];
+let reglaEnEdicion = null;
+
+// ======================================================
+// 1. CARGAR REGLAS
+// ======================================================
+async function cargarReglasAdministracion() {
+    console.log('📋 Cargando reglas de administración...');
+    
+    const container = document.getElementById('reglasContainer');
+    if (!container) {
+        console.warn('⚠️ No se encontró reglasContainer en el DOM');
+        return;
+    }
+    
+    container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Cargando reglas...</div>';
+    
+    try {
+        // 1. Obtener versión activa
+        const versionActiva = await API.getVersionActiva();
+        if (!versionActiva) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--warning);">
+                    ⚠️ No hay versión activa. Crea una versión primero.
+                </div>
+            `;
+            return;
+        }
+        
+        // 2. Obtener reglas de la versión activa
+        const reglas = await API.getReglasByVersion(versionActiva.id);
+        reglasData = reglas;
+        
+        // 3. Obtener todos los submotivos disponibles para los selects
+        const subMotivos = await API.getSubMotivos();
+        const atributos = await API.getAtributos();
+        const frentes = await API.getFrentes();
+        
+        // 4. Renderizar
+        renderizarTablaReglas(reglas, versionActiva, subMotivos, atributos, frentes);
+        
+        console.log(`✅ ${reglas.length} reglas cargadas para versión ${versionActiva.version}`);
+        
+    } catch (error) {
+        console.error('❌ Error cargando reglas:', error);
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: var(--danger);">
+                ❌ Error al cargar reglas: ${error.message}
+                <br><br>
+                <button onclick="cargarReglasAdministracion()" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; color: white; cursor: pointer;">
+                    🔄 Reintentar
+                </button>
+            </div>
+        `;
+    }
+}
+
+// ======================================================
+// 2. RENDERIZAR TABLA DE REGLAS
+// ======================================================
+function renderizarTablaReglas(reglas, versionActiva, subMotivos, atributos, frentes) {
+    const container = document.getElementById('reglasContainer');
+    if (!container) return;
+    
+    // Crear mapa de submotivos por código
+    const subMotivosMap = {};
+    subMotivos.forEach(s => {
+        subMotivosMap[s.codigo] = s;
+    });
+    
+    let html = `
+        <div style="margin-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+                <div>
+                    <h3 style="margin: 0;">📋 Reglas de Evaluación</h3>
+                    <span style="font-size: 13px; color: var(--muted);">
+                        Versión: <strong>${versionActiva.version}</strong> (ID: ${versionActiva.id})
+                    </span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="abrirModalNuevaRegla()" style="background: var(--ok); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                        ➕ Nueva Regla
+                    </button>
+                    <button onclick="cargarReglasAdministracion()" style="background: var(--accent); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                        🔄 Refrescar
+                    </button>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto; border: 1px solid var(--line); border-radius: 12px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background: linear-gradient(135deg, #f0f7ff, #e3f2fd);">
+                            <th style="padding: 10px 12px; text-align: left; min-width: 40px;">#</th>
+                            <th style="padding: 10px 12px; text-align: left; min-width: 150px;">📌 Origen</th>
+                            <th style="padding: 10px 12px; text-align: center; min-width: 100px;">⚡ Condición</th>
+                            <th style="padding: 10px 12px; text-align: left; min-width: 150px;">🎯 Acción</th>
+                            <th style="padding: 10px 12px; text-align: left; min-width: 120px;">📋 Afectados</th>
+                            <th style="padding: 10px 12px; text-align: left; min-width: 120px;">⏭️ Excepciones</th>
+                            <th style="padding: 10px 12px; text-align: center; min-width: 100px;">⚙️ Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+    
+    if (reglas.length === 0) {
+        html += `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px; color: var(--muted);">
+                    📭 No hay reglas configuradas para esta versión.
+                    <br>
+                    <button onclick="abrirModalNuevaRegla()" style="margin-top: 10px; padding: 6px 16px; background: var(--accent); border: none; border-radius: 6px; color: white; cursor: pointer;">
+                        ➕ Crear primera regla
+                    </button>
+                </td>
+            </tr>
+        `;
+    } else {
+        reglas.forEach((r, i) => {
+            const afectados = r.submotivos_afectados ? 
+                (Array.isArray(r.submotivos_afectados) ? r.submotivos_afectados : JSON.parse(r.submotivos_afectados)) : 
+                ['✅ Todos'];
+            
+            const excepciones = r.excepciones ? 
+                (Array.isArray(r.excepciones) ? r.excepciones : JSON.parse(r.excepciones)) : 
+                ['❌ Ninguna'];
+            
+            const valorTexto = r.valor_condicion === '0' ? '❌ No Cumple' : 
+                              r.valor_condicion === '1' ? '✅ Cumple' : 
+                              r.valor_condicion;
+            
+            const accionTexto = {
+                'marcar_no_aplica': '📝 Marcar No Aplica',
+                'deshabilitar': '🔒 Deshabilitar',
+                'habilitar': '🔓 Habilitar',
+                'marcar_valor': `📝 Marcar ${r.accion_valor || 'NA'}`
+            }[r.accion_tipo] || r.accion_tipo;
+            
+            const bgColor = i % 2 === 0 ? '#ffffff' : '#f8f9fa';
+            
+            html += `
+                <tr style="border-bottom: 1px solid #e0e0e0; background: ${bgColor};">
+                    <td style="padding: 10px 12px; text-align: center; font-weight: bold;">${i + 1}</td>
+                    <td style="padding: 10px 12px;">
+                        <strong>${r.submotivo_origen}</strong>
+                        <div style="font-size: 11px; color: var(--muted);">
+                            ${r.bloque_origen} / ${r.atributo_origen}
+                        </div>
+                    </td>
+                    <td style="padding: 10px 12px; text-align: center;">
+                        <span style="background: ${r.valor_condicion === '0' ? '#fff0f0' : '#e8f5e9'}; padding: 2px 10px; border-radius: 12px; font-size: 12px;">
+                            ${valorTexto}
+                        </span>
+                    </td>
+                    <td style="padding: 10px 12px;">
+                        <span style="background: #e3f2fd; padding: 2px 10px; border-radius: 12px; font-size: 12px;">
+                            ${accionTexto}
+                        </span>
+                        ${r.accion_valor && r.accion_tipo === 'marcar_valor' ? `<span style="font-size: 11px; color: var(--muted);"> → ${r.accion_valor}</span>` : ''}
+                    </td>
+                    <td style="padding: 10px 12px; font-size: 11px;">
+                        ${afectados.map(a => `<span style="background: #e8f5e9; padding: 1px 6px; border-radius: 10px; margin: 1px;">${a}</span>`).join(' ')}
+                    </td>
+                    <td style="padding: 10px 12px; font-size: 11px;">
+                        ${excepciones.map(e => `<span style="background: #fff3e0; padding: 1px 6px; border-radius: 10px; margin: 1px;">${e}</span>`).join(' ')}
+                    </td>
+                    <td style="padding: 10px 12px; text-align: center; white-space: nowrap;">
+                        <button onclick="abrirModalEditarRegla(${r.id})" 
+                                style="background: var(--warning); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; color: white; margin-right: 5px;">
+                            ✏️
+                        </button>
+                        <button onclick="eliminarRegla(${r.id})" 
+                                style="background: var(--danger); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; color: white;">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    
+    html += `
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top: 10px; font-size: 12px; color: var(--muted); text-align: center;">
+                💡 Las reglas se aplican automáticamente en el orden mostrado.
+                <span style="margin-left: 15px;">📌 Total: ${reglas.length} regla(s)</span>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+// ======================================================
+// 3. ABRIR MODAL PARA NUEVA REGLA
+// ======================================================
+async function abrirModalNuevaRegla() {
+    reglaEnEdicion = null;
+    
+    // Obtener datos para los selects
+    const [frentes, atributos, subMotivos] = await Promise.all([
+        API.getFrentes(),
+        API.getAtributos(),
+        API.getSubMotivos()
+    ]);
+    
+    // Limpiar modal anterior
+    const modalExistente = document.getElementById('modalRegla');
+    if (modalExistente) modalExistente.remove();
+    
+    const modalHtml = `
+        <div id="modalRegla" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10002; display: flex; justify-content: center; align-items: center;">
+            <div style="background: white; border-radius: 16px; width: 95%; max-width: 700px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+                <div style="padding: 15px 20px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="font-size: 16px;">➕ Nueva Regla de Evaluación</strong>
+                    <button onclick="cerrarModalRegla()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                </div>
+                <div style="padding: 20px; overflow-y: auto; flex: 1;">
+                    <form id="formRegla">
+                        <!-- Origen -->
+                        <div style="margin-bottom: 15px; background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #019DF4;">
+                            <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">📌 ORIGEN (qué campo activa la regla)</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Bloque *</label>
+                                    <select id="reglaBloqueOrigen" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="">Seleccionar</option>
+                                        ${frentes.map(f => `<option value="${f.codigo}">${f.codigo}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Atributo *</label>
+                                    <select id="reglaAtributoOrigen" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="">Seleccionar bloque primero</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Submotivo *</label>
+                                    <select id="reglaSubmotivoOrigen" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="">Seleccionar atributo primero</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Condición y Acción -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div style="background: #fff8e0; padding: 15px; border-radius: 10px; border-left: 4px solid #f39c12;">
+                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">⚡ CONDICIÓN</div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Valor que activa *</label>
+                                    <select id="reglaValorCondicion" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="0">❌ No Cumple</option>
+                                        <option value="1">✅ Cumple</option>
+                                        <option value="NA">No Aplica</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="background: #e8f5e9; padding: 15px; border-radius: 10px; border-left: 4px solid #28a745;">
+                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">🎯 ACCIÓN</div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Tipo *</label>
+                                    <select id="reglaAccionTipo" required onchange="toggleAccionValor()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="marcar_no_aplica">📝 Marcar como "No Aplica"</option>
+                                        <option value="deshabilitar">🔒 Deshabilitar campos</option>
+                                        <option value="habilitar">🔓 Habilitar campos</option>
+                                        <option value="marcar_valor">📝 Marcar con valor específico</option>
+                                    </select>
+                                </div>
+                                <div id="divAccionValor" style="display: none; margin-top: 8px;">
+                                    <label style="font-size: 12px; font-weight: 600;">Valor a aplicar</label>
+                                    <select id="reglaAccionValor" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="NA">No Aplica</option>
+                                        <option value="0">No Cumple</option>
+                                        <option value="1">Cumple</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Afectados y Excepciones -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div style="background: #f0f7ff; padding: 15px; border-radius: 10px; border-left: 4px solid #019DF4;">
+                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">📋 AFECTADOS</div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Submotivos afectados</label>
+                                    <select id="reglaSubmotivosAfectados" multiple style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line); min-height: 80px;">
+                                        <option value="">(vacío = todos)</option>
+                                        ${subMotivos.map(s => `<option value="${s.codigo}">${s.codigo}</option>`).join('')}
+                                    </select>
+                                    <small style="color: var(--muted);">Ctrl+clic para múltiple | Vacío = todos</small>
+                                </div>
+                            </div>
+                            <div style="background: #fff3e0; padding: 15px; border-radius: 10px; border-left: 4px solid #f39c12;">
+                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">⏭️ EXCEPCIONES</div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Submotivos excluidos</label>
+                                    <select id="reglaExcepciones" multiple style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line); min-height: 80px;">
+                                        ${subMotivos.map(s => `<option value="${s.codigo}">${s.codigo}</option>`).join('')}
+                                    </select>
+                                    <small style="color: var(--muted);">Ctrl+clic para múltiple | Estos NO serán afectados</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Orden -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div>
+                                <label style="font-size: 12px; font-weight: 600;">📊 Orden</label>
+                                <input type="number" id="reglaOrden" value="${reglasData.length + 1}" min="1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                            </div>
+                            <div>
+                                <label style="font-size: 12px; font-weight: 600;">📌 Activo</label>
+                                <select id="reglaActivo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                    <option value="true">✅ Activo</option>
+                                    <option value="false">⏸️ Inactivo</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0;">
+                    <button onclick="cerrarModalRegla()" style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white;">Cancelar</button>
+                    <button onclick="guardarRegla()" style="padding: 8px 20px; background: var(--ok); border: none; border-radius: 8px; cursor: pointer; color: white;">💾 Guardar Regla</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Configurar eventos de los selects
+    document.getElementById('reglaBloqueOrigen').addEventListener('change', function() {
+        actualizarSelectAtributos(this.value);
+    });
+    
+    document.getElementById('reglaAtributoOrigen').addEventListener('change', function() {
+        const bloque = document.getElementById('reglaBloqueOrigen').value;
+        actualizarSelectSubmotivos(bloque, this.value);
+    });
+}
+
+// ======================================================
+// 4. ABRIR MODAL PARA EDITAR REGLA
+// ======================================================
+async function abrirModalEditarRegla(id) {
+    reglaEnEdicion = id;
+    
+    const regla = reglasData.find(r => r.id === id);
+    if (!regla) {
+        alert('❌ Regla no encontrada');
+        return;
+    }
+    
+    // Obtener datos para los selects
+    const [frentes, atributos, subMotivos] = await Promise.all([
+        API.getFrentes(),
+        API.getAtributos(),
+        API.getSubMotivos()
+    ]);
+    
+    // Limpiar modal anterior
+    const modalExistente = document.getElementById('modalRegla');
+    if (modalExistente) modalExistente.remove();
+    
+    const afectados = regla.submotivos_afectados ? 
+        (Array.isArray(regla.submotivos_afectados) ? regla.submotivos_afectados : JSON.parse(regla.submotivos_afectados)) : [];
+    
+    const excepciones = regla.excepciones ? 
+        (Array.isArray(regla.excepciones) ? regla.excepciones : JSON.parse(regla.excepciones)) : [];
+    
+    const modalHtml = `
+        <div id="modalRegla" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10002; display: flex; justify-content: center; align-items: center;">
+            <div style="background: white; border-radius: 16px; width: 95%; max-width: 700px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+                <div style="padding: 15px 20px; background: linear-gradient(135deg, #f39c12, #e67e22); color: white; display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="font-size: 16px;">✏️ Editar Regla: ${regla.submotivo_origen}</strong>
+                    <button onclick="cerrarModalRegla()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                </div>
+                <div style="padding: 20px; overflow-y: auto; flex: 1;">
+                    <form id="formRegla">
+                        <!-- Origen -->
+                        <div style="margin-bottom: 15px; background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #019DF4;">
+                            <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">📌 ORIGEN (qué campo activa la regla)</div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Bloque *</label>
+                                    <select id="reglaBloqueOrigen" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="">Seleccionar</option>
+                                        ${frentes.map(f => `<option value="${f.codigo}" ${f.codigo === regla.bloque_origen ? 'selected' : ''}>${f.codigo}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Atributo *</label>
+                                    <select id="reglaAtributoOrigen" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="">Seleccionar bloque primero</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Submotivo *</label>
+                                    <select id="reglaSubmotivoOrigen" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="">Seleccionar atributo primero</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Condición y Acción -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div style="background: #fff8e0; padding: 15px; border-radius: 10px; border-left: 4px solid #f39c12;">
+                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">⚡ CONDICIÓN</div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Valor que activa *</label>
+                                    <select id="reglaValorCondicion" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="0" ${regla.valor_condicion === '0' ? 'selected' : ''}>❌ No Cumple</option>
+                                        <option value="1" ${regla.valor_condicion === '1' ? 'selected' : ''}>✅ Cumple</option>
+                                        <option value="NA" ${regla.valor_condicion === 'NA' ? 'selected' : ''}>No Aplica</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="background: #e8f5e9; padding: 15px; border-radius: 10px; border-left: 4px solid #28a745;">
+                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">🎯 ACCIÓN</div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Tipo *</label>
+                                    <select id="reglaAccionTipo" required onchange="toggleAccionValor()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="marcar_no_aplica" ${regla.accion_tipo === 'marcar_no_aplica' ? 'selected' : ''}>📝 Marcar como "No Aplica"</option>
+                                        <option value="deshabilitar" ${regla.accion_tipo === 'deshabilitar' ? 'selected' : ''}>🔒 Deshabilitar campos</option>
+                                        <option value="habilitar" ${regla.accion_tipo === 'habilitar' ? 'selected' : ''}>🔓 Habilitar campos</option>
+                                        <option value="marcar_valor" ${regla.accion_tipo === 'marcar_valor' ? 'selected' : ''}>📝 Marcar con valor específico</option>
+                                    </select>
+                                </div>
+                                <div id="divAccionValor" style="display: ${regla.accion_tipo === 'marcar_valor' ? 'block' : 'none'}; margin-top: 8px;">
+                                    <label style="font-size: 12px; font-weight: 600;">Valor a aplicar</label>
+                                    <select id="reglaAccionValor" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                        <option value="NA" ${regla.accion_valor === 'NA' ? 'selected' : ''}>No Aplica</option>
+                                        <option value="0" ${regla.accion_valor === '0' ? 'selected' : ''}>No Cumple</option>
+                                        <option value="1" ${regla.accion_valor === '1' ? 'selected' : ''}>Cumple</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Afectados y Excepciones -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div style="background: #f0f7ff; padding: 15px; border-radius: 10px; border-left: 4px solid #019DF4;">
+                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">📋 AFECTADOS</div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Submotivos afectados</label>
+                                    <select id="reglaSubmotivosAfectados" multiple style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line); min-height: 80px;">
+                                        <option value="">(vacío = todos)</option>
+                                        ${subMotivos.map(s => {
+                                            const selected = afectados.includes(s.codigo) ? 'selected' : '';
+                                            return `<option value="${s.codigo}" ${selected}>${s.codigo}</option>`;
+                                        }).join('')}
+                                    </select>
+                                    <small style="color: var(--muted);">Ctrl+clic para múltiple | Vacío = todos</small>
+                                </div>
+                            </div>
+                            <div style="background: #fff3e0; padding: 15px; border-radius: 10px; border-left: 4px solid #f39c12;">
+                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">⏭️ EXCEPCIONES</div>
+                                <div>
+                                    <label style="font-size: 12px; font-weight: 600;">Submotivos excluidos</label>
+                                    <select id="reglaExcepciones" multiple style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line); min-height: 80px;">
+                                        ${subMotivos.map(s => {
+                                            const selected = excepciones.includes(s.codigo) ? 'selected' : '';
+                                            return `<option value="${s.codigo}" ${selected}>${s.codigo}</option>`;
+                                        }).join('')}
+                                    </select>
+                                    <small style="color: var(--muted);">Ctrl+clic para múltiple | Estos NO serán afectados</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Orden -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div>
+                                <label style="font-size: 12px; font-weight: 600;">📊 Orden</label>
+                                <input type="number" id="reglaOrden" value="${regla.orden || 0}" min="1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                            </div>
+                            <div>
+                                <label style="font-size: 12px; font-weight: 600;">📌 Activo</label>
+                                <select id="reglaActivo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                    <option value="true" ${regla.activo ? 'selected' : ''}>✅ Activo</option>
+                                    <option value="false" ${!regla.activo ? 'selected' : ''}>⏸️ Inactivo</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0;">
+                    <button onclick="cerrarModalRegla()" style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white;">Cancelar</button>
+                    <button onclick="guardarRegla()" style="padding: 8px 20px; background: var(--warning); border: none; border-radius: 8px; cursor: pointer; color: white;">💾 Actualizar Regla</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Configurar eventos de los selects
+    document.getElementById('reglaBloqueOrigen').addEventListener('change', function() {
+        actualizarSelectAtributos(this.value);
+    });
+    
+    document.getElementById('reglaAtributoOrigen').addEventListener('change', function() {
+        const bloque = document.getElementById('reglaBloqueOrigen').value;
+        actualizarSelectSubmotivos(bloque, this.value);
+    });
+    
+    // Actualizar selects con los valores de la regla
+    setTimeout(() => {
+        // Seleccionar el atributo correcto
+        const atributoSelect = document.getElementById('reglaAtributoOrigen');
+        const atributosFiltrados = atributos.filter(a => a.frente_id === frentes.find(f => f.codigo === regla.bloque_origen)?.id);
+        atributoSelect.innerHTML = '<option value="">Seleccionar atributo</option>' + 
+            atributosFiltrados.map(a => `<option value="${a.nombre}" ${a.nombre === regla.atributo_origen ? 'selected' : ''}>${a.nombre}</option>`).join('');
+        
+        // Seleccionar el submotivo correcto
+        const subMotivoSelect = document.getElementById('reglaSubmotivoOrigen');
+        subMotivoSelect.innerHTML = '<option value="">Seleccionar submotivo</option>' + 
+            subMotivos.filter(s => s.atributo_id === atributosFiltrados.find(a => a.nombre === regla.atributo_origen)?.id)
+                .map(s => `<option value="${s.codigo}" ${s.codigo === regla.submotivo_origen ? 'selected' : ''}>${s.codigo}</option>`).join('');
+    }, 100);
+}
+
+// ======================================================
+// 5. FUNCIONES AUXILIARES DEL MODAL
+// ======================================================
+function toggleAccionValor() {
+    const tipo = document.getElementById('reglaAccionTipo').value;
+    const div = document.getElementById('divAccionValor');
+    div.style.display = tipo === 'marcar_valor' ? 'block' : 'none';
+}
+
+async function actualizarSelectAtributos(bloqueCodigo) {
+    const atributoSelect = document.getElementById('reglaAtributoOrigen');
+    const subMotivoSelect = document.getElementById('reglaSubmotivoOrigen');
+    
+    if (!bloqueCodigo) {
+        atributoSelect.innerHTML = '<option value="">Seleccionar bloque primero</option>';
+        subMotivoSelect.innerHTML = '<option value="">Seleccionar atributo primero</option>';
+        return;
+    }
+    
+    try {
+        const frentes = await API.getFrentes();
+        const frente = frentes.find(f => f.codigo === bloqueCodigo);
+        if (!frente) {
+            atributoSelect.innerHTML = '<option value="">No hay atributos para este bloque</option>';
+            return;
+        }
+        
+        const atributos = await API.getAtributos(frente.id);
+        atributoSelect.innerHTML = '<option value="">Seleccionar atributo</option>' + 
+            atributos.map(a => `<option value="${a.nombre}">${a.nombre}</option>`).join('');
+    } catch (error) {
+        console.error('Error cargando atributos:', error);
+        atributoSelect.innerHTML = '<option value="">Error cargando atributos</option>';
+    }
+}
+
+async function actualizarSelectSubmotivos(bloqueCodigo, atributoNombre) {
+    const subMotivoSelect = document.getElementById('reglaSubmotivoOrigen');
+    
+    if (!bloqueCodigo || !atributoNombre) {
+        subMotivoSelect.innerHTML = '<option value="">Seleccionar atributo primero</option>';
+        return;
+    }
+    
+    try {
+        const frentes = await API.getFrentes();
+        const frente = frentes.find(f => f.codigo === bloqueCodigo);
+        if (!frente) return;
+        
+        const atributos = await API.getAtributos(frente.id);
+        const atributo = atributos.find(a => a.nombre === atributoNombre);
+        if (!atributo) {
+            subMotivoSelect.innerHTML = '<option value="">No hay submotivos para este atributo</option>';
+            return;
+        }
+        
+        const subMotivos = await API.getSubMotivos(atributo.id);
+        subMotivoSelect.innerHTML = '<option value="">Seleccionar submotivo</option>' + 
+            subMotivos.map(s => `<option value="${s.codigo}">${s.codigo}</option>`).join('');
+    } catch (error) {
+        console.error('Error cargando submotivos:', error);
+        subMotivoSelect.innerHTML = '<option value="">Error cargando submotivos</option>';
+    }
+}
+
+function cerrarModalRegla() {
+    const modal = document.getElementById('modalRegla');
+    if (modal) modal.remove();
+    reglaEnEdicion = null;
+}
+
+// ======================================================
+// 6. GUARDAR REGLA
+// ======================================================
+async function guardarRegla() {
+    try {
+        // Obtener valores del formulario
+        const bloqueOrigen = document.getElementById('reglaBloqueOrigen').value;
+        const atributoOrigen = document.getElementById('reglaAtributoOrigen').value;
+        const submotivoOrigen = document.getElementById('reglaSubmotivoOrigen').value;
+        const valorCondicion = document.getElementById('reglaValorCondicion').value;
+        const accionTipo = document.getElementById('reglaAccionTipo').value;
+        const accionValor = document.getElementById('reglaAccionValor')?.value || null;
+        const orden = parseInt(document.getElementById('reglaOrden').value) || 0;
+        const activo = document.getElementById('reglaActivo').value === 'true';
+        
+        // Validar campos obligatorios
+        if (!bloqueOrigen || !atributoOrigen || !submotivoOrigen) {
+            alert('⚠️ Complete todos los campos de origen');
+            return;
+        }
+        
+        // Obtener submotivos afectados y excepciones - MANEJO CORRECTO
+        const afectadosSelect = document.getElementById('reglaSubmotivosAfectados');
+        const excepcionesSelect = document.getElementById('reglaExcepciones');
+        
+        // 🔴 CORREGIDO: Obtener valores seleccionados como array
+        let submotivosAfectados = null;
+        if (afectadosSelect && afectadosSelect.selectedOptions.length > 0) {
+            submotivosAfectados = Array.from(afectadosSelect.selectedOptions).map(opt => opt.value);
+            // Filtrar valores vacíos
+            submotivosAfectados = submotivosAfectados.filter(v => v && v !== '');
+            if (submotivosAfectados.length === 0) submotivosAfectados = null;
+        }
+        
+        let excepciones = null;
+        if (excepcionesSelect && excepcionesSelect.selectedOptions.length > 0) {
+            excepciones = Array.from(excepcionesSelect.selectedOptions).map(opt => opt.value);
+            // Filtrar valores vacíos
+            excepciones = excepciones.filter(v => v && v !== '');
+            if (excepciones.length === 0) excepciones = null;
+        }
+        
+        // Obtener versión activa
+        const versionActiva = await API.getVersionActiva();
+        if (!versionActiva) {
+            alert('❌ No hay versión activa');
+            return;
+        }
+        
+        // 🔴 CONSTRUIR DATOS CON JSON VÁLIDO
+        const data = {
+            version_id: versionActiva.id,
+            submotivo_origen: submotivoOrigen,
+            bloque_origen: bloqueOrigen,
+            atributo_origen: atributoOrigen,
+            valor_condicion: valorCondicion,
+            accion_tipo: accionTipo,
+            accion_valor: accionValor,
+            submotivos_afectados: submotivosAfectados,  // ← Array o null
+            excepciones: excepciones,                    // ← Array o null
+            orden: orden,
+            activo: activo
+        };
+        
+        console.log('📤 Datos a enviar:', JSON.stringify(data, null, 2));
+        
+        let result;
+        if (reglaEnEdicion) {
+            result = await API.actualizarRegla(reglaEnEdicion, data);
+            alert('✅ Regla actualizada correctamente');
+        } else {
+            result = await API.crearRegla(data);
+            alert('✅ Regla creada correctamente');
+        }
+        
+        cerrarModalRegla();
+        await cargarReglasAdministracion();
+        
+    } catch (error) {
+        console.error('❌ Error guardando regla:', error);
+        alert('❌ Error al guardar: ' + error.message);
+    }
+}
+
+// ======================================================
+// 7. ELIMINAR REGLA
+// ======================================================
+async function eliminarRegla(id) {
+    const regla = reglasData.find(r => r.id === id);
+    if (!regla) {
+        alert('❌ Regla no encontrada');
+        return;
+    }
+    
+    const confirmar = confirm(
+        `⚠️ ¿ELIMINAR REGLA?\n\n` +
+        `📌 Origen: ${regla.submotivo_origen}\n` +
+        `📌 Acción: ${regla.accion_tipo}\n\n` +
+        `¿Está seguro de continuar?`
+    );
+    
+    if (!confirmar) return;
+    
+    try {
+        await API.eliminarRegla(id);
+        alert('✅ Regla eliminada correctamente');
+        await cargarReglasAdministracion();
+    } catch (error) {
+        console.error('❌ Error eliminando regla:', error);
+        alert('❌ Error al eliminar: ' + error.message);
+    }
+}
+
+// ======================================================
+// 8. INICIALIZAR ADMINISTRACIÓN DE REGLAS
+// ======================================================
+async function inicializarReglasAdmin() {
+    // Verificar si existe el contenedor
+    const container = document.getElementById('reglasContainer');
+    if (!container) {
+        console.warn('⚠️ No se encontró reglasContainer. Asegúrate de agregarlo en el HTML.');
+        return;
+    }
+    
+    await cargarReglasAdministracion();
+}
+    
+
+    // ====================== CIERRE BLOQUE 15 =============================================
 
 // ======================================================
 // FUNCIÓN PARA ACTUALIZAR HEADER CON DATOS DEL USUARIO

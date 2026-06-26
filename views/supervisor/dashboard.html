@@ -1923,6 +1923,23 @@
                 </div>
             </div>
 
+            <!-- ======================================================
+            PESTAÑA - REGLAS DE EVALUACIÓN
+            ====================================================== -->
+            <div id="tab-reglas" class="tab-pane">
+                <div class="card">
+                    <h3>📋 Reglas de Evaluación</h3>
+                    <p style="color: var(--muted); margin-bottom: 15px;">
+                        Las reglas permiten automatizar acciones en el formulario del auditor cuando se selecciona un valor específico.
+                        <br>
+                        <span style="font-size: 12px;">💡 Ejemplo: Si "Cliente corta llamada" = "No Cumple", marcar otros campos como "No Aplica".</span>
+                    </p>
+                    <div id="reglasContainer">
+                        <!-- cargarReglasAdministracion() llenará esto -->
+                    </div>
+                </div>
+            </div>
+
             <!-- PESTAÑA DE GESTIÓN DE USUARIOS -->
             <div id="tab-gestionUsuarios" class="tab-content tab-pane">
                 <div style="display: flex; gap: 25px; flex-wrap: wrap;">
@@ -2676,6 +2693,8 @@
             </div>
         </div>
     </div>
+
+    
 
     <!-- ====================================================== -->
     <!-- MODAL: CAMBIO DE CONTRASEÑA (PRIMER LOGIN)             -->
