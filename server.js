@@ -5917,7 +5917,259 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
     return;
 }
 
+    // ======================================================
+    // API - CRITERIOS DE CUARTILES (CRUD)
+    // ======================================================
 
+    // 1. OBTENER TODOS LOS CRITERIOS
+    if (ruta === '/api/criterios-cuartiles' && metodo === 'GET') {
+        console.log('[API] GET /api/criterios-cuartiles');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        try {
+            const result = await pool.query(
+                'SELECT * FROM criterios_cuartiles ORDER BY fecha_vigencia_desde DESC, orden ASC'
+            );
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ success: true, data: result.rows }));
+        } catch (error) {
+            console.error('Error en /api/criterios-cuartiles:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ success: false, error: error.message }));
+        }
+        return;
+    }
+
+    // 2. OBTENER CRITERIOS ACTIVOS
+    if (ruta === '/api/criterios-cuartiles/activos' && metodo === 'GET') {
+        console.log('[API] GET /api/criterios-cuartiles/activos');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        try {
+            const hoy = new Date().toISOString().split('T')[0];
+            const result = await pool.query(
+                `SELECT * FROM criterios_cuartiles 
+                 WHERE activo = true 
+                   AND fecha_vigencia_desde <= $1 
+                   AND (fecha_vigencia_hasta IS NULL OR fecha_vigencia_hasta >= $1)
+                 ORDER BY orden ASC`,
+                [hoy]
+            );
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ success: true, data: result.rows }));
+        } catch (error) {
+            console.error('Error en /api/criterios-cuartiles/activos:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ success: false, error: error.message }));
+        }
+        return;
+    }
+
+    // 3. CREAR NUEVO CRITERIO
+    if (ruta === '/api/criterios-cuartiles' && metodo === 'POST') {
+        console.log('[API] POST /api/criterios-cuartiles');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        let body = '';
+        peticion.on('data', chunk => body += chunk);
+        peticion.on('end', async () => {
+            try {
+                const { 
+                    cuartil, 
+                    nombre, 
+                    limite_inferior, 
+                    limite_superior, 
+                    color_hex, 
+                    icono, 
+                    orden, 
+                    fecha_vigencia_desde, 
+                    fecha_vigencia_hasta,
+                    activo 
+                } = JSON.parse(body);
+                
+                const fechaHasta = fecha_vigencia_hasta || null;
+                
+                const result = await pool.query(
+                    `INSERT INTO criterios_cuartiles 
+                     (cuartil, nombre, limite_inferior, limite_superior, color_hex, icono, orden, 
+                      fecha_vigencia_desde, fecha_vigencia_hasta, creado_por, activo)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                     RETURNING *`,
+                    [
+                        cuartil, nombre, limite_inferior, limite_superior, 
+                        color_hex, icono, orden, fecha_vigencia_desde, 
+                        fechaHasta, 'admin', activo !== false
+                    ]
+                );
+                
+                console.log(`✅ Criterio creado: ${nombre} (${cuartil})`);
+                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ success: true, data: result.rows[0] }));
+            } catch (error) {
+                console.error('❌ Error creando criterio:', error);
+                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ success: false, error: error.message }));
+            }
+        });
+        return;
+    }
+
+    // 4. ACTUALIZAR CRITERIO
+    if (ruta.match(/^\/api\/criterios-cuartiles\/\d+$/) && metodo === 'PUT') {
+        console.log('[API] PUT /api/criterios-cuartiles/:id');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        const id = parseInt(ruta.split('/').pop());
+        let body = '';
+        peticion.on('data', chunk => body += chunk);
+        peticion.on('end', async () => {
+            try {
+                const { 
+                    cuartil, nombre, limite_inferior, limite_superior, 
+                    color_hex, icono, orden, fecha_vigencia_desde, 
+                    fecha_vigencia_hasta, activo 
+                } = JSON.parse(body);
+                
+                const fechaHasta = fecha_vigencia_hasta || null;
+                
+                const result = await pool.query(
+                    `UPDATE criterios_cuartiles 
+                     SET cuartil = $1, nombre = $2, limite_inferior = $3, limite_superior = $4, 
+                         color_hex = $5, icono = $6, orden = $7, activo = $8,
+                         fecha_vigencia_desde = $9, fecha_vigencia_hasta = $10,
+                         updated_at = CURRENT_TIMESTAMP
+                     WHERE id = $11
+                     RETURNING *`,
+                    [
+                        cuartil, nombre, limite_inferior, limite_superior, 
+                        color_hex, icono, orden, activo !== false,
+                        fecha_vigencia_desde, fechaHasta, id
+                    ]
+                );
+                
+                if (result.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
+                    return;
+                }
+                
+                console.log(`✅ Criterio actualizado: ${nombre} (${cuartil})`);
+                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ success: true, data: result.rows[0] }));
+            } catch (error) {
+                console.error('❌ Error actualizando criterio:', error);
+                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ success: false, error: error.message }));
+            }
+        });
+        return;
+    }
+
+    // 5. DESACTIVAR CRITERIO (DELETE)
+    if (ruta.match(/^\/api\/criterios-cuartiles\/\d+$/) && metodo === 'DELETE') {
+        console.log('[API] DELETE /api/criterios-cuartiles/:id');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        const id = parseInt(ruta.split('/').pop());
+        
+        try {
+            const check = await pool.query(
+                'SELECT id, nombre FROM criterios_cuartiles WHERE id = $1',
+                [id]
+            );
+            
+            if (check.rows.length === 0) {
+                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
+                return;
+            }
+            
+            const nombre = check.rows[0].nombre;
+            
+            await pool.query(
+                'UPDATE criterios_cuartiles SET activo = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+                [id]
+            );
+            
+            console.log(`✅ Criterio "${nombre}" desactivado (ID: ${id})`);
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ 
+                success: true, 
+                message: `Criterio "${nombre}" desactivado correctamente`
+            }));
+        } catch (error) {
+            console.error('❌ Error desactivando criterio:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ success: false, error: error.message }));
+        }
+        return;
+    }
+
+    // 6. ACTIVAR CRITERIO
+    if (ruta.match(/^\/api\/criterios-cuartiles\/\d+\/activar$/) && metodo === 'POST') {
+        console.log('[API] POST /api/criterios-cuartiles/:id/activar');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        const id = parseInt(ruta.split('/')[3]);
+        
+        try {
+            const result = await pool.query(
+                'UPDATE criterios_cuartiles SET activo = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+                [id]
+            );
+            
+            if (result.rows.length === 0) {
+                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
+                return;
+            }
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ success: true, data: result.rows[0] }));
+        } catch (error) {
+            console.error('Error activando criterio:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ success: false, error: error.message }));
+        }
+        return;
+    }
     
     // ======================================================
     // VISTAS HTML
@@ -5947,217 +6199,8 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
 
 }); // Fin createServer
 
-// ======================================================
-// API - CRITERIOS DE CUARTILES (CRUD)
-// ======================================================
 
-// 1. OBTENER TODOS LOS CRITERIOS
-registrarRuta('GET', '/api/criterios-cuartiles', async (req, res, query) => {
-    console.log('[API] GET /api/criterios-cuartiles');
-    
-    try {
-        const token = req.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            res.writeHead(401, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-        
-        const result = await pool.query(
-            'SELECT * FROM criterios_cuartiles ORDER BY fecha_vigencia_desde DESC, orden ASC'
-        );
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, data: result.rows }));
-        
-    } catch (error) {
-        console.error('Error en /api/criterios-cuartiles:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: error.message }));
-    }
-});
 
-// 2. OBTENER CRITERIOS ACTIVOS
-registrarRuta('GET', '/api/criterios-cuartiles/activos', async (req, res, query) => {
-    console.log('[API] GET /api/criterios-cuartiles/activos');
-    
-    try {
-        const token = req.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            res.writeHead(401, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-        
-        const hoy = new Date().toISOString().split('T')[0];
-        const result = await pool.query(
-            `SELECT * FROM criterios_cuartiles 
-             WHERE activo = true 
-               AND fecha_vigencia_desde <= $1 
-               AND (fecha_vigencia_hasta IS NULL OR fecha_vigencia_hasta >= $1)
-             ORDER BY orden ASC`,
-            [hoy]
-        );
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, data: result.rows }));
-        
-    } catch (error) {
-        console.error('Error en /api/criterios-cuartiles/activos:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: error.message }));
-    }
-});
-
-// 3. CREAR NUEVO CRITERIO
-registrarRuta('POST', '/api/criterios-cuartiles', async (req, res, query) => {
-    console.log('[API] POST /api/criterios-cuartiles');
-    
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
-        try {
-            const token = req.headers['authorization']?.split(' ')[1];
-            if (!token) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Token requerido' }));
-                return;
-            }
-            
-            const { cuartil, nombre, limite_inferior, limite_superior, color_hex, icono, orden, fecha_vigencia_desde, fecha_vigencia_hasta } = JSON.parse(body);
-            
-            const result = await pool.query(
-                `INSERT INTO criterios_cuartiles 
-                 (cuartil, nombre, limite_inferior, limite_superior, color_hex, icono, orden, fecha_vigencia_desde, fecha_vigencia_hasta, creado_por)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                 RETURNING *`,
-                [cuartil, nombre, limite_inferior, limite_superior, color_hex, icono, orden, fecha_vigencia_desde, fecha_vigencia_hasta, 'admin']
-            );
-            
-            res.writeHead(201, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, data: result.rows[0] }));
-            
-        } catch (error) {
-            console.error('Error creando criterio:', error);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: error.message }));
-        }
-    });
-});
-
-// 4. ACTUALIZAR CRITERIO
-registrarRuta('PUT', '/api/criterios-cuartiles/:id', async (req, res, query) => {
-    console.log('[API] PUT /api/criterios-cuartiles/:id');
-    
-    const id = parseInt(req.url.split('/').pop());
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
-        try {
-            const token = req.headers['authorization']?.split(' ')[1];
-            if (!token) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Token requerido' }));
-                return;
-            }
-            
-            const { cuartil, nombre, limite_inferior, limite_superior, color_hex, icono, orden, activo, fecha_vigencia_desde, fecha_vigencia_hasta } = JSON.parse(body);
-            
-            const result = await pool.query(
-                `UPDATE criterios_cuartiles 
-                 SET cuartil = $1, nombre = $2, limite_inferior = $3, limite_superior = $4, 
-                     color_hex = $5, icono = $6, orden = $7, activo = $8,
-                     fecha_vigencia_desde = $9, fecha_vigencia_hasta = $10,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = $11
-                 RETURNING *`,
-                [cuartil, nombre, limite_inferior, limite_superior, color_hex, icono, orden, activo, fecha_vigencia_desde, fecha_vigencia_hasta, id]
-            );
-            
-            if (result.rows.length === 0) {
-                res.writeHead(404, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
-                return;
-            }
-            
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true, data: result.rows[0] }));
-            
-        } catch (error) {
-            console.error('Error actualizando criterio:', error);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: error.message }));
-        }
-    });
-});
-
-// 5. DESACTIVAR CRITERIO
-registrarRuta('DELETE', '/api/criterios-cuartiles/:id', async (req, res, query) => {
-    console.log('[API] DELETE /api/criterios-cuartiles/:id');
-    
-    const id = parseInt(req.url.split('/').pop());
-    
-    try {
-        const token = req.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            res.writeHead(401, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-        
-        const result = await pool.query(
-            'UPDATE criterios_cuartiles SET activo = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
-            [id]
-        );
-        
-        if (result.rows.length === 0) {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
-            return;
-        }
-        
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, message: 'Criterio desactivado correctamente' }));
-        
-    } catch (error) {
-        console.error('Error eliminando criterio:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: error.message }));
-    }
-});
-
-// 6. ACTIVAR CRITERIO
-registrarRuta('POST', '/api/criterios-cuartiles/:id/activar', async (req, res, query) => {
-    console.log('[API] POST /api/criterios-cuartiles/:id/activar');
-    
-    const id = parseInt(req.url.split('/')[3]);
-    
-    try {
-        const token = req.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            res.writeHead(401, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-        
-        const result = await pool.query(
-            'UPDATE criterios_cuartiles SET activo = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
-            [id]
-        );
-        
-        if (result.rows.length === 0) {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
-            return;
-        }
-        
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, data: result.rows[0] }));
-        
-    } catch (error) {
-        console.error('Error activando criterio:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: error.message }));
-    }
-});
 
 servidor.listen(PORT, HOST, () => {
     console.log('');

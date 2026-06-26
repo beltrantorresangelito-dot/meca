@@ -2275,9 +2275,6 @@
                                         <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; text-transform: none;">
                                             <input type="checkbox" value="estadoBD"> 💾 BD
                                         </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; text-transform: none;">
-                                            <input type="checkbox" value="versiones"> 📦 Versiones
-                                        </label>
                                     </div>
                                 </div>
                                 <small style="color: var(--muted);">Seleccione las pestañas que podrá ver este rol</small>
@@ -2411,80 +2408,6 @@
                         <div style="padding: 12px; background: #f8f9fa; border-radius: 10px;">
                             🔍 Consultando estado de la base de datos...
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ====================================================== -->
-            <!-- PESTAÑA DE VERSIONES (SOLO ADMIN) -->
-            <!-- ====================================================== -->
-            <div id="tab-versiones" class="tab-content tab-pane">
-                <div class="card">
-                    <h3>📦 Gestión de Versiones del Sistema</h3>
-                    <p style="margin-bottom: 20px;">Publique nuevas versiones para que los usuarios puedan actualizar automáticamente.</p>
-
-                    <!-- Formulario de publicación -->
-                    <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 25px;">
-                        <h4 style="margin-top: 0; margin-bottom: 15px;">📤 Publicar Nueva Versión</h4>
-                        <form id="formPublicarVersion" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div>
-                                <label style="font-size: 12px;">Tipo de Sistema *</label>
-                                <select id="tipoSistema" required style="width: 100%; padding: 8px 12px;">
-                                        <option value="">Seleccionar...</option>
-                                        <option value="auditor">🎧 Auditor</option>
-                                        <option value="supervisor">👔 Supervisor</option>
-                                    </select>
-                            </div>
-                            <div>
-                                <label style="font-size: 12px;">Versión * (Ej: v1.0.0)</label>
-                                <input type="text" id="version" placeholder="v1.0.0" required style="width: 100%; padding: 8px 12px;">
-                            </div>
-                            <div style="grid-column: span 2;">
-                                <label style="font-size: 12px;">Archivo HTML *</label>
-                                <input type="file" id="archivoHtml" accept=".html" required>
-                                <small style="color: var(--muted);">Seleccione el archivo HTML completo del sistema</small>
-                            </div>
-                            <div style="grid-column: span 2;">
-                                <label style="font-size: 12px;">Descripción de Cambios</label>
-                                <textarea id="descripcion" rows="3" placeholder="Ej: Corrección de errores, nuevas funcionalidades..." style="width: 100%; padding: 8px 12px;"></textarea>
-                            </div>
-                            <div>
-                                <label style="font-size: 12px;">Publicado por</label>
-                                <input type="text" id="publicadoPor" placeholder="Nombre del administrador" style="width: 100%; padding: 8px 12px;">
-                            </div>
-                            <div style="display: flex; gap: 10px; align-items: flex-end;">
-                                <button type="submit" style="background: var(--ok); padding: 8px 20px;">🚀 Publicar Versión</button>
-                                <button type="button" onclick="limpiarFormVersiones()" style="background: #6c757d; padding: 8px 20px;">🗑️ Limpiar</button>
-                            </div>
-                        </form>
-                    </div>
-
-                    <!-- Tabla de versiones -->
-                    <h4>📋 Historial de Versiones</h4>
-                    <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button onclick="cargarVersionesTabla('auditor')" style="background: #019DF4; padding: 5px 12px; font-size: 12px;">🎧 Auditor</button>
-                        <button onclick="cargarVersionesTabla('supervisor')" style="background: #fd7e14; padding: 5px 12px; font-size: 12px;">👔 Supervisor</button>
-                        <button onclick="cargarVersionesTabla('todos')" style="background: #28a745; padding: 5px 12px; font-size: 12px;">📊 Todos</button>
-                    </div>
-                    <div class="table-container" style="max-height: 400px;">
-                        <table style="width: 100%;">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Versión</th>
-                                    <th>Tipo</th>
-                                    <th>Fecha</th>
-                                    <th>Publicado por</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tbodyVersiones">
-                                <tr>
-                                    <td colspan="7" style="text-align: center;">Cargando...</td>
-                                </tr>
-                            </tbody>
-                        </table>
                     </div>
                 </div>
             </div>

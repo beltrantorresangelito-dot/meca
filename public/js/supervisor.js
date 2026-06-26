@@ -6913,7 +6913,7 @@ async function actualizarTablaEvolutivaIndicadores() {
             const mes = fecha.getMonth() + 1;
             const claveMes = `${anio}-${String(mes).padStart(2, '0')}`;
             const mesesNombresLocal = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    const labelMes = `${mesesNombresLocal[mes - 1]} ${anio}`;
+            const labelMes = `${mesesNombresLocal[mes - 1]} ${anio}`;
             
             if (!evaluacionesPorMes[claveMes]) {
                 evaluacionesPorMes[claveMes] = {
@@ -6944,10 +6944,8 @@ async function actualizarTablaEvolutivaIndicadores() {
             const fallasPorSubmotivo = {};
             let totalFallasMes = 0;
             
-            // Registrar agentes involucrados por categoría
-            const agentesPorBloque = {};
-            const agentesPorAtributo = {};
-            const agentesPorSubmotivo = {};
+            // 🔴 NUEVO: Guardar TODAS las ocurrencias por agente (NO solo únicos)
+            const ocurrenciasPorAgente = {};
             
             for (const evalItem of evaluacionesMes) {
                 const agente = evalItem.agente || 'Sin agente';
@@ -6961,10 +6959,16 @@ async function actualizarTablaEvolutivaIndicadores() {
                             // Por BLOQUE (Motivo)
                             const bloque = det.bloque || 'Sin bloque';
                             if (!fallasPorBloque[bloque]) {
-                                fallasPorBloque[bloque] = { fallas: 0, gestores: new Set() };
+                                fallasPorBloque[bloque] = { fallas: 0, gestores: new Set(), ocurrenciasPorAgente: {} };
                             }
                             fallasPorBloque[bloque].fallas++;
                             fallasPorBloque[bloque].gestores.add(agente);
+                            
+                            // 🔴 NUEVO: Guardar ocurrencia por agente para este bloque
+                            if (!fallasPorBloque[bloque].ocurrenciasPorAgente[agente]) {
+                                fallasPorBloque[bloque].ocurrenciasPorAgente[agente] = 0;
+                            }
+                            fallasPorBloque[bloque].ocurrenciasPorAgente[agente]++;
                             
                             // Por ATRIBUTO
                             const atributo = det.atributo || 'Sin atributo';
@@ -6974,11 +6978,17 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     bloque: bloque,
                                     atributo: atributo,
                                     fallas: 0,
-                                    gestores: new Set()
+                                    gestores: new Set(),
+                                    ocurrenciasPorAgente: {}
                                 };
                             }
                             fallasPorAtributo[claveAtributo].fallas++;
                             fallasPorAtributo[claveAtributo].gestores.add(agente);
+                            
+                            if (!fallasPorAtributo[claveAtributo].ocurrenciasPorAgente[agente]) {
+                                fallasPorAtributo[claveAtributo].ocurrenciasPorAgente[agente] = 0;
+                            }
+                            fallasPorAtributo[claveAtributo].ocurrenciasPorAgente[agente]++;
                             
                             // Por SUBMOTIVO
                             const submotivo = det.submotivo || 'Sin submotivo';
@@ -6989,11 +6999,17 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     atributo: atributo,
                                     submotivo: submotivo,
                                     fallas: 0,
-                                    gestores: new Set()
+                                    gestores: new Set(),
+                                    ocurrenciasPorAgente: {}
                                 };
                             }
                             fallasPorSubmotivo[claveSubmotivo].fallas++;
                             fallasPorSubmotivo[claveSubmotivo].gestores.add(agente);
+                            
+                            if (!fallasPorSubmotivo[claveSubmotivo].ocurrenciasPorAgente[agente]) {
+                                fallasPorSubmotivo[claveSubmotivo].ocurrenciasPorAgente[agente] = 0;
+                            }
+                            fallasPorSubmotivo[claveSubmotivo].ocurrenciasPorAgente[agente]++;
                         }
                     }
                 }
@@ -7005,8 +7021,9 @@ async function actualizarTablaEvolutivaIndicadores() {
                 fallas: data.fallas,
                 gestores: Array.from(data.gestores),
                 cantidadGestores: data.gestores.size,
-                porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0
-            })).sort((a, b) => b.fallas - a.fallas).slice(0, 3); // Top 3 motivos
+                porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0,
+                ocurrenciasPorAgente: data.ocurrenciasPorAgente  // 🔴 NUEVO
+            })).sort((a, b) => b.fallas - a.fallas).slice(0, 3);
             
             const atributosArray = Object.values(fallasPorAtributo).map(data => ({
                 bloque: data.bloque,
@@ -7014,8 +7031,9 @@ async function actualizarTablaEvolutivaIndicadores() {
                 fallas: data.fallas,
                 gestores: Array.from(data.gestores),
                 cantidadGestores: data.gestores.size,
-                porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0
-            })).sort((a, b) => b.fallas - a.fallas).slice(0, 10); // Top 10 atributos
+                porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0,
+                ocurrenciasPorAgente: data.ocurrenciasPorAgente  // 🔴 NUEVO
+            })).sort((a, b) => b.fallas - a.fallas).slice(0, 10);
             
             const submotivosArray = Object.values(fallasPorSubmotivo).map(data => ({
                 bloque: data.bloque,
@@ -7024,8 +7042,9 @@ async function actualizarTablaEvolutivaIndicadores() {
                 fallas: data.fallas,
                 gestores: Array.from(data.gestores),
                 cantidadGestores: data.gestores.size,
-                porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0
-            })).sort((a, b) => b.fallas - a.fallas).slice(0, 10); // Top 10 submotivos
+                porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0,
+                ocurrenciasPorAgente: data.ocurrenciasPorAgente  // 🔴 NUEVO
+            })).sort((a, b) => b.fallas - a.fallas).slice(0, 10);
             
             datosPorMes[mesClave] = {
                 label: mesData.label,
@@ -7392,194 +7411,215 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
 
     // ======================================================
-// FUNCIÓN CORREGIDA - verAgentesJerarquia (Estructura Vertical)
-// ======================================================
-async function verAgentesJerarquia(tipo, key, datosEvolutivos) {
-    console.log(`🔍 verAgentesJerarquia - Buscando: tipo=${tipo}, key=${key}`);
-    
-    try {
-        if (!datosEvolutivos || !datosEvolutivos.meses) {
-            console.error('❌ datosEvolutivos inválido');
-            alert('Error: No hay datos disponibles');
-            return;
-        }
+    // FUNCIÓN CORREGIDA - verAgentesJerarquia (Estructura Vertical)
+    // ======================================================
+    async function verAgentesJerarquia(tipo, key, datosEvolutivos) {
+        console.log(`🔍 verAgentesJerarquia - Buscando: tipo=${tipo}, key=${key}`);
         
-        // Buscar el item en TODOS los meses
-        let itemEncontrado = null;
-        
-        for (const mes of datosEvolutivos.meses) {
-            let items = [];
-            if (tipo === 'bloques') items = mes.bloques || [];
-            else if (tipo === 'atributos') items = mes.atributos || [];
-            else items = mes.submotivos || [];
+        try {
+            if (!datosEvolutivos || !datosEvolutivos.meses) {
+                console.error('❌ datosEvolutivos inválido');
+                alert('Error: No hay datos disponibles');
+                return;
+            }
             
-            for (const item of items) {
-                let itemKey = '';
-                if (tipo === 'bloques') {
-                    itemKey = item.nombre;
-                } else if (tipo === 'atributos') {
-                    itemKey = `${item.bloque}|${item.atributo}`;
-                } else {
-                    itemKey = `${item.bloque}|${item.atributo}|${item.submotivo}`;
+            // Buscar el item en TODOS los meses
+            let itemEncontrado = null;
+            
+            for (const mes of datosEvolutivos.meses) {
+                let items = [];
+                if (tipo === 'bloques') items = mes.bloques || [];
+                else if (tipo === 'atributos') items = mes.atributos || [];
+                else items = mes.submotivos || [];
+                
+                for (const item of items) {
+                    let itemKey = '';
+                    if (tipo === 'bloques') {
+                        itemKey = item.nombre;
+                    } else if (tipo === 'atributos') {
+                        itemKey = `${item.bloque}|${item.atributo}`;
+                    } else {
+                        itemKey = `${item.bloque}|${item.atributo}|${item.submotivo}`;
+                    }
+                    
+                    if (itemKey === key) {
+                        if (!itemEncontrado) {
+                            itemEncontrado = {
+                                nombre: tipo === 'bloques' ? item.nombre : (tipo === 'atributos' ? item.atributo : item.submotivo),
+                                bloque: item.bloque,
+                                atributo: item.atributo,
+                                gestoresPorMes: []
+                            };
+                        }
+                        
+                        // 🔴 NUEVO: Guardar ocurrencias por agente para este mes
+                        const ocurrenciasPorAgente = item.ocurrenciasPorAgente || {};
+                        
+                        itemEncontrado.gestoresPorMes.push({
+                            mes: mes.label,
+                            gestores: item.gestores || [],
+                            fallas: item.fallas,
+                            ocurrenciasPorAgente: ocurrenciasPorAgente  // 🔴 NUEVO
+                        });
+                        break;
+                    }
+                }
+            }
+            
+            if (!itemEncontrado) {
+                console.error(`❌ No se encontró el item con key: "${key}"`);
+                alert(`No se encontraron detalles para: ${key}`);
+                return;
+            }
+            
+            console.log(`✅ Item encontrado: ${itemEncontrado.nombre}`);
+            
+            // 🔴 NUEVO: Consolidar agentes con sus ocurrencias por mes
+            const agentesMap = new Map();
+            
+            for (const mesData of itemEncontrado.gestoresPorMes) {
+                const ocurrenciasPorAgente = mesData.ocurrenciasPorAgente || {};
+                const mesLabel = mesData.mes;
+                
+                // 🔴 USAR ocurrenciasPorAgente en lugar de gestores (Set)
+                for (const [agente, ocurrencias] of Object.entries(ocurrenciasPorAgente)) {
+                    if (!agente) continue;
+                    if (!agentesMap.has(agente)) {
+                        agentesMap.set(agente, {
+                            nombre: agente,
+                            meses: {},
+                            total: 0
+                        });
+                    }
+                    const agenteData = agentesMap.get(agente);
+                    agenteData.meses[mesLabel] = (agenteData.meses[mesLabel] || 0) + ocurrencias;
+                    agenteData.total += ocurrencias;
+                }
+            }
+            
+            // Convertir a array y ordenar por total de fallas (mayor a menor)
+            const agentesArray = Array.from(agentesMap.values()).sort((a, b) => b.total - a.total);
+            console.log(`   Agentes encontrados: ${agentesArray.length}`);
+            
+            const mesesLabels = itemEncontrado.gestoresPorMes.map(m => m.mes);
+            
+            if (agentesArray.length === 0) {
+                alert(`No hay agentes registrados para ${itemEncontrado.nombre}`);
+                return;
+            }
+            
+            // ======================================================
+            // GENERAR TABLA CON ESTRUCTURA VERTICAL
+            // CADA AGENTE ES UNA FILA (tr), CADA MES ES UNA COLUMNA
+            // ======================================================
+            
+            let tablaAgentesHtml = `
+                <div class="table-container" style="max-height: 400px; overflow: auto; border: 1px solid #e0e0e0; border-radius: 8px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px;">
+                        <thead>
+                            <tr style="position: sticky; top: 0; background: #019DF4; z-index: 10;">
+                                <th style="position: sticky; left: 0; background: #019DF4; padding: 10px 8px; text-align: left; min-width: 200px;">👤 Agente</th>
+                                ${mesesLabels.map(m => `<th style="padding: 10px 8px; text-align: center; min-width: 70px;">${m}</th>`).join('')}
+                                <th style="padding: 10px 8px; text-align: center; min-width: 60px;">📊 Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            // 🔴 CADA AGENTE ES UNA FILA (tr) - CON EL NÚMERO DE OCURRENCIAS
+            for (const agente of agentesArray) {
+                tablaAgentesHtml += `<tr style="border-bottom: 1px solid #e0e0e0;">`;
+                
+                // Columna del nombre del agente (fija a la izquierda)
+                const totalOcurrencias = agente.total;
+                let alertaIcono = '';
+                if (totalOcurrencias >= 10) {
+                    alertaIcono = ' <span style="color: #d93025;">🔴</span>';
+                } else if (totalOcurrencias >= 5) {
+                    alertaIcono = ' <span style="color: #f39c12;">⚠️</span>';
                 }
                 
-                if (itemKey === key) {
-                    if (!itemEncontrado) {
-                        itemEncontrado = {
-                            nombre: tipo === 'bloques' ? item.nombre : (tipo === 'atributos' ? item.atributo : item.submotivo),
-                            bloque: item.bloque,
-                            atributo: item.atributo,
-                            gestoresPorMes: []
-                        };
+                tablaAgentesHtml += `<td style="position: sticky; left: 0; background: white; padding: 8px; font-weight: 500;">
+                    <strong>${escapeHtml(agente.nombre)}</strong>${alertaIcono}
+                </td>`;
+                
+                // Columnas de cada mes - 🔴 MOSTRAR EL NÚMERO DE OCURRENCIAS
+                for (const mesLabel of mesesLabels) {
+                    const ocurrencias = agente.meses[mesLabel] || 0;
+                    let color = '';
+                    let badge = '';
+                    if (ocurrencias >= 5) {
+                        color = 'color: #d93025; font-weight: bold;';
+                        badge = '🔴';
+                    } else if (ocurrencias >= 3) {
+                        color = 'color: #f39c12; font-weight: bold;';
+                        badge = '⚠️';
                     }
-                    itemEncontrado.gestoresPorMes.push({
-                        mes: mes.label,
-                        gestores: item.gestores || [],
-                        fallas: item.fallas
-                    });
-                    break;
+                    // 🔴 MOSTRAR EL NÚMERO, NO SOLO 1
+                    tablaAgentesHtml += `<td style="padding: 8px; text-align: center; ${color}">${ocurrencias > 0 ? `${badge} ${ocurrencias}` : '-'}</td>`;
                 }
-            }
-        }
-        
-        if (!itemEncontrado) {
-            console.error(`❌ No se encontró el item con key: "${key}"`);
-            alert(`No se encontraron detalles para: ${key}`);
-            return;
-        }
-        
-        console.log(`✅ Item encontrado: ${itemEncontrado.nombre}`);
-        
-        // Consolidar agentes únicos y sus ocurrencias por mes
-        const agentesMap = new Map();
-        
-        for (const mesData of itemEncontrado.gestoresPorMes) {
-            const gestores = mesData.gestores || [];
-            for (const agente of gestores) {
-                if (!agente) continue;
-                if (!agentesMap.has(agente)) {
-                    agentesMap.set(agente, {
-                        nombre: agente,
-                        meses: {},
-                        total: 0
-                    });
-                }
-                const agenteData = agentesMap.get(agente);
-                agenteData.meses[mesData.mes] = (agenteData.meses[mesData.mes] || 0) + 1;
-                agenteData.total++;
-            }
-        }
-        
-        // Convertir a array y ordenar por total de fallas (mayor a menor)
-        const agentesArray = Array.from(agentesMap.values()).sort((a, b) => b.total - a.total);
-        console.log(`   Agentes encontrados: ${agentesArray.length}`);
-        
-        const mesesLabels = itemEncontrado.gestoresPorMes.map(m => m.mes);
-        
-        if (agentesArray.length === 0) {
-            alert(`No hay agentes registrados para ${itemEncontrado.nombre}`);
-            return;
-        }
-        
-        // ======================================================
-        // GENERAR TABLA CON ESTRUCTURA VERTICAL CORRECTA
-        // CADA AGENTE ES UNA FILA (tr), CADA MES ES UNA COLUMNA
-        // ======================================================
-        
-        let tablaAgentesHtml = `
-            <div class="table-container" style="max-height: 400px; overflow: auto; border: 1px solid #e0e0e0; border-radius: 8px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px;">
-                    <thead>
-                        <tr style="position: sticky; top: 0; background: #019DF4; z-index: 10;">
-                            <th style="position: sticky; left: 0; background: #019DF4; padding: 10px 8px; text-align: left; min-width: 200px;">👤 Agente</th>
-                            ${mesesLabels.map(m => `<th style="padding: 10px 8px; text-align: center; min-width: 70px;">${m}</th>`).join('')}
-                            <th style="padding: 10px 8px; text-align: center; min-width: 60px;">📊 Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-        
-        // 🔴 CLAVE: CADA AGENTE ES UNA FILA (tr) - NO UNA COLUMNA
-        for (const agente of agentesArray) {
-            tablaAgentesHtml += `<tr style="border-bottom: 1px solid #e0e0e0;">`;
-            
-            // Columna del nombre del agente (fija a la izquierda)
-            tablaAgentesHtml += `<td style="position: sticky; left: 0; background: white; padding: 8px; font-weight: 500;">
-                <strong>${escapeHtml(agente.nombre)}</strong>
-                ${agente.total > 10 ? ' <span style="color: #d93025;">🔴</span>' : (agente.total > 5 ? ' <span style="color: #f39c12;">⚠️</span>' : '')}
-            </td>`;
-            
-            // Columnas de cada mes
-            for (const mesData of itemEncontrado.gestoresPorMes) {
-                const ocurrencias = agente.meses[mesData.mes] || 0;
-                let color = '';
-                let badge = '';
-                if (ocurrencias >= 5) {
-                    color = 'color: #d93025; font-weight: bold;';
-                    badge = '🔴';
-                } else if (ocurrencias >= 3) {
-                    color = 'color: #f39c12; font-weight: bold;';
-                    badge = '⚠️';
-                }
-                tablaAgentesHtml += `<td style="padding: 8px; text-align: center; ${color}">${ocurrencias > 0 ? `${badge} ${ocurrencias}` : '-'}</td>`;
+                
+                // Columna total
+                tablaAgentesHtml += `<td style="padding: 8px; text-align: center; font-weight: bold; ${totalOcurrencias >= 10 ? 'color: #d93025;' : (totalOcurrencias >= 5 ? 'color: #f39c12;' : '')}">${totalOcurrencias}</td>`;
+                
+                tablaAgentesHtml += `</tr>`;
             }
             
-            // Columna total
-            tablaAgentesHtml += `<td style="padding: 8px; text-align: center; font-weight: bold; ${agente.total >= 10 ? 'color: #d93025;' : (agente.total >= 5 ? 'color: #f39c12;' : '')}">${agente.total}</td>`;
+            if (agentesArray.length === 0) {
+                tablaAgentesHtml += `<tr><td colspan="${2 + mesesLabels.length}" style="text-align: center; padding: 40px;">📭 No hay agentes registrados</td></tr>`;
+            }
             
-            tablaAgentesHtml += `</tr>`;
-        }
-        
-        if (agentesArray.length === 0) {
-            tablaAgentesHtml += `<tr><td colspan="${2 + mesesLabels.length}" style="text-align: center; padding: 40px;">📭 No hay agentes registrados</td></tr>`;
-        }
-        
-        tablaAgentesHtml += `
-                    </tbody>
-                </table>
-            </div>
-        `;
-        
-        if (agentesArray.length > 50) {
-            tablaAgentesHtml += `<div style="margin-top: 10px; font-size: 11px; color: var(--muted); text-align: center;">... y ${agentesArray.length - 50} agentes más. Use scroll ↓ para verlos.</div>`;
-        }
-        
-        // Crear modal
-        const modalHtml = `
-            <div id="modalAgentesJerarquia" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100050; display: flex; justify-content: center; align-items: center;">
-                <div style="background: white; border-radius: 16px; width: 95%; max-width: 1200px; height: 85vh; display: flex; flex-direction: column; overflow: hidden;">
-                    <div style="padding: 15px 20px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                        <div>
-                            <strong style="font-size: 16px;">${tipo === 'bloques' ? '📁' : (tipo === 'atributos' ? '🏷️' : '🔬')} ${escapeHtml(itemEncontrado.nombre)}</strong>
-                            ${itemEncontrado.bloque ? `<span style="font-size: 12px; margin-left: 10px; opacity: 0.9;">(${escapeHtml(itemEncontrado.bloque)})</span>` : ''}
+            tablaAgentesHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            if (agentesArray.length > 50) {
+                tablaAgentesHtml += `<div style="margin-top: 10px; font-size: 11px; color: var(--muted); text-align: center;">... y ${agentesArray.length - 50} agentes más. Use scroll ↓ para verlos.</div>`;
+            }
+            
+            // Crear modal
+            const modalHtml = `
+                <div id="modalAgentesJerarquia" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100050; display: flex; justify-content: center; align-items: center;">
+                    <div style="background: white; border-radius: 16px; width: 95%; max-width: 1200px; height: 85vh; display: flex; flex-direction: column; overflow: hidden;">
+                        <div style="padding: 15px 20px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                            <div>
+                                <strong style="font-size: 16px;">${tipo === 'bloques' ? '📁' : (tipo === 'atributos' ? '🏷️' : '🔬')} ${escapeHtml(itemEncontrado.nombre)}</strong>
+                                ${itemEncontrado.bloque ? `<span style="font-size: 12px; margin-left: 10px; opacity: 0.9;">(${escapeHtml(itemEncontrado.bloque)})</span>` : ''}
+                                <span style="font-size: 11px; margin-left: 15px; opacity: 0.8;">📊 Total fallas: ${agentesArray.reduce((sum, a) => sum + a.total, 0)}</span>
+                            </div>
+                            <button onclick="cerrarModalAgentesJerarquia()" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">✖</button>
                         </div>
-                        <button onclick="cerrarModalAgentesJerarquia()" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">✖</button>
-                    </div>
-                    <div style="padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column;">
-                        <div style="margin-bottom: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; flex-shrink: 0;">
-                            <strong>📊 Resumen:</strong> ${agentesArray.length} agentes involucrados en ${mesesLabels.length} meses
-                            <span style="margin-left: 15px;">💡 Use scroll ↓ para ver más agentes y → para ver más meses</span>
+                        <div style="padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column;">
+                            <div style="margin-bottom: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; flex-shrink: 0;">
+                                <strong>📊 Resumen:</strong> ${agentesArray.length} agentes involucrados en ${mesesLabels.length} meses
+                                <span style="margin-left: 15px;">💡 Los números muestran la <strong>cantidad de veces</strong> que el agente presentó este error en cada mes</span>
+                                <span style="margin-left: 15px; background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">🔴 ≥ 5 ocurrencias</span>
+                                <span style="margin-left: 5px; background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">🟡 ≥ 3 ocurrencias</span>
+                            </div>
+                            ${tablaAgentesHtml}
                         </div>
-                        ${tablaAgentesHtml}
-                    </div>
-                    <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
-                        <button onclick="cerrarModalAgentesJerarquia()" style="background: #6c757d; padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; color: white;">Cerrar</button>
+                        <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
+                            <button onclick="exportarAgentesJerarquiaCSV('${tipo}', '${key}')" style="background: var(--accent); padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; color: white;">📥 Exportar CSV</button>
+                            <button onclick="cerrarModalAgentesJerarquia()" style="background: #6c757d; padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; color: white;">Cerrar</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
-        
-        const modalExistente = document.getElementById('modalAgentesJerarquia');
-        if (modalExistente) modalExistente.remove();
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        console.log('✅ Modal creado con estructura VERTICAL -', agentesArray.length, 'agentes como filas');
-        
-    } catch (error) {
-        console.error('❌ Error en verAgentesJerarquia:', error);
-        alert(`Error al cargar detalles: ${error.message}`);
+            `;
+            
+            const modalExistente = document.getElementById('modalAgentesJerarquia');
+            if (modalExistente) modalExistente.remove();
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            console.log('✅ Modal creado con estructura VERTICAL -', agentesArray.length, 'agentes como filas');
+            console.log('   📊 Mostrando ocurrencias por mes (no solo 1)');
+            
+        } catch (error) {
+            console.error('❌ Error en verAgentesJerarquia:', error);
+            alert(`Error al cargar detalles: ${error.message}`);
+        }
     }
-}
 
     // ======================================================
     // NUEVA FUNCIÓN: Cerrar modal de agentes
@@ -7716,48 +7756,114 @@ async function verAgentesJerarquia(tipo, key, datosEvolutivos) {
     }
 
     // ======================================================
-// EXPORTAR AGENTES DEL MODAL A CSV
-// ======================================================
-function exportarAgentesJerarquiaCSV(tipo, key) {
-    const modal = document.getElementById('modalAgentesJerarquia');
-    if (!modal) return;
-    
-    // Extraer datos de la tabla del modal
-    const tabla = modal.querySelector('.tabla-agentes-detalle');
-    if (!tabla) return;
-    
-    const headers = [];
-    const rows = [];
-    
-    // Obtener headers (primera fila del thead)
-    const theadRows = tabla.querySelectorAll('thead th');
-    theadRows.forEach(th => {
-        headers.push(th.innerText.trim());
-    });
-    
-    // Obtener datos del tbody
-    const tbodyRows = tabla.querySelectorAll('tbody tr');
-    tbodyRows.forEach(tr => {
-        const row = [];
-        const cells = tr.querySelectorAll('td');
-        cells.forEach(td => {
-            row.push(td.innerText.trim());
+    // EXPORTAR AGENTES DEL MODAL A CSV
+    // ======================================================
+    function exportarAgentesJerarquiaCSV(tipo, key) {
+        console.log(`📥 Exportando CSV para: ${tipo} - ${key}`);
+        
+        const modal = document.getElementById('modalAgentesJerarquia');
+        if (!modal) {
+            alert('❌ No se encontró el modal');
+            return;
+        }
+        
+        // 🔴 BUSCAR LA TABLA DENTRO DEL MODAL (por selector más flexible)
+        const tabla = modal.querySelector('.table-container table') || modal.querySelector('table');
+        if (!tabla) {
+            alert('❌ No se encontró la tabla en el modal');
+            return;
+        }
+        
+        // Obtener headers (primera fila del thead)
+        const thead = tabla.querySelector('thead');
+        if (!thead) {
+            alert('❌ No se encontró el encabezado de la tabla');
+            return;
+        }
+        
+        const headers = [];
+        const ths = thead.querySelectorAll('th');
+        ths.forEach(th => {
+            // Limpiar el texto del encabezado (quitar emojis y espacios extra)
+            let text = th.innerText.trim();
+            text = text.replace(/[👤📊🔴⚠️]/g, '').trim();
+            headers.push(text);
         });
-        rows.push(row);
-    });
-    
-    // Generar CSV
-    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))].join('\n');
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `agentes_${tipo}_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    alert('✅ Exportación completada');
-}
+        
+        // Obtener datos del tbody
+        const tbody = tabla.querySelector('tbody');
+        if (!tbody) {
+            alert('❌ No se encontraron datos en la tabla');
+            return;
+        }
+        
+        const rows = [];
+        const trs = tbody.querySelectorAll('tr');
+        
+        trs.forEach(tr => {
+            const row = [];
+            const cells = tr.querySelectorAll('td');
+            
+            cells.forEach(td => {
+                let text = td.innerText.trim();
+                // 🔴 Limpiar emojis y texto extra, dejar solo el número o texto
+                text = text.replace(/[🔴⚠️]/g, '').trim();
+                // Si está vacío o es '-', dejar como está
+                if (text === '-' || text === '') {
+                    row.push('0');
+                } else {
+                    row.push(text);
+                }
+            });
+            
+            // Solo agregar filas que tengan datos (no filas vacías)
+            if (row.some(cell => cell !== '0' && cell !== '')) {
+                rows.push(row);
+            }
+        });
+        
+        if (rows.length === 0) {
+            alert('⚠️ No hay datos para exportar');
+            return;
+        }
+        
+        // Generar CSV
+        let csvContent = '';
+        
+        // Agregar encabezados
+        csvContent += headers.join(',') + '\n';
+        
+        // Agregar filas
+        rows.forEach(row => {
+            const escapedRow = row.map(cell => {
+                // Escapar comillas y manejar números
+                const str = String(cell);
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            });
+            csvContent += escapedRow.join(',') + '\n';
+        });
+        
+        // Crear y descargar archivo
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // Generar nombre de archivo con fecha
+        const fecha = new Date().toISOString().slice(0, 10);
+        const nombreArchivo = `agentes_${tipo}_${fecha}.csv`;
+        a.download = nombreArchivo;
+        
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        alert(`✅ Exportación completada\n📊 ${rows.length} agentes exportados\n📁 ${nombreArchivo}`);
+    }
     // ===== 24. INICIO FUNCIÓN: renderizarFallasHorizontales =================
     function renderizarFallasHorizontales(container, evaluaciones) {
         if (!evaluaciones || evaluaciones.length === 0) {
@@ -18762,7 +18868,94 @@ async function cargarMesesParaSelectorQ4() {
         cargarSelectAuditoresFiltro();
         inicializarFiltroLoteEscuchas();
 
-        // 🔴 AGREGAR ESTAS LÍNEAS - Cargar historial al inicializar
+        // ======================================================
+        // CONECTAR FILTROS DE MONITOREO
+        // ======================================================
+        
+        // Filtro por auditor
+        const filtroAuditor = document.getElementById('filtroAuditorEscuchas');
+        if (filtroAuditor) {
+            const nuevoFiltroAuditor = filtroAuditor.cloneNode(true);
+            filtroAuditor.parentNode.replaceChild(nuevoFiltroAuditor, filtroAuditor);
+            document.getElementById('filtroAuditorEscuchas').addEventListener('change', function() {
+                console.log('📌 Filtro auditor cambiado a:', this.value);
+                aplicarFiltrosEscuchas();
+            });
+        }
+        
+        // Filtro por estado
+        const filtroEstado = document.getElementById('filtroEstadoEscuchas');
+        if (filtroEstado) {
+            const nuevoFiltroEstado = filtroEstado.cloneNode(true);
+            filtroEstado.parentNode.replaceChild(nuevoFiltroEstado, filtroEstado);
+            document.getElementById('filtroEstadoEscuchas').addEventListener('change', function() {
+                console.log('📌 Filtro estado cambiado a:', this.value);
+                aplicarFiltrosEscuchas();
+            });
+        }
+        
+        // Filtro por lote
+        const filtroLote = document.getElementById('filtroLoteEscuchas');
+        if (filtroLote) {
+            const nuevoFiltroLote = filtroLote.cloneNode(true);
+            filtroLote.parentNode.replaceChild(nuevoFiltroLote, filtroLote);
+            document.getElementById('filtroLoteEscuchas').addEventListener('change', function() {
+                console.log('📌 Filtro lote cambiado a:', this.value);
+                aplicarFiltrosEscuchas();
+            });
+        }
+        
+        // 🔴 NUEVO: Filtro de fecha inicio
+        const filtroFechaInicio = document.getElementById('filtroFechaInicioEscuchas');
+        if (filtroFechaInicio) {
+            const nuevoFiltroFechaInicio = filtroFechaInicio.cloneNode(true);
+            filtroFechaInicio.parentNode.replaceChild(nuevoFiltroFechaInicio, filtroFechaInicio);
+            document.getElementById('filtroFechaInicioEscuchas').addEventListener('change', function() {
+                console.log('📌 Filtro fecha inicio cambiado a:', this.value);
+                aplicarFiltrosEscuchas();
+            });
+        }
+        
+        // 🔴 NUEVO: Filtro de fecha fin
+        const filtroFechaFin = document.getElementById('filtroFechaFinEscuchas');
+        if (filtroFechaFin) {
+            const nuevoFiltroFechaFin = filtroFechaFin.cloneNode(true);
+            filtroFechaFin.parentNode.replaceChild(nuevoFiltroFechaFin, filtroFechaFin);
+            document.getElementById('filtroFechaFinEscuchas').addEventListener('change', function() {
+                console.log('📌 Filtro fecha fin cambiado a:', this.value);
+                aplicarFiltrosEscuchas();
+            });
+        }
+        
+        // Buscador de ticket
+        const buscadorTicket = document.getElementById('buscarTicketEscucha');
+        if (buscadorTicket) {
+            const nuevoBuscador = buscadorTicket.cloneNode(true);
+            buscadorTicket.parentNode.replaceChild(nuevoBuscador, buscadorTicket);
+            document.getElementById('buscarTicketEscucha').addEventListener('input', function() {
+                console.log('🔍 Buscando:', this.value);
+                aplicarFiltrosEscuchas();
+            });
+        }
+        
+        // Botón de limpiar filtros
+        const btnLimpiarFiltros = document.getElementById('btnLimpiarFiltrosEscuchas');
+        if (btnLimpiarFiltros) {
+            const nuevoBtn = btnLimpiarFiltros.cloneNode(true);
+            btnLimpiarFiltros.parentNode.replaceChild(nuevoBtn, btnLimpiarFiltros);
+            document.getElementById('btnLimpiarFiltrosEscuchas').addEventListener('click', function() {
+                console.log('🧹 Limpiando filtros de escuchas...');
+                document.getElementById('filtroAuditorEscuchas').value = '';
+                document.getElementById('filtroEstadoEscuchas').value = '';
+                document.getElementById('filtroLoteEscuchas').value = '';
+                document.getElementById('filtroFechaInicioEscuchas').value = '';
+                document.getElementById('filtroFechaFinEscuchas').value = '';
+                document.getElementById('buscarTicketEscucha').value = '';
+                aplicarFiltrosEscuchas();
+            });
+        }
+
+        // Cargar historial
         try {
             await cargarHistorialLotes();
             console.log('✅ Historial de lotes cargado automáticamente');
@@ -18771,6 +18964,11 @@ async function cargarMesesParaSelectorQ4() {
         }
 
         await refrescarMonitoreoEscuchas();
+        
+        // Aplicar filtros iniciales (mostrar todos)
+        setTimeout(() => {
+            aplicarFiltrosEscuchas();
+        }, 300);
     }
     // ===== FIN FUNCIÓN: inicializarGestionEscuchas =========================
 
@@ -21024,11 +21222,71 @@ async function cargarMesesParaSelectorQ4() {
 
     // ===== 37. INICIO FUNCIÓN: exportarHistorialLotesCSV ==================
     function exportarHistorialLotesCSV() {
-        if (!lotesHistorialGlobal || lotesHistorialGlobal.length === 0) {
+        console.log('📥 exportarHistorialLotesCSV - INICIADO');
+        
+        // 🔴 OBTENER DATOS DE FORMA ROBUSTA
+        let lotes = [];
+        
+        // Intentar 1: Desde window.lotesHistorialGlobal
+        if (window.lotesHistorialGlobal && window.lotesHistorialGlobal.length > 0) {
+            lotes = window.lotesHistorialGlobal;
+            console.log(`📋 Usando window.lotesHistorialGlobal: ${lotes.length} lotes`);
+        }
+        
+        // Intentar 2: Desde la variable global (sin window)
+        if (lotes.length === 0 && typeof lotesHistorialGlobal !== 'undefined' && lotesHistorialGlobal.length > 0) {
+            lotes = lotesHistorialGlobal;
+            console.log(`📋 Usando lotesHistorialGlobal: ${lotes.length} lotes`);
+        }
+        
+        // Intentar 3: Extraer de la tabla del DOM
+        if (lotes.length === 0) {
+            const tbody = document.getElementById('tablaHistorialLotes');
+            if (tbody) {
+                console.log('📋 Extrayendo datos desde la tabla del DOM...');
+                const filas = tbody.querySelectorAll('tr');
+                filas.forEach(fila => {
+                    const celdas = fila.querySelectorAll('td');
+                    if (celdas.length >= 10) {
+                        // Extraer texto limpio de cada celda
+                        const idText = celdas[0]?.textContent?.trim() || '0';
+                        const fechaText = celdas[1]?.textContent?.trim() || '';
+                        const archivoText = celdas[2]?.textContent?.trim() || '';
+                        const totalText = celdas[3]?.textContent?.trim() || '0';
+                        const pendientesText = celdas[4]?.textContent?.trim() || '0';
+                        const enProcesoText = celdas[5]?.textContent?.trim() || '0';
+                        const gestionadosText = celdas[6]?.textContent?.trim() || '0';
+                        const incidenciasText = celdas[7]?.textContent?.trim() || '0';
+                        const avanceText = celdas[8]?.textContent?.trim() || '0';
+                        const estadoText = celdas[9]?.textContent?.trim() || '';
+                        
+                        const lote = {
+                            id: parseInt(idText) || 0,
+                            fecha_carga: fechaText,
+                            nombre_archivo: archivoText,
+                            total: parseInt(totalText) || 0,
+                            pendientes: parseInt(pendientesText) || 0,
+                            enProceso: parseInt(enProcesoText) || 0,
+                            gestionados: parseInt(gestionadosText) || 0,
+                            incidencias: parseInt(incidenciasText) || 0,
+                            avance: parseInt(avanceText) || 0,
+                            estado: estadoText.includes('Activo') ? 'activo' : 'inactivo'
+                        };
+                        if (lote.id > 0) {
+                            lotes.push(lote);
+                        }
+                    }
+                });
+                console.log(`   📊 ${lotes.length} lotes extraídos de la tabla`);
+            }
+        }
+        
+        if (lotes.length === 0) {
             alert('⚠️ No hay datos de lotes para exportar');
             return;
         }
 
+        // Headers del CSV
         const headers = [
             'ID Lote',
             'Fecha Carga',
@@ -21042,34 +21300,48 @@ async function cargarMesesParaSelectorQ4() {
             'Estado'
         ];
 
-        const rows = lotesHistorialGlobal.map(lote => {
-            const fecha = new Date(lote.fecha_carga).toLocaleString('es-ES');
+        // Construir filas
+        const rows = lotes.map(lote => {
+            // Formatear fecha si es un objeto Date o string ISO
+            let fecha = lote.fecha_carga || '';
+            if (fecha && !isNaN(new Date(fecha).getTime())) {
+                fecha = new Date(fecha).toLocaleString('es-ES');
+            }
+            
             const nombreArchivo = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : '-';
 
             return [
-                lote.id,
+                lote.id || 0,
                 `"${fecha}"`,
                 `"${nombreArchivo}"`,
-                lote.total,
-                lote.pendientes,
-                lote.enProceso,
-                lote.gestionados,
-                lote.incidencias,
-                lote.avance,
+                lote.total || 0,
+                lote.pendientes || 0,
+                lote.enProceso || 0,
+                lote.gestionados || 0,
+                lote.incidencias || 0,
+                lote.avance || 0,
                 lote.estado === 'activo' ? 'ACTIVO' : 'INACTIVO'
             ];
         });
 
-        const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+        // Generar CSV
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.join(','))
+        ].join('\n');
+
+        // Descargar
         const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `historial_lotes_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        alert(`✅ Exportados ${lotesHistorialGlobal.length} lotes`);
+        alert(`✅ Exportados ${lotes.length} lotes`);
     }
     // ===== FIN FUNCIÓN: exportarHistorialLotesCSV ==========================
     
@@ -21320,6 +21592,118 @@ async function cargarMesesParaSelectorQ4() {
         }
     }
     // ===== FIN FUNCIÓN: limpiarTodasExclusiones ============================
+
+    // ======================================================
+    // APLICAR FILTROS DE MONITOREO DE ESCUCHAS
+    // ======================================================
+    function aplicarFiltrosEscuchas() {
+        console.log('🔍 aplicarFiltrosEscuchas - INICIADO');
+        
+        // Obtener valores de los filtros
+        const filtroAuditor = document.getElementById('filtroAuditorEscuchas')?.value || '';
+        const filtroEstado = document.getElementById('filtroEstadoEscuchas')?.value || '';
+        const filtroLote = document.getElementById('filtroLoteEscuchas')?.value || '';
+        const busquedaTicket = document.getElementById('buscarTicketEscucha')?.value?.toLowerCase() || '';
+        
+        // 🔴 FILTROS DE FECHA
+        const fechaInicio = document.getElementById('filtroFechaInicioEscuchas')?.value || '';
+        const fechaFin = document.getElementById('filtroFechaFinEscuchas')?.value || '';
+        
+        console.log(`   Filtros: Auditor=${filtroAuditor || 'todos'}, Estado=${filtroEstado || 'todos'}, Lote=${filtroLote || 'todos'}`);
+        console.log(`   Fechas: ${fechaInicio || 'sin inicio'} → ${fechaFin || 'sin fin'}`);
+        console.log(`   Busqueda: ${busquedaTicket || 'ninguna'}`);
+        
+        // Obtener todas las asignaciones
+        let asignaciones = window.asignacionesEscuchasGlobales || [];
+        
+        if (asignaciones.length === 0) {
+            console.log('⚠️ No hay asignaciones para filtrar');
+            refrescarMonitoreoEscuchas();
+            return;
+        }
+        
+        console.log(`   📊 Total asignaciones disponibles: ${asignaciones.length}`);
+        
+        // Aplicar filtros
+        let filtradas = asignaciones;
+        
+        // Filtrar por auditor
+        if (filtroAuditor) {
+            filtradas = filtradas.filter(a => a.auditor_asignado === filtroAuditor);
+            console.log(`   👤 Filtro auditor: ${filtradas.length} asignaciones`);
+        }
+        
+        // Filtrar por estado
+        if (filtroEstado) {
+            filtradas = filtradas.filter(a => a.estado === filtroEstado);
+            console.log(`   📌 Filtro estado: ${filtradas.length} asignaciones`);
+        }
+        
+        // Filtrar por lote
+        if (filtroLote && filtroLote !== 'activo' && filtroLote !== 'todos') {
+            const loteId = parseInt(filtroLote);
+            if (!isNaN(loteId)) {
+                filtradas = filtradas.filter(a => a.tarea_id === loteId);
+                console.log(`   📦 Filtro lote ID ${loteId}: ${filtradas.length} asignaciones`);
+            }
+        } else if (filtroLote === 'activo') {
+            const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+            if (loteActivo) {
+                filtradas = filtradas.filter(a => a.tarea_id === loteActivo.id);
+                console.log(`   📦 Filtro lote activo (ID ${loteActivo.id}): ${filtradas.length} asignaciones`);
+            }
+        }
+        
+        // 🔴 NUEVO: FILTRAR POR RANGO DE FECHAS
+        if (fechaInicio || fechaFin) {
+            // Convertir fechas a objetos Date para comparación
+            const inicio = fechaInicio ? new Date(fechaInicio) : null;
+            const fin = fechaFin ? new Date(fechaFin) : null;
+            
+            // Ajustar horas para comparación correcta
+            if (inicio) inicio.setHours(0, 0, 0, 0);
+            if (fin) fin.setHours(23, 59, 59, 999);
+            
+            const antes = filtradas.length;
+            
+            filtradas = filtradas.filter(a => {
+                if (!a.fecha_asignacion) return false;
+                
+                const fechaAsig = new Date(a.fecha_asignacion);
+                if (isNaN(fechaAsig.getTime())) return false;
+                
+                if (inicio && fechaAsig < inicio) return false;
+                if (fin && fechaAsig > fin) return false;
+                
+                return true;
+            });
+            
+            console.log(`   📅 Filtro de fechas: ${filtradas.length} asignaciones (de ${antes})`);
+        }
+        
+        // Filtrar por búsqueda de ticket
+        if (busquedaTicket) {
+            const antes = filtradas.length;
+            filtradas = filtradas.filter(a => 
+                (a.ticket || '').toLowerCase().includes(busquedaTicket) ||
+                (a.gestor_auditado || '').toLowerCase().includes(busquedaTicket) ||
+                (a.supervisor_responsable || '').toLowerCase().includes(busquedaTicket) ||
+                (a.auditor_asignado || '').toLowerCase().includes(busquedaTicket)
+            );
+            console.log(`   🔍 Búsqueda: ${filtradas.length} asignaciones (de ${antes})`);
+        }
+        
+        console.log(`   ✅ TOTAL FILTRADAS: ${filtradas.length} asignaciones (de ${asignaciones.length})`);
+        
+        // Actualizar la tabla con los datos filtrados
+        actualizarTablaMonitoreo(filtradas);
+        
+        // Actualizar contador de resultados
+        const contador = document.getElementById('resultadosEscuchasCount');
+        if (contador) {
+            contador.textContent = filtradas.length;
+        }
+    }
 
     // ===== 46. INICIO FUNCIÓN: limpiarTodasLasEscuchas ====================
     async function limpiarTodasLasEscuchas() {
@@ -29947,7 +30331,7 @@ async function showTab(tabName, event) {
             }
         }
 
-        if (tabName === 'estadoBD') {
+        if (tabName === 'estado BD') {
             if (typeof refrescarEstadoBD === 'function') await refrescarEstadoBD();
         }
 
@@ -33780,7 +34164,12 @@ async function guardarCriterioCuartil() {
     
     // Validaciones
     if (!cuartil || !nombre) {
-        alert('⚠️ Complete los campos obligatorios');
+        alert('⚠️ Complete los campos obligatorios: Cuartil y Nombre');
+        return;
+    }
+    
+    if (isNaN(limiteInferior) || isNaN(limiteSuperior)) {
+        alert('⚠️ Los límites deben ser números válidos');
         return;
     }
     
@@ -33799,6 +34188,22 @@ async function guardarCriterioCuartil() {
         return;
     }
     
+    // 🔴 🔴 🔴 CONSTRUIR DATOS EXACTAMENTE COMO LA PRUEBA 🔴 🔴 🔴
+    const data = {
+        cuartil: cuartil,
+        nombre: nombre,
+        limite_inferior: limiteInferior,
+        limite_superior: limiteSuperior,
+        color_hex: color,
+        icono: icono,
+        orden: orden,
+        fecha_vigencia_desde: fechaDesde,
+        fecha_vigencia_hasta: fechaHasta,
+        activo: activo
+    };
+    
+    console.log('📤 Enviando datos:', data);
+    
     const token = localStorage.getItem('meca_token');
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/criterios-cuartiles/${id}` : '/api/criterios-cuartiles';
@@ -33810,13 +34215,7 @@ async function guardarCriterioCuartil() {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                cuartil, nombre, limite_inferior, limite_superior,
-                color_hex: color, icono, orden,
-                fecha_vigencia_desde: fechaDesde,
-                fecha_vigencia_hasta: fechaHasta,
-                activo
-            })
+            body: JSON.stringify(data)  // ← Enviar el objeto directamente
         });
         
         if (!response.ok) {
@@ -33824,16 +34223,19 @@ async function guardarCriterioCuartil() {
             throw new Error(error.error || 'Error al guardar');
         }
         
+        const result = await response.json();
+        console.log('✅ Guardado:', result);
+        
         alert('✅ Criterio guardado correctamente');
         cerrarModalCriterio();
         await cargarCriteriosCuartilesTabla();
         invalidarCacheCuartiles();
         
     } catch (error) {
+        console.error('❌ Error:', error);
         alert('❌ Error: ' + error.message);
     }
 }
-
 // =============================================
 // 6. DESACTIVAR CRITERIO
 // =============================================
