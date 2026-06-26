@@ -2760,6 +2760,8 @@ async function eliminarRegla(id) {
     
     return await response.json();
 }
+
+
     
     // ======================================================
     // API PÚBLICA - Exportación de todos los métodos

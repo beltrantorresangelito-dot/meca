@@ -29941,6 +29941,12 @@ async function showTab(tabName, event) {
             }, 200);
         }
 
+        if (tabName === 'cuartiles') {
+            if (typeof cargarCriteriosCuartilesTabla === 'function') {
+                await cargarCriteriosCuartilesTabla();
+            }
+        }
+
         if (tabName === 'estadoBD') {
             if (typeof refrescarEstadoBD === 'function') await refrescarEstadoBD();
         }
@@ -33595,6 +33601,301 @@ async function getVersionActivaId() {
     } catch {
         return '';
     }
+}
+
+// ======================================================
+// CRUD: CRITERIOS DE CUARTILES
+// ======================================================
+
+// =============================================
+// 1. CARGAR CRITERIOS EN TABLA
+// =============================================
+async function cargarCriteriosCuartilesTabla() {
+    console.log('📋 Cargando criterios de cuartiles...');
+    
+    const tbody = document.getElementById('tbodyCriteriosCuartiles');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px;">⏳ Cargando...</td></tr>';
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('/api/criterios-cuartiles', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('Error al cargar criterios');
+        
+        const result = await response.json();
+        const criterios = result.data || [];
+        
+        if (criterios.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px;">📭 No hay criterios registrados</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        for (const c of criterios) {
+            const estadoBadge = c.activo 
+                ? '<span class="badge" style="background: var(--ok);">✅ Activo</span>'
+                : '<span class="badge" style="background: var(--danger);">❌ Inactivo</span>';
+            
+            const vigencia = c.fecha_vigencia_hasta 
+                ? `${formatDate(c.fecha_vigencia_desde)} → ${formatDate(c.fecha_vigencia_hasta)}`
+                : `${formatDate(c.fecha_vigencia_desde)} → ∞`;
+            
+            html += `
+                <tr>
+                    <td style="padding: 8px; text-align: center;">${c.id}</td>
+                    <td style="padding: 8px;">
+                        <span style="background: ${c.color_hex}; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px;">
+                            ${c.icono || '📊'} ${c.cuartil}
+                        </span>
+                    </td>
+                    <td style="padding: 8px;">${escapeHtml(c.nombre)}</td>
+                    <td style="padding: 8px; text-align: center;">${c.limite_inferior}%</td>
+                    <td style="padding: 8px; text-align: center;">${c.limite_superior}%</td>
+                    <td style="padding: 8px; text-align: center;">${c.orden}</td>
+                    <td style="padding: 8px; font-size: 12px;">${vigencia}</td>
+                    <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
+                    <td style="padding: 8px; text-align: center; white-space: nowrap;">
+                        <button onclick="editarCriterioCuartil(${c.id})" 
+                                style="background: var(--warning); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; margin-right: 5px;">
+                            ✏️
+                        </button>
+                        ${c.activo ? `
+                            <button onclick="desactivarCriterioCuartil(${c.id})" 
+                                    style="background: var(--danger); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; color: white;">
+                                🗑️
+                            </button>
+                        ` : `
+                            <button onclick="activarCriterioCuartil(${c.id})" 
+                                    style="background: var(--ok); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; color: white;">
+                                ✅ Activar
+                            </button>
+                        `}
+                    </td>
+                </tr>
+            `;
+        }
+        
+        tbody.innerHTML = html;
+        actualizarEstadisticasCriterios(criterios);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--danger); padding: 40px;">❌ Error: ${error.message}</td></tr>`;
+    }
+}
+
+// =============================================
+// 2. ACTUALIZAR ESTADÍSTICAS
+// =============================================
+function actualizarEstadisticasCriterios(criterios) {
+    const total = criterios.length;
+    const activos = criterios.filter(c => c.activo).length;
+    const vigentes = criterios.filter(c => {
+        if (!c.activo) return false;
+        const hoy = new Date().toISOString().split('T')[0];
+        if (!c.fecha_vigencia_hasta) return true;
+        return c.fecha_vigencia_hasta >= hoy;
+    }).length;
+    
+    document.getElementById('statsTotalCriterios').textContent = total;
+    document.getElementById('statsActivosCriterios').textContent = activos;
+    document.getElementById('statsVigentesCriterios').textContent = vigentes;
+}
+
+// =============================================
+// 3. ABRIR MODAL NUEVO CRITERIO
+// =============================================
+function abrirModalNuevoCriterio() {
+    document.getElementById('modalCriterioTitulo').textContent = '➕ Nuevo Criterio de Cuartil';
+    document.getElementById('criterioId').value = '';
+    document.getElementById('criterioCuartil').value = '';
+    document.getElementById('criterioNombre').value = '';
+    document.getElementById('criterioLimiteInferior').value = '';
+    document.getElementById('criterioLimiteSuperior').value = '';
+    document.getElementById('criterioColor').value = '#019DF4';
+    document.getElementById('criterioIcono').value = '📊';
+    document.getElementById('criterioOrden').value = '';
+    document.getElementById('criterioFechaDesde').value = new Date().toISOString().split('T')[0];
+    document.getElementById('criterioFechaHasta').value = '';
+    document.getElementById('criterioActivo').value = 'true';
+    
+    document.getElementById('modalCriterioCuartil').style.display = 'flex';
+}
+
+// =============================================
+// 4. EDITAR CRITERIO
+// =============================================
+async function editarCriterioCuartil(id) {
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`/api/criterios-cuartiles`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        const criterio = result.data.find(c => c.id === id);
+        
+        if (!criterio) {
+            alert('❌ Criterio no encontrado');
+            return;
+        }
+        
+        document.getElementById('modalCriterioTitulo').textContent = `✏️ Editar ${criterio.cuartil} - ${criterio.nombre}`;
+        document.getElementById('criterioId').value = criterio.id;
+        document.getElementById('criterioCuartil').value = criterio.cuartil;
+        document.getElementById('criterioNombre').value = criterio.nombre;
+        document.getElementById('criterioLimiteInferior').value = criterio.limite_inferior;
+        document.getElementById('criterioLimiteSuperior').value = criterio.limite_superior;
+        document.getElementById('criterioColor').value = criterio.color_hex || '#019DF4';
+        document.getElementById('criterioIcono').value = criterio.icono || '📊';
+        document.getElementById('criterioOrden').value = criterio.orden;
+        document.getElementById('criterioFechaDesde').value = criterio.fecha_vigencia_desde;
+        document.getElementById('criterioFechaHasta').value = criterio.fecha_vigencia_hasta || '';
+        document.getElementById('criterioActivo').value = criterio.activo ? 'true' : 'false';
+        
+        document.getElementById('modalCriterioCuartil').style.display = 'flex';
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+// =============================================
+// 5. GUARDAR CRITERIO
+// =============================================
+async function guardarCriterioCuartil() {
+    const id = document.getElementById('criterioId').value;
+    const cuartil = document.getElementById('criterioCuartil').value;
+    const nombre = document.getElementById('criterioNombre').value.trim();
+    const limiteInferior = parseFloat(document.getElementById('criterioLimiteInferior').value);
+    const limiteSuperior = parseFloat(document.getElementById('criterioLimiteSuperior').value);
+    const color = document.getElementById('criterioColor').value;
+    const icono = document.getElementById('criterioIcono').value || '📊';
+    const orden = parseInt(document.getElementById('criterioOrden').value) || 0;
+    const fechaDesde = document.getElementById('criterioFechaDesde').value;
+    const fechaHasta = document.getElementById('criterioFechaHasta').value || null;
+    const activo = document.getElementById('criterioActivo').value === 'true';
+    
+    // Validaciones
+    if (!cuartil || !nombre) {
+        alert('⚠️ Complete los campos obligatorios');
+        return;
+    }
+    
+    if (limiteInferior >= limiteSuperior) {
+        alert('⚠️ El límite inferior debe ser menor que el límite superior');
+        return;
+    }
+    
+    if (limiteInferior < 0 || limiteSuperior > 100) {
+        alert('⚠️ Los límites deben estar entre 0 y 100');
+        return;
+    }
+    
+    if (!fechaDesde) {
+        alert('⚠️ Seleccione una fecha de vigencia');
+        return;
+    }
+    
+    const token = localStorage.getItem('meca_token');
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/criterios-cuartiles/${id}` : '/api/criterios-cuartiles';
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                cuartil, nombre, limite_inferior, limite_superior,
+                color_hex: color, icono, orden,
+                fecha_vigencia_desde: fechaDesde,
+                fecha_vigencia_hasta: fechaHasta,
+                activo
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al guardar');
+        }
+        
+        alert('✅ Criterio guardado correctamente');
+        cerrarModalCriterio();
+        await cargarCriteriosCuartilesTabla();
+        invalidarCacheCuartiles();
+        
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+// =============================================
+// 6. DESACTIVAR CRITERIO
+// =============================================
+async function desactivarCriterioCuartil(id) {
+    if (!confirm('⚠️ ¿Desactivar este criterio?\n\nNo se eliminará, solo quedará inactivo.')) return;
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`/api/criterios-cuartiles/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('Error al desactivar');
+        
+        alert('✅ Criterio desactivado');
+        await cargarCriteriosCuartilesTabla();
+        invalidarCacheCuartiles();
+        
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+// =============================================
+// 7. ACTIVAR CRITERIO
+// =============================================
+async function activarCriterioCuartil(id) {
+    if (!confirm('⚠️ ¿Activar este criterio?')) return;
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`/api/criterios-cuartiles/${id}/activar`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('Error al activar');
+        
+        alert('✅ Criterio activado');
+        await cargarCriteriosCuartilesTabla();
+        invalidarCacheCuartiles();
+        
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+// =============================================
+// 8. CERRAR MODAL
+// =============================================
+function cerrarModalCriterio() {
+    document.getElementById('modalCriterioCuartil').style.display = 'none';
+}
+
+// =============================================
+// 9. FORMATO DE FECHA
+// =============================================
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 }
 
 // ========== ESTILOS CSS DINÁMICOS ==========

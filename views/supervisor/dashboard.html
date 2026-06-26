@@ -1940,6 +1940,145 @@
                 </div>
             </div>
 
+            <!-- ====================================================== -->
+            <!-- PESTAÑA: CONFIGURACIÓN DE CUARTILES -->
+            <!-- ====================================================== -->
+            <div id="tab-cuartiles" class="tab-pane">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <h3>⚙️ Configuración de Cuartiles</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="abrirModalNuevoCriterio()" style="background: var(--ok); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                                ➕ Nuevo Criterio
+                            </button>
+                            <button onclick="cargarCriteriosCuartilesTabla()" style="background: var(--accent); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+                                🔄 Refrescar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Estadísticas -->
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 15px 0;">
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: var(--accent);" id="statsTotalCriterios">0</div>
+                            <div style="font-size: 12px; color: var(--muted);">Total Criterios</div>
+                        </div>
+                        <div style="background: #e8f5e9; padding: 15px; border-radius: 10px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: var(--ok);" id="statsActivosCriterios">0</div>
+                            <div style="font-size: 12px; color: var(--muted);">Activos</div>
+                        </div>
+                        <div style="background: #fff3e0; padding: 15px; border-radius: 10px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: var(--warning);" id="statsVigentesCriterios">0</div>
+                            <div style="font-size: 12px; color: var(--muted);">Vigentes</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabla -->
+                    <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f8f9fa; position: sticky; top: 0;">
+                                    <th>ID</th>
+                                    <th>Cuartil</th>
+                                    <th>Nombre</th>
+                                    <th>Límite Inf.</th>
+                                    <th>Límite Sup.</th>
+                                    <th>Orden</th>
+                                    <th>Vigencia</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyCriteriosCuartiles">
+                                <tr><td colspan="9" style="text-align: center; padding: 40px;">⏳ Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====================================================== -->
+            <!-- MODAL: NUEVO/EDITAR CRITERIO -->
+            <!-- ====================================================== -->
+            <div id="modalCriterioCuartil" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10002; justify-content: center; align-items: center;">
+                <div style="background: white; border-radius: 16px; width: 90%; max-width: 550px; max-height: 85vh; overflow-y: auto; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 id="modalCriterioTitulo" style="margin: 0;">➕ Nuevo Criterio de Cuartil</h3>
+                        <button onclick="cerrarModalCriterio()" style="background: none; border: none; font-size: 24px; cursor: pointer;">✖</button>
+                    </div>
+                    
+                    <form id="formCriterioCuartil" onsubmit="event.preventDefault(); guardarCriterioCuartil();">
+                        <input type="hidden" id="criterioId">
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div>
+                                <label style="font-weight: 600;">Cuartil *</label>
+                                <select id="criterioCuartil" required style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                                    <option value="Q1">Q1 - Excelente</option>
+                                    <option value="Q2">Q2 - Bueno</option>
+                                    <option value="Q3">Q3 - Regular</option>
+                                    <option value="Q4">Q4 - Riesgo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-weight: 600;">Nombre *</label>
+                                <input type="text" id="criterioNombre" required placeholder="Ej: Excelente" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div>
+                                <label style="font-weight: 600;">Límite Inferior *</label>
+                                <input type="number" id="criterioLimiteInferior" required step="0.01" min="0" max="100" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                            </div>
+                            <div>
+                                <label style="font-weight: 600;">Límite Superior *</label>
+                                <input type="number" id="criterioLimiteSuperior" required step="0.01" min="0" max="100" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div>
+                                <label style="font-weight: 600;">Color</label>
+                                <input type="color" id="criterioColor" value="#019DF4" style="width: 100%; padding: 4px; border-radius: 8px; border: 1px solid #ddd; height: 40px;">
+                            </div>
+                            <div>
+                                <label style="font-weight: 600;">Ícono</label>
+                                <input type="text" id="criterioIcono" placeholder="🏆" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                            </div>
+                            <div>
+                                <label style="font-weight: 600;">Orden *</label>
+                                <input type="number" id="criterioOrden" required min="1" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div>
+                                <label style="font-weight: 600;">Vigencia Desde *</label>
+                                <input type="date" id="criterioFechaDesde" required style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                            </div>
+                            <div>
+                                <label style="font-weight: 600;">Vigencia Hasta</label>
+                                <input type="date" id="criterioFechaHasta" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="font-weight: 600;">Estado</label>
+                            <select id="criterioActivo" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+                                <option value="true">✅ Activo</option>
+                                <option value="false">❌ Inactivo</option>
+                            </select>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid #ddd; padding-top: 15px;">
+                            <button type="button" onclick="cerrarModalCriterio()" style="padding: 10px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white;">Cancelar</button>
+                            <button type="submit" style="padding: 10px 20px; background: var(--ok); border: none; border-radius: 8px; cursor: pointer; color: white;">💾 Guardar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <!-- PESTAÑA DE GESTIÓN DE USUARIOS -->
             <div id="tab-gestionUsuarios" class="tab-content tab-pane">
                 <div style="display: flex; gap: 25px; flex-wrap: wrap;">
