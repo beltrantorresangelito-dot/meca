@@ -2094,3 +2094,47 @@ td {
 .matriz-submotivo {
     margin-left: 20px;
 }
+
+/* Animación para la barra de progreso */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+#progressContainer .pulse {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Scrollbar personalizada para los logs */
+#progressLogs::-webkit-scrollbar {
+    width: 4px;
+}
+#progressLogs::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+#progressLogs::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+#progressLogs::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Entrada de logs con animación */
+.log-entry {
+    animation: slideIn 0.3s ease;
+    padding: 2px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}

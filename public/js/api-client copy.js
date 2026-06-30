@@ -2624,129 +2624,19 @@ const API = (function() {
     }
 
     // ======================================================
-    // API - REGLAS DE EVALUACIÓN (CRUD)
-    // ======================================================
+// API - REGLAS DE EVALUACIÓN (CRUD)
+// ======================================================
 
-    /**
-     * getReglasByVersion - Obtiene reglas de una versión específica
-     * @param {number} versionId - ID de la versión
-     * @returns {Array} Lista de reglas
-     */
-    async function getReglasByVersion(versionId) {
-        const token = localStorage.getItem('meca_token');
-        
-        try {
-            const response = await fetch(`/api/reglas-evaluacion/version/${versionId}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (!response.ok) {
-                if (response.status === 404) return [];
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-            
-            return await response.json();
-        } catch (error) {
-            console.error('❌ Error obteniendo reglas:', error);
-            return [];
-        }
-    }
-
-    /**
-     * crearRegla - Crea una nueva regla
-     * @param {Object} data - Datos de la regla
-     * @returns {Object} Regla creada
-     */
-    async function crearRegla(data) {
-        const token = localStorage.getItem('meca_token');
-        
-        // 🔴 Asegurar que los campos JSON sean válidos
-        const bodyData = {
-            version_id: data.version_id,
-            submotivo_origen: data.submotivo_origen,
-            bloque_origen: data.bloque_origen,
-            atributo_origen: data.atributo_origen,
-            valor_condicion: data.valor_condicion || '0',
-            accion_tipo: data.accion_tipo || 'marcar_no_aplica',
-            accion_valor: data.accion_valor || 'NA',
-            submotivos_afectados: data.submotivos_afectados || null,
-            excepciones: data.excepciones || null,
-            orden: data.orden || 0,
-            activo: data.activo !== false
-        };
-        
-        console.log('📤 Enviando a /api/reglas-evaluacion:', JSON.stringify(bodyData, null, 2));
-        
-        const response = await fetch('/api/reglas-evaluacion', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(bodyData)
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            console.error('❌ Error del servidor:', error);
-            throw new Error(error.error || 'Error al crear regla');
-        }
-        
-        return await response.json();
-    }
-
-    /**
-     * actualizarRegla - Actualiza una regla existente
-     * @param {number} id - ID de la regla
-     * @param {Object} data - Datos a actualizar
-     * @returns {Object} Regla actualizada
-     */
-    async function actualizarRegla(id, data) {
-        const token = localStorage.getItem('meca_token');
-        
-        const bodyData = {
-            submotivo_origen: data.submotivo_origen,
-            bloque_origen: data.bloque_origen,
-            atributo_origen: data.atributo_origen,
-            valor_condicion: data.valor_condicion || '0',
-            accion_tipo: data.accion_tipo || 'marcar_no_aplica',
-            accion_valor: data.accion_valor || 'NA',
-            submotivos_afectados: data.submotivos_afectados || null,
-            excepciones: data.excepciones || null,
-            orden: data.orden || 0,
-            activo: data.activo !== false
-        };
-        
-        const response = await fetch(`/api/reglas-evaluacion/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(bodyData)
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al actualizar regla');
-        }
-        
-        return await response.json();
-    }
-
-    /**
-     * eliminarRegla - Elimina una regla
-     * @param {number} id - ID de la regla
-     * @returns {Object} Resultado de la operación
-     */
-    async function eliminarRegla(id) {
-        const token = localStorage.getItem('meca_token');
-        
-        const response = await fetch(`/api/reglas-evaluacion/${id}`, {
-            method: 'DELETE',
+/**
+ * getReglasByVersion - Obtiene reglas de una versión específica
+ * @param {number} versionId - ID de la versión
+ * @returns {Array} Lista de reglas
+ */
+async function getReglasByVersion(versionId) {
+    const token = localStorage.getItem('meca_token');
+    
+    try {
+        const response = await fetch(`/api/reglas-evaluacion/version/${versionId}`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -2754,364 +2644,124 @@ const API = (function() {
         });
         
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al eliminar regla');
+            if (response.status === 404) return [];
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
         
         return await response.json();
+    } catch (error) {
+        console.error('❌ Error obteniendo reglas:', error);
+        return [];
     }
+}
 
-    // ======================================================
-    // Módulo: Transcripción - Nuevo
-    // ======================================================
-
-    /**
-     * crearTareaTranscripcion - Crea una tarea de transcripción desde MECA
-     * @param {Object} data - Datos de la tarea
-     * @returns {Object} Tarea creada
-     */
-    async function crearTareaTranscripcion(data) {
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/transcripcion/tareas', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al crear tarea');
-        }
-        return await response.json();
+/**
+ * crearRegla - Crea una nueva regla
+ * @param {Object} data - Datos de la regla
+ * @returns {Object} Regla creada
+ */
+async function crearRegla(data) {
+    const token = localStorage.getItem('meca_token');
+    
+    // 🔴 Asegurar que los campos JSON sean válidos
+    const bodyData = {
+        version_id: data.version_id,
+        submotivo_origen: data.submotivo_origen,
+        bloque_origen: data.bloque_origen,
+        atributo_origen: data.atributo_origen,
+        valor_condicion: data.valor_condicion || '0',
+        accion_tipo: data.accion_tipo || 'marcar_no_aplica',
+        accion_valor: data.accion_valor || 'NA',
+        submotivos_afectados: data.submotivos_afectados || null,
+        excepciones: data.excepciones || null,
+        orden: data.orden || 0,
+        activo: data.activo !== false
+    };
+    
+    console.log('📤 Enviando a /api/reglas-evaluacion:', JSON.stringify(bodyData, null, 2));
+    
+    const response = await fetch('/api/reglas-evaluacion', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bodyData)
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        console.error('❌ Error del servidor:', error);
+        throw new Error(error.error || 'Error al crear regla');
     }
+    
+    return await response.json();
+}
 
-    /**
-     * ejecutarTareaTranscripcion - Ejecuta una tarea de transcripción manualmente
-     * @param {number} tareaId - ID de la tarea
-     * @returns {Object} Resultado de la operación
-     */
-    async function ejecutarTareaTranscripcion(tareaId) {
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch(`/api/transcripcion/tareas/${tareaId}/ejecutar`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al ejecutar tarea');
-        }
-        return await response.json();
+/**
+ * actualizarRegla - Actualiza una regla existente
+ * @param {number} id - ID de la regla
+ * @param {Object} data - Datos a actualizar
+ * @returns {Object} Regla actualizada
+ */
+async function actualizarRegla(id, data) {
+    const token = localStorage.getItem('meca_token');
+    
+    const bodyData = {
+        submotivo_origen: data.submotivo_origen,
+        bloque_origen: data.bloque_origen,
+        atributo_origen: data.atributo_origen,
+        valor_condicion: data.valor_condicion || '0',
+        accion_tipo: data.accion_tipo || 'marcar_no_aplica',
+        accion_valor: data.accion_valor || 'NA',
+        submotivos_afectados: data.submotivos_afectados || null,
+        excepciones: data.excepciones || null,
+        orden: data.orden || 0,
+        activo: data.activo !== false
+    };
+    
+    const response = await fetch(`/api/reglas-evaluacion/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bodyData)
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al actualizar regla');
     }
+    
+    return await response.json();
+}
 
-    /**
-     * listarTranscripciones - Lista transcripciones con filtros
-     * @param {Object} filtros - Filtros opcionales
-     * @returns {Array} Lista de transcripciones
-     */
-    async function listarTranscripciones(filtros = {}) {
-        const token = localStorage.getItem('meca_token');
-        const params = new URLSearchParams(filtros).toString();
-        const url = params ? `/api/transcripcion/listar?${params}` : '/api/transcripcion/listar';
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al listar transcripciones');
+/**
+ * eliminarRegla - Elimina una regla
+ * @param {number} id - ID de la regla
+ * @returns {Object} Resultado de la operación
+ */
+async function eliminarRegla(id) {
+    const token = localStorage.getItem('meca_token');
+    
+    const response = await fetch(`/api/reglas-evaluacion/${id}`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
         }
-        return await response.json();
+    });
+    
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Error al eliminar regla');
     }
+    
+    return await response.json();
+}
 
-    /**
-     * obtenerTranscripcion - Obtiene una transcripción completa
-     * @param {number} id - ID de la transcripción
-     * @returns {Object} Transcripción completa
-     */
-    async function obtenerTranscripcion(id) {
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch(`/api/transcripcion/${id}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al obtener transcripción');
-        }
-        return await response.json();
-    }
 
-    /**
-     * obtenerEstadisticasTranscripcion - Obtiene estadísticas para dashboard
-     * @returns {Object} Estadísticas de transcripciones
-     */
-    async function obtenerEstadisticasTranscripcion() {
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/transcripcion/estadisticas', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al obtener estadísticas');
-        }
-        return await response.json();
-    }
-
-    // ======================================================
-    // MÓDULO: TRANSCRIPCIÓN (VERSIÓN CORREGIDA)
-    // ======================================================
-
-    /**
-     * subirAudio - Sube un archivo de audio desde MECA
-     * @param {File} file - Archivo de audio
-     * @param {Object} opciones - Opciones adicionales
-     * @returns {Object} Resultado de la subida
-     */
-    async function subirAudio(file, opciones = {}) {
-        console.log('📤 Subiendo archivo de audio:', file?.name);
-        
-        if (!file) {
-            throw new Error('⚠️ No se ha seleccionado ningún archivo');
-        }
-        
-        const token = localStorage.getItem('meca_token');
-        if (!token) {
-            throw new Error('⚠️ No hay sesión activa');
-        }
-        
-        const formData = new FormData();
-        formData.append('audio', file);
-        formData.append('crear_tarea', opciones.crearTarea !== undefined ? opciones.crearTarea : 'true');
-        formData.append('creado_por', opciones.creadoPor || 'MECA');
-        formData.append('modelo_whisper', opciones.modeloWhisper || 'small');
-        formData.append('idioma', opciones.idioma || 'Spanish');
-        formData.append('analizar_con_ollama', opciones.analizarConOllama !== undefined ? opciones.analizarConOllama : 'true');
-        
-        // 🔴 USAR LA VARIABLE GLOBAL
-        const response = await fetch(`${API_TRANSCRIPCION_URL}/subir`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            },
-            body: formData
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `Error HTTP ${response.status}`);
-        }
-        
-        return await response.json();
-    }
-
-    /**
-     * transcribirAudioEspecifico - Transcribe un audio específico
-     * @param {string} audioPath - Ruta del audio
-     * @param {Object} opciones - Opciones de transcripción
-     * @returns {Object} Resultado de la transcripción
-     */
-    async function transcribirAudioEspecifico(audioPath, opciones = {}) {
-        const token = localStorage.getItem('meca_token');
-        if (!token) {
-            throw new Error('⚠️ No hay sesión activa');
-        }
-        
-        // 🔴 USAR LA VARIABLE GLOBAL
-        const response = await fetch(`${API_TRANSCRIPCION_URL}/transcribir`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                audio_path: audioPath,
-                idioma: opciones.idioma || 'Spanish',
-                modelo: opciones.modelo || 'small',
-                analizar_con_ollama: opciones.analizarConOllama !== false,
-                modelo_ollama: opciones.modeloOllama || 'llama3.2:3b'
-            })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al transcribir');
-        }
-        
-        return await response.json();
-    }
-
-    /**
-     * listarTranscripciones - Lista transcripciones con filtros
-     * @param {Object} filtros - Filtros opcionales
-     * @returns {Object} Lista de transcripciones
-     */
-    async function listarTranscripciones(filtros = {}) {
-        const token = localStorage.getItem('meca_token');
-        if (!token) {
-            throw new Error('⚠️ No hay sesión activa');
-        }
-        
-        const params = new URLSearchParams();
-        if (filtros.estado) params.append('estado', filtros.estado);
-        if (filtros.fecha_desde) params.append('fecha_desde', filtros.fecha_desde);
-        if (filtros.fecha_hasta) params.append('fecha_hasta', filtros.fecha_hasta);
-        if (filtros.tarea_id) params.append('tarea_id', filtros.tarea_id);
-        if (filtros.limit) params.append('limit', filtros.limit || 50);
-        if (filtros.offset) params.append('offset', filtros.offset || 0);
-        
-        // 🔴 USAR LA VARIABLE GLOBAL
-        const url = params.toString() 
-            ? `${API_TRANSCRIPCION_URL}/listar?${params.toString()}`
-            : `${API_TRANSCRIPCION_URL}/listar`;
-        
-        console.log('📡 URL de listarTranscripciones:', url);
-        
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `Error HTTP ${response.status}`);
-        }
-        
-        return await response.json();
-    }
-
-    /**
-     * obtenerTranscripcion - Obtiene una transcripción completa
-     * @param {number} id - ID de la transcripción
-     * @returns {Object} Transcripción completa
-     */
-    async function obtenerTranscripcion(id) {
-        const token = localStorage.getItem('meca_token');
-        if (!token) {
-            throw new Error('⚠️ No hay sesión activa');
-        }
-        
-        // 🔴 USAR LA VARIABLE GLOBAL
-        const response = await fetch(`${API_TRANSCRIPCION_URL}/${id}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `Error HTTP ${response.status}`);
-        }
-        
-        return await response.json();
-    }
-
-    /**
-     * obtenerEstadisticasTranscripcion - Obtiene estadísticas para dashboard
-     * @returns {Object} Estadísticas de transcripciones
-     */
-    async function obtenerEstadisticasTranscripcion() {
-        const token = localStorage.getItem('meca_token');
-        if (!token) {
-            throw new Error('⚠️ No hay sesión activa');
-        }
-        
-        // 🔴 USAR LA VARIABLE GLOBAL
-        const response = await fetch(`${API_TRANSCRIPCION_URL}/estadisticas`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `Error HTTP ${response.status}`);
-        }
-        
-        return await response.json();
-    }
-
-    /**
-     * analizarTranscripcion - Reintenta análisis de una transcripción existente
-     * @param {number} id - ID de la transcripción
-     * @returns {Object} Resultado del análisis
-     */
-    async function analizarTranscripcion(id) {
-        const token = localStorage.getItem('meca_token');
-        if (!token) {
-            throw new Error('⚠️ No hay sesión activa');
-        }
-        
-        // 🔴 USAR LA VARIABLE GLOBAL
-        const response = await fetch(`${API_TRANSCRIPCION_URL}/${id}/analizar`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `Error HTTP ${response.status}`);
-        }
-        
-        return await response.json();
-    }
-
-    /**
-     * crearTareaTranscripcion - Crea una tarea de transcripción desde MECA
-     * @param {Object} data - Datos de la tarea
-     * @returns {Object} Tarea creada
-     */
-    async function crearTareaTranscripcion(data) {
-        const token = localStorage.getItem('meca_token');
-        if (!token) {
-            throw new Error('⚠️ No hay sesión activa');
-        }
-        
-        // 🔴 USAR LA VARIABLE GLOBAL
-        const response = await fetch(`${API_TRANSCRIPCION_URL}/tareas`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `Error HTTP ${response.status}`);
-        }
-        
-        return await response.json();
-    }
-
-    /**
-     * ejecutarTareaTranscripcion - Ejecuta una tarea de transcripción manualmente
-     * @param {number} tareaId - ID de la tarea
-     * @returns {Object} Resultado de la operación
-     */
-    async function ejecutarTareaTranscripcion(tareaId) {
-        const token = localStorage.getItem('meca_token');
-        if (!token) {
-            throw new Error('⚠️ No hay sesión activa');
-        }
-        
-        // 🔴 USAR LA VARIABLE GLOBAL
-        const response = await fetch(`${API_TRANSCRIPCION_URL}/tareas/${tareaId}/ejecutar`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `Error HTTP ${response.status}`);
-        }
-        
-        return await response.json();
-    }
     
     // ======================================================
     // API PÚBLICA - Exportación de todos los métodos
@@ -3308,18 +2958,6 @@ const API = (function() {
         getEstructuraVersion,
         congelarVersionActual,
         activarVersion,
-
-        // ==============================================
-        // TRANSCRIPCIÓN (NUEVO)
-        // ==============================================
-        crearTareaTranscripcion,
-        ejecutarTareaTranscripcion,
-        listarTranscripciones,
-        obtenerTranscripcion,
-        obtenerEstadisticasTranscripcion,
-        subirAudio,
-        transcribirAudioEspecifico,
-        analizarTranscripcion,
         
         // Utilidad: cambiar modo de un módulo (para pruebas)
         setModo: (modulo, modo) => {

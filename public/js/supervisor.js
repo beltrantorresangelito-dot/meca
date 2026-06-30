@@ -94,6 +94,11 @@
     let mesFiltroGP = 'todos';  // 'todos' o formato 'YYYY-MM'
 
 // ======================================================
+// CONFIGURACIÓN DE API DE TRANSCRIPCIÓN
+// ======================================================
+const API_TRANSCRIPCION_URL = 'http://localhost:5001/api/transcripcion';
+
+// ======================================================
 // MATRICES DE EVALUACIÓN POR FECHA
 // ======================================================
 const MATRIZ_ANTIGUA = {
@@ -30377,6 +30382,12 @@ async function showTab(tabName, event) {
             if (typeof mostrarAdminToolsInformes === 'function') mostrarAdminToolsInformes();
         }
 
+        if (tabName === 'transcripcion') {
+            if (typeof cargarTranscripciones === 'function') {
+                cargarTranscripciones();
+            }
+        }
+
     } catch (error) {
         console.error(`❌ Error en acciones de pestaña ${tabName}:`, error);
     }
@@ -34300,6 +34311,470 @@ function formatDate(dateStr) {
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 }
 
+// ======================================================
+// VARIABLES DE PROGRESO
+// ======================================================
+
+let progresoActivo = false;
+let progresoInterval = null;
+let tareaEnProgreso = null;
+
+// ======================================================
+// FUNCIÓN: subirYTranscribirConProgreso
+// ======================================================
+
+async function subirYTranscribirConProgreso() {
+    const fileInput = document.getElementById('audioFileInput');
+    const status = document.getElementById('uploadStatus');
+    
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        alert('⚠️ Seleccione un archivo de audio');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    const crearTarea = document.getElementById('crearTareaAuto')?.checked !== false;
+    
+    // Mostrar barra de progreso
+    mostrarProgreso('📤 Subiendo audio...', 5);
+    agregarLogProgreso('📤 Iniciando subida del archivo: ' + file.name);
+    
+    try {
+        // ======================================================
+        // PASO 1: SUBIR AUDIO
+        // ======================================================
+        const formData = new FormData();
+        formData.append('audio', file);
+        formData.append('crear_tarea', crearTarea ? 'true' : 'false');
+        formData.append('creado_por', usuarioActual?.nombre_completo || 'MECA');
+        
+        const token = localStorage.getItem('meca_token');
+        
+        const uploadResponse = await fetch('http://localhost:5001/api/transcripcion/subir', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+        });
+        
+        const uploadData = await uploadResponse.json();
+        
+        if (!uploadData.success) {
+            throw new Error(uploadData.error || 'Error al subir archivo');
+        }
+        
+        agregarLogProgreso('✅ Audio subido: ' + uploadData.archivo);
+        actualizarProgreso('📝 Preparando transcripción...', 20);
+        
+        // ======================================================
+        // PASO 2: INICIAR TRANSCRIPCIÓN
+        // ======================================================
+        
+        if (uploadData.tarea_id) {
+            agregarLogProgreso('📋 Tarea creada con ID: ' + uploadData.tarea_id);
+            
+            // Verificar si la tarea ya tiene transcripciones previas
+            const transCheck = await fetch(`http://localhost:5001/api/transcripcion/listar?tarea_id=${uploadData.tarea_id}&limit=1`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const transCheckData = await transCheck.json();
+            
+            if (transCheckData.data && transCheckData.data.length > 0) {
+                const existente = transCheckData.data[0];
+                if (existente.estado === 'analizado') {
+                    agregarLogProgreso('✅ Ya existe una transcripción analizada para este audio');
+                    actualizarProgreso('✅ Transcripción ya completada', 100);
+                    setTimeout(() => {
+                        ocultarProgreso();
+                        cargarTranscripciones();
+                        if (status) {
+                            status.innerHTML = '<span style="color: var(--ok);">✅ Transcripción ya existente</span>';
+                        }
+                    }, 2000);
+                    return;
+                }
+            }
+            
+            // Iniciar la tarea
+            const ejecutarResponse = await fetch(`http://localhost:5001/api/transcripcion/tareas/${uploadData.tarea_id}/ejecutar`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const ejecutarData = await ejecutarResponse.json();
+            
+            if (!ejecutarData.success) {
+                throw new Error(ejecutarData.error || 'Error al iniciar tarea');
+            }
+            
+            agregarLogProgreso('🚀 Tarea iniciada');
+            tareaEnProgreso = uploadData.tarea_id;
+            
+            // ======================================================
+            // PASO 3: MONITOREAR PROGRESO
+            // ======================================================
+            actualizarProgreso('🔄 Transcribiendo audio...', 40);
+            await monitorearProgreso(uploadData.tarea_id);
+            
+        } else {
+            // Si no hay tarea, transcribir directamente
+            agregarLogProgreso('🎤 Transcribiendo directamente...');
+            actualizarProgreso('🎤 Transcribiendo audio...', 40);
+            
+            const transcribeResponse = await fetch('http://localhost:5001/api/transcripcion/transcribir', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    audio_path: uploadData.ruta,
+                    modelo: 'small',
+                    idioma: 'Spanish',
+                    analizar_con_ollama: true
+                })
+            });
+            
+            const transcribeData = await transcribeResponse.json();
+            
+            if (!transcribeData.success) {
+                throw new Error(transcribeData.error || 'Error en transcripción');
+            }
+            
+            agregarLogProgreso('✅ Transcripción completada');
+            actualizarProgreso('✅ Transcripción completada', 100);
+        }
+        
+        // ======================================================
+        // COMPLETADO
+        // ======================================================
+        agregarLogProgreso('✅ Proceso completado exitosamente');
+        actualizarProgreso('✅ Transcripción completada', 100);
+        
+        setTimeout(() => {
+            ocultarProgreso();
+            cargarTranscripciones();
+            if (status) {
+                status.innerHTML = '<span style="color: var(--ok);">✅ Transcripción completada exitosamente</span>';
+            }
+        }, 3000);
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        agregarLogProgreso('❌ Error: ' + error.message);
+        actualizarProgreso('❌ Error: ' + error.message, 0, true);
+        
+        if (status) {
+            status.innerHTML = `<span style="color: var(--danger);">❌ ${error.message}</span>`;
+        }
+        
+        setTimeout(ocultarProgreso, 5000);
+    }
+}
+
+// ======================================================
+// FUNCIÓN: MONITOREAR PROGRESO
+// ======================================================
+
+async function monitorearProgreso(tareaId) {
+    const token = localStorage.getItem('meca_token');
+    let intentos = 0;
+    const maxIntentos = 300; // 5 minutos (cada 1 segundo)
+    let transcripcionCompletada = false;
+    let ultimoEstado = '';
+    
+    return new Promise((resolve, reject) => {
+        if (progresoInterval) {
+            clearInterval(progresoInterval);
+        }
+        
+        progresoInterval = setInterval(async () => {
+            intentos++;
+            
+            try {
+                // ======================================================
+                // 1. VERIFICAR TRANSCRIPCIONES COMPLETADAS (LO MÁS IMPORTANTE)
+                // ======================================================
+                const transResponse = await fetch(`http://localhost:5001/api/transcripcion/listar?tarea_id=${tareaId}&limit=5`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (transResponse.ok) {
+                    const transData = await transResponse.json();
+                    
+                    if (transData.data && transData.data.length > 0) {
+                        // Buscar la transcripción más reciente de esta tarea
+                        const trans = transData.data[0];
+                        
+                        // ✅ CASO 1: Transcripción ya analizada (completa)
+                        if (trans.estado === 'analizado') {
+                            if (!transcripcionCompletada) {
+                                agregarLogProgreso(`🧠 Análisis completado - Calificación: ${trans.calificacion || 0}%`);
+                                actualizarProgreso('✅ Transcripción y análisis completados', 100);
+                                transcripcionCompletada = true;
+                                clearInterval(progresoInterval);
+                                resolve();
+                                return;
+                            }
+                        }
+                        
+                        // 📝 CASO 2: Transcripción transcrita pero no analizada
+                        if (trans.estado === 'transcrito' && !transcripcionCompletada) {
+                            if (ultimoEstado !== 'transcrito') {
+                                agregarLogProgreso('📝 Transcripción completada. Iniciando análisis con Ollama...');
+                                actualizarProgreso('🧠 Analizando con Ollama...', 85);
+                                ultimoEstado = 'transcrito';
+                            }
+                        }
+                        
+                        // ⏳ CASO 3: En proceso (transcribiendo)
+                        if (trans.estado === 'en_proceso' && !transcripcionCompletada) {
+                            if (ultimoEstado !== 'en_proceso') {
+                                agregarLogProgreso('🔄 Transcribiendo audio...');
+                                actualizarProgreso('🔄 Transcribiendo audio...', 60);
+                                ultimoEstado = 'en_proceso';
+                            }
+                        }
+                    }
+                }
+                
+                // ======================================================
+                // 2. VERIFICAR EL ESTADO DE LA TAREA (LOGS DE EJECUCIÓN)
+                // ======================================================
+                const estadoResponse = await fetch(`http://localhost:5001/api/transcripcion/estado/${tareaId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (estadoResponse.ok) {
+                    const estadoData = await estadoResponse.json();
+                    
+                    // Si la tarea está en error
+                    if (estadoData.estado === 'error') {
+                        agregarLogProgreso('❌ Error en la transcripción: ' + (estadoData.error || 'Error desconocido'));
+                        actualizarProgreso('❌ Error en la transcripción', 0, true);
+                        clearInterval(progresoInterval);
+                        reject(new Error(estadoData.error || 'Error en la transcripción'));
+                        return;
+                    }
+                    
+                    // Si la tarea está completada pero no hay transcripción (caso borde)
+                    if (estadoData.estado === 'completado' && !transcripcionCompletada) {
+                        // Esperar un poco más por si la transcripción está por llegar
+                        if (intentos > 10) {
+                            agregarLogProgreso('⚠️ La tarea se completó pero no se encontró transcripción');
+                            actualizarProgreso('⚠️ Verificando transcripción...', 95);
+                        }
+                    }
+                }
+                
+                // ======================================================
+                // 3. TIMEOUT
+                // ======================================================
+                if (intentos >= maxIntentos) {
+                    clearInterval(progresoInterval);
+                    if (transcripcionCompletada) {
+                        resolve();
+                    } else {
+                        agregarLogProgreso('⏰ Tiempo de espera agotado');
+                        actualizarProgreso('⏰ Tiempo de espera agotado', 95);
+                        resolve(); // No rechazamos, solo terminamos
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error monitoreando:', error);
+                if (intentos > 10) {
+                    agregarLogProgreso('⚠️ Error monitoreando: ' + error.message);
+                }
+            }
+        }, 1000);
+    });
+}
+
+// ======================================================
+// FUNCIONES DE UI PARA PROGRESO
+// ======================================================
+
+function mostrarProgreso(mensaje, porcentaje) {
+    const container = document.getElementById('progressContainer');
+    const minimizado = document.getElementById('progressMinimizado');
+    
+    if (container) {
+        container.style.display = 'block';
+    }
+    if (minimizado) {
+        minimizado.style.display = 'none';
+    }
+    
+    progresoActivo = true;
+    actualizarProgreso(mensaje, porcentaje);
+    
+    // Limpiar logs anteriores
+    const logsContainer = document.getElementById('progressLogs');
+    if (logsContainer) {
+        logsContainer.innerHTML = '';
+    }
+}
+
+function actualizarProgreso(mensaje, porcentaje, esError = false) {
+    const status = document.getElementById('progressStatus');
+    const bar = document.getElementById('progressBar');
+    const text = document.getElementById('progressText');
+    const pct = document.getElementById('progressPercentage');
+    
+    if (status) {
+        status.textContent = mensaje;
+        if (esError) {
+            status.style.color = 'var(--danger)';
+        } else {
+            status.style.color = '';
+        }
+    }
+    
+    const pctValue = Math.min(100, Math.max(0, porcentaje || 0));
+    
+    if (bar) {
+        bar.style.width = pctValue + '%';
+        if (esError) {
+            bar.style.background = 'linear-gradient(90deg, #d93025, #b71c1c)';
+        } else if (pctValue >= 90) {
+            bar.style.background = 'linear-gradient(90deg, #28a745, #20c997)';
+        } else {
+            bar.style.background = 'linear-gradient(90deg, #019DF4, #00B4F0)';
+        }
+    }
+    
+    if (text) {
+        text.textContent = Math.round(pctValue) + '%';
+    }
+    
+    if (pct) {
+        pct.textContent = Math.round(pctValue) + '%';
+    }
+}
+
+function agregarLogProgreso(mensaje) {
+    const container = document.getElementById('progressLogs');
+    if (!container) return;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    const div = document.createElement('div');
+    div.className = 'log-entry';
+    
+    // Determinar icono y color según el mensaje
+    let color = '#333';
+    let icono = 'ℹ️';
+    
+    if (mensaje.includes('✅') || mensaje.includes('completada') || mensaje.includes('exitosa') || mensaje.includes('Completado')) {
+        color = '#28a745';
+        icono = '✅';
+    } else if (mensaje.includes('❌') || mensaje.includes('Error') || mensaje.includes('error')) {
+        color = '#d93025';
+        icono = '❌';
+    } else if (mensaje.includes('⏳') || mensaje.includes('🔄') || mensaje.includes('📤') || mensaje.includes('Iniciando')) {
+        color = '#019DF4';
+        icono = '⏳';
+    } else if (mensaje.includes('🧠') || mensaje.includes('Analizando') || mensaje.includes('Ollama')) {
+        color = '#7b1fa2';
+        icono = '🧠';
+    } else if (mensaje.includes('📋') || mensaje.includes('Tarea') || mensaje.includes('tarea')) {
+        color = '#f39c12';
+        icono = '📋';
+    } else if (mensaje.includes('🎤') || mensaje.includes('Transcribiendo') || mensaje.includes('transcribiendo')) {
+        color = '#fd7e14';
+        icono = '🎤';
+    }
+    
+    // Limpiar emojis para el texto
+    let textoLimpio = mensaje;
+    const emojis = ['✅', '❌', '⏳', '🔄', '📤', '🧠', '📋', '🚀', '🎤', '📝', '⚠️', '⏰'];
+    emojis.forEach(emoji => {
+        textoLimpio = textoLimpio.replace(emoji, '').trim();
+    });
+    
+    div.innerHTML = `
+        <span style="color: #6c757d; font-size: 10px;">[${timestamp}]</span>
+        <span style="color: ${color};">${icono} ${textoLimpio}</span>
+    `;
+    
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    
+    // Limitar logs a 50
+    while (container.children.length > 50) {
+        container.removeChild(container.firstChild);
+    }
+}
+
+function ocultarProgreso() {
+    const container = document.getElementById('progressContainer');
+    const minimizado = document.getElementById('progressMinimizado');
+    
+    if (container) {
+        container.style.display = 'none';
+    }
+    if (minimizado) {
+        minimizado.style.display = 'none';
+    }
+    
+    progresoActivo = false;
+    if (progresoInterval) {
+        clearInterval(progresoInterval);
+        progresoInterval = null;
+    }
+}
+
+function cancelarTranscripcion() {
+    if (confirm('⚠️ ¿Cancelar la transcripción en curso?')) {
+        ocultarProgreso();
+        agregarLogProgreso('⏹️ Transcripción cancelada por el usuario');
+        // Aquí podrías agregar lógica para cancelar la tarea en la BD
+    }
+}
+
+// ======================================================
+// FUNCIONES DE MINIMIZAR/EXPANDIR
+// ======================================================
+
+function minimizarProgreso() {
+    const container = document.getElementById('progressContainer');
+    const minimizado = document.getElementById('progressMinimizado');
+    
+    if (container) {
+        container.style.display = 'none';
+    }
+    if (minimizado) {
+        minimizado.style.display = 'flex';
+        // Actualizar el ícono con el progreso actual
+        const bar = document.getElementById('progressBar');
+        const pct = bar ? parseInt(bar.style.width) || 0 : 0;
+        const icon = document.getElementById('progressMinimizadoIcon');
+        if (icon) {
+            if (pct >= 100) {
+                icon.textContent = '✅';
+            } else if (pct >= 50) {
+                icon.textContent = '🔄';
+            } else {
+                icon.textContent = '📊';
+            }
+        }
+    }
+}
+
+function expandirProgreso() {
+    const container = document.getElementById('progressContainer');
+    const minimizado = document.getElementById('progressMinimizado');
+    
+    if (container) {
+        container.style.display = 'block';
+    }
+    if (minimizado) {
+        minimizado.style.display = 'none';
+    }
+}
+
 // ========== ESTILOS CSS DINÁMICOS ==========
 function agregarEstilosMatriz() {
     if (document.getElementById('matriz-styles')) return;
@@ -35410,9 +35885,662 @@ async function inicializarReglasAdmin() {
     
     await cargarReglasAdministracion();
 }
-    
 
     // ====================== CIERRE BLOQUE 15 =============================================
+
+// ======================================================
+// MÓDULO: Transcripción - Panel MECA
+// ======================================================
+
+let transcripcionesData = [];
+
+/**
+ * cargarTranscripciones - Carga la lista de transcripciones
+ */
+async function cargarTranscripciones() {
+    const tbody = document.getElementById('tablaTranscripciones');
+    if (!tbody) return;
+    
+    const busqueda = document.getElementById('buscarTranscripcion')?.value || '';
+    const estado = document.getElementById('filtroEstadoTranscripcion')?.value || '';
+    
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">⏳ Cargando...</td></tr>';
+    
+    try {
+        const result = await API.listarTranscripciones({ estado, limit: 50 });
+        
+        console.log('📊 Resultado completo:', result); // 🔴 LOG PARA DEPURACIÓN
+        
+        if (!result.success) {
+            console.error('❌ Error en la respuesta:', result);
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ ${result.error || 'Error desconocido'}</td></tr>`;
+            return;
+        }
+        
+        // 🔴 VERIFICAR LA ESTRUCTURA DE LOS DATOS
+        const transcripciones = result.data || [];
+        console.log('📊 Transcripciones:', transcripciones);
+        
+        if (transcripciones.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--muted);">📭 No hay transcripciones</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        for (const t of transcripciones) {
+            const fecha = t.fecha_transcripcion ? new Date(t.fecha_transcripcion).toLocaleString('es-ES') : '-';
+            
+            let estadoBadge = '';
+            if (t.estado === 'analizado') {
+                estadoBadge = '<span class="badge" style="background: var(--ok);">✅ Analizado</span>';
+            } else if (t.estado === 'transcrito') {
+                estadoBadge = '<span class="badge" style="background: var(--warning);">📝 Transcrito</span>';
+            } else if (t.estado === 'error') {
+                estadoBadge = '<span class="badge" style="background: var(--danger);">❌ Error</span>';
+            } else {
+                estadoBadge = `<span class="badge" style="background: #6c757d;">${t.estado}</span>`;
+            }
+            
+            let calificacionHtml = '-';
+            if (t.calificacion !== null && t.calificacion !== undefined) {
+                const color = t.calificacion >= 90 ? '#28a745' : (t.calificacion >= 70 ? '#f39c12' : '#d93025');
+                calificacionHtml = `<span style="color: ${color}; font-weight: bold;">${t.calificacion}%</span>`;
+            }
+            
+            const nombreMostrar = t.audio_nombre || 'Sin nombre';
+            
+            html += `
+                <tr>
+                    <td style="padding: 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.audio_nombre || '')}">
+                        <strong>${escapeHtml(nombreMostrar)}</strong>
+                    </td>
+                    <td style="padding: 8px; text-align: center; font-size: 12px;">${fecha}</td>
+                    <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
+                    <td style="padding: 8px; text-align: center; font-size: 16px; font-weight: bold;">${calificacionHtml}</td>
+                    <td style="padding: 8px; text-align: center; font-size: 12px;">${escapeHtml(t.nombre_tarea || '-')}</td>
+                    <td style="padding: 8px; text-align: center; white-space: nowrap;">
+                        <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center;">
+                            <button onclick="verTranscripcionCompleta(${t.id})" 
+                                    style="background: #019DF4; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
+                                    title="Ver transcripción completa">
+                                📄
+                            </button>
+                            <button onclick="verAnalisisOllama(${t.id})" 
+                                    style="background: #7b1fa2; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
+                                    title="Ver análisis de Ollama">
+                                🧠
+                            </button>
+                            ${t.estado === 'transcrito' ? `
+                                <button onclick="analizarTranscripcionMECA(${t.id})" 
+                                        style="background: #f39c12; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
+                                        title="Analizar con Ollama">
+                                    🔄
+                                </button>
+                            ` : ''}
+                            <button onclick="eliminarTranscripcion(${t.id}, '${escapeHtml(t.audio_nombre || '')}')" 
+                                    style="background: #d93025; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
+                                    title="Eliminar transcripción">
+                                🗑️
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        tbody.innerHTML = html;
+        
+        // Actualizar KPIs
+        await actualizarKPIsTranscripcion();
+        
+    } catch (error) {
+        console.error('❌ Error cargando transcripciones:', error);
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+    }
+}
+
+// ======================================================
+// 1. VER TRANSCRIPCIÓN COMPLETA
+// ======================================================
+
+async function verTranscripcionCompleta(id) {
+    console.log('📄 verTranscripcionCompleta - ID:', id);
+    
+    try {
+        const result = await API.obtenerTranscripcion(id);
+        console.log('📊 Resultado:', result);
+        
+        if (!result.success || !result.data) {
+            alert('❌ No se pudo obtener la transcripción');
+            return;
+        }
+        
+        const data = result.data;
+        
+        // Crear modal
+        const modalHtml = `
+            <div id="modalTranscripcionCompleta" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100050; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                <div style="background: white; border-radius: 16px; width: 95%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                    <!-- Header -->
+                    <div style="padding: 15px 20px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                        <div>
+                            <strong style="font-size: 16px;">📄 Transcripción Completa</strong>
+                            <div style="font-size: 12px; opacity: 0.8; margin-top: 2px;">${escapeHtml(data.audio_nombre || 'Sin nombre')}</div>
+                        </div>
+                        <button onclick="cerrarModalTranscripcion()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                    </div>
+                    
+                    <!-- Body -->
+                    <div style="padding: 20px; overflow-y: auto; flex: 1; background: #f8fafc;">
+                        <div style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+                            <div><strong>📅 Fecha:</strong> ${data.fecha_transcripcion || 'N/A'}</div>
+                            <div><strong>📊 Estado:</strong> ${data.estado || 'N/A'}</div>
+                            <div><strong>🎯 Calificación:</strong> ${data.calificacion !== null ? data.calificacion + '%' : 'Pendiente'}</div>
+                            <div><strong>📋 Tarea:</strong> ${data.nombre_tarea || 'Manual'}</div>
+                        </div>
+                        
+                        <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e0e0e0;">
+                            <div style="font-weight: 600; margin-bottom: 10px; color: #333;">📝 Texto de la transcripción:</div>
+                            <div style="font-size: 14px; line-height: 1.8; white-space: pre-wrap; max-height: 400px; overflow-y: auto; padding: 10px; background: #fafafa; border-radius: 8px; font-family: inherit;">
+                                ${escapeHtml(data.transcripcion || 'Sin transcripción')}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
+                        <button onclick="copiarTranscripcion(${id})" style="background: var(--accent); padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                            📋 Copiar texto
+                        </button>
+                        <button onclick="cerrarModalTranscripcion()" style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Eliminar modal existente
+        const existing = document.getElementById('modalTranscripcionCompleta');
+        if (existing) existing.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al cargar la transcripción: ' + error.message);
+    }
+}
+
+// ======================================================
+// 2. CERRAR MODAL DE TRANSCRIPCIÓN
+// ======================================================
+
+function cerrarModalTranscripcion() {
+    const modal = document.getElementById('modalTranscripcionCompleta');
+    if (modal) modal.remove();
+}
+
+// ======================================================
+// 3. COPIAR TRANSCRIPCIÓN
+// ======================================================
+
+async function copiarTranscripcion(id) {
+    try {
+        const result = await API.obtenerTranscripcion(id);
+        if (result.success && result.data && result.data.transcripcion) {
+            await navigator.clipboard.writeText(result.data.transcripcion);
+            alert('✅ Transcripción copiada al portapapeles');
+        }
+    } catch (error) {
+        alert('❌ Error al copiar: ' + error.message);
+    }
+}
+
+// ======================================================
+// 4. VER ANÁLISIS DE OLLAMA
+// ======================================================
+
+async function verAnalisisOllama(id) {
+    console.log('🧠 verAnalisisOllama - ID:', id);
+    
+    try {
+        const result = await API.obtenerTranscripcion(id);
+        
+        if (!result.success || !result.data) {
+            alert('❌ No se pudo obtener el análisis');
+            return;
+        }
+        
+        const data = result.data;
+        
+        if (!data.analisis_ollama) {
+            alert('⚠️ Esta transcripción aún no tiene análisis de Ollama.\n\nUse el botón 🔄 para analizarla.');
+            return;
+        }
+        
+        // Parsear el análisis
+        let analisis = data.analisis_ollama;
+        if (typeof analisis === 'string') {
+            try {
+                analisis = JSON.parse(analisis);
+            } catch (e) {
+                // Si no se puede parsear, mostrar como texto
+            }
+        }
+        
+        // Crear modal
+        const modalHtml = `
+            <div id="modalAnalisisOllama" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100050; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                <div style="background: white; border-radius: 16px; width: 95%; max-width: 750px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                    <!-- Header -->
+                    <div style="padding: 15px 20px; background: linear-gradient(135deg, #7b1fa2, #9c27b0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                        <div>
+                            <strong style="font-size: 16px;">🧠 Análisis con Ollama</strong>
+                            <div style="font-size: 12px; opacity: 0.8; margin-top: 2px;">${escapeHtml(data.audio_nombre || 'Sin nombre')}</div>
+                        </div>
+                        <button onclick="cerrarModalAnalisis()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                    </div>
+                    
+                    <!-- Body -->
+                    <div style="padding: 20px; overflow-y: auto; flex: 1; background: #f8fafc;">
+                        <!-- Resumen -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                            <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
+                                <div style="font-size: 11px; color: #6c757d;">Calificación</div>
+                                <div style="font-size: 24px; font-weight: bold; color: ${analisis.calificacion >= 90 ? '#28a745' : (analisis.calificacion >= 70 ? '#f39c12' : '#d93025')};">${analisis.calificacion || 0}%</div>
+                            </div>
+                            <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
+                                <div style="font-size: 11px; color: #6c757d;">Sentimiento Cliente</div>
+                                <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">${analisis.sentimiento_cliente || 'neutral'}</div>
+                            </div>
+                            <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
+                                <div style="font-size: 11px; color: #6c757d;">Sentimiento Gestor</div>
+                                <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">${analisis.sentimiento_gestor || 'neutral'}</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Justificación -->
+                        ${analisis.justificacion ? `
+                            <div style="background: white; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid #e0e0e0;">
+                                <div style="font-weight: 600; margin-bottom: 8px; color: #333;">📝 Justificación</div>
+                                <div style="font-size: 14px; line-height: 1.6;">${escapeHtml(analisis.justificacion)}</div>
+                            </div>
+                        ` : ''}
+                        
+                        <!-- Protocolos cumplidos -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div style="background: white; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0;">
+                                <div style="font-weight: 600; margin-bottom: 10px; color: #28a745;">✅ Protocolos cumplidos</div>
+                                ${analisis.protocolos_cumplidos && analisis.protocolos_cumplidos.length > 0 ? 
+                                    analisis.protocolos_cumplidos.map(p => 
+                                        `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0;">✓ ${escapeHtml(p)}</div>`
+                                    ).join('') : 
+                                    '<div style="color: #6c757d; font-size: 13px;">No hay protocolos cumplidos</div>'
+                                }
+                            </div>
+                            <div style="background: white; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0;">
+                                <div style="font-weight: 600; margin-bottom: 10px; color: #d93025;">❌ Protocolos incumplidos</div>
+                                ${analisis.protocolos_incumplidos && analisis.protocolos_incumplidos.length > 0 ? 
+                                    analisis.protocolos_incumplidos.map(p => 
+                                        `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0;">✗ ${escapeHtml(p)}</div>`
+                                    ).join('') : 
+                                    '<div style="color: #6c757d; font-size: 13px;">No hay protocolos incumplidos</div>'
+                                }
+                            </div>
+                        </div>
+                        
+                        <!-- Recomendaciones -->
+                        ${analisis.recomendaciones && analisis.recomendaciones.length > 0 ? `
+                            <div style="background: #fff8e0; border-radius: 10px; padding: 15px; margin-top: 15px; border: 1px solid #f39c12;">
+                                <div style="font-weight: 600; margin-bottom: 8px; color: #f39c12;">💡 Recomendaciones</div>
+                                ${analisis.recomendaciones.map(r => 
+                                    `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0e6d0;">• ${escapeHtml(r)}</div>`
+                                ).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
+                        <button onclick="copiarAnalisisOllama(${id})" style="background: #7b1fa2; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                            📋 Copiar análisis
+                        </button>
+                        <button onclick="cerrarModalAnalisis()" style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Eliminar modal existente
+        const existing = document.getElementById('modalAnalisisOllama');
+        if (existing) existing.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al cargar el análisis: ' + error.message);
+    }
+}
+
+// ======================================================
+// 5. CERRAR MODAL DE ANÁLISIS
+// ======================================================
+
+function cerrarModalAnalisis() {
+    const modal = document.getElementById('modalAnalisisOllama');
+    if (modal) modal.remove();
+}
+
+// ======================================================
+// 6. COPIAR ANÁLISIS DE OLLAMA
+// ======================================================
+
+async function copiarAnalisisOllama(id) {
+    try {
+        const result = await API.obtenerTranscripcion(id);
+        if (result.success && result.data && result.data.analisis_ollama) {
+            let analisis = result.data.analisis_ollama;
+            if (typeof analisis === 'string') {
+                analisis = JSON.parse(analisis);
+            }
+            const texto = JSON.stringify(analisis, null, 2);
+            await navigator.clipboard.writeText(texto);
+            alert('✅ Análisis copiado al portapapeles');
+        }
+    } catch (error) {
+        alert('❌ Error al copiar: ' + error.message);
+    }
+}
+
+// ======================================================
+// 7. ELIMINAR TRANSCRIPCIÓN
+// ======================================================
+
+async function eliminarTranscripcion(id, nombre) {
+    console.log('🗑️ eliminarTranscripcion - ID:', id);
+    
+    // Confirmación con información detallada
+    const confirmar = confirm(
+        `⚠️ ¿ELIMINAR TRANSCRIPCIÓN?\n\n` +
+        `📄 Archivo: ${nombre || 'Sin nombre'}\n` +
+        `🆔 ID: ${id}\n\n` +
+        `Esta acción eliminará:\n` +
+        `   • La transcripción\n` +
+        `   • El análisis de Ollama (si existe)\n` +
+        `   • El registro de la base de datos\n\n` +
+        `⚠️ Esta acción NO se puede deshacer.\n\n` +
+        `¿Está seguro de continuar?`
+    );
+    
+    if (!confirmar) return;
+    
+    // Confirmación adicional con código
+    const codigo = prompt('Para confirmar, escribe "ELIMINAR" en mayúsculas:');
+    if (codigo !== 'ELIMINAR') {
+        alert('❌ Operación cancelada.');
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        
+        // Eliminar la transcripción
+        const response = await fetch(`http://localhost:5001/api/transcripcion/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Error al eliminar');
+        }
+        
+        alert(`✅ Transcripción eliminada correctamente\n\n📄 ${nombre || 'Sin nombre'}`);
+        
+        // Recargar la tabla
+        cargarTranscripciones();
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al eliminar: ' + error.message);
+    }
+}
+
+// ======================================================
+// 8. ANALIZAR TRANSCRIPCIÓN (Reintentar)
+// ======================================================
+
+async function analizarTranscripcionMECA(id) {
+    console.log('🔄 analizarTranscripcionMECA - ID:', id);
+    
+    if (!confirm(`🧠 ¿Reintentar análisis con Ollama para la transcripción ID ${id}?`)) return;
+    
+    try {
+        const result = await API.analizarTranscripcion(id);
+        
+        if (result.success) {
+            alert(`✅ Análisis completado\n\n📊 Calificación: ${result.analisis?.calificacion || 0}%`);
+            cargarTranscripciones();
+        } else {
+            alert(`❌ Error: ${result.error || 'No se pudo analizar'}`);
+        }
+    } catch (error) {
+        alert(`❌ Error: ${error.message}`);
+    }
+}
+
+
+/**
+ * actualizarKPIsTranscripcion - Actualiza los KPIs del dashboard
+ */
+async function actualizarKPIsTranscripcion() {
+    try {
+        const result = await API.obtenerEstadisticasTranscripcion();
+        
+        if (!result.success) return;
+        
+        const data = result.data;
+        document.getElementById('kpiTotalTranscripciones').textContent = data.total || 0;
+        document.getElementById('kpiHoyTranscripciones').textContent = data.hoy || 0;
+        document.getElementById('kpiCalificadasTranscripciones').textContent = data.calificadas || 0;
+        document.getElementById('kpiPromedioTranscripciones').textContent = (data.promedio || 0) + '%';
+        
+    } catch (error) {
+        console.error('Error actualizando KPIs:', error);
+    }
+}
+
+/**
+ * subirAudioDesdeMECA - Sube un audio desde la interfaz
+ */
+async function subirAudioDesdeMECA() {
+    const fileInput = document.getElementById('audioFileInput');
+    const status = document.getElementById('uploadStatus');
+    
+    if (!fileInput.files || fileInput.files.length === 0) {
+        status.innerHTML = '<span style="color: var(--danger);">⚠️ Seleccione un archivo de audio</span>';
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    const crearTarea = document.getElementById('crearTareaAuto').checked;
+    
+    status.innerHTML = '<span style="color: var(--accent);">⏳ Subiendo archivo...</span>';
+    
+    try {
+        const result = await API.subirAudio(file, { crearTarea });
+        
+        if (result.success) {
+            status.innerHTML = `<span style="color: var(--ok);">✅ Audio subido: ${result.archivo}</span>`;
+            fileInput.value = '';
+            
+            // Si se creó tarea, mostrar ID
+            if (result.tarea_id) {
+                status.innerHTML += `<br><span style="color: var(--accent);">📋 Tarea creada: ID ${result.tarea_id}</span>`;
+            }
+            
+            // Recargar lista
+            setTimeout(cargarTranscripciones, 1000);
+        } else {
+            status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${result.error}</span>`;
+        }
+    } catch (error) {
+        status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${error.message}</span>`;
+    }
+}
+
+/**
+ * programarTareaTranscripcion - Programa una tarea desde la interfaz
+ */
+async function programarTareaTranscripcion() {
+    const nombre = document.getElementById('tareaNombre').value.trim();
+    const frecuencia = document.getElementById('tareaFrecuencia').value;
+    const hora = document.getElementById('tareaHora').value;
+    const modelo = document.getElementById('tareaModelo').value;
+    const analizar = document.getElementById('tareaAnalizarOllama').checked;
+    const status = document.getElementById('tareaStatus');
+    
+    if (!nombre) {
+        status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese un nombre para la tarea</span>';
+        return;
+    }
+    
+    status.innerHTML = '<span style="color: var(--accent);">⏳ Creando tarea...</span>';
+    
+    try {
+        const result = await API.crearTareaTranscripcion({
+            nombre,
+            frecuencia,
+            hora_ejecucion: hora,
+            modelo_whisper: modelo,
+            analizar_con_ollama: analizar,
+            creado_por: 'MECA'
+        });
+        
+        if (result.success) {
+            status.innerHTML = `<span style="color: var(--ok);">✅ Tarea creada: ID ${result.id}</span>`;
+            document.getElementById('tareaNombre').value = '';
+            
+            // Recargar lista
+            setTimeout(cargarTranscripciones, 1000);
+        } else {
+            status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${result.error}</span>`;
+        }
+    } catch (error) {
+        status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${error.message}</span>`;
+    }
+}
+
+/**
+ * verTranscripcion - Muestra el detalle completo de una transcripción
+ */
+async function verTranscripcion(id) {
+    try {
+        const result = await API.obtenerTranscripcion(id);
+        
+        if (!result.success || !result.data) {
+            alert('❌ No se pudo obtener la transcripción');
+            return;
+        }
+        
+        const data = result.data;
+        
+        let mensaje = `📋 TRANSCRIPCIÓN COMPLETA\n`;
+        mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        mensaje += `📄 Archivo: ${data.audio_nombre || 'Sin nombre'}\n`;
+        mensaje += `📅 Fecha: ${data.fecha_transcripcion || 'N/A'}\n`;
+        mensaje += `📊 Estado: ${data.estado || 'N/A'}\n`;
+        mensaje += `🎯 Calificación: ${data.calificacion !== null ? data.calificacion + '%' : 'Pendiente'}\n`;
+        mensaje += `📋 Tarea: ${data.nombre_tarea || 'Manual'}\n\n`;
+        
+        mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        mensaje += `📝 TRANSCRIPCIÓN:\n`;
+        mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        mensaje += `${data.transcripcion || 'Sin transcripción'}\n\n`;
+        
+        if (data.analisis_ollama) {
+            const analisis = typeof data.analisis_ollama === 'string' 
+                ? JSON.parse(data.analisis_ollama) 
+                : data.analisis_ollama;
+            
+            mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            mensaje += `🧠 ANÁLISIS CON OLLAMA\n`;
+            mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+            mensaje += `📊 Calificación: ${analisis.calificacion || 0}%\n`;
+            mensaje += `📌 Justificación: ${analisis.justificacion || 'N/A'}\n\n`;
+            
+            if (analisis.protocolos_cumplidos && analisis.protocolos_cumplidos.length > 0) {
+                mensaje += `✅ Protocolos cumplidos:\n`;
+                analisis.protocolos_cumplidos.forEach(p => {
+                    mensaje += `   • ${p}\n`;
+                });
+                mensaje += `\n`;
+            }
+            
+            if (analisis.protocolos_incumplidos && analisis.protocolos_incumplidos.length > 0) {
+                mensaje += `❌ Protocolos incumplidos:\n`;
+                analisis.protocolos_incumplidos.forEach(p => {
+                    mensaje += `   • ${p}\n`;
+                });
+                mensaje += `\n`;
+            }
+            
+            if (analisis.recomendaciones && analisis.recomendaciones.length > 0) {
+                mensaje += `💡 Recomendaciones:\n`;
+                analisis.recomendaciones.forEach(r => {
+                    mensaje += `   • ${r}\n`;
+                });
+            }
+        }
+        
+        if (data.error) {
+            mensaje += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            mensaje += `❌ ERROR:\n${data.error}\n`;
+        }
+        
+        alert(mensaje);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert(`❌ Error: ${error.message}`);
+    }
+}
+
+/**
+ * analizarTranscripcionMECA - Reintenta el análisis de una transcripción
+ */
+async function analizarTranscripcionMECA(id) {
+    if (!confirm(`🧠 ¿Reintentar análisis con Ollama para la transcripción ID ${id}?`)) return;
+    
+    try {
+        const result = await API.analizarTranscripcion(id);
+        
+        if (result.success) {
+            alert(`✅ Análisis completado\n\n📊 Calificación: ${result.analisis?.calificacion || 0}%`);
+            cargarTranscripciones();
+        } else {
+            alert(`❌ Error: ${result.error || 'No se pudo analizar'}`);
+        }
+    } catch (error) {
+        alert(`❌ Error: ${error.message}`);
+    }
+}
+
+// Cargar al abrir la pestaña
+document.addEventListener('showTab', function(e) {
+    if (e.detail && e.detail.tabName === 'transcripcion') {
+        cargarTranscripciones();
+    }
+});
+
 
 // ======================================================
 // FUNCIÓN PARA ACTUALIZAR HEADER CON DATOS DEL USUARIO
