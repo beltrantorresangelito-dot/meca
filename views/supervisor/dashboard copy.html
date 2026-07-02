@@ -2661,7 +2661,7 @@
         </div>
 
         <!-- ====================================================== -->
-        <!-- PESTAÑA: TRANSCRIPCIÓN (SECCIÓN COMPLETA)              -->
+        <!-- PESTAÑA: TRANSCRIPCIÓN (NUEVA)                          -->
         <!-- ====================================================== -->
         <div id="tab-transcripcion" class="tab-pane">
             <div class="card">
@@ -2690,14 +2690,13 @@
                     </div>
                 </div>
                 
-                <!-- ===== SUBIR AUDIO Y PROGRAMAR TAREA ===== -->
+                <!-- ===== SUBIR AUDIO ===== -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                    
-                    <!-- ===== COLUMNA 1: SUBIR AUDIO ===== -->
+                    <!-- Subir audio -->
                     <div class="card" style="padding: 20px;">
                         <h4>📤 Subir Audio</h4>
-                        <input type="file" id="audioFileInput" accept=".mp3,.wav,.m4a,.flac,.aac,.ogg" style="margin: 10px 0; width: 100%;">
-                        <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                        <input type="file" id="audioFileInput" accept=".mp3,.wav,.m4a,.flac,.aac,.ogg" style="margin: 10px 0;">
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
                             <label>
                                 <input type="checkbox" id="crearTareaAuto" checked>
                                 Crear tarea automática
@@ -2709,122 +2708,29 @@
                         <div id="uploadStatus" style="margin-top: 10px; font-size: 13px;"></div>
                     </div>
                     
-                    <!-- ===== COLUMNA 2: PROGRAMAR TAREA ===== -->
+                    <!-- Programar tarea -->
                     <div class="card" style="padding: 20px;">
                         <h4>📋 Programar Tarea</h4>
                         <div style="display: flex; flex-direction: column; gap: 10px;">
                             <input type="text" id="tareaNombre" placeholder="Nombre de la tarea" style="padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                            
-                            <!-- ===== ORIGEN DE AUDIOS ===== -->
-                            <div>
-                                <label style="font-size: 12px; font-weight: 600;">📁 Origen de los audios</label>
-                                <select id="tareaTipoOrigen" onchange="toggleOrigenConfig()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                    <option value="local">📂 Carpeta Local</option>
-                                    <option value="sftp">🌐 SFTP</option>
-                                    <option value="sharepoint">📁 SharePoint Online</option>
-                                </select>
-                            </div>
-                            
-                            <!-- ===== CONFIGURACIÓN LOCAL ===== -->
-                            <div id="configLocal">
-                                <label style="font-size: 12px; font-weight: 600;">📂 Carpeta de origen</label>
-                                <input type="text" id="tareaCarpetaOrigen" value="C:\MECA_ML\audios" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                            </div>
-                            
-                            <!-- ===== CONFIGURACIÓN SFTP ===== -->
-                            <div id="configSftp" style="display: none;">
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                    <div>
-                                        <label style="font-size: 12px; font-weight: 600;">🌐 Host</label>
-                                        <input type="text" id="tareaSftpHost" placeholder="sftp.empresa.com" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                    </div>
-                                    <div>
-                                        <label style="font-size: 12px; font-weight: 600;">🔌 Puerto</label>
-                                        <input type="number" id="tareaSftpPort" value="22" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                    </div>
-                                </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-                                    <div>
-                                        <label style="font-size: 12px; font-weight: 600;">👤 Usuario</label>
-                                        <input type="text" id="tareaSftpUser" placeholder="usuario_sftp" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                    </div>
-                                    <div>
-                                        <label style="font-size: 12px; font-weight: 600;">🔑 Contraseña</label>
-                                        <input type="password" id="tareaSftpPassword" placeholder="******" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                    </div>
-                                </div>
-                                <div style="margin-top: 10px;">
-                                    <label style="font-size: 12px; font-weight: 600;">📁 Ruta remota</label>
-                                    <input type="text" id="tareaSftpRuta" value="/" placeholder="/audios/" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                </div>
-                                <button onclick="testSftpConexion()" style="margin-top: 10px; background: var(--accent); padding: 6px 16px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;">
-                                    🔗 Probar conexión SFTP
-                                </button>
-                                <div id="sftpTestResult" style="margin-top: 8px; font-size: 12px;"></div>
-                            </div>
-                            
-                            <!-- ===== CONFIGURACIÓN SHAREPOINT ===== -->
-                            <div id="configSharepoint" style="display: none;">
-                                <div style="margin-bottom: 10px;">
-                                    <label style="font-size: 12px; font-weight: 600;">🌐 Site URL</label>
-                                    <input type="text" id="tareaSharepointSite" placeholder="https://tuempresa.sharepoint.com/sites/TuSitio" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                    <div>
-                                        <label style="font-size: 12px; font-weight: 600;">👤 Usuario</label>
-                                        <input type="text" id="tareaSharepointUser" placeholder="usuario@empresa.com" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                    </div>
-                                    <div>
-                                        <label style="font-size: 12px; font-weight: 600;">🔑 Contraseña</label>
-                                        <input type="password" id="tareaSharepointPassword" placeholder="******" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                    </div>
-                                </div>
-                                <div style="margin-top: 10px;">
-                                    <label style="font-size: 12px; font-weight: 600;">📁 Biblioteca</label>
-                                    <input type="text" id="tareaSharepointLibrary" placeholder="Documentos" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                </div>
-                                <button onclick="testSharepointConexion()" style="margin-top: 10px; background: var(--accent); padding: 6px 16px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;">
-                                    🔗 Probar conexión SharePoint
-                                </button>
-                                <div id="sharepointTestResult" style="margin-top: 8px; font-size: 12px;"></div>
-                            </div>
-                            
-                            <!-- ===== CONFIGURACIÓN GENERAL ===== -->
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <div>
-                                    <label style="font-size: 12px; font-weight: 600;">🔄 Frecuencia</label>
-                                    <select id="tareaFrecuencia" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                        <option value="diaria">Diaria</option>
-                                        <option value="semanal">Semanal</option>
-                                        <option value="mensual">Mensual</option>
-                                        <option value="personalizado">Personalizado (cada X minutos)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style="font-size: 12px; font-weight: 600;">⏰ Hora</label>
-                                    <input type="time" id="tareaHora" value="06:00" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                </div>
-                            </div>
-                            
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <div>
-                                    <label style="font-size: 12px; font-weight: 600;">🎤 Modelo Whisper</label>
-                                    <select id="tareaModelo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                        <option value="tiny">Tiny (rápido)</option>
-                                        <option value="base">Base</option>
-                                        <option value="small" selected>Small (balanceado)</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="large">Large (preciso)</option>
-                                    </select>
-                                </div>
-                                <div style="display: flex; align-items: center; padding-top: 20px;">
-                                    <label>
-                                        <input type="checkbox" id="tareaAnalizarOllama" checked>
-                                        Analizar con Ollama
-                                    </label>
-                                </div>
-                            </div>
-                            
+                            <select id="tareaFrecuencia" style="padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                <option value="diaria">Diaria</option>
+                                <option value="semanal">Semanal</option>
+                                <option value="mensual">Mensual</option>
+                                <option value="personalizado">Personalizado (cada X minutos)</option>
+                            </select>
+                            <input type="time" id="tareaHora" value="06:00" style="padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                            <select id="tareaModelo" style="padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                <option value="tiny">Tiny (rápido)</option>
+                                <option value="base">Base</option>
+                                <option value="small" selected>Small (balanceado)</option>
+                                <option value="medium">Medium</option>
+                                <option value="large">Large (preciso)</option>
+                            </select>
+                            <label>
+                                <input type="checkbox" id="tareaAnalizarOllama" checked>
+                                Analizar con Ollama
+                            </label>
                             <button onclick="programarTareaTranscripcion()" style="background: var(--ok); padding: 8px 20px; border: none; border-radius: 8px; color: white; cursor: pointer;">
                                 💾 Programar Tarea
                             </button>
@@ -2833,108 +2739,19 @@
                     </div>
                 </div>
                 
-                <!-- ===== SECCIÓN: TAREAS PROGRAMADAS (CORREGIDA) ===== -->
-                <div class="card" style="margin-top: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
-                        <h4>📋 Tareas Programadas</h4>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button onclick="cargarTareasProgramadas()" style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px;">
-                                🔄 Refrescar
-                            </button>
-                            <button onclick="exportarTareasCSV()" style="background: var(--ok); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px;">
-                                📥 Exportar
-                            </button>
-                            <span style="background: #e3f2fd; padding: 4px 12px; border-radius: 20px; font-size: 11px;" id="totalTareasBadge">0 tareas</span>
-                            <span style="background: #e8f5e9; padding: 4px 12px; border-radius: 20px; font-size: 11px;" id="activasBadge">0 activas</span>
-                            <span style="background: #fff3e0; padding: 4px 12px; border-radius: 20px; font-size: 11px;" id="erroresBadge">0 errores</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Filtros compactos -->
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
-                        <select id="filtroTareaOrigen" onchange="cargarTareasProgramadas()" style="padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px;">
-                            <option value="">Todos los orígenes</option>
-                            <option value="local">📂 Local</option>
-                            <option value="sftp">🌐 SFTP</option>
-                            <option value="sharepoint">📁 SharePoint</option>
-                        </select>
-                        <select id="filtroTareaEstado" onchange="cargarTareasProgramadas()" style="padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px;">
-                            <option value="">Todos los estados</option>
-                            <option value="activo">✅ Activo</option>
-                            <option value="pausado">⏸️ Pausado</option>
-                        </select>
-                        <select id="filtroTareaEjecucion" onchange="cargarTareasProgramadas()" style="padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px;">
-                            <option value="">Todos</option>
-                            <option value="completado">✅ Completadas</option>
-                            <option value="en_proceso">🔄 En proceso</option>
-                            <option value="error">❌ Con errores</option>
-                            <option value="sin_ejecutar">⏳ Sin ejecutar</option>
-                        </select>
-                        <input type="text" id="buscarTarea" placeholder="🔍 Buscar..." oninput="cargarTareasProgramadas()" style="padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px; flex: 1; min-width: 120px;">
-                    </div>
-                    
-                    <!-- Tabla de tareas CON BOTÓN ELIMINAR -->
-                    <div class="table-container" style="max-height: 250px; overflow-y: auto;">
-                        <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
-                            <thead>
-                                <tr style="background: linear-gradient(135deg, #f8f9fa, #e9ecef); position: sticky; top: 0; z-index: 10;">
-                                    <th style="padding: 6px 8px; text-align: center;">#</th>
-                                    <th style="padding: 6px 8px; text-align: left;">📌 Nombre</th>
-                                    <th style="padding: 6px 8px; text-align: center;">📁</th>
-                                    <th style="padding: 6px 8px; text-align: center;">🔄</th>
-                                    <th style="padding: 6px 8px; text-align: center;">📊 Estado</th>
-                                    <th style="padding: 6px 8px; text-align: center;">📅 Última ejec.</th>
-                                    <th style="padding: 6px 8px; text-align: center;">⚙️ Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tablaTareasProgramadas">
-                                <tr><td colspan="7" style="text-align: center; padding: 20px;">⏳ Cargando...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                <!-- ===== SECCIÓN: BARRA DE PROGRESO ===== -->
-                <div id="progressContainer" style="display: none; margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 12px; border: 1px solid #e0e0e0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <div>
-                            <span id="progressStatus" style="font-weight: bold;">📤 Subiendo audio...</span>
-                            <span id="progressPercentage" style="margin-left: 15px; font-size: 14px; color: var(--accent);">0%</span>
-                        </div>
-                        <button onclick="cancelarTranscripcion()" style="background: var(--danger); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;">
-                            ❌ Cancelar
-                        </button>
-                    </div>
-                    
-                    <!-- Barra de progreso -->
-                    <div style="background: #e9ecef; border-radius: 10px; height: 20px; overflow: hidden; position: relative;">
-                        <div id="progressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #019DF4, #00B4F0); transition: width 0.5s ease; border-radius: 10px;"></div>
-                        <div id="progressText" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; font-weight: bold; color: #333; text-shadow: 0 1px 2px rgba(255,255,255,0.5);">
-                            0%
-                        </div>
-                    </div>
-                    
-                    <!-- Logs en tiempo real -->
-                    <div id="progressLogs" style="margin-top: 10px; max-height: 100px; overflow-y: auto; background: #fff; border-radius: 8px; padding: 8px; font-size: 12px; font-family: monospace; border: 1px solid #e0e0e0;">
-                        <div style="color: var(--muted);">⏳ Esperando inicio...</div>
-                    </div>
-                </div>
-                
-                <!-- ===== SECCIÓN: TRANSCRIPCIONES RECIENTES ===== -->
-                <div class="card" style="margin-top: 20px;">
+                <!-- ===== TABLA DE TRANSCRIPCIONES ===== -->
+                <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
                         <h4>📊 Transcripciones Recientes</h4>
                         <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                             <input type="text" id="buscarTranscripcion" placeholder="🔍 Buscar..." oninput="cargarTranscripciones()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line);">
                             <select id="filtroEstadoTranscripcion" onchange="cargarTranscripciones()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line);">
                                 <option value="">Todos los estados</option>
-                                <option value="transcrito">📝 Transcrito</option>
-                                <option value="analizado">✅ Analizado</option>
-                                <option value="error">❌ Error</option>
+                                <option value="transcrito">Transcrito</option>
+                                <option value="analizado">Analizado</option>
+                                <option value="error">Error</option>
                             </select>
-                            <button onclick="cargarTranscripciones()" style="background: var(--accent); padding: 6px 16px; border: none; border-radius: 6px; color: white; cursor: pointer;">
-                                🔄 Refrescar
-                            </button>
+                            <button onclick="cargarTranscripciones()" style="background: var(--accent); padding: 6px 16px; border: none; border-radius: 6px; color: white; cursor: pointer;">🔄 Refrescar</button>
                         </div>
                     </div>
                     <div class="table-container" style="max-height: 400px; overflow-y: auto;">
@@ -2954,19 +2771,6 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
-                
-                <!-- ===== LEYENDA ===== -->
-                <div style="margin-top: 15px; padding: 8px 12px; background: #f8f9fa; border-radius: 8px; font-size: 11px; color: var(--muted); display: flex; gap: 15px; flex-wrap: wrap;">
-                    <span>✅ <span style="color: var(--ok);">Completado</span></span>
-                    <span>🔄 <span style="color: var(--accent);">En proceso</span></span>
-                    <span>⏳ <span style="color: #f39c12;">Pendiente</span></span>
-                    <span>❌ <span style="color: var(--danger);">Error</span></span>
-                    <span>📁 <span style="color: #6c757d;">Origen: Local/SFTP/SharePoint</span></span>
-                    <span>📄 <span style="color: #019DF4;">Ver transcripción</span></span>
-                    <span>🧠 <span style="color: #7b1fa2;">Ver análisis Ollama</span></span>
-                    <span>🔄 <span style="color: #f39c12;">Reanalizar</span></span>
-                    <span>🗑️ <span style="color: var(--danger);">Eliminar</span></span>
                 </div>
             </div>
         </div>

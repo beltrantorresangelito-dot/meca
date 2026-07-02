@@ -622,78 +622,267 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     }
 
     // Crear asignaciones
-    if (ruta === '/api/escuchas/asignaciones' && metodo === 'POST') {
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+    // ======================================================
+// API - ESCUCHAS - Crear asignaciones (POST) - CON ID
+// ======================================================
+if (ruta === '/api/escuchas/asignaciones' && metodo === 'POST') {
+    console.log('[API] POST /api/escuchas/asignaciones');
+    
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+        return;
+    }
+    
+    let body = '';
+    peticion.on('data', chunk => body += chunk);
+    peticion.on('end', async () => {
+        try {
+            const data = JSON.parse(body);
+            const { tarea_id, asignaciones } = data;
+            
+            console.log(`📊 Recibidas ${asignaciones?.length || 0} asignaciones para tarea ${tarea_id}`);
+            
+            if (!asignaciones || asignaciones.length === 0) {
+                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'No hay asignaciones' }));
+                return;
+            }
+
+            // 🔴 VALIDAR QUE TODAS TENGAN ID
+            const sinId = asignaciones.filter(a => !a.id);
+            if (sinId.length > 0) {
+                console.error(`❌ ${sinId.length} asignaciones sin ID`);
+                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ 
+                    error: `${sinId.length} asignaciones sin ID`,
+                    muestra: sinId.slice(0, 3).map(a => a.ticket)
+                }));
+                return;
+            }
+
+            console.log(`   IDs generados: ${asignaciones[0].id} - ${asignaciones[asignaciones.length-1].id}`);
+            
+            // 🔴 INSERTAR CON ID
+            const client = await pool.connect();
+            let insertados = 0;
+            
+            try {
+                await client.query('BEGIN');
+                
+                for (const asig of asignaciones) {
+                    // 🔴 CLAVE: INSERT CON id COMO PRIMER CAMPO
+                    const result = await client.query(`
+                        INSERT INTO asignaciones_escucha (
+                            id,
+                            tarea_id, 
+                            ticket, 
+                            supervisor_responsable, 
+                            gestor_auditado,
+                            auditor_asignado, 
+                            motivos, 
+                            submotivos, 
+                            subnivel, 
+                            peticion,
+                            usuario_dni, 
+                            usuario_mov, 
+                            motivo_call, 
+                            fecha_descarga,
+                            estado, 
+                            fecha_asignacion, 
+                            created_at, 
+                            updated_at
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+                        RETURNING id
+                    `, [
+                        asig.id,
+                        asig.tarea_id, 
+                        asig.ticket, 
+                        asig.supervisor_responsable, 
+                        asig.gestor_auditado,
+                        asig.auditor_asignado, 
+                        asig.motivos, 
+                        asig.submotivos, 
+                        asig.subnivel, 
+                        asig.peticion,
+                        asig.usuario_dni, 
+                        asig.usuario_mov, 
+                        asig.motivo_call, 
+                        asig.fecha_descarga,
+                        asig.estado, 
+                        asig.fecha_asignacion, 
+                        asig.created_at, 
+                        asig.updated_at
+                    ]);
+                    insertados++;
+                }
+                
+                await client.query('COMMIT');
+                console.log(`✅ ${insertados} asignaciones insertadas correctamente`);
+                
+                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ success: true, total: insertados }));
+                
+            } catch (err) {
+                await client.query('ROLLBACK');
+                console.error('❌ Error en transacción:', err);
+                throw err;
+            } finally {
+                client.release();
+            }
+            
+        } catch (error) {
+            console.error('❌ Error en POST /api/escuchas/asignaciones:', error);
+            
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ 
+                error: error.message,
+                stack: error.stack 
+            }));
+        }
+    });
+    return;
+}
+
+// ======================================================
+// API - ESCUCHAS - Eliminar lote (DELETE)
+// ======================================================
+if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
+    console.log('[API] DELETE /api/escuchas/lotes/:id');
+    
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+        return;
+    }
+    
+    const loteId = parseInt(ruta.split('/').pop());
+    
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        // 1. Verificar que el lote existe
+        const check = await client.query(
+            'SELECT id, nombre_archivo FROM tareas_escucha WHERE id = $1',
+            [loteId]
+        );
+        
+        if (check.rows.length === 0) {
+            await client.query('ROLLBACK');
+            respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Lote no encontrado' }));
+            client.release();
             return;
         }
         
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { asignaciones } = JSON.parse(body);
-                
-                for (const asig of asignaciones) {
-                    await pool.query(`
-                        INSERT INTO asignaciones_escucha (
-                            tarea_id, ticket, supervisor_responsable, gestor_auditado,
-                            auditor_asignado, motivos, submotivos, subnivel, peticion,
-                            usuario_dni, usuario_mov, motivo_call, fecha_descarga,
-                            estado, fecha_asignacion, created_at, updated_at
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-                    `, [
-                        asig.tarea_id, asig.ticket, asig.supervisor_responsable, asig.gestor_auditado,
-                        asig.auditor_asignado, asig.motivos, asig.submotivos, asig.subnivel, asig.peticion,
-                        asig.usuario_dni, asig.usuario_mov, asig.motivo_call, asig.fecha_descarga,
-                        asig.estado, asig.fecha_asignacion, asig.created_at, asig.updated_at
-                    ]);
-                }
-                
-                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true, total: asignaciones.length }));
-            } catch (error) {
-                console.error('Error:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
+        const nombreArchivo = check.rows[0].nombre_archivo || 'Desconocido';
+        
+        // 2. Eliminar asignaciones relacionadas (ON DELETE CASCADE debería hacer esto)
+        // Pero por seguridad, eliminamos manualmente
+        await client.query(
+            'DELETE FROM asignaciones_escucha WHERE tarea_id = $1',
+            [loteId]
+        );
+        
+        // 3. Eliminar el lote
+        await client.query(
+            'DELETE FROM tareas_escucha WHERE id = $1',
+            [loteId]
+        );
+        
+        await client.query('COMMIT');
+        
+        console.log(`✅ Lote ${loteId} eliminado: ${nombreArchivo}`);
+        
+        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ 
+            success: true, 
+            message: `Lote "${nombreArchivo}" eliminado correctamente`
+        }));
+        
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('❌ Error eliminando lote:', error);
+        respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: error.message }));
+    } finally {
+        client.release();
     }
+    return;
+}
 
     // Crear tarea (lote)
     if (ruta === '/api/escuchas/tareas' && metodo === 'POST') {
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-        
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { fecha_carga, nombre_archivo, total_registros, estado, creado_por, created_at } = JSON.parse(body);
-                
-                const result = await pool.query(`
-                    INSERT INTO tareas_escucha (fecha_carga, nombre_archivo, total_registros, estado, creado_por, created_at)
-                    VALUES ($1, $2, $3, $4, $5, $6)
-                    RETURNING id
-                `, [fecha_carga, nombre_archivo, total_registros, estado, creado_por, created_at]);
-                
-                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ id: result.rows[0].id }));
-            } catch (error) {
-                console.error('Error:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
+    console.log('[API] POST /api/escuchas/tareas');
+    
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
         return;
     }
+    
+    let body = '';
+    peticion.on('data', chunk => body += chunk);
+    peticion.on('end', async () => {
+        try {
+            const data = JSON.parse(body);
+            console.log('📥 Body recibido:', data);
+            
+            // 🔴 EXTRAER SOLO LOS CAMPOS QUE EXISTEN EN LA TABLA
+            const { id, fecha_carga, nombre_archivo, total_registros, estado, creado_por, created_at } = data;
+            
+            // 🔴 VALIDAR CAMPOS OBLIGATORIOS
+            if (!id) {
+                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'El campo id es requerido' }));
+                return;
+            }
+            
+            if (!fecha_carga) {
+                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'El campo fecha_carga es requerido' }));
+                return;
+            }
+            
+            // 🔴 INSERTAR SOLO LAS COLUMNAS QUE EXISTEN (6 columnas)
+            const result = await pool.query(`
+                INSERT INTO tareas_escucha (
+                    id, 
+                    fecha_carga, 
+                    nombre_archivo, 
+                    total_registros, 
+                    estado, 
+                    creado_por
+                ) VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id
+            `, [
+                id, 
+                fecha_carga, 
+                nombre_archivo || null, 
+                total_registros || 0, 
+                estado || 'activo', 
+                creado_por || 'supervisor'
+            ]);
+            
+            console.log(`✅ Tarea creada con ID: ${result.rows[0].id}`);
+            
+            respuesta.writeHead(201, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ id: result.rows[0].id }));
+            
+        } catch (error) {
+            console.error('❌ Error creando tarea:', error);
+            console.error('📝 Detalle:', error.message);
+            
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+    });
+    return;
+}
 
     // Mis escuchas (por auditor)
     if (ruta === '/api/escuchas/mis-escuchas' && metodo === 'GET') {

@@ -19302,36 +19302,17 @@ async function cargarMesesParaSelectorQ4() {
 
             // 5. Distribuir tickets
             infoDiv.innerHTML = `<div style="background: var(--accent); color: white; padding: 10px; border-radius: 8px;">✅ ${ticketsNuevos.length} tickets nuevos. Distribuyendo...</div>`;
-
-            const resultadoDistribucion = await distribuirTareasEquitativamenteConExclusion(ticketsNuevos);
-
-            // 🔴 DIAGNÓSTICO
-            console.log('📊 resultadoDistribucion:', resultadoDistribucion);
-            console.log('📊 distribucion:', resultadoDistribucion?.distribucion);
-            console.log('📊 distribucion keys:', Object.keys(resultadoDistribucion?.distribucion || {}));
-
-            // 🔴 VALIDAR QUE LA DISTRIBUCIÓN SEA VÁLIDA
-            if (!resultadoDistribucion || !resultadoDistribucion.distribucion || Object.keys(resultadoDistribucion.distribucion).length === 0) {
-                console.error('❌ La distribución está vacía');
-                throw new Error('No se pudo distribuir los tickets');
-            }
-
+            
+            const distribucion = await distribuirTareasEquitativamente(ticketsNuevos);
+            
             // 6. Crear registro de tarea (lote)
             const tarea = await crearRegistroTarea(file.name, ticketsNuevos.length);
-
-            // 🔴 VERIFICAR QUE LA TAREA SE CREÓ
-            if (!tarea || !tarea.id) {
-                throw new Error('No se pudo crear la tarea');
-            }
-
-            // 7. Guardar asignaciones - 🔴 CORREGIDO: pasar la distribución correcta
-            const asignacionesGuardadas = await guardarAsignacionesEnAPI(
-                tarea.id, 
-                resultadoDistribucion.distribucion  // ← PASAR SOLO LA DISTRIBUCIÓN
-            );
+            
+            // 7. Guardar asignaciones
+            const asignacionesGuardadas = await guardarAsignacionesEnAPI(tarea.id, distribucion);
             
             // 8. Mostrar resumen
-            mostrarResumenDistribucion(resultadoDistribucion, ticketsNuevos.length, ticketsOmitidosDetalle.length);
+            mostrarResumenDistribucion(distribucion, ticketsNuevos.length, ticketsOmitidosDetalle.length);
             
             infoDiv.innerHTML = `<div style="background: var(--ok); color: white; padding: 10px; border-radius: 8px;">✅ Distribución completada: ${asignacionesGuardadas.length} tareas asignadas.</div>`;
             
@@ -19349,89 +19330,46 @@ async function cargarMesesParaSelectorQ4() {
     }
     // ===== FIN FUNCIÓN: cargarYDistribuirEscuchas ==========================
 
-    async function guardarAsignacionesEnAPI(tareaId, distribucion) {
-    const token = localStorage.getItem('meca_token');
-    const registros = [];
+    async function guardarAsignacionesEnAPI(tareaId, asignaciones) {
+        const token = localStorage.getItem('meca_token');
+        const registros = [];
 
-    console.log('📊 guardarAsignacionesEnAPI - INICIO');
-    console.log(`   tareaId: ${tareaId}`);
-    console.log(`   Auditores: ${Object.keys(distribucion || {}).join(', ')}`);
-
-    if (!distribucion || typeof distribucion !== 'object' || Object.keys(distribucion).length === 0) {
-        console.error('❌ No hay distribución válida');
-        return [];
-    }
-
-    // 🔴 OBTENER EL ID MÁXIMO ACTUAL PARA GENERAR IDs ÚNICOS
-    let idBase = Date.now();
-    let contador = 0;
-
-    for (const [auditor, tickets] of Object.entries(distribucion)) {
-        if (!tickets || !Array.isArray(tickets) || tickets.length === 0) continue;
-
-        for (const ticket of tickets) {
-            contador++;
-            // 🔴 GENERAR ID ÚNICO: timestamp + contador
-            const nuevoId = idBase + contador;
-            
-            registros.push({
-                id: nuevoId,  // ← CLAVE: ID generado por el frontend
-                tarea_id: tareaId,
-                ticket: String(ticket.ticket || ''),
-                supervisor_responsable: String(ticket.supervisor_responsable || ''),
-                gestor_auditado: String(ticket.gestor_auditado || ''),
-                auditor_asignado: String(auditor),
-                motivos: String(ticket.motivos || ''),
-                submotivos: String(ticket.submotivos || ''),
-                subnivel: String(ticket.subnivel || ''),
-                peticion: String(ticket.peticion || ''),
-                usuario_dni: String(ticket.usuario_dni || ''),
-                usuario_mov: String(ticket.usuario_mov || ''),
-                motivo_call: String(ticket.motivo_call || ''),
-                fecha_descarga: ticket.fecha_descarga || null,
-                estado: 'pendiente',
-                fecha_asignacion: new Date().toISOString(),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            });
+        for (const [auditor, tickets] of Object.entries(asignaciones)) {
+            for (const ticket of tickets) {
+                registros.push({
+                    tarea_id: tareaId,
+                    ticket: ticket.ticket,
+                    supervisor_responsable: ticket.supervisor_responsable || '',
+                    gestor_auditado: ticket.gestor_auditado || '',
+                    auditor_asignado: auditor,
+                    motivos: ticket.motivos || '',
+                    submotivos: ticket.submotivos || '',
+                    subnivel: ticket.subnivel || '',
+                    peticion: ticket.peticion || '',
+                    usuario_dni: ticket.usuario_dni || '',
+                    usuario_mov: ticket.usuario_mov || '',
+                    motivo_call: ticket.motivo_call || '',
+                    fecha_descarga: ticket.fecha_descarga || null,
+                    estado: 'pendiente',
+                    fecha_asignacion: new Date().toISOString(),
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                });
+            }
         }
-    }
 
-    if (registros.length === 0) {
-        console.warn('⚠️ No hay registros para guardar');
-        return [];
-    }
-
-    console.log(`📝 ${registros.length} registros generados con IDs (${registros[0].id} - ${registros[registros.length-1].id})`);
-
-    try {
         const response = await fetch('/api/escuchas/asignaciones', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ 
-                tarea_id: tareaId, 
-                asignaciones: registros 
-            })
+            body: JSON.stringify({ tarea_id: tareaId, asignaciones: registros })
         });
-
-        if (!response.ok) {
-            const error = await response.json();
-            console.error('❌ Error en API:', error);
-            throw new Error(error.error || 'Error guardando asignaciones');
-        }
-
-        const data = await response.json();
-        console.log(`✅ ${data.total || registros.length} asignaciones guardadas`);
-        return data;
         
-    } catch (error) {
-        console.error('❌ Error guardando asignaciones:', error);
-        throw error;
+        if (!response.ok) throw new Error('Error guardando asignaciones');
+        return await response.json();
     }
-}
 
 
 
@@ -19563,150 +19501,145 @@ async function cargarMesesParaSelectorQ4() {
 
     // ===== 8.INICIO FUNCIÓN: distribuirTareasEquitativamenteConExclusion =
     async function distribuirTareasEquitativamenteConExclusion(tickets) {
-    console.log('🔄 distribuirTareasEquitativamenteConExclusion - INICIO');
-    console.log(`📊 Total tickets a distribuir: ${tickets?.length || 0}`);
+        console.log('🔄 Iniciando distribución EQUITATIVA de tareas...');
+        console.log(`📊 Total tickets a distribuir: ${tickets?.length || 0}`);
 
-    // 🔴 VALIDACIÓN INICIAL
-    if (!tickets || tickets.length === 0) {
-        console.warn('⚠️ No hay tickets para distribuir');
-        return { distribucion: {}, auditores: [] };
-    }
+        // 🔴 VALIDACIÓN INICIAL
+        if (!tickets || tickets.length === 0) {
+            console.warn('⚠️ No hay tickets para distribuir');
+            return { distribucion: {}, auditores: [] };
+        }
 
-    // Obtener auditores activos desde la base de datos
-    const db = getDB();
-    if (!db) {
-        console.error('❌ Base de datos no disponible');
-        return { distribucion: {}, auditores: [] };
-    }
+        // Obtener auditores activos desde la base de datos
+        const db = getDB();
+        if (!db) throw new Error('Base de datos no disponible');
 
-    const { data: auditoresData, error } = await db
-        .from('usuarios')
-        .select('usuario, nombre_completo')
-        .eq('activo', true)
-        .eq('rol', 'AUDITOR');
+        const { data: auditoresData, error } = await db
+            .from('usuarios')
+            .select('usuario, nombre_completo')
+            .eq('activo', true)
+            .eq('rol', 'AUDITOR');
 
-    if (error) {
-        console.error('❌ Error obteniendo auditores:', error);
-        return { distribucion: {}, auditores: [] };
-    }
+        if (error) throw error;
 
-    let auditores = auditoresData || [];
-    console.log(`👥 Auditores activos: ${auditores.map(a => a.usuario).join(', ')}`);
+        let auditores = auditoresData || [];
+        console.log(`👥 Auditores activos en sistema: ${auditores.map(a => a.usuario).join(', ')}`);
 
-    // 🔴 FILTRAR AUDITORES EXCLUIDOS
-    const excluidosGlobal = typeof auditoresExcluidosGlobal !== 'undefined' ? auditoresExcluidosGlobal : [];
-    console.log(`🚫 Auditores excluidos: ${excluidosGlobal.join(', ') || 'ninguno'}`);
+        // 🔴 USAR LA VARIABLE GLOBAL CORRECTA (sin window si ya está en el scope)
+        // La variable global se llama auditoresExcluidosGlobal (definida al inicio)
+        const excluidosGlobal = typeof auditoresExcluidosGlobal !== 'undefined' ? auditoresExcluidosGlobal : [];
+        console.log(`🚫 Auditores excluidos: ${excluidosGlobal.join(', ') || 'ninguno'}`);
 
-    const auditoresFiltrados = auditores.filter(a => !excluidosGlobal.includes(a.usuario));
-    console.log(`✅ Auditores disponibles: ${auditoresFiltrados.length}`);
+        // 🔴 FILTRAR AUDITORES EXCLUIDOS (IMPORTANTE: excluirlos COMPLETAMENTE)
+        const auditoresFiltrados = auditores.filter(a => !excluidosGlobal.includes(a.usuario));
+        console.log(`✅ Auditores disponibles después de exclusión: ${auditoresFiltrados.length}`);
 
-    if (auditoresFiltrados.length === 0) {
-        console.error('❌ No hay auditores disponibles después de excluir');
-        alert('⚠️ No hay auditores disponibles. Verifique que haya auditores activos y no excluidos.');
-        return { distribucion: {}, auditores: [] };
-    }
+        // Mostrar qué auditores fueron excluidos
+        const excluidos = auditores.filter(a => excluidosGlobal.includes(a.usuario));
+        if (excluidos.length > 0) {
+            console.log(`🚫 Auditores EXCLUIDOS (no reciben tickets): ${excluidos.map(a => a.usuario).join(', ')}`);
+        }
 
-    // Obtener carga actual
-    const cargaActual = await obtenerCargaActualAuditores(auditoresFiltrados);
+        // 🔴 VALIDACIÓN: Si no hay auditores disponibles
+        if (auditoresFiltrados.length === 0) {
+            console.error('❌ No hay auditores disponibles después de aplicar exclusiones');
+            alert('⚠️ No hay auditores disponibles para asignar tickets. Verifique que haya auditores activos y no excluidos.');
+            return { distribucion: {}, auditores: [] };
+        }
 
-    // Crear array de auditores con su carga
-    let auditoresConCarga = auditoresFiltrados.map(auditor => ({
-        usuario: auditor.usuario,
-        nombre: auditor.nombre_completo || auditor.usuario,
-        carga: cargaActual[auditor.usuario] || 0
-    }));
+        // Obtener carga actual de cada auditor (solo de los NO excluidos)
+        const cargaActual = await obtenerCargaActualAuditores(auditoresFiltrados);
 
-    // Ordenar por carga (menor primero)
-    auditoresConCarga.sort((a, b) => a.carga - b.carga);
+        console.log('📊 CARGA ACTUAL DE CADA AUDITOR (pendientes + en_proceso):', cargaActual);
 
-    console.log('📋 Auditores ordenados por carga:');
-    auditoresConCarga.forEach(a => console.log(`   ${a.usuario}: ${a.carga} pendientes`));
+        // Crear array de auditores con su carga actual
+        let auditoresConCarga = auditoresFiltrados.map(auditor => ({
+            usuario: auditor.usuario,
+            nombre: auditor.nombre_completo || auditor.usuario,
+            carga: cargaActual[auditor.usuario] || 0
+        }));
 
-    // 🔴 INICIALIZAR DISTRIBUCIÓN
-    const distribucion = {};
-    auditoresFiltrados.forEach(a => { 
-        distribucion[a.usuario] = []; 
-    });
+        // Ordenar por carga (menor carga primero)
+        auditoresConCarga.sort((a, b) => a.carga - b.carga);
 
-    let idx = 0;
-    let totalAsignados = 0;
-
-    // 🔴 DISTRIBUIR TICKETS
-    for (const ticket of tickets) {
-        const auditorSeleccionado = auditoresConCarga[idx % auditoresConCarga.length];
-        
-        distribucion[auditorSeleccionado.usuario].push({
-            ...ticket,
-            auditor_asignado: auditorSeleccionado.usuario
+        console.log('📋 Auditores ordenados por carga actual:');
+        auditoresConCarga.forEach(a => {
+            console.log(`   ${a.usuario}: ${a.carga} pendientes`);
         });
 
-        // Incrementar carga virtual
-        auditoresConCarga = auditoresConCarga.map(a =>
-            a.usuario === auditorSeleccionado.usuario
-                ? { ...a, carga: a.carga + 1 }
-                : a
-        );
-        auditoresConCarga.sort((a, b) => a.carga - b.carga);
-        idx++;
-        totalAsignados++;
-    }
+        // Distribuir tickets SOLO entre auditores NO excluidos
+        const distribucion = {};
+        auditoresFiltrados.forEach(a => { distribucion[a.usuario] = []; });
 
-    // 🔴 VERIFICAR RESULTADO
-    console.log('\n📊 RESUMEN FINAL DE CARGA POR AUDITOR:');
-    let totalVerificado = 0;
-    for (const auditor of auditoresFiltrados) {
-        const asignados = distribucion[auditor.usuario]?.length || 0;
-        totalVerificado += asignados;
-        console.log(`   ${auditor.usuario}: ${cargaActual[auditor.usuario] || 0} previos + ${asignados} nuevos = ${(cargaActual[auditor.usuario] || 0) + asignados} total`);
-    }
-    console.log(`📊 Total tickets asignados: ${totalVerificado} (de ${tickets.length})`);
+        let idx = 0;
+        for (const ticket of tickets) {
+            // Seleccionar el auditor con menor carga actual (solo entre los disponibles)
+            const auditorSeleccionado = auditoresConCarga[idx % auditoresConCarga.length];
 
-    // 🔴 VERIFICAR QUE NO HAYA TICKETS PERDIDOS
-    if (totalVerificado !== tickets.length) {
-        console.error(`❌ ERROR: Se perdieron ${tickets.length - totalVerificado} tickets en la distribución`);
-    }
+            distribucion[auditorSeleccionado.usuario].push({
+                ...ticket,
+                auditor_asignado: auditorSeleccionado.usuario
+            });
 
-    // 🔴 RETORNAR CON LA ESTRUCTURA CORRECTA
-    return { distribucion, auditores: auditoresFiltrados };
-}
+            // Incrementar su carga virtual para el siguiente ticket
+            auditoresConCarga = auditoresConCarga.map(a =>
+                a.usuario === auditorSeleccionado.usuario
+                    ? { ...a, carga: a.carga + 1 }
+                    : a
+            );
+            auditoresConCarga.sort((a, b) => a.carga - b.carga);
+            idx++;
+        }
+
+        // Mostrar resumen FINAL
+        console.log('\n📊 RESUMEN FINAL DE CARGA POR AUDITOR:');
+        let totalAsignados = 0;
+        for (const auditor of auditoresFiltrados) {
+            const asignados = distribucion[auditor.usuario]?.length || 0;
+            const cargaFinal = (cargaActual[auditor.usuario] || 0) + asignados;
+            console.log(`   ${auditor.usuario}: ${cargaActual[auditor.usuario] || 0} pendientes + ${asignados} nuevos = ${cargaFinal} total`);
+            totalAsignados += asignados;
+        }
+        console.log(`📊 Total tickets asignados: ${totalAsignados}`);
+
+        // 🔴 VERIFICAR QUE NINGÚN TICKET SE ASIGNÓ A UN AUDITOR EXCLUIDO
+        for (const auditor of excluidos) {
+            if (distribucion[auditor.usuario] && distribucion[auditor.usuario].length > 0) {
+                console.error(`❌ ERROR: Se asignaron tickets al auditor excluido ${auditor.usuario}`);
+            }
+        }
+
+        return { distribucion, auditores: auditoresFiltrados };
+    }
     // ===== FIN FUNCIÓN: distribuirTareasEquitativamenteConExclusion ========
     
     // ===== 9. INICIO FUNCIÓN: crearRegistroTarea =========================
     async function crearRegistroTarea(nombreArchivo, totalRegistros) {
-    const token = localStorage.getItem('meca_token');
-    
-    // 🔴 GENERAR ID ÚNICO
-    const nuevoId = Date.now();
-    
-    const fechaFormateada = new Date().toISOString();
-    
-    const nuevaTarea = {
-        id: nuevoId,  // ← ID generado por el frontend
-        fecha_carga: fechaFormateada,
-        nombre_archivo: nombreArchivo,
-        total_registros: totalRegistros,
-        estado: 'activo',
-        creado_por: window.usuarioActual?.usuario || 'supervisor'
-    };
-    
-    console.log('📤 Enviando tarea:', nuevaTarea);
-    
-    const response = await fetch('/api/escuchas/tareas', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(nuevaTarea)
-    });
-    
-    if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Error creando tarea');
+        const token = localStorage.getItem('meca_token');
+        
+        const nuevaTarea = {
+            fecha_carga: new Date().toISOString(),
+            nombre_archivo: nombreArchivo,
+            total_registros: totalRegistros,
+            estado: 'activo',
+            creado_por: window.usuarioActual?.usuario || 'supervisor',
+            created_at: new Date().toISOString()
+        };
+        
+        const response = await fetch('/api/escuchas/tareas', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(nuevaTarea)
+        });
+        
+        if (!response.ok) throw new Error('Error creando tarea');
+        
+        const data = await response.json();
+        return data;
     }
-    
-    return await response.json();
-}
     // ===== FIN FUNCIÓN: crearRegistroTarea =================================
     
     // ===== 10. INICIO FUNCIÓN: guardarAsignacionesEnPostgreSQL ==============
@@ -19916,130 +19849,29 @@ async function cargarMesesParaSelectorQ4() {
     }
     // ===== FIN FUNCIÓN: mostrarResumenDistribucionConFiltro ================
 
-    // ===== FUNCIÓN: mostrarResumenDistribucion =====
-function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitidos) {
-    console.log('📊 Mostrando resumen de distribución...');
-    
-    const resumenDiv = document.getElementById('resumenDistribucion');
-    const contentDiv = document.getElementById('resumenDistribucionContent');
-    
-    if (!resumenDiv || !contentDiv) {
-        console.warn('⚠️ Elementos de resumen no encontrados en el DOM');
-        return;
-    }
-    
-    const { distribucion, auditores } = resultadoDistribucion;
-    
-    if (!distribucion || Object.keys(distribucion).length === 0) {
-        contentDiv.innerHTML = '<div style="color: var(--danger);">❌ No se pudo realizar la distribución</div>';
-        resumenDiv.style.display = 'block';
-        return;
-    }
-    
-    // Calcular estadísticas
-    const auditoresConTickets = Object.keys(distribucion).filter(a => distribucion[a]?.length > 0);
-    const totalAsignados = auditoresConTickets.reduce((sum, a) => sum + distribucion[a].length, 0);
-    
-    let html = `
-        <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center;">
-            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                <div style="background: #e3f2fd; border-radius: 10px; padding: 6px 15px; text-align: center; min-width: 90px;">
-                    <div style="font-size: 20px; font-weight: bold;">${totalTickets}</div>
-                    <div style="font-size: 10px; color: var(--muted);">Total Excel</div>
-                </div>
-                <div style="background: #e8f5e9; border-radius: 10px; padding: 6px 15px; text-align: center; min-width: 90px;">
-                    <div style="font-size: 20px; font-weight: bold; color: var(--ok);">${totalAsignados}</div>
-                    <div style="font-size: 10px; color: var(--muted);">Asignados</div>
-                </div>
-                <div style="background: #fff3e0; border-radius: 10px; padding: 6px 15px; text-align: center; min-width: 90px;">
-                    <div style="font-size: 20px; font-weight: bold; color: var(--warning);">${omitidos || 0}</div>
-                    <div style="font-size: 10px; color: var(--muted);">Omitidos</div>
-                </div>
-                <div style="background: #f3e5f5; border-radius: 10px; padding: 6px 15px; text-align: center; min-width: 90px;">
-                    <div style="font-size: 20px; font-weight: bold;">${auditores?.length || 0}</div>
-                    <div style="font-size: 10px; color: var(--muted);">Auditores</div>
-                </div>
-            </div>
-            
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                ${auditoresConTickets.slice(0, 6).map(a => {
-                    const cantidad = distribucion[a]?.length || 0;
-                    const porcentaje = totalAsignados > 0 ? Math.round((cantidad / totalAsignados) * 100) : 0;
-                    const nombreMostrar = a.substring(0, 15);
-                    return `
-                        <div style="background: #f8f9fa; border-radius: 8px; padding: 4px 12px; text-align: center; border-left: 3px solid var(--accent);">
-                            <div style="font-size: 11px; font-weight: bold;">${escapeHtml(nombreMostrar)}</div>
-                            <div style="font-size: 14px; font-weight: bold; color: var(--accent);">${cantidad}</div>
-                            <div style="font-size: 9px; color: var(--muted);">${porcentaje}%</div>
-                        </div>
-                    `;
-                }).join('')}
-                ${auditoresConTickets.length > 6 ? `<div style="background: #f8f9fa; border-radius: 8px; padding: 4px 12px; text-align: center;">
-                    <div style="font-size: 11px;">+${auditoresConTickets.length - 6} más</div>
-                </div>` : ''}
-            </div>
-        </div>
-    `;
-    
-    // Auditor sin tickets
-    const auditoresSinTickets = (auditores || []).filter(a => !distribucion[a?.usuario || a] || distribucion[a?.usuario || a].length === 0);
-    if (auditoresSinTickets.length > 0 && auditoresSinTickets.length < (auditores?.length || 0)) {
-        html += `
-            <div style="margin-top: 8px; font-size: 10px; color: var(--warning); text-align: center; border-top: 1px solid var(--line); padding-top: 8px;">
-                ⚠️ ${auditoresSinTickets.map(a => escapeHtml(a.nombre_completo || a.usuario || a)).join(', ')} no recibieron tickets
-            </div>
-        `;
-    }
-    
-    contentDiv.innerHTML = html;
-    resumenDiv.style.display = 'block';
-    
-    // Scroll al resumen
-    setTimeout(() => {
-        resumenDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
-}
-    
     // ===== 12. INICIO FUNCIÓN: refrescarMonitoreoEscuchas =================
     async function refrescarMonitoreoEscuchas() {
-    console.log('🔄 Refrescando monitoreo de escuchas...');
-    
-    const token = localStorage.getItem('meca_token');
-    
-    try {
-        const response = await fetch('/api/escuchas/asignaciones', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        console.log('🔄 Refrescando monitoreo de escuchas...');
         
-        if (!response.ok) {
-            console.warn(`⚠️ Error en API: ${response.status}`);
-            window.asignacionesEscuchasGlobales = [];
-            actualizarTablaMonitoreo([]);
-            await actualizarTarjetasProgreso([]);  // ← PASAR ARRAY VACÍO
-            return;
+        const token = localStorage.getItem('meca_token');
+        
+        try {
+            const response = await fetch('/api/escuchas/asignaciones', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (!response.ok) throw new Error('Error cargando asignaciones');
+            
+            const asignaciones = await response.json();
+            window.asignacionesEscuchasGlobales = asignaciones;
+            
+            actualizarTablaMonitoreo(asignaciones);
+            await actualizarTarjetasProgreso(asignaciones);
+            
+        } catch (error) {
+            console.error('❌ Error refrescando monitoreo:', error);
         }
-        
-        const asignaciones = await response.json();
-        
-        if (!Array.isArray(asignaciones)) {
-            console.warn('⚠️ La respuesta no es un array:', asignaciones);
-            window.asignacionesEscuchasGlobales = [];
-            actualizarTablaMonitoreo([]);
-            await actualizarTarjetasProgreso([]);
-            return;
-        }
-        
-        window.asignacionesEscuchasGlobales = asignaciones;
-        actualizarTablaMonitoreo(asignaciones);
-        await actualizarTarjetasProgreso(asignaciones);  // ← PASAR LAS ASIGNACIONES
-        
-    } catch (error) {
-        console.error('❌ Error refrescando monitoreo:', error);
-        window.asignacionesEscuchasGlobales = [];
-        actualizarTablaMonitoreo([]);
-        await actualizarTarjetasProgreso([]);
     }
-}
     // ===== FIN FUNCIÓN: refrescarMonitoreoEscuchas =========================
 
     // ===== 13. INICIO FUNCIÓN: inicializarFiltroLoteEscuchas ==============
@@ -20272,333 +20104,82 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     
     // ===== 17. INICIO FUNCIÓN: actualizarTarjetasProgreso =================
     async function actualizarTarjetasProgreso(asignaciones) {
-    const container = document.getElementById('tarjetasProgresoAuditores');
-    if (!container) {
-        console.warn('⚠️ tarjetasProgresoAuditores no encontrado');
-        return;
-    }
+        const container = document.getElementById('tarjetasProgresoAuditores');
+        if (!container) return;
 
-    try {
+        // Obtener TODAS las asignaciones del lote activo (sin filtrar por estado)
         const db = getDB();
-        
-        // 🔴 1. OBTENER TODOS LOS LOTES ACTIVOS
-        let lotesActivos = [];
-        let loteInfo = null;
-        
-        if (db) {
-            try {
-                const { data, error } = await db
-                    .from('tareas_escucha')
-                    .select('*')
-                    .eq('estado', 'activo')
-                    .order('id', { ascending: false });
-                
-                if (!error && data && data.length > 0) {
-                    lotesActivos = data;
-                    console.log(`📦 ${lotesActivos.length} lotes activos encontrados`);
-                    lotesActivos.forEach(l => {
-                        console.log(`   ID: ${l.id}, Archivo: ${l.nombre_archivo}, Tickets: ${l.total_registros}`);
-                    });
-                } else {
-                    console.log('⚠️ No hay lotes activos');
-                }
-            } catch (err) {
-                console.warn('Error obteniendo lotes activos:', err);
-            }
-        }
 
-        // 🔴 SI NO HAY LOTES ACTIVOS, MOSTRAR MENSAJE
-        if (lotesActivos.length === 0) {
-            container.innerHTML = `
-                <div style="
-                    text-align: center; 
-                    padding: 40px; 
-                    background: #fff8e0; 
-                    border-radius: 12px;
-                    border: 1px solid #f39c12;
-                ">
-                    <div style="font-size: 48px; margin-bottom: 10px;">📦</div>
-                    <strong style="font-size: 16px;">No hay lotes activos</strong>
-                    <p style="margin-top: 5px; color: var(--muted);">
-                        Cargue un archivo de escuchas para iniciar un nuevo lote.
-                    </p>
-                </div>
-            `;
+        // Obtener el lote activo
+        const { data: loteActivo } = await db
+            .from('tareas_escucha')
+            .select('id')
+            .eq('estado', 'activo')
+            .single();
+
+        if (!loteActivo) {
+            container.innerHTML = '<div>No hay lote activo</div>';
             return;
         }
 
-        // 🔴 2. OBTENER TODAS LAS ASIGNACIONES
-        let todasAsignaciones = asignaciones;
-        
-        if (!todasAsignaciones || todasAsignaciones.length === 0) {
-            console.log('🔄 Obteniendo asignaciones de la BD...');
-            const token = localStorage.getItem('meca_token');
-            const response = await fetch('/api/escuchas/asignaciones', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (response.ok) {
-                todasAsignaciones = await response.json();
-                console.log(`📊 ${todasAsignaciones?.length || 0} asignaciones obtenidas de la BD`);
-            } else {
-                console.warn('⚠️ Error obteniendo asignaciones:', response.status);
-                container.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--muted);">⚠️ No se pudieron cargar los datos</div>';
-                return;
-            }
-        }
+        // Obtener TODAS las asignaciones del lote activo
+        const { data: todasAsignaciones } = await db
+            .from('asignaciones_escucha')
+            .select('*')
+            .eq('tarea_id', loteActivo.id);
 
-        // 🔴 3. FILTRAR ASIGNACIONES DE TODOS LOS LOTES ACTIVOS
-        const idsLotesActivos = lotesActivos.map(l => l.id);
-        const asignacionesFiltradas = todasAsignaciones.filter(a => idsLotesActivos.includes(a.tarea_id));
-        
-        console.log(`📊 ${asignacionesFiltradas.length} asignaciones de ${lotesActivos.length} lotes activos`);
+        if (!todasAsignaciones) return;
 
-        if (asignacionesFiltradas.length === 0) {
-            container.innerHTML = `
-                <div style="
-                    text-align: center; 
-                    padding: 40px; 
-                    background: #f0f7ff; 
-                    border-radius: 12px;
-                    border: 1px solid #019DF4;
-                ">
-                    <div style="font-size: 48px; margin-bottom: 10px;">📭</div>
-                    <strong style="font-size: 16px;">Los lotes activos no tienen tickets asignados</strong>
-                    <p style="margin-top: 5px; color: var(--muted);">
-                        ${lotesActivos.length} lote(s) activo(s) sin asignaciones.
-                    </p>
-                </div>
-            `;
-            return;
-        }
-
-        // 🔴 4. AGRUPAR POR AUDITOR (ACUMULADO DE TODOS LOS LOTES)
+        // Agrupar por auditor
         const progresoPorAuditor = {};
 
-        for (const asig of asignacionesFiltradas) {
+        for (const asig of todasAsignaciones) {
             const auditor = asig.auditor_asignado || 'Sin asignar';
             if (!progresoPorAuditor[auditor]) {
                 progresoPorAuditor[auditor] = {
                     total: 0,
                     pendiente: 0,
                     en_proceso: 0,
-                    gestionado: 0,
-                    incidencias: 0,
-                    tickets: [],
-                    lotes: new Set()
+                    gestionado: 0
                 };
             }
 
             progresoPorAuditor[auditor].total++;
-            progresoPorAuditor[auditor].tickets.push(asig);
-            progresoPorAuditor[auditor].lotes.add(asig.tarea_id);
 
             if (asig.estado === 'pendiente') {
                 progresoPorAuditor[auditor].pendiente++;
             } else if (asig.estado === 'en_proceso') {
                 progresoPorAuditor[auditor].en_proceso++;
-            } else if (asig.estado === 'gestionado' || asig.estado === 'completado') {
+            } else if (asig.estado === 'gestionado') {
                 progresoPorAuditor[auditor].gestionado++;
             }
-
-            if (asig.audio_disponible === false && asig.motivo_incidencia) {
-                progresoPorAuditor[auditor].incidencias++;
-            }
         }
 
-        // 🔴 5. GENERAR HTML - TABLA CON TODOS LOS LOTES
-        const auditoresOrdenados = Object.keys(progresoPorAuditor).sort((a, b) => {
-            const pctA = (progresoPorAuditor[a].gestionado / progresoPorAuditor[a].total) * 100;
-            const pctB = (progresoPorAuditor[b].gestionado / progresoPorAuditor[b].total) * 100;
-            return pctB - pctA;
-        });
+        // Mostrar en la UI
+        let html = '<div style="display: grid; gap: 10px;">';
 
-        // Calcular totales generales
-        let totalGeneral = 0;
-        let pendientesGeneral = 0;
-        let enProcesoGeneral = 0;
-        let gestionadosGeneral = 0;
-        let incidenciasGeneral = 0;
-
-        for (const auditor of auditoresOrdenados) {
-            const stats = progresoPorAuditor[auditor];
-            totalGeneral += stats.total;
-            pendientesGeneral += stats.pendiente;
-            enProcesoGeneral += stats.en_proceso;
-            gestionadosGeneral += stats.gestionado;
-            incidenciasGeneral += stats.incidencias;
-        }
-
-        const avanceGeneral = totalGeneral > 0 ? ((gestionadosGeneral / totalGeneral) * 100).toFixed(1) : 0;
-
-        // 🔴 MOSTRAR TODOS LOS LOTES ACTIVOS EN EL ENCABEZADO
-        let lotesHtml = lotesActivos.map(l => {
-            const nombre = l.nombre_archivo ? l.nombre_archivo.split('/').pop().split('\\').pop() : 'Sin nombre';
-            return `<span style="background: rgba(255,255,255,0.15); padding: 2px 10px; border-radius: 12px; font-size: 11px; margin: 2px;">📄 ${escapeHtml(nombre)}</span>`;
-        }).join(' ');
-
-        let html = `
-            <!-- Encabezado con todos los lotes -->
-            <div style="
-                background: linear-gradient(135deg, #019DF4, #00B4F0); 
-                color: white; 
-                padding: 12px 20px; 
-                border-radius: 12px 12px 0 0;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                flex-wrap: wrap;
-                gap: 10px;
-            ">
-                <div>
-                    <strong style="font-size: 16px;">📦 ${lotesActivos.length} Lote(s) Activo(s)</strong>
-                    <div style="font-size: 12px; margin-top: 4px; display: flex; gap: 5px; flex-wrap: wrap;">
-                        ${lotesHtml}
-                    </div>
-                </div>
-                <div style="display: flex; gap: 15px; font-size: 12px; flex-wrap: wrap;">
-                    <span>📊 Total: <strong>${totalGeneral}</strong></span>
-                    <span>⏳ Pendientes: <strong>${pendientesGeneral}</strong></span>
-                    <span>🔄 En proceso: <strong>${enProcesoGeneral}</strong></span>
-                    <span>✅ Gestionados: <strong>${gestionadosGeneral}</strong></span>
-                    <span>⚠️ Incidencias: <strong style="color: #ff6b6b;">${incidenciasGeneral}</strong></span>
-                    <span>📈 Avance: <strong>${avanceGeneral}%</strong></span>
-                </div>
-            </div>
-            
-            <!-- Barra de progreso general -->
-            <div style="background: #f8f9fa; padding: 8px 20px; border-bottom: 1px solid #e0e0e0;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 12px; font-weight: 600; min-width: 60px;">Progreso:</span>
-                    <div style="flex: 1; background: #e9ecef; border-radius: 10px; height: 12px; max-width: 400px;">
-                        <div style="width: ${avanceGeneral}%; height: 100%; background: linear-gradient(90deg, #28a745, #20c997); border-radius: 10px; transition: width 0.5s;"></div>
-                    </div>
-                    <span style="font-size: 13px; font-weight: bold; color: #28a745;">${avanceGeneral}%</span>
-                </div>
-            </div>
-            
-            <!-- Tabla de auditores -->
-            <div style="overflow-x: auto; border-radius: 0 0 12px 12px; border: 1px solid #e0e0e0; border-top: none;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                    <thead>
-                        <tr style="background: #f8f9fa; border-bottom: 2px solid #e0e0e0;">
-                            <th style="padding: 10px 12px; text-align: left; min-width: 150px;">👤 Auditor</th>
-                            <th style="padding: 10px 12px; text-align: center; min-width: 60px;">📊 Total</th>
-                            <th style="padding: 10px 12px; text-align: center; min-width: 60px;">⏳ Pend.</th>
-                            <th style="padding: 10px 12px; text-align: center; min-width: 60px;">🔄 Prog.</th>
-                            <th style="padding: 10px 12px; text-align: center; min-width: 60px;">✅ Hecho</th>
-                            <th style="padding: 10px 12px; text-align: center; min-width: 60px;">⚠️ Inc.</th>
-                            <th style="padding: 10px 12px; text-align: center; min-width: 100px;">📈 Avance</th>
-                            <th style="padding: 10px 12px; text-align: center; min-width: 80px;">🎯 Estado</th>
-                            <th style="padding: 10px 12px; text-align: center; min-width: 80px;">📦 Lotes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-
-        for (const auditor of auditoresOrdenados) {
-            const stats = progresoPorAuditor[auditor];
+        for (const [auditor, stats] of Object.entries(progresoPorAuditor)) {
             const porcentaje = stats.total > 0 ? ((stats.gestionado / stats.total) * 100).toFixed(1) : 0;
-            
-            let barColor = '#28a745';
-            if (porcentaje < 30) barColor = '#d93025';
-            else if (porcentaje < 60) barColor = '#f39c12';
-            else if (porcentaje < 85) barColor = '#019DF4';
-
-            let estadoTexto = '🟢 Activo';
-            let estadoColor = '#28a745';
-            if (stats.pendiente === stats.total && stats.total > 0) {
-                estadoTexto = '🟡 Sin iniciar';
-                estadoColor = '#f39c12';
-            } else if (stats.gestionado === stats.total && stats.total > 0) {
-                estadoTexto = '✅ Completado';
-                estadoColor = '#28a745';
-            } else if (stats.incidencias > 0) {
-                estadoTexto = `⚠️ ${stats.incidencias} incidencia(s)`;
-                estadoColor = '#d93025';
-            }
-
-            const tiempoEstimado = stats.total > 0 ? (stats.total * 15) : 0;
-            const tiempoFormateado = tiempoEstimado > 60 ? `${Math.round(tiempoEstimado / 60)}h` : `${tiempoEstimado}min`;
-
-            // 🔴 MOSTRAR CANTIDAD DE LOTES DEL AUDITOR
-            const cantidadLotes = stats.lotes.size;
 
             html += `
-                <tr style="border-bottom: 1px solid #f0f0f0;">
-                    <td style="padding: 10px 12px;">
-                        <strong>${escapeHtml(auditor)}</strong>
-                        <div style="font-size: 10px; color: var(--muted);">⏱️ ${tiempoFormateado} estimado</div>
-                    </td>
-                    <td style="padding: 10px 12px; text-align: center; font-weight: bold;">${stats.total}</td>
-                    <td style="padding: 10px 12px; text-align: center; color: var(--warning);">${stats.pendiente}</td>
-                    <td style="padding: 10px 12px; text-align: center; color: var(--accent);">${stats.en_proceso}</td>
-                    <td style="padding: 10px 12px; text-align: center; color: var(--ok); font-weight: bold;">${stats.gestionado}</td>
-                    <td style="padding: 10px 12px; text-align: center; ${stats.incidencias > 0 ? 'color: var(--danger); font-weight: bold;' : 'color: var(--muted);'}">${stats.incidencias}</td>
-                    <td style="padding: 10px 12px; text-align: center;">
-                        <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
-                            <div style="background: #e9ecef; border-radius: 10px; height: 8px; width: 80px;">
-                                <div style="width: ${porcentaje}%; height: 100%; background: ${barColor}; border-radius: 10px; transition: width 0.3s;"></div>
-                            </div>
-                            <span style="font-size: 12px; font-weight: bold; color: ${barColor};">${porcentaje}%</span>
-                        </div>
-                    </td>
-                    <td style="padding: 10px 12px; text-align: center;">
-                        <span style="color: ${estadoColor}; font-weight: 500; font-size: 12px;">${estadoTexto}</span>
-                    </td>
-                    <td style="padding: 10px 12px; text-align: center; font-size: 12px;">
-                        <span style="background: #e3f2fd; padding: 2px 10px; border-radius: 12px;">${cantidadLotes} lote(s)</span>
-                    </td>
-                </tr>
+                <div style="border: 1px solid #ddd; border-radius: 8px; padding: 10px;">
+                    <strong>🎧 ${escapeHtml(auditor)}</strong>
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                        <span>📊 Total: ${stats.total}</span>
+                        <span>⏳ Pendientes: ${stats.pendiente}</span>
+                        <span>✅ Gestionados: ${stats.gestionado}</span>
+                        <span>📈 Avance: ${porcentaje}%</span>
+                    </div>
+                    <div style="background: #e9ecef; border-radius: 10px; height: 8px; margin-top: 8px;">
+                        <div style="width: ${porcentaje}%; height: 100%; background: #28a745; border-radius: 10px;"></div>
+                    </div>
+                </div>
             `;
         }
 
-        html += `
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- Pie de tabla con resumen -->
-            <div style="
-                background: #f8f9fa; 
-                padding: 10px 20px; 
-                border-radius: 0 0 12px 12px;
-                border: 1px solid #e0e0e0;
-                border-top: none;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                flex-wrap: wrap;
-                gap: 10px;
-                font-size: 12px;
-                color: var(--muted);
-            ">
-                <div>
-                    📊 ${auditoresOrdenados.length} auditores activos | 
-                    📋 ${totalGeneral} tickets totales |
-                    📦 ${lotesActivos.length} lotes activos
-                </div>
-                <div>
-                    ⏳ ${pendientesGeneral} pendientes | 
-                    🔄 ${enProcesoGeneral} en proceso | 
-                    ✅ ${gestionadosGeneral} gestionados
-                    ${incidenciasGeneral > 0 ? `| ⚠️ ${incidenciasGeneral} incidencias` : ''}
-                </div>
-                <div>
-                    📈 Avance general: <strong style="color: #28a745;">${avanceGeneral}%</strong>
-                </div>
-            </div>
-        `;
-
+        html += '</div>';
         container.innerHTML = html;
-        
-        console.log(`✅ ${auditoresOrdenados.length} auditores mostrados - ${lotesActivos.length} lotes activos`);
-
-    } catch (error) {
-        console.error('❌ Error en actualizarTarjetasProgreso:', error);
-        container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--danger);">❌ Error al cargar progreso: ${error.message}</div>`;
     }
-}
     // ===== FIN FUNCIÓN: actualizarTarjetasProgreso =========================
 
     // ===== 18. INICIO FUNCIÓN: cargarSelectAuditoresFiltro ================
@@ -21771,103 +21352,64 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     
     // ===== 38. INICIO FUNCIÓN: eliminarLote ===============================
     async function eliminarLote(loteId) {
-    console.log(`🗑️ Eliminando lote ID: ${loteId}`);
+        console.log(`🗑️ Iniciando eliminación del lote ID: ${loteId}`);
 
-    // 🔴 PRIMERO: Intentar obtener el lote desde el historial global
-    let lote = window.lotesHistorialGlobal?.find(l => l.id === loteId);
-    
-    // 🔴 SI NO ESTÁ EN EL HISTORIAL, BUSCAR DIRECTAMENTE EN LA BD
-    if (!lote) {
-        console.log('🔍 Lote no encontrado en historial, consultando BD...');
+        const lote = window.lotesHistorialGlobal?.find(l => l.id === loteId);
+        if (!lote) {
+            alert('❌ No se encontró el lote especificado');
+            return;
+        }
+
+        const nombreArchivo = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : 'Desconocido';
+        const fechaCarga = lote.fecha_carga ? new Date(lote.fecha_carga).toLocaleString('es-ES') : 'Fecha desconocida';
+
+        const confirmar = confirm(
+            `⚠️ ¿ELIMINAR LOTE COMPLETO?\n\n` +
+            `📦 Lote ID: ${loteId}\n` +
+            `📄 Archivo: ${nombreArchivo}\n` +
+            `📅 Fecha carga: ${fechaCarga}\n\n` +
+            `⚠️ Esta acción ELIMINARÁ PERMANENTEMENTE todos los tickets asociados.\n\n` +
+            `¿Está ABSOLUTAMENTE SEGURO de continuar?`
+        );
+
+        if (!confirmar) return;
+
+        const codigo = prompt('Para confirmar, escribe "ELIMINAR LOTE" en mayúsculas:');
+        if (codigo !== 'ELIMINAR LOTE') {
+            alert('❌ Operación cancelada.');
+            return;
+        }
+
         try {
-            const db = getDB();
-            if (db) {
-                const { data, error } = await db
-                    .from('tareas_escucha')
-                    .select('*')
-                    .eq('id', loteId)
-                    .maybeSingle();
-                
-                if (!error && data) {
-                    lote = data;
-                    console.log('✅ Lote encontrado en BD:', lote);
+            // 🔴 CAMBIO: Usar API en lugar de PostgreSQL directo
+            await API.eliminarLote(loteId);
+            
+            alert(`✅ LOTE ELIMINADO CORRECTAMENTE\n\n📦 Lote ID: ${loteId}\n📄 Archivo: ${nombreArchivo}`);
+
+            // Recargar historial
+            await cargarHistorialLotes();
+            
+            // Si el lote eliminado era el activo, refrescar monitoreo
+            if (lote.estado === 'activo') {
+                await refrescarMonitoreoEscuchas();
+            }
+            
+            // Limpiar selección actual si estaba seleccionado
+            if (window.loteSeleccionadoId === loteId) {
+                window.loteSeleccionadoId = null;
+                const tbody = document.getElementById('tablaMonitoreoEscuchas');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 40px;">
+                        📭 El lote seleccionado ha sido eliminado. Seleccione otro lote para ver sus tickets.
+                    <\/td><\/tr>`;
                 }
             }
+
         } catch (error) {
-            console.warn('Error consultando BD:', error);
+            console.error('❌ Error eliminando lote:', error);
+            alert(`❌ Error al eliminar el lote:\n\n${error.message}`);
         }
     }
-    
-    // 🔴 SI AÚN NO SE ENCUENTRA, CREAR UN OBJETO CON LA INFORMACIÓN MÍNIMA
-    if (!lote) {
-        console.warn(`⚠️ No se encontró información del lote ${loteId}, pero se procederá a eliminar`);
-        lote = {
-            id: loteId,
-            nombre_archivo: 'Lote desconocido',
-            estado: 'inactivo'
-        };
-    }
-
-    const nombreArchivo = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : 'Desconocido';
-    const fechaCarga = lote.fecha_carga ? new Date(lote.fecha_carga).toLocaleString('es-ES') : 'Fecha desconocida';
-
-    const confirmar = confirm(
-        `⚠️ ¿ELIMINAR LOTE COMPLETO?\n\n` +
-        `📦 Lote ID: ${loteId}\n` +
-        `📄 Archivo: ${nombreArchivo}\n` +
-        `📅 Fecha carga: ${fechaCarga}\n\n` +
-        `⚠️ Esta acción ELIMINARÁ PERMANENTEMENTE todos los tickets asociados.\n\n` +
-        `¿Está ABSOLUTAMENTE SEGURO de continuar?`
-    );
-
-    if (!confirmar) return;
-
-    const codigo = prompt('Para confirmar, escribe "ELIMINAR LOTE" en mayúsculas:');
-    if (codigo !== 'ELIMINAR LOTE') {
-        alert('❌ Operación cancelada.');
-        return;
-    }
-
-    try {
-        // 🔴 ELIMINAR USANDO LA API
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch(`/api/escuchas/lotes/${loteId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al eliminar lote');
-        }
-
-        alert(`✅ LOTE ELIMINADO CORRECTAMENTE\n\n📦 Lote ID: ${loteId}\n📄 Archivo: ${nombreArchivo}`);
-
-        // 🔴 RECARGAR EL HISTORIAL PARA ACTUALIZAR LA TABLA
-        await cargarHistorialLotes();
-        
-        // 🔴 REFRESCAR MONITOREO
-        await refrescarMonitoreoEscuchas();
-        
-        // 🔴 LIMPIAR SELECCIÓN ACTUAL
-        if (window.loteSeleccionadoId === loteId) {
-            window.loteSeleccionadoId = null;
-            const tbody = document.getElementById('tablaMonitoreoEscuchas');
-            if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 40px;">
-                    📭 El lote seleccionado ha sido eliminado. Seleccione otro lote para ver sus tickets.
-                <\/td><\/tr>`;
-            }
-        }
-
-    } catch (error) {
-        console.error('❌ Error eliminando lote:', error);
-        alert(`❌ Error al eliminar el lote:\n\n${error.message}`);
-    }
-}
     // ===== FIN FUNCIÓN: eliminarLote =======================================
     
     // ===== 39. INICIO FUNCIÓN: cargarExclusionesGuardadas =================
@@ -30657,235 +30199,6 @@ function inicializarFiltrosGestionPersonasGP() {
     console.log("✅ Filtros de Gestión de Personas inicializados");
 }
 
-// ======================================================
-// EJECUTAR TAREA AHORA (DESDE LA TABLA)
-// ======================================================
-
-async function ejecutarTareaAhora(tareaId) {
-    if (!confirm(`⚠️ ¿Ejecutar la tarea ID ${tareaId} ahora?\n\nEsto iniciará el proceso de transcripción inmediatamente.`)) {
-        return;
-    }
-    
-    try {
-        const token = localStorage.getItem('meca_token');
-        
-        // Mostrar indicador en el botón
-        const buttons = document.querySelectorAll(`button[onclick*="ejecutarTareaAhora(${tareaId})"]`);
-        buttons.forEach(btn => {
-            btn.textContent = '⏳';
-            btn.disabled = true;
-        });
-        
-        const response = await fetch(`http://localhost:5001/api/transcripcion/tareas/${tareaId}/ejecutar`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            alert(`✅ Tarea ${tareaId} iniciada correctamente`);
-            
-            // Recargar la tabla de tareas y transcripciones después de unos segundos
-            setTimeout(() => {
-                if (typeof cargarTareasProgramadas === 'function') {
-                    cargarTareasProgramadas();
-                }
-                if (typeof cargarTranscripciones === 'function') {
-                    cargarTranscripciones();
-                }
-            }, 3000);
-            
-        } else {
-            alert(`❌ Error al ejecutar la tarea:\n${result.error || 'Error desconocido'}`);
-        }
-        
-    } catch (error) {
-        console.error('Error ejecutando tarea:', error);
-        alert(`❌ Error: ${error.message}`);
-    } finally {
-        // Restaurar botones
-        const buttons = document.querySelectorAll(`button[onclick*="ejecutarTareaAhora(${tareaId})"]`);
-        buttons.forEach(btn => {
-            btn.textContent = '▶️';
-            btn.disabled = false;
-        });
-    }
-}
-
-// ======================================================
-// VER LOGS DE TAREA (DESDE LA TABLA)
-// ======================================================
-
-async function verLogsTarea(tareaId) {
-    try {
-        const token = localStorage.getItem('meca_token');
-        
-        const response = await fetch(`http://localhost:5001/api/transcripcion/logs/${tareaId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        const result = await response.json();
-        
-        if (!result.logs || result.logs.length === 0) {
-            alert(`📋 TAREA #${tareaId}\n\n⏳ No hay logs disponibles. La tarea aún no se ha ejecutado.`);
-            return;
-        }
-        
-        // Generar mensaje con los logs
-        let mensaje = `📋 LOGS DE TAREA #${tareaId}\n`;
-        mensaje += `${'═'.repeat(50)}\n\n`;
-        
-        result.logs.forEach(log => {
-            mensaje += `  ${log}\n`;
-        });
-        
-        mensaje += `\n${'═'.repeat(50)}`;
-        mensaje += `\n📌 Total logs: ${result.logs.length}`;
-        
-        alert(mensaje);
-        
-    } catch (error) {
-        console.error('Error obteniendo logs:', error);
-        alert(`❌ Error al obtener logs:\n${error.message}`);
-    }
-}
-
-// ======================================================
-// EXPORTAR TAREAS A CSV
-// ======================================================
-
-function exportarTareasCSV() {
-    if (!tareasDataGlobal || tareasDataGlobal.length === 0) {
-        alert('⚠️ No hay datos de tareas para exportar');
-        return;
-    }
-    
-    // Headers
-    const headers = [
-        'ID',
-        'Nombre',
-        'Estado',
-        'Frecuencia',
-        'Origen',
-        'Carpeta/URL',
-        'Fecha Creación',
-        'Última Ejecución',
-        'Estado Ejecución',
-        'Archivos Procesados'
-    ];
-    
-    // Construir filas
-    const rows = tareasDataGlobal.map(t => [
-        t.id,
-        `"${t.nombre || ''}"`,
-        t.estado || '',
-        t.frecuencia || '',
-        t.tipo_origen || 'local',
-        `"${t.carpeta_origen || t.sftp_host || t.sharepoint_site || ''}"`,
-        t.fecha_creacion ? new Date(t.fecha_creacion).toLocaleString('es-ES') : '',
-        t.ultima_ejecucion ? new Date(t.ultima_ejecucion).toLocaleString('es-ES') : '',
-        t.ultima_ejecucion_estado || 'sin_ejecutar',
-        `${t.ultima_ejecucion_correctos || 0}/${t.ultima_ejecucion_total || 0}`
-    ]);
-    
-    // Generar CSV
-    const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-    ].join('\n');
-    
-    // Descargar
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tareas_programadas_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    alert(`✅ Exportadas ${tareasDataGlobal.length} tareas`);
-}
-
-// ======================================================
-// ELIMINAR TAREA PROGRAMADA
-// ======================================================
-
-async function eliminarTarea(tareaId, nombreTarea) {
-    // Confirmación con información detallada
-    const confirmar = confirm(
-        `⚠️ ¿ELIMINAR TAREA PROGRAMADA?\n\n` +
-        `🆔 ID: ${tareaId}\n` +
-        `📌 Nombre: ${nombreTarea || 'Sin nombre'}\n\n` +
-        `Esta acción eliminará:\n` +
-        `   • La tarea programada\n` +
-        `   • Todos los logs de ejecución asociados\n` +
-        `   • Todas las transcripciones generadas por esta tarea\n\n` +
-        `⚠️ Esta acción NO se puede deshacer.\n\n` +
-        `¿Está seguro de continuar?`
-    );
-    
-    if (!confirmar) return;
-    
-    // Confirmación adicional con código
-    const codigo = prompt('Para confirmar, escribe "ELIMINAR TAREA" en mayúsculas:');
-    if (codigo !== 'ELIMINAR TAREA') {
-        alert('❌ Operación cancelada.');
-        return;
-    }
-    
-    try {
-        const token = localStorage.getItem('meca_token');
-        
-        // Mostrar indicador en el botón
-        const buttons = document.querySelectorAll(`button[onclick*="eliminarTarea(${tareaId},"]`);
-        buttons.forEach(btn => {
-            btn.textContent = '⏳';
-            btn.disabled = true;
-        });
-        
-        const response = await fetch(`http://localhost:5001/api/transcripcion/tareas/${tareaId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(result.error || 'Error al eliminar tarea');
-        }
-        
-        alert(`✅ Tarea "${nombreTarea || tareaId}" eliminada correctamente`);
-        
-        // Recargar la tabla de tareas
-        if (typeof cargarTareasProgramadas === 'function') {
-            cargarTareasProgramadas();
-        }
-        
-        // También recargar transcripciones si es necesario
-        if (typeof cargarTranscripciones === 'function') {
-            cargarTranscripciones();
-        }
-        
-    } catch (error) {
-        console.error('Error eliminando tarea:', error);
-        alert(`❌ Error al eliminar la tarea:\n${error.message}`);
-    } finally {
-        // Restaurar botones
-        const buttons = document.querySelectorAll(`button[onclick*="eliminarTarea(${tareaId},"]`);
-        buttons.forEach(btn => {
-            btn.textContent = '🗑️';
-            btn.disabled = false;
-        });
-    }
-}
-
 // ======================================================================================
 // BLOQUE 14: FUNCIONES AUXILIARES Y DE NAVEGACIÓN
 // ======================================================================================
@@ -31072,15 +30385,6 @@ async function showTab(tabName, event) {
         if (tabName === 'transcripcion') {
             if (typeof cargarTranscripciones === 'function') {
                 cargarTranscripciones();
-            }
-        }
-
-        if (tabName === 'transcripcion') {
-            if (typeof cargarTareasProgramadas === 'function') {
-                setTimeout(cargarTareasProgramadas, 300);
-            }
-            if (typeof cargarTranscripciones === 'function') {
-                setTimeout(cargarTranscripciones, 500);
             }
         }
 
@@ -37102,11 +36406,6 @@ async function programarTareaTranscripcion() {
     const hora = document.getElementById('tareaHora').value;
     const modelo = document.getElementById('tareaModelo').value;
     const analizar = document.getElementById('tareaAnalizarOllama').checked;
-    const tipoOrigen = document.getElementById('tareaTipoOrigen').value;
-    const diaSemana = document.getElementById('tareaDiaSemana')?.value || null;
-    const diaMes = document.getElementById('tareaDiaMes')?.value || null;
-    const intervaloMinutos = document.getElementById('tareaIntervalo')?.value || null;
-
     const status = document.getElementById('tareaStatus');
     
     if (!nombre) {
@@ -37116,176 +36415,27 @@ async function programarTareaTranscripcion() {
     
     status.innerHTML = '<span style="color: var(--accent);">⏳ Creando tarea...</span>';
     
-    // Construir datos según el origen
-    const data = {
-        nombre,
-        frecuencia,
-        hora_ejecucion: hora || null,
-        dia_semana: parseInt(diaSemana) || null,
-        dia_mes: parseInt(diaMes) || null,
-        intervalo_minutos: parseInt(intervaloMinutos) || null,
-        modelo_whisper: modelo,
-        analizar_con_ollama: analizar,
-        creado_por: 'MECA',
-        tipo_origen: tipoOrigen
-    };
-    
-    // Configuración local
-    if (tipoOrigen === 'local') {
-        data.carpeta_origen = document.getElementById('tareaCarpetaOrigen').value;
-    }
-    
-    // Configuración SFTP
-    if (tipoOrigen === 'sftp') {
-        data.sftp_host = document.getElementById('tareaSftpHost').value;
-        data.sftp_port = parseInt(document.getElementById('tareaSftpPort').value) || 22;
-        data.sftp_user = document.getElementById('tareaSftpUser').value;
-        data.sftp_password = document.getElementById('tareaSftpPassword').value;
-        data.sftp_ruta = document.getElementById('tareaSftpRuta').value || '/';
-    }
-    
-    // Configuración SharePoint
-    if (tipoOrigen === 'sharepoint') {
-        data.sharepoint_site = document.getElementById('tareaSharepointSite').value;
-        data.sharepoint_library = document.getElementById('tareaSharepointLibrary').value;
-        data.sharepoint_user = document.getElementById('tareaSharepointUser').value;
-        data.sharepoint_password = document.getElementById('tareaSharepointPassword').value;
-    }
-    
     try {
-        const result = await API.crearTareaTranscripcion(data);
+        const result = await API.crearTareaTranscripcion({
+            nombre,
+            frecuencia,
+            hora_ejecucion: hora,
+            modelo_whisper: modelo,
+            analizar_con_ollama: analizar,
+            creado_por: 'MECA'
+        });
         
         if (result.success) {
             status.innerHTML = `<span style="color: var(--ok);">✅ Tarea creada: ID ${result.id}</span>`;
             document.getElementById('tareaNombre').value = '';
+            
+            // Recargar lista
             setTimeout(cargarTranscripciones, 1000);
         } else {
             status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${result.error}</span>`;
         }
     } catch (error) {
         status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${error.message}</span>`;
-    }
-}
-
-// ======================================================
-// CARGAR TAREAS PROGRAMADAS (CON BOTÓN ELIMINAR)
-// ======================================================
-
-let tareasDataGlobal = [];
-
-async function cargarTareasProgramadas() {
-    const tbody = document.getElementById('tablaTareasProgramadas');
-    if (!tbody) return;
-    
-    const filtroOrigen = document.getElementById('filtroTareaOrigen')?.value || '';
-    const filtroEstado = document.getElementById('filtroTareaEstado')?.value || '';
-    const filtroEjecucion = document.getElementById('filtroTareaEjecucion')?.value || '';
-    const busqueda = document.getElementById('buscarTarea')?.value?.toLowerCase() || '';
-    
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">⏳ Cargando...</td></tr>';
-    
-    try {
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch('http://localhost:5001/api/transcripcion/tareas/todas', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        const result = await response.json();
-        
-        if (!result.success) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--danger);">❌ ${result.error || 'Error'}</td></tr>`;
-            return;
-        }
-        
-        let tareas = result.data || [];
-        tareasDataGlobal = tareas;
-        
-        // Aplicar filtros
-        if (filtroOrigen) {
-            tareas = tareas.filter(t => t.tipo_origen === filtroOrigen);
-        }
-        if (filtroEstado) {
-            tareas = tareas.filter(t => t.estado === filtroEstado);
-        }
-        if (filtroEjecucion === 'sin_ejecutar') {
-            tareas = tareas.filter(t => !t.ultima_ejecucion);
-        } else if (filtroEjecucion) {
-            tareas = tareas.filter(t => t.ultima_ejecucion_estado === filtroEjecucion);
-        }
-        if (busqueda) {
-            tareas = tareas.filter(t => 
-                t.nombre?.toLowerCase().includes(busqueda) ||
-                t.carpeta_origen?.toLowerCase().includes(busqueda) ||
-                t.sftp_host?.toLowerCase().includes(busqueda)
-            );
-        }
-        
-        // Actualizar badges
-        const total = result.data?.length || 0;
-        const activas = result.data?.filter(t => t.estado === 'activo').length || 0;
-        const conError = result.data?.filter(t => t.ultima_ejecucion_estado === 'error').length || 0;
-        
-        document.getElementById('totalTareasBadge').textContent = `${total} tareas`;
-        document.getElementById('activasBadge').textContent = `${activas} activas`;
-        document.getElementById('erroresBadge').textContent = `${conError} errores`;
-        
-        if (tareas.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--muted);">📭 No hay tareas</td></tr>';
-            return;
-        }
-        
-        let html = '';
-        for (const tarea of tareas) {
-            const origenIcono = tarea.tipo_origen === 'sftp' ? '🌐' : (tarea.tipo_origen === 'sharepoint' ? '📁' : '📂');
-            
-            let estadoBadge = '';
-            if (tarea.estado === 'activo') {
-                estadoBadge = '<span style="color: var(--ok); font-weight: bold;">✅</span>';
-            } else {
-                estadoBadge = '<span style="color: #6c757d;">⏸️</span>';
-            }
-            
-            let ejecucionBadge = '';
-            if (tarea.ultima_ejecucion_estado === 'completado') {
-                ejecucionBadge = '<span style="color: var(--ok);">✅</span>';
-            } else if (tarea.ultima_ejecucion_estado === 'en_proceso') {
-                ejecucionBadge = '<span style="color: var(--accent);">🔄</span>';
-            } else if (tarea.ultima_ejecucion_estado === 'error') {
-                ejecucionBadge = '<span style="color: var(--danger);">❌</span>';
-            } else {
-                ejecucionBadge = '<span style="color: #6c757d;">⏳</span>';
-            }
-            
-            const fechaUltima = tarea.ultima_ejecucion ? new Date(tarea.ultima_ejecucion).toLocaleString('es-ES') : '-';
-            
-            html += `
-                <tr>
-                    <td style="padding: 6px 8px; text-align: center; font-weight: bold;">${tarea.id}</td>
-                    <td style="padding: 6px 8px;">
-                        <strong style="font-size: 12px;">${escapeHtml(tarea.nombre)}</strong>
-                        <div style="font-size: 10px; color: var(--muted);">${tarea.frecuencia || 'manual'}</div>
-                    </td>
-                    <td style="padding: 6px 8px; text-align: center; font-size: 16px;" title="${tarea.tipo_origen || 'local'}">${origenIcono}</td>
-                    <td style="padding: 6px 8px; text-align: center; font-size: 12px;">${tarea.frecuencia || '-'}</td>
-                    <td style="padding: 6px 8px; text-align: center;">
-                        ${estadoBadge} ${ejecucionBadge}
-                    </td>
-                    <td style="padding: 6px 8px; text-align: center; font-size: 11px;">${fechaUltima}</td>
-                    <td style="padding: 6px 8px; text-align: center; white-space: nowrap;">
-                        <button onclick="ejecutarTareaAhora(${tarea.id})" style="background: var(--accent); padding: 2px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" title="Ejecutar ahora">▶️</button>
-                        <button onclick="verLogsTarea(${tarea.id})" style="background: #7b1fa2; padding: 2px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" title="Ver logs">📋</button>
-                        <!-- 🔴 BOTÓN ELIMINAR -->
-                        <button onclick="eliminarTarea(${tarea.id}, '${escapeHtml(tarea.nombre)}')" style="background: #d93025; padding: 2px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" title="Eliminar tarea">🗑️</button>
-                    </td>
-                </tr>
-            `;
-        }
-        
-        tbody.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error cargando tareas:', error);
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--danger);">❌ ${error.message}</td></tr>`;
     }
 }
 
@@ -37391,111 +36541,6 @@ document.addEventListener('showTab', function(e) {
     }
 });
 
-// ======================================================
-// FUNCIÓN: toggleOrigenConfig
-// ======================================================
-
-function toggleOrigenConfig() {
-    const tipo = document.getElementById('tareaTipoOrigen').value;
-    
-    document.getElementById('configLocal').style.display = tipo === 'local' ? 'block' : 'none';
-    document.getElementById('configSftp').style.display = tipo === 'sftp' ? 'block' : 'none';
-    document.getElementById('configSharepoint').style.display = tipo === 'sharepoint' ? 'block' : 'none';
-}
-
-// ======================================================
-// FUNCIÓN: testSftpConexion
-// ======================================================
-
-async function testSftpConexion() {
-    const resultDiv = document.getElementById('sftpTestResult');
-    resultDiv.innerHTML = '⏳ Probando conexión...';
-    resultDiv.style.color = 'var(--accent)';
-    
-    const data = {
-        host: document.getElementById('tareaSftpHost').value,
-        port: parseInt(document.getElementById('tareaSftpPort').value) || 22,
-        username: document.getElementById('tareaSftpUser').value,
-        password: document.getElementById('tareaSftpPassword').value
-    };
-    
-    if (!data.host || !data.username || !data.password) {
-        resultDiv.innerHTML = '⚠️ Complete todos los campos';
-        resultDiv.style.color = 'var(--danger)';
-        return;
-    }
-    
-    try {
-        const response = await fetch('http://localhost:5001/api/transcripcion/test/sftp', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('meca_token')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            resultDiv.innerHTML = '✅ ' + result.message;
-            resultDiv.style.color = 'var(--ok)';
-        } else {
-            resultDiv.innerHTML = '❌ ' + (result.error || 'Error de conexión');
-            resultDiv.style.color = 'var(--danger)';
-        }
-    } catch (error) {
-        resultDiv.innerHTML = '❌ Error: ' + error.message;
-        resultDiv.style.color = 'var(--danger)';
-    }
-}
-
-// ======================================================
-// FUNCIÓN: testSharepointConexion
-// ======================================================
-
-async function testSharepointConexion() {
-    const resultDiv = document.getElementById('sharepointTestResult');
-    resultDiv.innerHTML = '⏳ Probando conexión...';
-    resultDiv.style.color = 'var(--accent)';
-    
-    const data = {
-        site_url: document.getElementById('tareaSharepointSite').value,
-        username: document.getElementById('tareaSharepointUser').value,
-        password: document.getElementById('tareaSharepointPassword').value,
-        library: document.getElementById('tareaSharepointLibrary').value
-    };
-    
-    if (!data.site_url || !data.username || !data.password || !data.library) {
-        resultDiv.innerHTML = '⚠️ Complete todos los campos';
-        resultDiv.style.color = 'var(--danger)';
-        return;
-    }
-    
-    try {
-        const response = await fetch('http://localhost:5001/api/transcripcion/test/sharepoint', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('meca_token')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            resultDiv.innerHTML = '✅ ' + result.message;
-            resultDiv.style.color = 'var(--ok)';
-        } else {
-            resultDiv.innerHTML = '❌ ' + (result.error || 'Error de conexión');
-            resultDiv.style.color = 'var(--danger)';
-        }
-    } catch (error) {
-        resultDiv.innerHTML = '❌ Error: ' + error.message;
-        resultDiv.style.color = 'var(--danger)';
-    }
-}
 
 // ======================================================
 // FUNCIÓN PARA ACTUALIZAR HEADER CON DATOS DEL USUARIO

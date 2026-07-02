@@ -27,9 +27,9 @@ const pool = new Pool({
     database: process.env.DB_NAME || 'postgres',   // Nombre de la BD
 
     // ⚙️ CONFIGURACIÓN DEL POOL
-    max: 20,                    // Máximo de conexiones simultáneas
-    idleTimeoutMillis: 30000,   // Tiempo máximo de inactividad (30s)
-    connectionTimeoutMillis: 5000, // Tiempo máximo para conectar (5s)
+    max: 30,                    // Máximo de conexiones simultáneas
+    idleTimeoutMillis: 60000,   // Tiempo máximo de inactividad (30s)
+    connectionTimeoutMillis: 10000, // Tiempo máximo para conectar (5s)
 });
 
 // ======================================================

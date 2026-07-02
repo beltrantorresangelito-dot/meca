@@ -7864,6 +7864,15 @@ function manejarCambioSelectConReglas(select) {
         texto: select.options[select.selectedIndex]?.text
     });
     
+    // ======================================================
+    // 🔴 PASO 1: ACTUALIZAR EL PESO DEL SELECT ACTUAL (SIEMPRE)
+    // ======================================================
+    // Esta es la línea que faltaba
+    recalcularSubmotivo(select);
+    
+    // ======================================================
+    // PASO 2: BUSCAR REGLAS APLICABLES
+    // ======================================================
     const reglasAplicables = reglasEvaluacionGlobal.filter(regla => {
         const coincideSubmotivo = !regla.submotivo_origen || select.dataset.submotivo === regla.submotivo_origen;
         const coincideBloque = !regla.bloque_origen || select.dataset.bloque === regla.bloque_origen;
@@ -7873,19 +7882,29 @@ function manejarCambioSelectConReglas(select) {
     
     if (reglasAplicables.length === 0) {
         console.log('   ℹ️ No hay reglas definidas para este select');
-        if (typeof actualizarResultadoAtributo === 'function') {
-            actualizarResultadoAtributo(select, select.dataset.atributo);
+        // Recalcular atributo y frente
+        const bloque = select.dataset.bloque;
+        const atributo = select.dataset.atributo;
+        if (bloque && atributo) {
+            recalcularAtributoDinamico(bloque, atributo);
+            recalcularFrente(bloque);
+            recalcularNotaFinalGlobal();
         }
         return;
     }
     
     console.log(`   📋 Reglas aplicables: ${reglasAplicables.length}`);
     
+    // ======================================================
+    // PASO 3: EJECUTAR REGLAS
+    // ======================================================
     for (const regla of reglasAplicables) {
         ejecutarReglaConRehabilitacion(regla, select);
     }
     
-    // Recalcular todo dinámicamente
+    // ======================================================
+    // PASO 4: RECALCULAR TODO DINÁMICAMENTE
+    // ======================================================
     setTimeout(() => {
         const frentes = document.querySelectorAll('.frente-container');
         frentes.forEach(frenteContainer => {
@@ -7897,7 +7916,6 @@ function manejarCambioSelectConReglas(select) {
         recalcularNotaFinalGlobal();
     }, 100);
 }
-
 
 
 // ======================================================
