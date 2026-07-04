@@ -94,6 +94,1681 @@
     let mesFiltroGP = 'todos';  // 'todos' o formato 'YYYY-MM'
 
 // ======================================================
+// CONFIGURACIÓN DE CACHÉ PARA MATRICES
+// ======================================================
+
+// Usar una variable diferente para evitar colisiones
+const MATRIZ_CACHE_DURACION = 10 * 60 * 1000; // 10 minutos
+const matrizCacheStore = {};
+
+// ======================================================
+// LIMPIAR CACHÉ DE MATRIZ AL RECARGAR LA PÁGINA
+// ======================================================
+
+// 🔴 FORZAR LIMPIEZA DE CACHÉ EN CADA CARGA
+// Esto asegura que siempre se obtengan los datos más recientes de la BD
+(function limpiarCacheAlInicio() {
+    // Limpiar caché en memoria
+    for (const key in matrizCacheStore) {
+        delete matrizCacheStore[key];
+    }
+    console.log('🗑️ Caché de matriz limpiada al iniciar la página');
+    
+    // También limpiar localStorage si existe
+    try {
+        localStorage.removeItem('matrizCacheStore');
+        localStorage.removeItem('estructura_evaluacion_v4');
+        localStorage.removeItem('estructura_evaluacion_v4_time');
+    } catch(e) {
+        // Ignorar errores de localStorage
+    }
+})();
+
+// ======================================================
+// FUNCIÓN: obtenerVersionMatrizPorFecha
+// ======================================================
+
+async function obtenerVersionMatrizPorFecha(fechaEvaluacion) {
+    console.log(`📅 Buscando versión de matriz para fecha: ${fechaEvaluacion}`);
+    
+    const db = getDB();
+    if (!db) {
+        console.error('❌ Base de datos no disponible');
+        return null;
+    }
+
+    try {
+        // Si no hay fecha, usar la versión activa
+        if (!fechaEvaluacion || fechaEvaluacion === 'Sin fecha' || fechaEvaluacion === 'N/A') {
+            console.log('   ⚠️ Sin fecha, usando versión activa');
+            const { data: activa, error: activaError } = await db
+                .from('versiones_matriz')
+                .select('*')
+                .eq('activa', true)
+                .limit(1);
+
+            if (activaError || !activa || activa.length === 0) {
+                console.error('❌ No hay versión activa');
+                return null;
+            }
+            console.log(`   ✅ Usando versión activa: ${activa[0].version} (ID: ${activa[0].id})`);
+            return activa[0];
+        }
+
+        // Convertir fecha a formato YYYY-MM-DD para comparación
+        let fechaComparable = null;
+        
+        if (fechaEvaluacion.includes('/')) {
+            const fechaParte = fechaEvaluacion.split(' ')[0];
+            const partes = fechaParte.split('/');
+            if (partes.length === 3) {
+                fechaComparable = `${partes[2]}-${partes[1]}-${partes[0]}`;
+            }
+        } else if (fechaEvaluacion.includes('-')) {
+            fechaComparable = fechaEvaluacion.split('T')[0];
+        }
+
+        if (!fechaComparable) {
+            console.warn(`   ⚠️ Formato de fecha no reconocido: ${fechaEvaluacion}, usando versión activa`);
+            const { data: activa, error: activaError } = await db
+                .from('versiones_matriz')
+                .select('*')
+                .eq('activa', true)
+                .limit(1);
+
+            if (activaError || !activa || activa.length === 0) {
+                console.error('❌ No hay versión activa');
+                return null;
+            }
+            return activa[0];
+        }
+
+        console.log(`   🔍 Buscando versión con fecha_vigencia <= ${fechaComparable}`);
+
+        // Buscar la versión más reciente con fecha_vigencia <= fechaEvaluacion
+        const { data: versiones, error: versionError } = await db
+            .from('versiones_matriz')
+            .select('*')
+            .lte('fecha_vigencia', fechaComparable)
+            .order('fecha_vigencia', { ascending: false })
+            .limit(1);
+
+        if (versionError) {
+            console.error('❌ Error buscando versión:', versionError);
+            return null;
+        }
+
+        if (versiones && versiones.length > 0) {
+            const version = versiones[0];
+            const estado = version.activa ? 'ACTIVA' : 'INACTIVA (histórica)';
+            console.log(`   ✅ Versión encontrada: ${version.version} (${estado}) - vigente desde ${version.fecha_vigencia}`);
+            return version;
+        }
+
+        // Si no hay versión para esa fecha, usar la activa
+        console.log('   ⚠️ No hay versión para esa fecha, usando versión activa');
+        const { data: activa, error: activaError } = await db
+            .from('versiones_matriz')
+            .select('*')
+            .eq('activa', true)
+            .limit(1);
+
+        if (activaError || !activa || activa.length === 0) {
+            console.error('❌ No hay versión activa');
+            return null;
+        }
+        console.log(`   ✅ Usando versión activa: ${activa[0].version}`);
+        return activa[0];
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        return null;
+    }
+}
+
+// ======================================================
+// FUNCIÓN: obtenerMatrizPorVersion (VERSIÓN CORREGIDA)
+// ======================================================
+async function obtenerMatrizPorVersion(versionId, forzarRecarga = false) {
+    console.log(`📥 Obteniendo matriz para versión ID: ${versionId}`);
+    
+    // Verificar caché
+    if (!forzarRecarga && matrizCacheStore[versionId]) {
+        const cache = matrizCacheStore[versionId];
+        if ((Date.now() - cache.timestamp) < MATRIZ_CACHE_DURACION) {
+            console.log(`   📦 Usando caché para versión ${versionId}`);
+            return cache.matriz;
+        }
+    }
+
+    const db = getDB();
+    if (!db) {
+        console.error('❌ Base de datos no disponible');
+        return null;
+    }
+
+    try {
+        // 1. OBTENER LA VERSIÓN
+        const { data: version, error: versionError } = await db
+            .from('versiones_matriz')
+            .select('id, version, activa, fecha_vigencia')
+            .eq('id', versionId)
+            .limit(1);
+
+        if (versionError || !version || version.length === 0) {
+            console.error(`❌ Versión ${versionId} no encontrada`);
+            return null;
+        }
+
+        console.log(`   📌 Versión: ${version[0].version} (${version[0].activa ? 'ACTIVA' : 'HISTÓRICA'})`);
+
+        // 2. OBTENER TODOS LOS FRENTES DE LA VERSIÓN
+        const { data: frentes, error: frentesError } = await db
+            .from('version_frentes')
+            .select('id, codigo, nombre')
+            .eq('version_id', versionId)
+            .eq('activo', true);
+
+        if (frentesError) {
+            console.error('❌ Error obteniendo frentes:', frentesError);
+            return null;
+        }
+
+        const matriz = {};
+        let totalSubs = 0;
+
+        for (const frente of frentes) {
+            // 3. OBTENER ATRIBUTOS DEL FRENTE
+            const { data: atributos, error: atributosError } = await db
+                .from('version_atributos')
+                .select('id, nombre')
+                .eq('version_frente_id', frente.id)
+                .eq('activo', true);
+
+            if (atributosError) {
+                console.warn(`   ⚠️ Error en atributos para ${frente.codigo}:`, atributosError);
+                continue;
+            }
+
+            for (const attr of atributos) {
+                // 4. OBTENER SUB-MOTIVOS CON CLASIFICACION
+                const { data: subMotivos, error: subError } = await db
+                    .from('version_sub_motivos')
+                    .select('codigo, descripcion, clasificacion')
+                    .eq('version_atributo_id', attr.id)
+                    .eq('activo', true);
+
+                if (subError) {
+                    console.warn(`   ⚠️ Error en sub-motivos para ${attr.nombre}:`, subError);
+                    continue;
+                }
+
+                for (const sub of subMotivos) {
+                    // 🔴 GUARDAR SOLO LA CLASIFICACIÓN DE LA BD
+                    const clasificacion = sub.clasificacion || 'PROCESO';
+                    
+                    // 🔴 NO ASIGNAR 'tipo' MANUALMENTE AQUÍ
+                    // Eso se hará en obtenerDetalleQuiebresPorEvaluacion
+                    matriz[sub.codigo] = {
+                        motivo: frente.nombre,
+                        atributo: attr.nombre,
+                        clasificacion: clasificacion,
+                        frente_codigo: frente.codigo
+                    };
+                    totalSubs++;
+                }
+            }
+        }
+
+        // Guardar en caché
+        matrizCacheStore[versionId] = {
+            matriz: matriz,
+            timestamp: Date.now(),
+            version: version[0]
+        };
+
+        console.log(`   ✅ Matriz cargada: ${totalSubs} sub-motivos`);
+        
+        // Contar clasificaciones para diagnóstico
+        const conteo = { PROCESO: 0, 'HABILIDADES BLANDAS': 0, FEEDBACK: 0 };
+        for (const [key, value] of Object.entries(matriz)) {
+            if (conteo[value.clasificacion] !== undefined) {
+                conteo[value.clasificacion]++;
+            }
+        }
+        console.log('   📊 Clasificaciones en matriz:', conteo);
+
+        return matriz;
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        return null;
+    }
+}
+// ======================================================
+// FUNCIÓN: obtenerMatrizParaFecha (VERSIÓN DINÁMICA)
+// ======================================================
+async function obtenerMatrizParaFecha(fechaEvaluacion = null) {
+    console.log(`🔍 Obteniendo matriz para fecha: ${fechaEvaluacion || 'actual'}`);
+    
+    // 🔴 OBTENER LA VERSIÓN DE MATRIZ PARA ESA FECHA
+    const version = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
+    if (!version) {
+        console.error('❌ No se encontró versión');
+        return null;
+    }
+
+    // 🔴 OBTENER LA MATRIZ PARA ESA VERSIÓN
+    const matriz = await obtenerMatrizPorVersion(version.id);
+    return matriz;
+}
+// ======================================================
+// FUNCIÓN: obtenerTipoAccionPorSubmotivo (VERSIÓN DINÁMICA)
+// ======================================================
+async function obtenerTipoAccionPorSubmotivo(submotivo, fechaEvaluacion = null) {
+    // 🔴 OBTENER LA MATRIZ DINÁMICA DESDE LA BD
+    const matriz = await obtenerMatrizParaFecha(fechaEvaluacion);
+    
+    if (!matriz) {
+        console.warn(`⚠️ No se pudo cargar matriz para ${fechaEvaluacion || 'fecha actual'}`);
+        return 'proceso';
+    }
+    
+    if (matriz[submotivo]) {
+        const tipo = matriz[submotivo].tipo;
+        return tipo === 'procesos' ? 'proceso' : tipo;
+    }
+    
+    // Fallback: determinar por frente
+    const frente = determinarFrenteSubmotivo(submotivo);
+    if (frente === 'cliente' || frente === 'negocio') {
+        return 'feedback';
+    }
+    if (frente === 'proceso') {
+        return 'proceso';
+    }
+    return 'proceso';
+}
+
+// ======================================================
+// FUNCIÓN: clasificarPDAporTipo (ACTUALIZADA)
+// ======================================================
+
+async function clasificarPDAporTipo(submotivosFallados, fechaEvaluacion = null) {
+    console.log(`📋 Clasificando PDA para ${submotivosFallados.length} submotivos...`);
+    console.log(`   📅 Fecha de referencia: ${fechaEvaluacion || 'actual'}`);
+
+    const matriz = await obtenerMatrizParaFecha(fechaEvaluacion);
+    
+    if (!matriz) {
+        console.warn('⚠️ No se pudo cargar matriz, usando clasificación por defecto');
+        return clasificarPDAporTipoFallback(submotivosFallados);
+    }
+
+    const version = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
+    if (version) {
+        const estado = version.activa ? 'ACTIVA' : 'HISTÓRICA';
+        console.log(`   📌 Usando matriz: ${version.version} (${estado}) - vigente desde ${version.fecha_vigencia}`);
+    }
+
+    const resultado = {
+        tipo: null,
+        requiereProcesos: false,
+        requiereHabilidades: false,
+        requiereFeedback: false,
+        detalle: {
+            procesos: [],
+            habilidades: [],
+            feedback: []
+        },
+        mensaje: '',
+        resumenTipos: []
+    };
+
+    for (const submotivo of submotivosFallados) {
+        const info = matriz[submotivo];
+        const tipo = info ? info.tipo : 'proceso';
+        
+        switch (tipo) {
+            case 'procesos':
+                resultado.requiereProcesos = true;
+                if (!resultado.detalle.procesos.includes(submotivo)) {
+                    resultado.detalle.procesos.push(submotivo);
+                }
+                break;
+            case 'habilidades':
+                resultado.requiereHabilidades = true;
+                if (!resultado.detalle.habilidades.includes(submotivo)) {
+                    resultado.detalle.habilidades.push(submotivo);
+                }
+                break;
+            case 'feedback':
+                resultado.requiereFeedback = true;
+                if (!resultado.detalle.feedback.includes(submotivo)) {
+                    resultado.detalle.feedback.push(submotivo);
+                }
+                break;
+        }
+    }
+
+    const tiposRequeridos = [];
+    if (resultado.requiereProcesos) tiposRequeridos.push('procesos');
+    if (resultado.requiereHabilidades) tiposRequeridos.push('habilidades');
+    if (resultado.requiereFeedback) tiposRequeridos.push('feedback');
+
+    resultado.resumenTipos = tiposRequeridos;
+
+    if (tiposRequeridos.length === 0) {
+        resultado.tipo = 'ninguno';
+        resultado.mensaje = 'No se requiere ningún tipo de PDA';
+    } else if (tiposRequeridos.length === 1) {
+        resultado.tipo = tiposRequeridos[0];
+        const nombres = {
+            'procesos': 'Capacitación de Procesos',
+            'habilidades': 'Capacitación de Habilidades Blandas',
+            'feedback': 'Feedback Directo'
+        };
+        resultado.mensaje = `PDA de tipo: ${nombres[tiposRequeridos[0]]}`;
+    } else {
+        resultado.tipo = 'ambos';
+        const nombres = tiposRequeridos.map(t => {
+            const map = {
+                'procesos': 'Procesos',
+                'habilidades': 'Habilidades Blandas',
+                'feedback': 'Feedback'
+            };
+            return map[t];
+        });
+        resultado.mensaje = `PDA combinado: ${nombres.join(' + ')}`;
+    }
+
+    console.log(`✅ Clasificación: ${resultado.tipo} | ${resultado.mensaje}`);
+    return resultado;
+}
+
+function clasificarPDAporTipoFallback(submotivosFallados) {
+    const resultado = {
+        tipo: 'procesos',
+        requiereProcesos: true,
+        requiereHabilidades: false,
+        requiereFeedback: false,
+        detalle: { procesos: submotivosFallados, habilidades: [], feedback: [] },
+        mensaje: 'PDA de tipo: Procesos (fallback)',
+        resumenTipos: ['procesos']
+    };
+    return resultado;
+}
+
+// ======================================================
+// FUNCIÓN: obtenerDetalleQuiebresPorEvaluacion (VERSIÓN CORREGIDA)
+// ======================================================
+async function obtenerDetalleQuiebresPorEvaluacion(evaluacionesCiclo) {
+    console.log(`📊 Analizando ${evaluacionesCiclo.length} evaluaciones del ciclo...`);
+    
+    // Obtener la fecha de referencia para la matriz
+    const primeraEvaluacion = evaluacionesCiclo[0];
+    const fechaEvaluacion = primeraEvaluacion?.fechaOriginal || primeraEvaluacion?.fecha || null;
+    console.log(`   📅 Fecha de referencia para matriz: ${fechaEvaluacion || 'actual'}`);
+    
+    // OBTENER LA MATRIZ DINÁMICA DESDE LA BD
+    const matriz = await obtenerMatrizParaFecha(fechaEvaluacion);
+    
+    // 🔴 DIAGNÓSTICO: Verificar que la matriz NO esté vacía
+    console.log('🔍 MATRIZ EN obtenerDetalleQuiebresPorEvaluacion:');
+    console.log('   ¿Existe?', !!matriz);
+    console.log('   Cantidad de submotivos:', matriz ? Object.keys(matriz).length : 0);
+    if (matriz) {
+        const ejemplos = Object.entries(matriz).slice(0, 5);
+        ejemplos.forEach(([key, value]) => {
+            console.log(`      ${key} → ${value.clasificacion}`);
+        });
+    }
+    
+    const resultado = {
+        evaluaciones: [],
+        resumen: {
+            totalEvaluaciones: evaluacionesCiclo.length,
+            evaluacionesConFallas: 0,
+            evaluacionesSinFallas: 0,
+            totalFallas: 0,
+            totalSubmotivosUnicos: 0,
+            fallasPorBloque: { ENC: 0, ECUF: 0, ECN: 0 },
+            submotivosMasFrecuentes: {},
+            submotivosPorTipo: {
+                procesos: [],
+                habilidades: [],
+                feedback: []
+            },
+            resumenPorTipo: {
+                procesos: { total: 0, submotivos: {}, atributos: {}, evaluaciones: {} },
+                habilidades: { total: 0, submotivos: {}, atributos: {}, evaluaciones: {} },
+                feedback: { total: 0, submotivos: {}, atributos: {}, evaluaciones: {} }
+            }
+        },
+        audiosQuiebre: []
+    };
+
+    // PROCESAR CADA EVALUACIÓN
+    for (const evalItem of evaluacionesCiclo) {
+        const idAudio = evalItem.idLlamada || evalItem.ticketPSI || evalItem.id || 'Sin ID';
+        const fecha = evalItem.fechaOriginal || evalItem.fecha || 'Sin fecha';
+        const nota = evalItem.notaFinal || 0;
+        
+        const detalles = evalItem.detalles || [];
+        
+        // Filtrar solo los que NO cumplen (fallas)
+        const fallas = detalles.filter(d => {
+            const cumple = d.cumple === true || d.cumple === 'true' || d.cumple === 1 || d.cumple === '1';
+            return !cumple;
+        });
+
+        if (fallas.length > 0) {
+            resultado.resumen.evaluacionesConFallas++;
+            resultado.resumen.totalFallas += fallas.length;
+
+            // PROCESAR CADA FALLA - 🔴 SIN CLASIFICACIÓN MANUAL
+            const fallasProcesadas = fallas.map(f => {
+                const submotivo = f.submotivo || 'Sin submotivo';
+                const bloque = f.bloque || 'proceso';
+                const atributo = f.atributo || 'Sin atributo';
+                
+                // 🔴 DETERMINAR LA CLASIFICACIÓN SOLO DESDE LA MATRIZ (BD)
+                let tipo = 'proceso';
+                let clasificacion = 'PROCESO';
+                
+                if (matriz && matriz[submotivo]) {
+                    // 🔴 USAR SOLO LA CLASIFICACIÓN DE LA BD
+                    clasificacion = matriz[submotivo].clasificacion || 'PROCESO';
+                    
+                    // 🔴 ASIGNAR TIPO SEGÚN LA CLASIFICACIÓN DE LA BD
+                    if (clasificacion === 'HABILIDADES BLANDAS') {
+                        tipo = 'habilidades';
+                    } else if (clasificacion === 'FEEDBACK') {
+                        tipo = 'feedback';
+                    } else {
+                        tipo = 'proceso';
+                    }
+                } else {
+                    // 🔴 FALLBACK: Si no está en la matriz, usar el bloque
+                    console.warn(`   ⚠️ Submotivo "${submotivo}" no encontrado en matriz`);
+                    if (bloque === 'ENC' || bloque === 'cliente') {
+                        tipo = 'habilidades';
+                        clasificacion = 'HABILIDADES BLANDAS';
+                    } else if (bloque === 'ECUF' || bloque === 'negocio') {
+                        tipo = 'feedback';
+                        clasificacion = 'FEEDBACK';
+                    } else {
+                        tipo = 'proceso';
+                        clasificacion = 'PROCESO';
+                    }
+                }
+                
+                return {
+                    submotivo: submotivo,
+                    bloque: bloque,
+                    atributo: atributo,
+                    peso: f.peso || 0,
+                    tipo: tipo,
+                    clasificacion: clasificacion
+                };
+            });
+
+            // GUARDAR EVALUACIÓN CON SUS FALLAS
+            resultado.evaluaciones.push({
+                id: evalItem.id || evalItem._id || 'N/A',
+                idAudio: idAudio,
+                fecha: fecha,
+                nota: nota,
+                fallas: fallasProcesadas,
+                submotivosFallados: fallasProcesadas.map(f => f.submotivo).filter(Boolean),
+                tiposFallados: [...new Set(fallasProcesadas.map(f => f.tipo))]
+            });
+
+            // ACUMULAR PARA EL RESUMEN POR TIPO
+            for (const falla of fallasProcesadas) {
+                const submotivo = falla.submotivo;
+                const tipo = falla.tipo || 'proceso';
+                const atributo = falla.atributo || 'Sin atributo';
+                
+                // Determinar la clave correcta
+                let clave = 'procesos';
+                if (tipo === 'habilidades') clave = 'habilidades';
+                else if (tipo === 'feedback') clave = 'feedback';
+                
+                // Contar por bloque (ENC, ECUF, ECN)
+                const bloque = falla.bloque || 'Otros';
+                if (bloque === 'ENC' || bloque === 'cliente') {
+                    resultado.resumen.fallasPorBloque.ENC++;
+                } else if (bloque === 'ECUF' || bloque === 'negocio') {
+                    resultado.resumen.fallasPorBloque.ECUF++;
+                } else {
+                    resultado.resumen.fallasPorBloque.ECN++;
+                }
+
+                // SUBMOTIVOS MÁS FRECUENTES
+                if (submotivo && submotivo !== 'Sin submotivo') {
+                    resultado.resumen.submotivosMasFrecuentes[submotivo] = 
+                        (resultado.resumen.submotivosMasFrecuentes[submotivo] || 0) + 1;
+                    
+                    // INICIALIZAR RESUMEN POR TIPO
+                    if (!resultado.resumen.resumenPorTipo[clave]) {
+                        resultado.resumen.resumenPorTipo[clave] = { 
+                            total: 0, 
+                            submotivos: {}, 
+                            atributos: {},
+                            evaluaciones: {}
+                        };
+                    }
+                    
+                    // INCREMENTAR TOTAL
+                    resultado.resumen.resumenPorTipo[clave].total++;
+                    
+                    // CONTAR SUBMOTIVOS
+                    resultado.resumen.resumenPorTipo[clave].submotivos[submotivo] = 
+                        (resultado.resumen.resumenPorTipo[clave].submotivos[submotivo] || 0) + 1;
+                    
+                    // CONTAR ATRIBUTOS
+                    if (atributo && atributo !== 'Sin atributo') {
+                        resultado.resumen.resumenPorTipo[clave].atributos[atributo] = 
+                            (resultado.resumen.resumenPorTipo[clave].atributos[atributo] || 0) + 1;
+                    }
+                    
+                    // REGISTRAR EVALUACIONES
+                    if (!resultado.resumen.resumenPorTipo[clave].evaluaciones[submotivo]) {
+                        resultado.resumen.resumenPorTipo[clave].evaluaciones[submotivo] = [];
+                    }
+                    const evalInfo = `${idAudio} (${fecha})`;
+                    if (!resultado.resumen.resumenPorTipo[clave].evaluaciones[submotivo].includes(evalInfo)) {
+                        resultado.resumen.resumenPorTipo[clave].evaluaciones[submotivo].push(evalInfo);
+                    }
+
+                    // SUBMOTIVOS POR TIPO (lista única)
+                    if (!resultado.resumen.submotivosPorTipo[clave]) {
+                        resultado.resumen.submotivosPorTipo[clave] = [];
+                    }
+                    if (!resultado.resumen.submotivosPorTipo[clave].includes(submotivo)) {
+                        resultado.resumen.submotivosPorTipo[clave].push(submotivo);
+                    }
+                }
+            }
+        } else {
+            resultado.resumen.evaluacionesSinFallas++;
+        }
+    }
+
+    // CALCULAR TOTAL DE SUBMOTIVOS ÚNICOS
+    resultado.resumen.totalSubmotivosUnicos = Object.keys(resultado.resumen.submotivosMasFrecuentes).length;
+
+    // Ordenar submotivos por frecuencia
+    resultado.resumen.submotivosMasFrecuentes = Object.entries(resultado.resumen.submotivosMasFrecuentes)
+        .sort((a, b) => b[1] - a[1])
+        .reduce((acc, [key, value]) => {
+            acc[key] = value;
+            return acc;
+        }, {});
+
+    // Ordenar submotivos por tipo
+    for (const tipo of ['procesos', 'habilidades', 'feedback']) {
+        if (resultado.resumen.submotivosPorTipo[tipo]) {
+            resultado.resumen.submotivosPorTipo[tipo].sort();
+        }
+        if (resultado.resumen.resumenPorTipo[tipo]) {
+            resultado.resumen.resumenPorTipo[tipo].submotivos = 
+                Object.entries(resultado.resumen.resumenPorTipo[tipo].submotivos)
+                    .sort((a, b) => b[1] - a[1])
+                    .reduce((acc, [key, value]) => {
+                        acc[key] = value;
+                        return acc;
+                    }, {});
+        }
+    }
+
+    resultado.audiosQuiebre = resultado.evaluaciones
+        .filter(e => e.fallas.length > 0)
+        .map(e => e.idAudio);
+
+    console.log(`✅ Análisis completado:`);
+    console.log(`   - ${resultado.evaluaciones.length} evaluaciones con fallas`);
+    console.log(`   - ${resultado.resumen.totalFallas} fallas totales`);
+    console.log(`   - 📚 Procesos: ${resultado.resumen.resumenPorTipo.procesos?.total || 0}`);
+    console.log(`   - 🎯 Habilidades: ${resultado.resumen.resumenPorTipo.habilidades?.total || 0}`);
+    console.log(`   - 💬 Feedback: ${resultado.resumen.resumenPorTipo.feedback?.total || 0}`);
+    
+    return resultado;
+}
+
+// ======================================================
+// FUNCIÓN: generarEstructuraInformePDA (ACTUALIZADA)
+// ======================================================
+
+async function generarEstructuraInformePDA(agente, cicloBasal) {
+    console.log(`📄 Generando estructura de informe PDA para ${agente} - Ciclo #${cicloBasal.numero}`);
+
+    // OBTENER LA FECHA DE REFERENCIA
+    const primeraEvaluacion = cicloBasal.evaluaciones[0];
+    const fechaEvaluacion = primeraEvaluacion?.fechaOriginal || primeraEvaluacion?.fecha || null;
+    console.log(`   📅 Fecha de referencia para matriz: ${fechaEvaluacion || 'actual'}`);
+
+    // OBTENER LA MATRIZ DINÁMICA DESDE LA BD
+    const matriz = await obtenerMatrizParaFecha(fechaEvaluacion);
+    
+    if (matriz) {
+        console.log(`   📌 Matriz cargada: ${Object.keys(matriz).length} submotivos mapeados`);
+    } else {
+        console.warn('   ⚠️ No se pudo cargar la matriz, usando clasificación por defecto');
+    }
+
+    // OBTENER DETALLE DE QUIEBRES
+    const detalleQuiebres = await obtenerDetalleQuiebresPorEvaluacion(cicloBasal.evaluaciones);
+    
+    console.log('📊 detalleQuiebres.evaluaciones:', detalleQuiebres.evaluaciones?.length);
+    console.log('📊 detalleQuiebres.resumen.resumenPorTipo:', detalleQuiebres.resumen.resumenPorTipo);
+    
+    // Extraer todos los submotivos fallados
+    const todosSubmotivos = [];
+    for (const ev of detalleQuiebres.evaluaciones) {
+        for (const falla of ev.fallas) {
+            if (falla.submotivo && !todosSubmotivos.includes(falla.submotivo)) {
+                todosSubmotivos.push(falla.submotivo);
+            }
+        }
+    }
+    
+    // CLASIFICAR EL PDA
+    const clasificacion = await clasificarPDAporTipo(todosSubmotivos);
+
+    // 🔴 CONSTRUIR LA ESTRUCTURA COMPLETA
+    const estructura = {
+        agente: agente,
+        ciclo: {
+            numero: cicloBasal.numero,
+            fechaInicio: cicloBasal.fechaInicio,
+            fechaFin: cicloBasal.fechaFin,
+            totalEvaluaciones: cicloBasal.totalEvaluaciones,
+            promedio: cicloBasal.promedio,
+            cuartil: cicloBasal.cuartil
+        },
+        clasificacion: clasificacion,
+        detalleQuiebres: detalleQuiebres,
+        resumen: {
+            totalAudiosConFallas: detalleQuiebres.evaluaciones.length,
+            totalFallas: detalleQuiebres.resumen.totalFallas,
+            promedioFallasPorAudio: detalleQuiebres.evaluaciones.length > 0 
+                ? (detalleQuiebres.resumen.totalFallas / detalleQuiebres.evaluaciones.length).toFixed(1)
+                : 0,
+            fallasPorBloque: detalleQuiebres.resumen.fallasPorBloque,
+            topSubmotivos: Object.keys(detalleQuiebres.resumen.submotivosMasFrecuentes).slice(0, 5),
+            resumenPorTipo: detalleQuiebres.resumen.resumenPorTipo || {},
+            submotivosPorTipo: detalleQuiebres.resumen.submotivosPorTipo || {}
+        },
+        // 🔴 CLAVE: Asegurar que evaluaciones tenga la propiedad 'fallas'
+        evaluaciones: detalleQuiebres.evaluaciones.map(ev => ({
+            ...ev,
+            fallas: ev.fallas || []  // Asegurar que siempre tenga fallas
+        })),
+        audiosQuiebre: detalleQuiebres.audiosQuiebre,
+        fechaGeneracion: new Date().toISOString(),
+        versionMatriz: {
+            id: null,
+            nombre: null,
+            fecha_vigencia: null
+        }
+    };
+
+    // AGREGAR INFORMACIÓN DE LA VERSIÓN DE MATRIZ
+    try {
+        const version = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
+        if (version) {
+            estructura.versionMatriz.id = version.id;
+            estructura.versionMatriz.nombre = version.version;
+            estructura.versionMatriz.fecha_vigencia = version.fecha_vigencia;
+            console.log(`   📌 Matriz usada: ${version.version} (vigente desde ${version.fecha_vigencia})`);
+        }
+    } catch (e) {
+        console.warn('   ⚠️ No se pudo obtener la versión de matriz:', e);
+    }
+
+    console.log(`✅ Estructura de informe generada`);
+    console.log(`   - ${estructura.evaluaciones.length} evaluaciones con fallas`);
+    console.log(`   - ${estructura.resumen.totalFallas} fallas totales`);
+    console.log(`   - Tipo PDA: ${estructura.clasificacion.tipo}`);
+    console.log(`   - Procesos: ${estructura.resumen.resumenPorTipo.procesos?.total || 0}`);
+    console.log(`   - Habilidades: ${estructura.resumen.resumenPorTipo.habilidades?.total || 0}`);
+    console.log(`   - Feedback: ${estructura.resumen.resumenPorTipo.feedback?.total || 0}`);
+
+    return estructura;
+}
+
+
+// ======================================================
+// FUNCIÓN: obtenerInfoCompletaSubmotivo
+// ======================================================
+
+function obtenerInfoCompletaSubmotivo(submotivo) {
+    if (MATRIZ_COMPLETA_PDA[submotivo]) {
+        return {
+            ...MATRIZ_COMPLETA_PDA[submotivo],
+            submotivo: submotivo
+        };
+    }
+    return {
+        submotivo: submotivo,
+        tipo: 'proceso',
+        motivo: 'Desconocido',
+        atributo: 'Desconocido',
+        clasificacion: 'PROCESO'
+    };
+}
+
+
+// ======================================================
+// FUNCIÓN: clasificarPDAporTipo (COMPLETA)
+// ======================================================
+async function clasificarPDAporTipo(submotivosFallados) {
+    console.log(`📋 Clasificando PDA para ${submotivosFallados.length} submotivos...`);
+
+    // OBTENER LA FECHA DE REFERENCIA
+    const fechaReferencia = new Date().toISOString().split('T')[0];
+    console.log(`   📅 Fecha de referencia para matriz: ${fechaReferencia}`);
+    
+    // OBTENER LA MATRIZ DINÁMICA DESDE LA BD
+    const matriz = await obtenerMatrizParaFecha(fechaReferencia);
+    
+    if (matriz) {
+        console.log(`   📌 Matriz cargada: ${Object.keys(matriz).length} submotivos mapeados`);
+    } else {
+        console.warn('   ⚠️ No se pudo cargar la matriz, usando clasificación por defecto');
+    }
+
+    const resultado = {
+        tipo: null,
+        requiereProcesos: false,
+        requiereHabilidades: false,
+        requiereFeedback: false,
+        detalle: {
+            procesos: [],
+            habilidades: [],
+            feedback: []
+        },
+        mensaje: '',
+        resumenTipos: []
+    };
+
+    for (const submotivo of submotivosFallados) {
+        let tipo = 'proceso';
+        
+        // USAR LA MATRIZ DINÁMICA
+        if (matriz && matriz[submotivo]) {
+            const info = matriz[submotivo];
+            if (info.clasificacion === 'HABILIDADES BLANDAS') {
+                tipo = 'habilidades';
+            } else if (info.clasificacion === 'FEEDBACK') {
+                tipo = 'feedback';
+            } else {
+                tipo = 'proceso';
+            }
+        } else {
+            // Fallback: usar el mapa de frentes si la matriz no tiene el submotivo
+            const frente = determinarFrenteSubmotivo(submotivo);
+            if (frente === 'cliente' || frente === 'ENC') {
+                const feedbacks = ['No_Corta_Llamada', 'Amabilidad', 'No_Usa_Jergas', 'Tono_de_Voz/ Vocalizacion'];
+                if (feedbacks.includes(submotivo)) {
+                    tipo = 'feedback';
+                } else {
+                    tipo = 'habilidades';
+                }
+            } else if (frente === 'negocio' || frente === 'ECUF') {
+                tipo = 'feedback';
+            } else {
+                tipo = 'proceso';
+            }
+            console.warn(`   ⚠️ Submotivo "${submotivo}" no encontrado en matriz, usando fallback: ${tipo}`);
+        }
+        
+        const claveTipo = tipo === 'habilidades' ? 'habilidades' : 
+                         tipo === 'feedback' ? 'feedback' : 'procesos';
+        
+        switch (tipo) {
+            case 'proceso':
+                resultado.requiereProcesos = true;
+                if (!resultado.detalle.procesos.includes(submotivo)) {
+                    resultado.detalle.procesos.push(submotivo);
+                }
+                break;
+            case 'habilidades':
+                resultado.requiereHabilidades = true;
+                if (!resultado.detalle.habilidades.includes(submotivo)) {
+                    resultado.detalle.habilidades.push(submotivo);
+                }
+                break;
+            case 'feedback':
+                resultado.requiereFeedback = true;
+                if (!resultado.detalle.feedback.includes(submotivo)) {
+                    resultado.detalle.feedback.push(submotivo);
+                }
+                break;
+        }
+    }
+
+    const tiposRequeridos = [];
+    if (resultado.requiereProcesos) tiposRequeridos.push('procesos');
+    if (resultado.requiereHabilidades) tiposRequeridos.push('habilidades');
+    if (resultado.requiereFeedback) tiposRequeridos.push('feedback');
+
+    resultado.resumenTipos = tiposRequeridos;
+
+    if (tiposRequeridos.length === 0) {
+        resultado.tipo = 'ninguno';
+        resultado.mensaje = 'No se requiere ningún tipo de PDA';
+    } else if (tiposRequeridos.length === 1) {
+        resultado.tipo = tiposRequeridos[0];
+        const nombres = {
+            'procesos': 'Capacitación de Procesos',
+            'habilidades': 'Capacitación de Habilidades Blandas',
+            'feedback': 'Feedback Directo'
+        };
+        resultado.mensaje = `PDA de tipo: ${nombres[tiposRequeridos[0]]}`;
+    } else {
+        resultado.tipo = 'ambos';
+        const nombres = tiposRequeridos.map(t => {
+            const map = {
+                'procesos': 'Procesos',
+                'habilidades': 'Habilidades Blandas',
+                'feedback': 'Feedback'
+            };
+            return map[t];
+        });
+        resultado.mensaje = `PDA combinado: ${nombres.join(' + ')}`;
+    }
+
+    console.log(`✅ Clasificación: ${resultado.tipo} | ${resultado.mensaje}`);
+    console.log(`   Procesos: ${resultado.detalle.procesos.length} submotivos`);
+    console.log(`   Habilidades: ${resultado.detalle.habilidades.length} submotivos`);
+    console.log(`   Feedback: ${resultado.detalle.feedback.length} submotivos`);
+
+    return resultado;
+}
+
+
+// ======================================================
+// FUNCIÓN: generarInformePDATXT (CORREGIDA)
+// ======================================================
+
+function generarInformePDATXT(informe) {
+    const { agente, ciclo, clasificacion, resumen, audiosQuiebre, evaluaciones } = informe;
+
+    // Función auxiliar para padding seguro
+    function padRight(str, len) {
+        if (!str) str = '';
+        const strLen = str.length;
+        if (strLen >= len) return str.substring(0, len);
+        return str + ' '.repeat(len - strLen);
+    }
+
+    function padLeft(str, len) {
+        if (!str) str = '';
+        const strLen = str.length;
+        if (strLen >= len) return str.substring(0, len);
+        return ' '.repeat(len - strLen) + str;
+    }
+
+    let txt = '';
+    txt += '╔═══════════════════════════════════════════════════════════════════════════════╗\n';
+    txt += '║                    NOTIFICACIÓN DE RESULTADOS - PDA                          ║\n';
+    txt += '║                    Plan de Desarrollo y Acción                              ║\n';
+    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
+    txt += '║                                                                               ║\n';
+    txt += `║  👤 GESTOR: ${padRight(agente, 53)}║\n`;
+    txt += `║  📊 CICLO BASAL: #${padRight(String(ciclo.numero), 48)}║\n`;
+    txt += `║  📅 PERÍODO: ${padRight(`${ciclo.fechaInicio} → ${ciclo.fechaFin}`, 48)}║\n`;
+    txt += `║  📞 EVALUACIONES: ${padRight(`${ciclo.totalEvaluaciones}/5`, 48)}║\n`;
+    txt += `║  📈 PROMEDIO: ${padRight(`${ciclo.promedio}% (Q4 - RIESGO)`, 48)}║\n`;
+    txt += `║  📋 TIPO PDA: ${padRight(clasificacion.tipo.toUpperCase(), 48)}║\n`;
+    txt += `║  📅 FECHA INFORME: ${padRight(new Date().toLocaleDateString('es-ES'), 48)}║\n`;
+    txt += '║                                                                               ║\n';
+    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
+    txt += '║  🎧 AUDIOS CON QUIEBRES                                                        ║\n';
+    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
+    txt += '║                                                                               ║\n';
+    txt += `║  Total audios: ${audiosQuiebre.length} | Total fallas: ${resumen.totalFallas} | Promedio: ${resumen.promedioFallasPorAudio}/audio${' '.repeat(10)}║\n`;
+    txt += '║                                                                               ║\n';
+    txt += '║  ┌──────┬─────────────────────┬──────────────┬──────────┬──────────┬───────────║\n';
+    txt += '║  │  #   │ ID Audio           │ Fecha        │ Nota     │ Fallas   │ Submotivos║\n';
+    txt += '║  ├──────┼─────────────────────┼──────────────┼──────────┼──────────┼───────────║\n';
+    
+    for (let i = 0; i < Math.min(evaluaciones.length, 10); i++) {
+        const ev = evaluaciones[i];
+        const submotivosResum = ev.fallas.map(f => f.submotivo).join(', ');
+        const submotivosTrunc = submotivosResum.length > 28 ? submotivosResum.substring(0, 25) + '...' : submotivosResum;
+        txt += `║  │ ${padLeft(String(i+1), 2)} │ ${padRight(ev.idAudio, 19)} │ ${padRight(ev.fecha, 12)} │ ${padLeft(String(ev.nota), 4)}%   │ ${padLeft(String(ev.fallas.length), 4)}    │ ${padRight(submotivosTrunc, 28)}║\n`;
+    }
+    if (evaluaciones.length > 10) {
+        txt += `║  │ ... │ ...                 │ ...          │ ...      │ ...      │ ...       ║\n`;
+    }
+    txt += '║  └──────┴─────────────────────┴──────────────┴──────────┴──────────┴───────────║\n';
+    txt += '║                                                                               ║\n';
+    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
+    txt += '║  📊 DESGLOSE POR TIPO DE ACCIÓN                                                ║\n';
+    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
+    txt += '║                                                                               ║\n';
+
+    // Desglose por tipo
+    const tipos = ['procesos', 'habilidades', 'feedback'];
+    const nombresTipo = {
+        'procesos': '📚 Capacitación de Procesos (ECN)',
+        'habilidades': '🎯 Capacitación de Habilidades Blandas (ENC)',
+        'feedback': '💬 Feedback Directo (ENC/ECUF)'
+    };
+
+    for (const tipo of tipos) {
+        const data = resumen.resumenPorTipo[tipo];
+        const submotivos = resumen.submotivosPorTipo[tipo] || [];
+        
+        if (data && data.total > 0) {
+            const titulo = `${nombresTipo[tipo]} (${data.total} fallas)`;
+            txt += `║  ${padRight(titulo, 63)}║\n`;
+            txt += '║                                                                               ║\n';
+            const submotivosOrdenados = Object.entries(data.submotivos || {})
+                .sort((a, b) => b[1] - a[1]);
+            
+            for (const [sub, count] of submotivosOrdenados) {
+                const line = `     • ${sub} (${count} veces)`;
+                txt += `║  ${padRight(line, 63)}║\n`;
+            }
+            txt += '║                                                                               ║\n';
+        }
+    }
+
+    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
+    txt += '║  💡 RECOMENDACIÓN DE ACCIÓN                                                   ║\n';
+    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
+    txt += '║                                                                               ║\n';
+    txt += `║  ${padRight(clasificacion.mensaje, 63)}║\n`;
+    txt += '║                                                                               ║\n';
+    txt += '║  Próximo paso: Enviar este informe al área de Operaciones para su gestión.    ║\n';
+    txt += '║                                                                               ║\n';
+    txt += '╚═══════════════════════════════════════════════════════════════════════════════╝\n';
+
+    return txt;
+}
+
+// ======================================================
+// FUNCIÓN: mostrarInformePDA (VERSIÓN CORREGIDA - TAMAÑO)
+// ======================================================
+
+function mostrarInformePDA(informe) {
+    const html = generarInformePDAHTML(informe);
+    const txt = generarInformePDATXT(informe);
+
+    const modalHtml = `
+        <div id="modalInformePDA" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100050; display: flex; justify-content: center; align-items: center; padding: 20px;">
+            <div style="background: white; border-radius: 16px; width: 95%; max-width: 1100px; height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                <div style="padding: 15px 20px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                    <div>
+                        <strong style="font-size: 18px;">📋 Informe PDA - ${informe.agente}</strong>
+                        <div style="font-size: 13px; opacity: 0.8; margin-top: 2px;">Ciclo #${informe.ciclo.numero} | Tipo: ${informe.clasificacion.tipo.toUpperCase()} | ${informe.evaluaciones.length} audios analizados</div>
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button onclick="copiarInformePDAHTML()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                            📋 Copiar HTML
+                        </button>
+                        <button onclick="copiarInformePDATXT()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                            📋 Copiar TXT
+                        </button>
+                        <button onclick="imprimirInformePDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                            🖨️ Imprimir
+                        </button>
+                        <button onclick="cerrarModalInformePDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 22px; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">✖</button>
+                    </div>
+                </div>
+                <div id="informePDAContent" style="padding: 0; overflow-y: auto; flex: 1; background: #f5f5f0;">
+                    <iframe id="informePDAIframe" style="width: 100%; height: 100%; border: none; min-height: 500px;"></iframe>
+                </div>
+                <div style="padding: 10px 20px; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
+                    <div style="font-size: 12px; color: #666;">
+                        📌 <strong>Total fallas:</strong> ${informe.resumen.totalFallas} | 
+                        <strong>Procesos:</strong> ${informe.resumen.resumenPorTipo.procesos?.total || 0} | 
+                        <strong>Habilidades:</strong> ${informe.resumen.resumenPorTipo.habilidades?.total || 0} | 
+                        <strong>Feedback:</strong> ${informe.resumen.resumenPorTipo.feedback?.total || 0}
+                    </div>
+                    <button onclick="cerrarModalInformePDA()" style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 13px;">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const existing = document.getElementById('modalInformePDA');
+    if (existing) existing.remove();
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const iframe = document.getElementById('informePDAIframe');
+    if (iframe) {
+        const iframeDoc = iframe.contentWindow.document;
+        iframeDoc.open();
+        iframeDoc.write(html);
+        iframeDoc.close();
+    }
+
+    window._informePDAHTML = html;
+    window._informePDATXT = txt;
+    window._informePDA = informe;
+
+    console.log('✅ Informe PDA mostrado correctamente');
+}
+
+// ======================================================
+// FUNCIÓN: actualizarEstadoPDAEnvio
+// ======================================================
+
+async function actualizarEstadoPDAEnvio(informe, nuevoEstado) {
+    try {
+        const db = getDB();
+        if (!db) return;
+
+        // Buscar si ya existe un PDA para este agente y ciclo
+        const { data: pdaExistente, error: findError } = await db
+            .from('pda_cabecera')
+            .select('id')
+            .eq('agente', informe.agente)
+            .eq('ciclo_basal_numero', informe.ciclo.numero)
+            .maybeSingle();
+
+        if (findError) {
+            console.warn('Error buscando PDA:', findError);
+            return;
+        }
+
+        let pdaId;
+        if (pdaExistente) {
+            pdaId = pdaExistente.id;
+            // Actualizar estado
+            await db
+                .from('pda_cabecera')
+                .update({
+                    estado: nuevoEstado,
+                    fecha_envio_operaciones: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', pdaId);
+        } else {
+            // Crear nuevo PDA si no existe
+            const nuevoPDA = {
+                agente: informe.agente,
+                ciclo_basal_numero: informe.ciclo.numero,
+                fecha_inicio_ciclo_basal: informe.ciclo.fechaInicio,
+                fecha_fin_ciclo_basal: informe.ciclo.fechaFin,
+                promedio_basal: informe.ciclo.promedio,
+                cuartil_basal: informe.ciclo.cuartil,
+                tipo_pda: informe.clasificacion.tipo,
+                estado: nuevoEstado,
+                evaluaciones_detalle: JSON.stringify(informe.evaluaciones),
+                audios_quiebre: JSON.stringify(informe.audiosQuiebre),
+                resumen_quiebres: JSON.stringify(informe.resumen),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+
+            const { data: inserted, error: insertError } = await db
+                .from('pda_cabecera')
+                .insert(nuevoPDA)
+                .select();
+
+            if (insertError) throw insertError;
+            pdaId = inserted?.[0]?.id;
+        }
+
+        console.log(`✅ PDA #${pdaId} actualizado a estado: ${nuevoEstado}`);
+        return pdaId;
+
+    } catch (error) {
+        console.warn('⚠️ Error actualizando estado del PDA:', error);
+        return null;
+    }
+}
+
+
+
+// ======================================================
+// FUNCIÓN: generarYEnviarPDA
+// ======================================================
+
+async function generarYEnviarPDA(agente, cicloNumero) {
+    console.log(`🚀 Generando y enviando PDA para ${agente} - Ciclo #${cicloNumero}`);
+
+    try {
+        // 1. Generar el informe
+        const informe = await generarYMostrarInformePDA(agente, cicloNumero);
+        
+        if (!informe) {
+            console.error('❌ No se pudo generar el informe');
+            return;
+        }
+
+        // 2. Preguntar si desea enviar a Operaciones
+        const enviar = confirm(
+            `📤 ¿Enviar este informe a Operaciones?\n\n` +
+            `👤 Agente: ${informe.agente}\n` +
+            `📊 Ciclo: #${informe.ciclo.numero}\n` +
+            `📋 Tipo: ${informe.clasificacion.tipo.toUpperCase()}\n` +
+            `📧 Destinatario: operaciones@empresa.com\n\n` +
+            `El informe se enviará por correo electrónico con el detalle completo.`
+        );
+
+        if (enviar) {
+            await enviarInformeAOperaciones(informe);
+        }
+
+        return informe;
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al generar y enviar PDA: ' + error.message);
+    }
+}
+// ======================================================
+// FUNCIÓN: registrarNotificacionGestor
+// ======================================================
+
+async function registrarNotificacionGestor(pdaId, observaciones = '') {
+    console.log(`📝 Registrando notificación al gestor para PDA #${pdaId}`);
+
+    const db = getDB();
+    if (!db) {
+        alert('❌ Base de datos no disponible');
+        return false;
+    }
+
+    try {
+        // Actualizar el estado del PDA
+        const { error } = await db
+            .from('pda_cabecera')
+            .update({
+                estado: 'gestor_notificado',
+                fecha_notificacion_gestor: new Date().toISOString().split('T')[0],
+                notificado_por: window.usuarioActual?.nombre_completo || window.usuarioActual?.usuario || 'Operaciones',
+                observaciones_notificacion: observaciones || 'Gestor notificado sobre su desempeño en Q4.',
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', pdaId);
+
+        if (error) throw error;
+
+        // Registrar en historial de cambios
+        await registrarHistorialPDA(pdaId, 'pendiente_operaciones', 'gestor_notificado', 'Gestor notificado por Operaciones');
+
+        alert(`✅ Notificación registrada correctamente\n\nPDA #${pdaId} ahora está en estado "gestor_notificado"`);
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al registrar notificación: ' + error.message);
+        return false;
+    }
+}
+
+// ======================================================
+// FUNCIÓN: enviarListaACapacitacion
+// ======================================================
+
+async function enviarListaACapacitacion(pdaIds) {
+    console.log(`📤 Enviando ${pdaIds.length} PDA(s) a Capacitación`);
+
+    const db = getDB();
+    if (!db) {
+        alert('❌ Base de datos no disponible');
+        return false;
+    }
+
+    try {
+        // Obtener los datos de los PDA
+        const { data: pdaList, error } = await db
+            .from('pda_cabecera')
+            .select('*')
+            .in('id', pdaIds);
+
+        if (error) throw error;
+
+        if (!pdaList || pdaList.length === 0) {
+            alert('⚠️ No se encontraron PDA para enviar');
+            return false;
+        }
+
+        // Generar la lista para Capacitación
+        let listaHtml = `
+            <h2>📋 LISTA DE GESTORES PARA CAPACITACIÓN</h2>
+            <p><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-ES')}</p>
+            <p><strong>Total gestores:</strong> ${pdaList.length}</p>
+            <hr>
+            <table border="1" cellpadding="8" style="border-collapse: collapse; width: 100%;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Agente</th>
+                        <th>Ciclo</th>
+                        <th>Tipo PDA</th>
+                        <th>Items a trabajar</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        for (let i = 0; i < pdaList.length; i++) {
+            const pda = pdaList[i];
+            // Obtener submotivos del PDA (desde el JSON almacenado o desde acciones)
+            const submotivos = pda.evaluaciones_detalle 
+                ? JSON.parse(pda.evaluaciones_detalle)
+                : [];
+
+            const itemsResumen = submotivos.length > 0 
+                ? submotivos.slice(0, 3).map(s => s.submotivo).join(', ') + (submotivos.length > 3 ? '...' : '')
+                : 'Pendiente';
+
+            listaHtml += `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td><strong>${pda.agente}</strong></td>
+                    <td>#${pda.ciclo_basal_numero}</td>
+                    <td>${pda.tipo_pda?.toUpperCase() || 'PENDIENTE'}</td>
+                    <td>${itemsResumen}</td>
+                </tr>
+            `;
+        }
+
+        listaHtml += `
+                </tbody>
+            </table>
+            <hr>
+            <p style="color: #666; font-size: 12px;">Documento generado por Sistema MECA</p>
+        `;
+
+        // Mostrar la lista en un modal para revisión antes de enviar
+        const modalHtml = `
+            <div id="modalListaCapacitacion" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100060; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                <div style="background: white; border-radius: 16px; width: 95%; max-width: 800px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;">
+                    <div style="padding: 15px 20px; background: linear-gradient(135deg, #fd7e14, #f39c12); color: white; display: flex; justify-content: space-between; align-items: center;">
+                        <strong style="font-size: 16px;">📋 Lista para Capacitación</strong>
+                        <button onclick="cerrarModalListaCapacitacion()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                    </div>
+                    <div style="padding: 20px; overflow-y: auto; flex: 1;">
+                        ${listaHtml}
+                    </div>
+                    <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0;">
+                        <button onclick="cerrarModalListaCapacitacion()" style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white;">Cerrar</button>
+                        <button onclick="confirmarEnvioCapacitacion(${JSON.stringify(pdaIds).replace(/"/g, "'")})" style="padding: 8px 20px; background: #fd7e14; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                            📤 Enviar a Capacitación
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const existing = document.getElementById('modalListaCapacitacion');
+        if (existing) existing.remove();
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Guardar referencia de los IDs para la confirmación
+        window._pdaIdsEnviarCapacitacion = pdaIds;
+
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al generar lista: ' + error.message);
+        return false;
+    }
+}
+
+// ======================================================
+// FUNCIÓN: confirmarEnvioCapacitacion
+// ======================================================
+
+async function confirmarEnvioCapacitacion(pdaIds) {
+    console.log(`📤 Confirmando envío a Capacitación para ${pdaIds.length} PDA(s)`);
+
+    const db = getDB();
+    if (!db) {
+        alert('❌ Base de datos no disponible');
+        return;
+    }
+
+    try {
+        // Actualizar estado de los PDA
+        const idsArray = Array.isArray(pdaIds) ? pdaIds : [pdaIds];
+        
+        for (const id of idsArray) {
+            await db
+                .from('pda_cabecera')
+                .update({
+                    estado: 'enviado_capacitacion',
+                    fecha_envio_capacitacion: new Date().toISOString().split('T')[0],
+                    enviado_por: window.usuarioActual?.nombre_completo || window.usuarioActual?.usuario || 'Operaciones',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', id);
+
+            // Registrar en historial
+            await registrarHistorialPDA(id, 'gestor_notificado', 'enviado_capacitacion', 'Enviado a Capacitación');
+        }
+
+        alert(`✅ ${idsArray.length} PDA(s) enviados a Capacitación correctamente`);
+        
+        cerrarModalListaCapacitacion();
+        
+        // Recargar datos si es necesario
+        if (typeof cargarDatosPDA === 'function') {
+            await cargarDatosPDA();
+        }
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al enviar a Capacitación: ' + error.message);
+    }
+}
+
+// ======================================================
+// FUNCIÓN: cerrarModalListaCapacitacion
+// ======================================================
+
+function cerrarModalListaCapacitacion() {
+    const modal = document.getElementById('modalListaCapacitacion');
+    if (modal) modal.remove();
+    window._pdaIdsEnviarCapacitacion = null;
+}
+
+// ======================================================
+// FUNCIÓN: registrarHistorialPDA
+// ======================================================
+
+async function registrarHistorialPDA(pdaId, estadoAnterior, estadoNuevo, observacion = '') {
+    const db = getDB();
+    if (!db) return;
+
+    try {
+        await db
+            .from('historial_pda_estados')
+            .insert({
+                pda_id: pdaId,
+                estado_anterior: estadoAnterior,
+                estado_nuevo: estadoNuevo,
+                observacion: observacion,
+                usuario_id: window.usuarioActual?.id || 1,
+                fecha_cambio: new Date().toISOString()
+            });
+        console.log(`📝 Historial registrado: ${estadoAnterior} → ${estadoNuevo} (PDA #${pdaId})`);
+    } catch (error) {
+        console.warn('⚠️ Error registrando historial:', error);
+    }
+}
+
+// ======================================================
+// FUNCIONES AUXILIARES PARA EL MODAL
+// ======================================================
+
+function cerrarModalInformePDA() {
+    const modal = document.getElementById('modalInformePDA');
+    if (modal) modal.remove();
+    window._informePDAHTML = null;
+    window._informePDATXT = null;
+    window._informePDA = null;
+}
+
+function copiarInformePDAHTML() {
+    if (!window._informePDAHTML) {
+        alert('⚠️ No hay informe para copiar');
+        return;
+    }
+    navigator.clipboard.writeText(window._informePDAHTML)
+        .then(() => alert('✅ Informe HTML copiado al portapapeles'))
+        .catch(() => alert('❌ Error al copiar'));
+}
+
+function copiarInformePDATXT() {
+    if (!window._informePDATXT) {
+        alert('⚠️ No hay informe para copiar');
+        return;
+    }
+    navigator.clipboard.writeText(window._informePDATXT)
+        .then(() => alert('✅ Informe TXT copiado al portapapeles'))
+        .catch(() => alert('❌ Error al copiar'));
+}
+
+function imprimirInformePDA() {
+    if (!window._informePDAHTML) {
+        alert('⚠️ No hay informe para imprimir');
+        return;
+    }
+    const ventana = window.open('', '_blank');
+    ventana.document.write(window._informePDAHTML);
+    ventana.document.close();
+    ventana.print();
+}
+
+// ======================================================
+// FUNCIÓN: generarYMostrarInformePDA
+// ======================================================
+
+async function generarYMostrarInformePDA(agente, cicloNumero) {
+    console.log(`📄 Generando informe PDA para ${agente} - Ciclo #${cicloNumero}`);
+
+    try {
+        // 1. Obtener ciclos del agente
+        const ciclos = await agruparEvaluacionesEnCiclos(agente);
+        
+        // 2. Buscar el ciclo específico
+        const ciclo = ciclos.find(c => c.numero === cicloNumero && c.esCompleto);
+        if (!ciclo) {
+            alert(`❌ No se encontró el ciclo #${cicloNumero} para ${agente}`);
+            return;
+        }
+
+        if (ciclo.cuartil !== 'Q4') {
+            alert(`⚠️ El agente ${agente} no está en Q4 (${ciclo.cuartil} - ${ciclo.promedio}%). No requiere PDA.`);
+            return;
+        }
+
+        // 3. Generar estructura del informe
+        const informe = generarEstructuraInformePDA(agente, ciclo);
+
+        // 4. Mostrar el informe
+        mostrarInformePDA(informe);
+
+        return informe;
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al generar el informe: ' + error.message);
+    }
+}
+
+// ======================================================
+// FUNCIÓN: generarEstructuraInformePDA (COMPLETA)
+// ======================================================
+async function generarEstructuraInformePDA(agente, cicloBasal) {
+    console.log(`📄 Generando estructura de informe PDA para ${agente} - Ciclo #${cicloBasal.numero}`);
+
+    // OBTENER LA FECHA DE REFERENCIA
+    const primeraEvaluacion = cicloBasal.evaluaciones[0];
+    const fechaEvaluacion = primeraEvaluacion?.fechaOriginal || primeraEvaluacion?.fecha || null;
+    console.log(`   📅 Fecha de referencia para matriz: ${fechaEvaluacion || 'actual'}`);
+
+    // OBTENER LA MATRIZ DINÁMICA DESDE LA BD
+    const matriz = await obtenerMatrizParaFecha(fechaEvaluacion);
+    
+    if (matriz) {
+        console.log(`   📌 Matriz cargada: ${Object.keys(matriz).length} submotivos mapeados`);
+    } else {
+        console.warn('   ⚠️ No se pudo cargar la matriz, usando clasificación por defecto');
+    }
+
+    // OBTENER DETALLE DE QUIEBRES
+    const detalleQuiebres = await obtenerDetalleQuiebresPorEvaluacion(cicloBasal.evaluaciones);
+    
+    // Extraer todos los submotivos fallados
+    const todosSubmotivos = [];
+    for (const ev of detalleQuiebres.evaluaciones) {
+        for (const falla of ev.fallas) {
+            if (falla.submotivo && !todosSubmotivos.includes(falla.submotivo)) {
+                todosSubmotivos.push(falla.submotivo);
+            }
+        }
+    }
+    
+    // CLASIFICAR EL PDA
+    const clasificacion = await clasificarPDAporTipo(todosSubmotivos);
+
+    // Construir la estructura completa
+    const estructura = {
+        agente: agente,
+        ciclo: {
+            numero: cicloBasal.numero,
+            fechaInicio: cicloBasal.fechaInicio,
+            fechaFin: cicloBasal.fechaFin,
+            totalEvaluaciones: cicloBasal.totalEvaluaciones,
+            promedio: cicloBasal.promedio,
+            cuartil: cicloBasal.cuartil
+        },
+        clasificacion: clasificacion,
+        detalleQuiebres: detalleQuiebres,
+        resumen: {
+            totalAudiosConFallas: detalleQuiebres.evaluaciones.length,
+            totalFallas: detalleQuiebres.resumen.totalFallas,
+            promedioFallasPorAudio: detalleQuiebres.evaluaciones.length > 0 
+                ? (detalleQuiebres.resumen.totalFallas / detalleQuiebres.evaluaciones.length).toFixed(1)
+                : 0,
+            fallasPorBloque: detalleQuiebres.resumen.fallasPorBloque,
+            topSubmotivos: Object.keys(detalleQuiebres.resumen.submotivosMasFrecuentes).slice(0, 5),
+            resumenPorTipo: detalleQuiebres.resumen.resumenPorTipo || clasificacion.detalle,
+            submotivosPorTipo: detalleQuiebres.resumen.submotivosPorTipo || clasificacion.detalle
+        },
+        audiosQuiebre: detalleQuiebres.audiosQuiebre,
+        evaluaciones: detalleQuiebres.evaluaciones,
+        fechaGeneracion: new Date().toISOString(),
+        versionMatriz: {
+            id: null,
+            nombre: null,
+            fecha_vigencia: null
+        }
+    };
+
+    // AGREGAR INFORMACIÓN DE LA VERSIÓN DE MATRIZ
+    try {
+        const version = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
+        if (version) {
+            estructura.versionMatriz.id = version.id;
+            estructura.versionMatriz.nombre = version.version;
+            estructura.versionMatriz.fecha_vigencia = version.fecha_vigencia;
+            console.log(`   📌 Matriz usada: ${version.version} (vigente desde ${version.fecha_vigencia})`);
+        }
+    } catch (e) {
+        console.warn('   ⚠️ No se pudo obtener la versión de matriz:', e);
+    }
+
+    console.log(`✅ Estructura de informe generada`);
+    console.log(`   - ${estructura.evaluaciones.length} evaluaciones con fallas`);
+    console.log(`   - ${estructura.audiosQuiebre.length} audios con quiebres`);
+    console.log(`   - ${estructura.resumen.totalFallas} fallas totales`);
+    console.log(`   - Tipo PDA: ${estructura.clasificacion.tipo}`);
+    console.log(`   - Procesos: ${estructura.resumen.resumenPorTipo.procesos?.total || 0}`);
+    console.log(`   - Habilidades: ${estructura.resumen.resumenPorTipo.habilidades?.total || 0}`);
+    console.log(`   - Feedback: ${estructura.resumen.resumenPorTipo.feedback?.total || 0}`);
+
+    return estructura;
+}
+
+// ======================================================
+// FUNCIÓN AUXILIAR: construirResumenDesdeEvaluaciones (COMPLETA)
+// ======================================================
+function construirResumenDesdeEvaluaciones(evaluaciones) {
+    console.log('🔧 construirResumenDesdeEvaluaciones - INICIO');
+    console.log(`📊 Evaluaciones recibidas: ${evaluaciones?.length || 0}`);
+    
+    // Inicializar resumen con estructura completa
+    const resumen = {
+        procesos: { total: 0, submotivos: {}, atributos: {}, evaluaciones: {} },
+        habilidades: { total: 0, submotivos: {}, atributos: {}, evaluaciones: {} },
+        feedback: { total: 0, submotivos: {}, atributos: {}, evaluaciones: {} }
+    };
+    
+    if (!evaluaciones || evaluaciones.length === 0) {
+        console.log('⚠️ No hay evaluaciones para construir resumen');
+        return resumen;
+    }
+    
+    let totalFallasProcesadas = 0;
+    let evaluacionesConFallas = 0;
+    
+    for (const ev of evaluaciones) {
+        // Verificar si tiene la propiedad 'fallas'
+        const fallas = ev.fallas || [];
+        
+        if (fallas.length === 0) {
+            console.log(`   ⚠️ Evaluación ${ev.idAudio || ev.id || 'N/A'} no tiene fallas`);
+            continue;
+        }
+        
+        evaluacionesConFallas++;
+        console.log(`   📊 Evaluación ${ev.idAudio || ev.id || 'N/A'}: ${fallas.length} fallas`);
+        
+        for (const falla of fallas) {
+            // Determinar el tipo
+            let tipo = falla.tipo || 'proceso';
+            let clave = 'procesos';
+            
+            if (tipo === 'habilidades' || tipo === 'habilidad') {
+                clave = 'habilidades';
+                tipo = 'habilidades';
+            } else if (tipo === 'feedback') {
+                clave = 'feedback';
+            } else {
+                clave = 'procesos';
+                tipo = 'proceso';
+            }
+            
+            const submotivo = falla.submotivo || 'Sin submotivo';
+            const atributo = falla.atributo || 'Sin atributo';
+            const idAudio = ev.idAudio || ev.idLlamada || ev.id || 'Sin ID';
+            const fecha = ev.fecha || 'Sin fecha';
+            const evalInfo = `${idAudio} (${fecha})`;
+            
+            // Inicializar si no existe
+            if (!resumen[clave]) {
+                resumen[clave] = { total: 0, submotivos: {}, atributos: {}, evaluaciones: {} };
+            }
+            
+            // INCREMENTAR TOTAL
+            resumen[clave].total++;
+            totalFallasProcesadas++;
+            
+            // CONTAR SUBMOTIVOS
+            resumen[clave].submotivos[submotivo] = (resumen[clave].submotivos[submotivo] || 0) + 1;
+            
+            // CONTAR ATRIBUTOS
+            if (atributo && atributo !== 'Sin atributo') {
+                resumen[clave].atributos[atributo] = (resumen[clave].atributos[atributo] || 0) + 1;
+            }
+            
+            // REGISTRAR EVALUACIONES
+            if (!resumen[clave].evaluaciones[submotivo]) {
+                resumen[clave].evaluaciones[submotivo] = [];
+            }
+            if (!resumen[clave].evaluaciones[submotivo].includes(evalInfo)) {
+                resumen[clave].evaluaciones[submotivo].push(evalInfo);
+            }
+        }
+    }
+    
+    console.log(`✅ construirResumenDesdeEvaluaciones COMPLETADO:`);
+    console.log(`   - Evaluaciones con fallas: ${evaluacionesConFallas}`);
+    console.log(`   - Total fallas procesadas: ${totalFallasProcesadas}`);
+    console.log(`   - Procesos: ${resumen.procesos.total}`);
+    console.log(`   - Habilidades: ${resumen.habilidades.total}`);
+    console.log(`   - Feedback: ${resumen.feedback.total}`);
+    
+    return resumen;
+}
+// ======================================================
 // CONFIGURACIÓN DE API DE TRANSCRIPCIÓN
 // ======================================================
 const API_TRANSCRIPCION_URL = 'http://localhost:5001/api/transcripcion';
@@ -829,72 +2504,6 @@ if (document.readyState === 'loading') {
     inicializarEventoAgentes();
 }
 
-
-// ======================================================
-// MAPEO DE SUBMOTIVOS PARA GESTIÓN DE ACCIONES (3 TIPOS)
-// ======================================================
-const MAPEO_ACCIONES_PDA = {
-    feedback: {
-        nombre: '💬 Feedback',
-        requiereCodigo: false,
-        grupos: {
-            'GESTION DE ESPERA': {
-                submotivos: ['No_Deja_en_Espera_al_Cliente']
-            },
-            'CORTE / ABANDONO DE LLAMADA': {
-                submotivos: ['No_Corta_Llamada']
-            },
-            'IMAGEN CORPORATIVA': {
-                submotivos: ['No_Perjudica_imagen_Movistar', 'No_Compara_con_otros_clientes']
-            }
-        }
-    },
-    proceso: {
-        nombre: '📚 Capacitación Proceso',
-        requiereCodigo: true,
-        grupos: {
-            'PROTOCOLOS DE ATENCION': {
-                submotivos: ['Cumple_Speech', 'Especifica_Motivo_Llamada', 'Menciona_Numero_Servicio']
-            },
-            'BRINDA INFORMACION': {
-                submotivos: ['Brinda_informacion_correcta', 'No_Repite_Información', 'Informa_Campañas']
-            },
-            'SONDEO': {
-                submotivos: ['Identifica_Responsable_de_Pago', 'Valida_Pago_de_Deuda']
-            },
-            'MOTIVO DE NO PAGO': {
-                submotivos: ['Pregunta_motivo_no_pago']
-            },
-            'LUGARES DE PAGO': {
-                submotivos: ['Prioriza_pagos_APP_Digitales', 'Prioriza_pagos_Bancos/Agentes']
-            },
-            'CIERRE': {
-                submotivos: ['Confirma_Compromiso_de_Pago', 'Cierre_correcto']
-            },
-            'TIPIFICACION': {
-                submotivos: ['Tipificacion_correcta']
-            }
-        }
-    },
-    habilidades: {
-        nombre: '🎯 Capacitación Habilidades Blandas',
-        requiereCodigo: true,
-        grupos: {
-            'ESCUCHA ACTIVA': {
-                submotivos: ['No_Interrumpe_Dialogo', 'No_Omite_Preguntas_del_Cliente']
-            },
-            'NEGOCIACION Y REBATE': {
-                submotivos: ['Genera_Compromiso_de_Pago', 'Maneja_Objeciones', 'Resuelve_dudas']
-            },
-            'LENGUAJE Y COMUNICACIÓN': {
-                submotivos: ['No_Usa_Jergas', 'Transmite_Seguridad/confianza', 'Tono_de_Voz/ Vocalizacion']
-            },
-            'RESPETO AL CLIENTE': {
-                submotivos: ['No_Genera_conflicto_con_cliente', 'Amabilidad']
-            }
-        }
-    }
-};
 
 // ========================================================================================
 // BLOQUE 1: CONEXIÓN BD, LOGIN, SESIÓN Y ACTUALIZACIONES (13 funciones)
@@ -15220,333 +16829,611 @@ async function cargarMesesParaSelectorQ4() {
     }
     // ===== FIN FUNCIÓN: renderizarChecklistAcciones ========================
     
-    // ===== FUNCIÓN MODIFICADA: generarPDAConDocumento (acepta número de ciclo) =====
-    async function generarPDAConDocumento(agente, numeroCiclo = null) {
-        console.log('📝 Generando documento PDA profesional para:', agente);
-        if (numeroCiclo) {
-            console.log(`   Ciclo específico solicitado: #${numeroCiclo}`);
-        }
+// ======================================================
+// FUNCIÓN COMPLETA: generarPDAConDocumento (CON SOPORTE PARA MÚLTIPLES CICLOS Q4)
+// ======================================================
 
-        const db = getDB();
-        if (!db) {
-            alert('❌ Base de datos no disponible');
-            return;
-        }
-
-        // 🔴 VALIDACIÓN 1: Verificar si ya existe un PDA activo
-        if (!window.datosPDA || window.datosPDA.length === 0) {
-            await cargarDatosPDA();
-        }
-
-        const estadosActivos = ['pendiente', 'notificado', 'en_gestion', 'en_seguimiento'];
-        const pdaActivo = window.datosPDA?.find(pda =>
-            pda.agente === agente &&
-            estadosActivos.includes(pda.estado)
-        );
-
-        if (pdaActivo) {
-            let estadoTexto = '';
-            switch (pdaActivo.estado) {
-                case 'pendiente': estadoTexto = '⏳ Pendiente'; break;
-                case 'notificado': estadoTexto = '📨 Notificado'; break;
-                case 'en_gestion': estadoTexto = '✏️ En gestión'; break;
-                case 'en_seguimiento': estadoTexto = '📊 En seguimiento'; break;
-                default: estadoTexto = pdaActivo.estado;
-            }
-
-            const mensaje = `⚠️ El gestor ${agente} ya tiene un PDA activo.\n\n` +
-                `📋 Estado actual: ${estadoTexto}\n` +
-                `🆔 ID: ${pdaActivo.id}\n` +
-                `📅 Fecha detección: ${pdaActivo.fechaDeteccion || 'N/A'}\n\n` +
-                `Complete o cierre el PDA actual antes de generar uno nuevo.`;
-
-            if (confirm(mensaje + '\n\n¿Desea ir a la pestaña de Gestión PDA para verlo?')) {
-                showTab('gestionPDA', null);
-            }
-            return;
-        }
-
-        // 🔴 VALIDACIÓN 2: Verificar límite de 2 PDA por mes
-        const mesActual = new Date().getMonth();
-        const anioActual = new Date().getFullYear();
-
-        const pdaCompletadosEsteMes = window.datosPDA?.filter(pda =>
-            pda.agente === agente &&
-            pda.estado === 'completado' &&
-            pda.fechaFinGestion
-        ).length || 0;
-
-        if (pdaCompletadosEsteMes >= 2) {
-            alert(`⚠️ El gestor ${agente} ya tiene ${pdaCompletadosEsteMes} PDA completados este mes.\n\n` +
-                `Debe escalar el caso a Gerencia antes de aplicar otro PDA.\n` +
-                `Límite: 2 PDA por gestor por mes.`);
-            return;
-        }
-
-        // Mostrar indicador de carga
-        const loadingMsg = document.createElement('div');
-        loadingMsg.textContent = '⏳ Generando documento...';
-        loadingMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; z-index: 10002; box-shadow: 0 4px 20px rgba(0,0,0,0.2);';
-        document.body.appendChild(loadingMsg);
-
-        try {
-            // 🔴 OBTENER LOS CICLOS DEL AGENTE (usando la función corregida)
-            const ciclos = await agruparEvaluacionesEnCiclos(agente);
-            
-            if (ciclos.length === 0) {
-                alert(`⚠️ No se encontraron ciclos de evaluación para ${agente}`);
-                document.body.removeChild(loadingMsg);
-                return;
-            }
-            
-            let cicloBasal = null;
-            
-            // 🔴 Si se especificó un número de ciclo, buscar ese ciclo específico
-            if (numeroCiclo) {
-                cicloBasal = ciclos.find(c => c.numero === numeroCiclo && c.cuartil === 'Q4' && c.esCompleto);
-                if (cicloBasal) {
-                    console.log(`✅ Usando ciclo específico #${numeroCiclo} (${cicloBasal.fechaInicio} → ${cicloBasal.fechaFin})`);
-                } else {
-                    console.warn(`⚠️ No se encontró el ciclo #${numeroCiclo} en Q4, buscando último ciclo completo...`);
-                }
-            }
-            
-            // 🔴 Si no se encontró el ciclo específico, buscar el último ciclo completo en Q4
-            if (!cicloBasal) {
-                // Buscar el último ciclo completo que esté en Q4
-                for (let i = ciclos.length - 1; i >= 0; i--) {
-                    if (ciclos[i].esCompleto && ciclos[i].cuartil === 'Q4') {
-                        cicloBasal = ciclos[i];
-                        console.log(`✅ Usando último ciclo Q4 encontrado: #${cicloBasal.numero}`);
-                        break;
-                    }
-                }
-            }
-            
-            // 🔴 Si aún no hay ciclo, buscar el último ciclo completo (aunque no sea Q4)
-            if (!cicloBasal) {
-                for (let i = ciclos.length - 1; i >= 0; i--) {
-                    if (ciclos[i].esCompleto) {
-                        cicloBasal = ciclos[i];
-                        console.log(`⚠️ Usando último ciclo completo (${cicloBasal.cuartil}) como fallback`);
-                        break;
-                    }
-                }
-            }
-
-            // Validar que tenemos un ciclo basal
-            if (!cicloBasal) {
-                alert(`⚠️ No se encontró un ciclo basal completo para ${agente}\n\nSe requieren 5 evaluaciones para cerrar un ciclo basal.`);
-                document.body.removeChild(loadingMsg);
-                return;
-            }
-
-            // Verificar que el ciclo basal esté en Q4
-            if (cicloBasal.cuartil !== 'Q4') {
-                alert(`⚠️ El gestor ${agente} NO está en Q4 (${cicloBasal.cuartil} - ${cicloBasal.promedio}%).\n\nSolo se generan PDA para gestores en Q4.`);
-                document.body.removeChild(loadingMsg);
-                return;
-            }
-
-            const totalEvals = cicloBasal.totalEvaluaciones;
-            const evaluacionesCicloBasal = cicloBasal.evaluaciones;
-            
-            console.log(`✅ Ciclo basal: Ciclo ${cicloBasal.numero} (${cicloBasal.fechaInicio} → ${cicloBasal.fechaFin}) - ${totalEvals} evaluaciones`);
-
-            // ======================================================
-            // CALCULAR ESTADÍSTICAS DEL CICLO BASAL
-            // ======================================================
-            let todasLasFallas = {};
-            let sumaNotas = 0;
-            let sumaENC = 0;
-            let sumaECUF = 0;
-            let sumaECN = 0;
-            let fechas = [];
-
-            for (const evalItem of evaluacionesCicloBasal) {
-                sumaNotas += evalItem.notaFinal || 0;
-                sumaENC += evalItem.totalENC || 0;
-                sumaECUF += evalItem.totalECUF || 0;
-                sumaECN += evalItem.totalECN || 0;
-
-                const fechaStr = evalItem.fechaOriginal || evalItem.fecha || '';
-                if (fechaStr) {
-                    fechas.push(fechaStr);
-                }
-
-                // Procesar detalles de la evaluación
-                if (evalItem.detalles && evalItem.detalles.length > 0) {
-                    evalItem.detalles.forEach(det => {
-                        const cumple = det.cumple === true || det.cumple === 1 || det.cumple === 'true';
-                        if (!cumple && det.submotivo) {
-                            const key = det.submotivo;
-                            if (!todasLasFallas[key]) {
-                                todasLasFallas[key] = {
-                                    submotivo: det.submotivo,
-                                    bloque: det.bloque || '',
-                                    atributo: det.atributo || '',
-                                    ocurrencias: 0,
-                                    peso: det.peso || 0
-                                };
-                            }
-                            todasLasFallas[key].ocurrencias++;
-                        }
-                    });
-                }
-            }
-
-            // Calcular promedios
-            const promedioFinal = (sumaNotas / totalEvals).toFixed(1);
-            const promedioENC = (sumaENC / totalEvals).toFixed(1);
-            const promedioECUF = (sumaECUF / totalEvals).toFixed(1);
-            const promedioECN = (sumaECN / totalEvals).toFixed(1);
-
-            const evaluaciones = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
-            const porcentajes = calcularPromediosMotivosPorcentaje(evaluaciones);
-            const pctENC = Math.round(Number(porcentajes.promedioENC));
-            const pctECUF = Math.round(Number(porcentajes.promedioECUF));
-            const pctECN = Math.round(Number(porcentajes.promedioECN));
-
-            const sumRawENC = datosAgrupados.reduce((sum, d) => sum + (parseFloat(d.promedioENC) * d.count), 0);
-            const sumRawECUF = datosAgrupados.reduce((sum, d) => sum + (parseFloat(d.promedioECUF) * d.count), 0);
-            const sumRawECN = datosAgrupados.reduce((sum, d) => sum + (parseFloat(d.promedioECN) * d.count), 0);
-
-            const promedioRawENC = (sumRawENC / totalEvals).toFixed(1);
-            const promedioRawECUF = (sumRawECUF / totalEvals).toFixed(1);
-            const promedioRawECN = (sumRawECN / totalEvals).toFixed(1);
-
-            const matrizDominante = obtenerMatrizDominante(evaluaciones);
-            const encDetalleText = matrizDominante ? `${promedioRawENC}/${matrizDominante.pesos.ENC} pts` : `${promedioRawENC} pts`;
-            const ecufDetalleText = matrizDominante ? `${promedioRawECUF}/${matrizDominante.pesos.ECUF} pts` : `${promedioRawECUF} pts`;
-            const ecnDetalleText = matrizDominante ? `${promedioRawECN}/${matrizDominante.pesos.ECN} pts` : `${promedioRawECN} pts`;
-
-            const encElem = document.getElementById('kpiPromedioENC');
-            const encDetalle = document.getElementById('kpiPromedioENCDetalle');
-            const ecufElem = document.getElementById('kpiPromedioECUF');
-            const ecufDetalle = document.getElementById('kpiPromedioECUFDetalle');
-            const ecnElem = document.getElementById('kpiPromedioECN');
-            const ecnDetalle = document.getElementById('kpiPromedioECNDetalle');
-
-            if (encElem) encElem.textContent = pctENC + '%';
-            if (encDetalle) encDetalle.textContent = encDetalleText;
-            if (ecufElem) ecufElem.textContent = pctECUF + '%';
-            if (ecufDetalle) ecufDetalle.textContent = ecufDetalleText;
-            if (ecnElem) ecnElem.textContent = pctECN + '%';
-            if (ecnDetalle) ecnDetalle.textContent = ecnDetalleText;
-            const periodoHasta = fechas[fechas.length - 1] ? formatearFechaParaDocumento(fechas[fechas.length - 1]) : 'N/A';
-
-            // Fecha próxima evaluación: HOY + 7 DÍAS
-            const hoy = new Date();
-            hoy.setDate(hoy.getDate() + 7);
-            const fechaProximaEvaluacion = hoy.toLocaleDateString('es-ES');
-
-            console.log(`📊 CICLO BASAL - ${agente}:`);
-            console.log(`   Evaluaciones: ${totalEvals}`);
-            console.log(`   Período: ${periodoDesde} → ${periodoHasta}`);
-
-            // Generar ID de documento
-            const documentoId = generarDocumentoId();
-            const fechaEmision = new Date().toLocaleDateString('es-ES');
-
-            // ======================================================
-            // CREAR REGISTRO EN pda_cabecera
-            // ======================================================
-            const nuevoPdaId = await crearPDAEnPostgreSQL({
-                agente,
-                fechaDeteccion: new Date().toISOString().split('T')[0],
-                fechaInicioCicloBasal: periodoDesde !== 'N/A' ? convertirFechaDDMMYYYYaISO(periodoDesde) : null,
-                fechaFinCicloBasal: periodoHasta !== 'N/A' ? convertirFechaDDMMYYYYaISO(periodoHasta) : null,
-                cicloBasalNumero: cicloBasal.numero, // ← NUEVO: guardar el número de ciclo
-                cuartilBasal: 'Q4',
-                promedioBasal: parseFloat(promedioFinal),
-                estado: 'pendiente'
-            });
-
-            if (!nuevoPdaId) {
-                throw new Error('No se pudo crear el registro en pda_cabecera');
-            }
-
-            console.log(`✅ PDA creado con ID: ${nuevoPdaId}`);
-
-            // ======================================================
-            // CREAR ACCIONES EN pda_acciones
-            // ======================================================
-            await crearAccionesPDADesdeMatriz(nuevoPdaId, itemsOrdenados);
-
-            // ======================================================
-            // CREAR REGISTRO EN pda_ciclos_evaluacion
-            // ======================================================
-            await crearCicloEvaluacion({
-                agente,
-                tipoCiclo: 'basal',
-                pdaOrigenId: nuevoPdaId,
-                fechaInicio: periodoDesde !== 'N/A' ? convertirFechaDDMMYYYYaISO(periodoDesde) : null,
-                fechaFin: periodoHasta !== 'N/A' ? convertirFechaDDMMYYYYaISO(periodoHasta) : null,
-                totalEvaluaciones: totalEvals,
-                promedioNota: parseFloat(promedioFinal),
-                cuartil: 'Q4',
-                mejoraDetectada: false
-            });
-
-            // ======================================================
-            // GENERAR DOCUMENTO HTML
-            // ======================================================
-            const documentoHTML = generarDocumentoHTML({
-                documentoId,
-                fechaEmision,
-                agente,
-                periodoDesde,
-                periodoHasta,
-                totalEvals,
-                promedioFinal,
-                promedioENC,
-                promedioECUF,
-                promedioECN,
-                pctENC,
-                pctECUF,
-                pctECN,
-                cuartil: 'Q4',
-                itemsCriticos,
-                itemsNoCriticos,
-                fechaProximaEvaluacion
-            });
-
-            const documentoTexto = generarDocumentoTexto({
-                documentoId,
-                fechaEmision,
-                agente,
-                periodoDesde,
-                periodoHasta,
-                totalEvals,
-                promedioFinal,
-                promedioENC,
-                promedioECUF,
-                promedioECN,
-                pctENC,
-                pctECUF,
-                pctECN,
-                itemsCriticos,
-                itemsNoCriticos,
-                fechaProximaEvaluacion
-            });
-
-            // ======================================================
-            // MOSTRAR MODAL CON EL DOCUMENTO
-            // ======================================================
-            document.body.removeChild(loadingMsg);
-            mostrarModalDocumentoProfesional(documentoHTML, documentoTexto, agente);
-
-            // Recargar listas de PDA
-            await cargarDatosPDA();
-
-        } catch (error) {
-            console.error('Error generando documento:', error);
-            if (loadingMsg && loadingMsg.parentNode) {
-                document.body.removeChild(loadingMsg);
-            }
-            alert('❌ Error al generar el documento: ' + error.message);
-        }
+async function generarPDAConDocumento(agente, numeroCiclo = null) {
+    console.log('📝 Generando documento PDA profesional para:', agente);
+    if (numeroCiclo) {
+        console.log(`   Ciclo específico solicitado: #${numeroCiclo}`);
     }
+
+    const db = getDB();
+    if (!db) {
+        alert('❌ Base de datos no disponible');
+        return;
+    }
+
+    // ======================================================
+    // PASO 1: VERIFICAR PDA ACTIVO (SOLO PARA EL MISMO CICLO)
+    // ======================================================
+    if (!window.datosPDA || window.datosPDA.length === 0) {
+        await cargarDatosPDA();
+    }
+
+    // ======================================================
+    // PASO 2: OBTENER CICLOS DEL AGENTE
+    // ======================================================
+    const ciclos = await agruparEvaluacionesEnCiclos(agente);
+    
+    if (ciclos.length === 0) {
+        alert(`⚠️ No se encontraron ciclos de evaluación para ${agente}`);
+        return;
+    }
+    
+    // Filtrar ciclos Q4 y completos
+    const ciclosQ4 = ciclos.filter(c => c.cuartil === 'Q4' && c.esCompleto);
+    
+    if (ciclosQ4.length === 0) {
+        alert(`⚠️ El gestor ${agente} no tiene ciclos Q4 completos\n\nSe requieren 5 evaluaciones para cerrar un ciclo basal.`);
+        return;
+    }
+    
+    console.log(`📊 Ciclos Q4 encontrados: ${ciclosQ4.length}`);
+    ciclosQ4.forEach(c => {
+        console.log(`   Ciclo #${c.numero} (${c.fechaInicio} → ${c.fechaFin}) - Promedio: ${c.promedio}%`);
+    });
+    
+    // ======================================================
+    // PASO 3: DETERMINAR QUÉ CICLO USAR
+    // ======================================================
+    let cicloSeleccionado = null;
+    
+    if (numeroCiclo) {
+        // Buscar el ciclo específico
+        cicloSeleccionado = ciclosQ4.find(c => c.numero === numeroCiclo);
+        if (!cicloSeleccionado) {
+            alert(`❌ No se encontró el ciclo Q4 #${numeroCiclo} para ${agente}`);
+            return;
+        }
+        console.log(`✅ Usando ciclo específico #${numeroCiclo}`);
+    } else if (ciclosQ4.length === 1) {
+        // Solo un ciclo Q4, usarlo
+        cicloSeleccionado = ciclosQ4[0];
+        console.log(`✅ Usando único ciclo Q4: #${cicloSeleccionado.numero}`);
+    } else {
+        // 🔴 MÚLTIPLES CICLOS Q4 - Preguntar al usuario
+        let mensaje = `⚠️ El gestor ${agente} tiene ${ciclosQ4.length} ciclos en Q4:\n\n`;
+        ciclosQ4.forEach((c, i) => {
+            mensaje += `${i + 1}. Ciclo #${c.numero} (${c.fechaInicio} → ${c.fechaFin}) - ${c.promedio}%\n`;
+        });
+        mensaje += `\n¿Para qué ciclo desea generar el PDA? (Ingrese el número de ciclo)`;
+        
+        const respuesta = prompt(mensaje);
+        if (!respuesta) return;
+        
+        const cicloNumero = parseInt(respuesta);
+        cicloSeleccionado = ciclosQ4.find(c => c.numero === cicloNumero);
+        
+        if (!cicloSeleccionado) {
+            alert(`❌ Ciclo #${cicloNumero} no encontrado o no está en Q4`);
+            return;
+        }
+        console.log(`✅ Usando ciclo seleccionado: #${cicloSeleccionado.numero}`);
+    }
+
+    // ======================================================
+    // PASO 4: VERIFICAR SI YA EXISTE PDA PARA ESTE CICLO
+    // ======================================================
+    const estadosActivos = ['pendiente', 'notificado', 'en_gestion', 'en_seguimiento', 'pendiente_operaciones', 'gestor_notificado', 'enviado_capacitacion'];
+    
+    const pdaActivo = window.datosPDA?.find(pda =>
+        pda.agente === agente &&
+        pda.ciclo_basal_numero === cicloSeleccionado.numero &&
+        estadosActivos.includes(pda.estado)
+    );
+
+    if (pdaActivo) {
+        let estadoTexto = '';
+        switch (pdaActivo.estado) {
+            case 'pendiente': estadoTexto = '⏳ Pendiente'; break;
+            case 'pendiente_operaciones': estadoTexto = '⏳ Pendiente Operaciones'; break;
+            case 'notificado': estadoTexto = '📨 Notificado'; break;
+            case 'gestor_notificado': estadoTexto = '📨 Gestor Notificado'; break;
+            case 'en_gestion': estadoTexto = '✏️ En gestión'; break;
+            case 'en_seguimiento': estadoTexto = '📊 En seguimiento'; break;
+            case 'enviado_capacitacion': estadoTexto = '📤 Enviado a Capacitación'; break;
+            default: estadoTexto = pdaActivo.estado;
+        }
+
+        const mensaje = `⚠️ El gestor ${agente} ya tiene un PDA activo para el ciclo #${cicloSeleccionado.numero}.\n\n` +
+            `📋 Estado actual: ${estadoTexto}\n` +
+            `🆔 ID: ${pdaActivo.id}\n` +
+            `📅 Fecha detección: ${pdaActivo.fechaDeteccion || 'N/A'}\n\n` +
+            `Complete o cierre el PDA actual antes de generar uno nuevo para este ciclo.`;
+
+        if (confirm(mensaje + '\n\n¿Desea ir a la pestaña de Gestión PDA para verlo?')) {
+            showTab('gestionPDA', null);
+        }
+        return;
+    }
+
+    // ======================================================
+    // PASO 5: VERIFICAR LÍMITE DE 2 PDA POR MES (POR AGENTE)
+    // ======================================================
+    const mesActual = new Date().getMonth();
+    const anioActual = new Date().getFullYear();
+
+    const pdaCompletadosEsteMes = window.datosPDA?.filter(pda =>
+        pda.agente === agente &&
+        pda.estado === 'completado' &&
+        pda.fechaFinGestion
+    ).length || 0;
+
+    if (pdaCompletadosEsteMes >= 2) {
+        alert(`⚠️ El gestor ${agente} ya tiene ${pdaCompletadosEsteMes} PDA completados este mes.\n\n` +
+            `Debe escalar el caso a Gerencia antes de aplicar otro PDA.\n` +
+            `Límite: 2 PDA por gestor por mes.`);
+        return;
+    }
+
+    // ======================================================
+    // PASO 6: MOSTRAR INDICADOR DE CARGA
+    // ======================================================
+    const loadingMsg = document.createElement('div');
+    loadingMsg.textContent = '⏳ Generando documento...';
+    loadingMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; z-index: 10002; box-shadow: 0 4px 20px rgba(0,0,0,0.2);';
+    document.body.appendChild(loadingMsg);
+
+    try {
+        // ======================================================
+        // PASO 7: DATOS DEL CICLO SELECCIONADO
+        // ======================================================
+        const cicloBasal = cicloSeleccionado;
+        const totalEvals = cicloBasal.totalEvaluaciones;
+        const evaluacionesCicloBasal = cicloBasal.evaluaciones;
+        
+        // Extraer fechas del ciclo
+        const fechasCiclo = [];
+        for (const evalItem of evaluacionesCicloBasal) {
+            const fechaStr = evalItem.fechaOriginal || evalItem.fecha || '';
+            if (fechaStr) {
+                fechasCiclo.push(fechaStr);
+            }
+        }
+        let periodoDesde = 'N/A';
+        let periodoHasta = 'N/A';
+        if (fechasCiclo.length > 0) {
+            periodoDesde = formatearFechaParaDocumento(fechasCiclo[0]);
+            periodoHasta = formatearFechaParaDocumento(fechasCiclo[fechasCiclo.length - 1]);
+        }
+        
+        console.log(`✅ Ciclo basal: Ciclo ${cicloBasal.numero} (${periodoDesde} → ${periodoHasta}) - ${totalEvals} evaluaciones`);
+
+        // Fecha de referencia para la matriz
+        const primeraEvaluacion = evaluacionesCicloBasal[0];
+        const fechaEvaluacion = primeraEvaluacion?.fechaOriginal || primeraEvaluacion?.fecha || null;
+        console.log(`   📅 Fecha de referencia para matriz: ${fechaEvaluacion || 'actual'}`);
+
+        // ======================================================
+        // PASO 8: GENERAR ESTRUCTURA DEL INFORME
+        // ======================================================
+        console.log('📊 Generando estructura del informe...');
+        const informe = await generarEstructuraInformePDA(agente, cicloBasal);
+        console.log('📊 Informe generado');
+
+        // ======================================================
+        // PASO 9: EXTRAER DATOS PARA EL HTML
+        // ======================================================
+        const resumenPorTipoParaHTML = 
+            informe.resumen?.resumenPorTipo || 
+            informe.detalleQuiebres?.resumen?.resumenPorTipo || 
+            {};
+
+        const detalleQuiebresParaHTML = informe.detalleQuiebres || {};
+
+        console.log('📊 resumenPorTipoParaHTML keys:', Object.keys(resumenPorTipoParaHTML));
+        console.log('📊 evaluaciones en informe:', informe.evaluaciones?.length || 0);
+
+        // Obtener la matriz para la fecha
+        const versionMatriz = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
+        const matrizCompleta = versionMatriz ? await obtenerMatrizPorVersion(versionMatriz.id) : null;
+
+        // ======================================================
+        // PASO 10: GENERAR DOCUMENTO ID
+        // ======================================================
+        const documentoId = generarDocumentoId();
+        const fechaEmision = new Date().toLocaleDateString('es-ES');
+        const fechaProximaEvaluacion = new Date();
+        fechaProximaEvaluacion.setDate(fechaProximaEvaluacion.getDate() + 7);
+        const fechaProximaEvaluacionStr = fechaProximaEvaluacion.toLocaleDateString('es-ES');
+
+        // Obtener items para compatibilidad
+        const itemsFallas = Object.values(informe.detalleQuiebres?.resumen?.submotivosMasFrecuentes || {});
+        const itemsCriticos = itemsFallas.filter(item => (item?.ocurrencias || 0) >= 3);
+        const itemsNoCriticos = itemsFallas.filter(item => (item?.ocurrencias || 0) < 3);
+
+        // ======================================================
+        // PASO 11: GENERAR DOCUMENTO HTML
+        // ======================================================
+        console.log('📄 Generando documento HTML...');
+
+        const nombreAgente = agente || 'Sin agente';
+        const cicloNumero = cicloBasal.numero || 0;
+        const fechaInicio = cicloBasal.fechaInicio || 'N/A';
+        const fechaFin = cicloBasal.fechaFin || 'N/A';
+        const totalEvaluaciones = cicloBasal.totalEvaluaciones || 0;
+        const promedio = cicloBasal.promedio || 0;
+        const cuartil = cicloBasal.cuartil || 'Q4';
+        const promedioENC = cicloBasal.promedioENC || 0;
+        const promedioECUF = cicloBasal.promedioECUF || 0;
+        const promedioECN = cicloBasal.promedioECN || 0;
+
+        // Calcular porcentajes para cada motivo
+        const pesos = { ENC: 30, ECUF: 30, ECN: 40 };
+        const pctENC = Math.round((promedioENC / pesos.ENC) * 100);
+        const pctECUF = Math.round((promedioECUF / pesos.ECUF) * 100);
+        const pctECN = Math.round((promedioECN / pesos.ECN) * 100);
+
+        const documentoHTML = generarDocumentoHTML({
+            agente: nombreAgente,
+            cicloNumero: cicloNumero,
+            periodoDesde: fechaInicio,
+            periodoHasta: fechaFin,
+            totalEvals: totalEvaluaciones,
+            promedioFinal: promedio,
+            cuartil: cuartil,
+            promedioENC: promedioENC,
+            promedioECUF: promedioECUF,
+            promedioECN: promedioECN,
+            pctENC: pctENC,
+            pctECUF: pctECUF,
+            pctECN: pctECN,
+            documentoId: documentoId,
+            fechaEmision: fechaEmision,
+            fechaProximaEvaluacion: fechaProximaEvaluacionStr,
+            versionMatriz: versionMatriz,
+            matrizCompleta: matrizCompleta,
+            evaluaciones: informe.evaluaciones || [],
+            audiosQuiebre: informe.audiosQuiebre || [],
+            resumenPorTipo: resumenPorTipoParaHTML,
+            detalleQuiebres: detalleQuiebresParaHTML,
+            itemsCriticos: itemsCriticos || [],
+            itemsNoCriticos: itemsNoCriticos || []
+        });
+
+        // ======================================================
+        // PASO 12: GENERAR DOCUMENTO TEXTO
+        // ======================================================
+        console.log('📄 Generando documento TXT...');
+        const documentoTexto = generarDocumentoTexto({
+            documentoId: documentoId,
+            fechaEmision: fechaEmision,
+            agente: nombreAgente,
+            periodoDesde: fechaInicio,
+            periodoHasta: fechaFin,
+            totalEvals: totalEvaluaciones,
+            promedioFinal: promedio,
+            promedioENC: promedioENC,
+            promedioECUF: promedioECUF,
+            promedioECN: promedioECN,
+            pctENC: pctENC,
+            pctECUF: pctECUF,
+            pctECN: pctECN,
+            cuartil: cuartil,
+            fechaProximaEvaluacion: fechaProximaEvaluacionStr,
+            versionMatriz: versionMatriz
+        });
+
+        // ======================================================
+        // PASO 13: GUARDAR EN BASE DE DATOS
+        // ======================================================
+        console.log('💾 Guardando PDA completo en base de datos...');
+        const guardado = await guardarPDAEnBaseDeDatos(informe);
+        
+        if (!guardado) {
+            throw new Error('No se pudo guardar el PDA en la base de datos');
+        }
+
+        // ======================================================
+        // PASO 14: MOSTRAR MODAL CON EL DOCUMENTO
+        // ======================================================
+        document.body.removeChild(loadingMsg);
+        mostrarModalDocumentoProfesional(documentoHTML, documentoTexto, agente);
+
+        // Recargar listas de PDA
+        await cargarDatosPDA();
+
+        console.log('✅ PDA generado correctamente para:', agente);
+        console.log(`   Ciclo: #${cicloBasal.numero}`);
+        console.log(`   Promedio: ${cicloBasal.promedio}%`);
+
+    } catch (error) {
+        console.error('Error generando documento:', error);
+        if (loadingMsg && loadingMsg.parentNode) {
+            document.body.removeChild(loadingMsg);
+        }
+        alert('❌ Error al generar el documento: ' + error.message);
+    }
+}
+// ======================================================
+// FUNCIÓN: guardarPDAEnBaseDeDatos
+// ======================================================
+
+async function guardarPDAEnBaseDeDatos(informe) {
+    console.log(`💾 Guardando PDA completo para ${informe.agente}`);
+
+    const db = getDB();
+    if (!db) {
+        alert('❌ Base de datos no disponible');
+        return false;
+    }
+
+    try {
+        // ======================================================
+        // 1. GENERAR ID PARA PDA_CABECERA
+        // ======================================================
+        
+        const { data: maxIdData } = await db
+            .from('pda_cabecera')
+            .select('id')
+            .order('id', { ascending: false })
+            .limit(1);
+
+        let nuevoId = 1;
+        if (maxIdData && maxIdData.length > 0 && maxIdData[0].id !== null && maxIdData[0].id !== undefined) {
+            nuevoId = Number(maxIdData[0].id) + 1;
+            console.log(`   ID máximo cabecera: ${maxIdData[0].id}, nuevo: ${nuevoId}`);
+        } else {
+            console.log('   📭 Tabla pda_cabecera vacía, empezando desde ID: 1');
+        }
+
+        // ======================================================
+        // 2. INSERTAR EN PDA_CABECERA
+        // ======================================================
+        
+        const pdaData = {
+            id: nuevoId,
+            agente: informe.agente,
+            fecha_deteccion: new Date().toISOString().split('T')[0],
+            fecha_inicio_ciclo_basal: informe.ciclo.fechaInicio !== 'N/A' ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaInicio) : null,
+            fecha_fin_ciclo_basal: informe.ciclo.fechaFin !== 'N/A' ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaFin) : null,
+            ciclo_basal_numero: informe.ciclo.numero,
+            promedio_basal: parseFloat(informe.ciclo.promedio),
+            cuartil_basal: informe.ciclo.cuartil,
+            estado: 'pendiente',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        console.log('📤 Insertando en pda_cabecera...');
+        console.log('   ID:', pdaData.id, '| Agente:', pdaData.agente, '| Ciclo:', pdaData.ciclo_basal_numero);
+
+        const { error: cabeceraError } = await db
+            .from('pda_cabecera')
+            .insert(pdaData);
+
+        if (cabeceraError) {
+            console.error('❌ Error en pda_cabecera:', cabeceraError);
+            throw cabeceraError;
+        }
+
+        const pdaId = nuevoId;
+        console.log(`✅ PDA_CABECERA: #${pdaId}`);
+
+        // ======================================================
+        // 3. EXTRAER TODAS LAS FALLAS DEL INFORME
+        // ======================================================
+        const todasLasFallas = [];
+        // El informe tiene 'evaluaciones' que contienen 'fallas'
+        if (informe.evaluaciones && informe.evaluaciones.length > 0) {
+            for (const ev of informe.evaluaciones) {
+                if (ev.fallas && ev.fallas.length > 0) {
+                    for (const falla of ev.fallas) {
+                        todasLasFallas.push(falla);
+                    }
+                }
+            }
+        }
+        // Si no hay fallas en evaluaciones, intentar desde detalleQuiebres
+        if (todasLasFallas.length === 0 && informe.detalleQuiebres) {
+            // Si detalleQuiebres tiene evaluaciones con fallas
+            for (const ev of (informe.detalleQuiebres.evaluaciones || [])) {
+                if (ev.fallas && ev.fallas.length > 0) {
+                    for (const falla of ev.fallas) {
+                        todasLasFallas.push(falla);
+                    }
+                }
+            }
+        }
+
+        console.log(`📊 Total fallas extraídas: ${todasLasFallas.length}`);
+
+        // ======================================================
+        // 4. GUARDAR ACCIONES EN PDA_ACCIONES
+        // ======================================================
+        if (todasLasFallas.length > 0) {
+            await crearAccionesPDADesdeMatriz(pdaId, todasLasFallas);
+        } else {
+            console.warn('⚠️ No hay fallas para crear acciones');
+        }
+
+        // ======================================================
+        // 5. GUARDAR CICLO BASAL EN PDA_CICLOS_EVALUACION
+        // ======================================================
+        await guardarCicloBasalPDA(pdaId, informe);
+
+        // ======================================================
+        // 6. GUARDAR DOCUMENTO EN PDA_DOCUMENTOS
+        // ======================================================
+        await guardarDocumentoPDA(pdaId, informe);
+
+        // ======================================================
+        // 7. RESUMEN FINAL
+        // ======================================================
+        
+        console.log('\n📊 === RESUMEN DE INSERCIÓN ===');
+        console.log(`✅ pda_cabecera: ID ${pdaId}`);
+        console.log(`✅ pda_acciones: ${todasLasFallas.length} acciones`);
+        console.log(`✅ pda_ciclos_evaluacion: guardado`);
+        console.log(`✅ pda_documentos: guardado`);
+
+        alert(`✅ PDA COMPLETO GUARDADO\n\n` +
+            `👤 Agente: ${informe.agente}\n` +
+            `📊 Ciclo: #${informe.ciclo.numero}\n` +
+            `🆔 ID: ${pdaId}`);
+
+        await cargarDatosPDA();
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al guardar: ' + error.message);
+        return false;
+    }
+}
+
+// ======================================================
+// FUNCIÓN: verificarPDAFinal
+// ======================================================
+
+async function verificarPDAFinal() {
+    const db = getDB();
+    if (!db) {
+        console.error('❌ Base de datos no disponible');
+        return;
+    }
+
+    console.log('🔍 === VERIFICACIÓN FINAL ===');
+    
+    // 1. Buscar en pda_cabecera
+    const { data: cabecera, error: err1 } = await db
+        .from('pda_cabecera')
+        .select('*')
+        .eq('agente', 'BARREDA TORRES HUGO DOMINGO')
+        .order('id', { ascending: false })
+        .limit(1);
+
+    if (err1) {
+        console.error('❌ Error:', err1);
+    } else if (cabecera && cabecera.length > 0) {
+        console.log('✅ PDA_CABECERA:', {
+            id: cabecera[0].id,
+            agente: cabecera[0].agente,
+            estado: cabecera[0].estado,
+            ciclo: cabecera[0].ciclo_basal_numero,
+            promedio: cabecera[0].promedio_basal
+        });
+    } else {
+        console.log('❌ No se encontró el PDA');
+    }
+
+    // 2. Contar acciones
+    const { count: totalAcciones, error: err2 } = await db
+        .from('pda_acciones')
+        .select('*', { count: 'exact', head: true })
+        .eq('pda_id', cabecera?.[0]?.id || 0);
+
+    if (err2) {
+        console.error('❌ Error:', err2);
+    } else {
+        console.log(`✅ PDA_ACCIONES: ${totalAcciones || 0} acciones`);
+    }
+
+    // 3. Verificar ciclo basal
+    const { data: ciclo, error: err3 } = await db
+        .from('pda_ciclos_evaluacion')
+        .select('*')
+        .eq('pda_origen_id', cabecera?.[0]?.id || 0)
+        .limit(1);
+
+    if (err3) {
+        console.error('❌ Error:', err3);
+    } else if (ciclo && ciclo.length > 0) {
+        console.log('✅ PDA_CICLOS_EVALUACION:', {
+            id: ciclo[0].id,
+            tipo: ciclo[0].tipo_ciclo,
+            promedio: ciclo[0].promedio_nota,
+            cuartil: ciclo[0].cuartil
+        });
+    }
+
+    // 4. Verificar documento
+    const { data: doc, error: err4 } = await db
+        .from('pda_documentos')
+        .select('*')
+        .eq('agente', 'BARREDA TORRES HUGO DOMINGO')
+        .order('id', { ascending: false })
+        .limit(1);
+
+    if (err4) {
+        console.error('❌ Error:', err4);
+    } else if (doc && doc.length > 0) {
+        console.log('✅ PDA_DOCUMENTOS:', {
+            id: doc[0].id,
+            documento_id: doc[0].documento_id,
+            estado: doc[0].estado
+        });
+    }
+
+    console.log('✅ VERIFICACIÓN COMPLETADA');
+}
+
+console.log('✅ Función verificarPDAFinal definida');
+
+// ======================================================
+// FUNCIÓN: generarIdUnicoPDA
+// ======================================================
+
+async function generarIdUnicoPDA() {
+    const db = getDB();
+    if (!db) return Date.now();
+
+    try {
+        // Obtener el ID más alto
+        const { data: maxIdData, error } = await db
+            .from('pda_cabecera')
+            .select('id')
+            .order('id', { ascending: false })
+            .limit(1);
+
+        if (error) {
+            console.warn('Error obteniendo max ID:', error);
+            return Date.now();
+        }
+
+        // Si no hay registros, usar timestamp
+        if (!maxIdData || maxIdData.length === 0) {
+            return Date.now();
+        }
+
+        // Obtener el ID más alto
+        let maxId = Number(maxIdData[0].id);
+        let nuevoId = maxId + 1;
+        let timestamp = Date.now();
+
+        // Si el timestamp es menor que el maxId, usar maxId + 1
+        if (timestamp <= maxId) {
+            return maxId + 1;
+        }
+
+        // Si el timestamp ya existe, incrementar hasta que sea único
+        let intentos = 0;
+        while (intentos < 10) {
+            const { data: verificar, error: verifError } = await db
+                .from('pda_cabecera')
+                .select('id')
+                .eq('id', timestamp)
+                .maybeSingle();
+
+            if (verifError || !verificar) {
+                // El timestamp es único, usarlo
+                return timestamp;
+            }
+            // Si ya existe, incrementar
+            timestamp++;
+            intentos++;
+        }
+
+        // Fallback: usar maxId + 1
+        return maxId + 1;
+
+    } catch (error) {
+        console.error('Error generando ID:', error);
+        return Date.now() + Math.floor(Math.random() * 1000);
+    }
+}
 
     // ======================================================
     // FUNCIÓN: Cargar Meses Disponibles para el Selector Q3
@@ -15807,442 +17694,603 @@ async function cargarMesesParaSelectorQ4() {
         container.innerHTML = html;
     }
 
-    // ===== 19. INICIO FUNCIÓN: generarDocumentoHTML =======================
-    async function generarDocumentoHTML(data) {
-        const {
-            documentoId, fechaEmision, agente, periodoDesde, periodoHasta,
-            totalEvals, promedioFinal, promedioENC, promedioECUF, promedioECN,
-            pctENC, pctECUF, pctECN, cuartil, itemsCriticos, itemsNoCriticos,
-            fechaProximaEvaluacion
-        } = data;
+// ======================================================
+// FUNCIÓN: generarDocumentoHTML (COMPLETA Y CORREGIDA)
+// ======================================================
+function generarDocumentoHTML(data) {
+    console.log('📄 Generando documento HTML completo con estructura Word...');
+    
+    if (!data) {
+        console.error('❌ data es undefined o null');
+        return '<h1>Error: Datos no disponibles</h1>';
+    }
+    
+    // ======================================================
+    // 1. DECLARAR TODAS LAS VARIABLES AL INICIO
+    // ======================================================
+    const {
+        documentoId = 'N/A',
+        fechaEmision = new Date().toLocaleDateString('es-ES'),
+        agente = 'Sin agente',
+        periodoDesde = 'N/A',
+        periodoHasta = 'N/A',
+        totalEvals = 0,
+        promedioFinal = 0,
+        promedioENC = 0,
+        promedioECUF = 0,
+        promedioECN = 0,
+        pctENC = 0,
+        pctECUF = 0,
+        pctECN = 0,
+        cuartil = 'Q4',
+        fechaProximaEvaluacion = 'N/A',
+        evaluaciones = [],
+        audiosQuiebre = [],
+        resumenPorTipo = {},
+        detalleQuiebres = {},
+        cicloNumero = 0,
+        versionMatriz = null,
+        matrizCompleta = null
+    } = data;
 
-        // 🔴 Usar el sistema de cuartiles para determinar colores
-        const resultadoCuartilGeneral = await obtenerCuartilPorNota(promedioFinal);
-        const estadoFinal = resultadoCuartilGeneral.cuartil === 'Q1' || resultadoCuartilGeneral.cuartil === 'Q2' ? 'APRUEBA' : 'NO APRUEBA - Requiere Plan de Mejora';
-        const colorFinal = resultadoCuartilGeneral.color;
+    // ======================================================
+    // 2. DECLARAR CONSTANTES PARA TIPOS
+    // ======================================================
+    const tipos = ['procesos', 'habilidades', 'feedback'];
+    const nombresTipo = {
+        'procesos': '📚 CAPACITACIÓN PROCESOS (ECN)',
+        'habilidades': '🎯 CAPACITACIÓN HABILIDADES BLANDAS (ENC)',
+        'feedback': '💬 FEEDBACK (ENC/ECUF)'
+    };
+    const coloresTipo = {
+        'procesos': '#fd7e14',
+        'habilidades': '#7b1fa2',
+        'feedback': '#019DF4'
+    };
+    const iconosTipo = {
+        'procesos': '📚',
+        'habilidades': '🎯',
+        'feedback': '💬'
+    };
 
-        // Para los motivos, usar los mismos colores según su porcentaje
-        const colorENC = pctENC >= 90 ? '#28a745' : '#d93025';
-        const colorECUF = pctECUF >= 90 ? '#28a745' : '#d93025';
-        const colorECN = pctECN >= 90 ? '#28a745' : '#d93025';
+    // ======================================================
+    // 3. DIAGNÓSTICO - LOG DE DATOS RECIBIDOS
+    // ======================================================
+    console.log('📊 [generarDocumentoHTML] resumenPorTipo recibido:', resumenPorTipo);
+    console.log('📊 [generarDocumentoHTML] detalleQuiebres recibido:', detalleQuiebres);
+    console.log('📊 [generarDocumentoHTML] evaluaciones recibidas:', evaluaciones?.length);
 
-        // Generar filas de la tabla de resultados
-        const tablaResultados = `
-            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                <thead>
-                    <tr>
-                        <th style="background: #019DF4; color: white; padding: 10px; text-align: left; border: 1px solid #ddd;">INDICADOR</th>
-                        <th style="background: #019DF4; color: white; padding: 10px; text-align: center; border: 1px solid #ddd;">PUNTAJE</th>
-                        <th style="background: #019DF4; color: white; padding: 10px; text-align: center; border: 1px solid #ddd;">META</th>
-                        <th style="background: #019DF4; color: white; padding: 10px; text-align: center; border: 1px solid #ddd;">ESTADO</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>🎯 ENC - Cliente</strong></td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${promedioENC}/${obtenerPesosActuales().ENC} (${pctENC}%)</td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">≥ 90%</td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd; color: ${colorENC}; font-weight: bold;">${pctENC >= 90 ? '✅ OK' : '🔴 POR DEBAJO'}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>⚠️ ECUF - Negocio</strong></td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${promedioECUF}/${obtenerPesosActuales().ECUF} (${pctECUF}%)</td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">≥ 90%</td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd; color: ${colorECUF}; font-weight: bold;">${pctECUF >= 90 ? '✅ OK' : '🔴 POR DEBAJO'}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>💰 ECN - Proceso</strong></td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${promedioECN}/${obtenerPesosActuales().ECN} (${pctECN}%)</td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">≥ 90%</td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd; color: ${colorECN}; font-weight: bold;">${pctECN >= 90 ? '✅ OK' : '🔴 POR DEBAJO'}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 8px; border: 1px solid #ddd;"><strong>📊 NOTA FINAL</strong></td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">${promedioFinal}%</td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd;">≥ 85%</td>
-                        <td style="padding: 8px; text-align: center; border: 1px solid #ddd; color: ${colorFinal}; font-weight: bold;">${promedioFinal >= 85 ? '✅ APRUEBA' : '🔴 NO APRUEBA'}</td>
-                    </tr>
-                </tbody>
-            </table>
-        `;
+    // ======================================================
+    // 4. DECLARAR resumenPorTipoData - FORZAR CONSTRUCCIÓN
+    // ======================================================
+    let resumenPorTipoData = resumenPorTipo || {};
 
-        // Generar lista de ítems críticos
-        let itemsCriticosHTML = '';
-        itemsCriticos.forEach(item => {
-            itemsCriticosHTML += `
-                <div style="background: #fff0f0; border-left: 4px solid #d93025; padding: 12px; margin-bottom: 10px; border-radius: 8px;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                        <span style="background: #d93025; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">CRÍTICO</span>
-                        <strong style="color: #d93025;">🔴 ${escapeHtml(item.submotivo)}</strong>
-                    </div>
-                    <div style="font-size: 13px; color: #555; margin-left: 15px;">
-                        <div>📂 Bloque: ${escapeHtml(item.bloque || 'Sin bloque')}</div>
-                        <div>🏷️ Atributo: ${escapeHtml(item.atributo || 'Sin atributo')}</div>
-                        <div>📊 Ocurrencias: ${item.ocurrencias} veces</div>
-                        <div>⚖️ Peso: ${item.peso}%</div>
-                    </div>
-                </div>
-            `;
-        });
+    // Si no hay datos en resumenPorTipo, intentar extraer de detalleQuiebres
+    if (Object.keys(resumenPorTipoData).length === 0 && detalleQuiebres?.resumen?.resumenPorTipo) {
+        resumenPorTipoData = detalleQuiebres.resumen.resumenPorTipo;
+        console.log('📊 Usando resumenPorTipo desde detalleQuiebres');
+    }
 
-        // Generar lista de ítems no críticos
-        let itemsNoCriticosHTML = '';
-        itemsNoCriticos.slice(0, 5).forEach(item => {
-            itemsNoCriticosHTML += `
-                <div style="background: #fff8f0; border-left: 4px solid #f39c12; padding: 12px; margin-bottom: 10px; border-radius: 8px;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                        <span style="background: #f39c12; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px;">NO CRÍTICO</span>
-                        <strong style="color: #f39c12;">🟡 ${escapeHtml(item.submotivo)}</strong>
-                    </div>
-                    <div style="font-size: 13px; color: #555; margin-left: 15px;">
-                        <div>📂 Bloque: ${escapeHtml(item.bloque || 'Sin bloque')}</div>
-                        <div>🏷️ Atributo: ${escapeHtml(item.atributo || 'Sin atributo')}</div>
-                        <div>📊 Ocurrencias: ${item.ocurrencias} veces</div>
-                        <div>⚖️ Peso: ${item.peso}%</div>
-                    </div>
-                </div>
-            `;
-        });
-
-        // Generar expectativa de mejora
-        let expectativaItems = '';
-        itemsCriticos.slice(0, 3).forEach(item => {
-            expectativaItems += `<li>✓ ${escapeHtml(item.submotivo)}</li>`;
-        });
-        if (itemsNoCriticos.length > 0) {
-            expectativaItems += `<li>✓ ${escapeHtml(itemsNoCriticos[0].submotivo)}</li>`;
+    // FORZAR CONSTRUCCIÓN DESDE EVALUACIONES SIEMPRE QUE HAYA DATOS
+    if (evaluaciones && evaluaciones.length > 0) {
+        let tieneFallas = false;
+        let totalFallasEnEval = 0;
+        for (const ev of evaluaciones) {
+            if (ev.fallas && ev.fallas.length > 0) {
+                tieneFallas = true;
+                totalFallasEnEval += ev.fallas.length;
+            }
         }
+        
+        if (tieneFallas) {
+            console.log(`📊 FORZANDO construcción de resumen desde ${evaluaciones.length} evaluaciones (${totalFallasEnEval} fallas)...`);
+            const resumenConstruido = construirResumenDesdeEvaluaciones(evaluaciones);
+            
+            const totalConstruido = Object.values(resumenConstruido).reduce((sum, tipo) => sum + (tipo?.total || 0), 0);
+            if (totalConstruido > 0) {
+                resumenPorTipoData = resumenConstruido;
+                console.log('📊 Usando resumen construido desde evaluaciones:');
+                console.log(`   Procesos: ${resumenPorTipoData.procesos?.total || 0}`);
+                console.log(`   Habilidades: ${resumenPorTipoData.habilidades?.total || 0}`);
+                console.log(`   Feedback: ${resumenPorTipoData.feedback?.total || 0}`);
+            }
+        }
+    }
 
-        // HTML completo del documento
-        return `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>Documento PDA - ${escapeHtml(agente)}</title>
-            <!-- ===== INICIO BLOQUE: ESTILOS CSS ===== -->
-                <style>
-                    * { margin: 0; padding: 0; box-sizing: border-box; }
-                    body { 
-                        font-family: 'Segoe UI', Arial, sans-serif; 
-                        background: white; 
-                        padding: 40px;
-                        line-height: 1.5;
-                    }
-                    .documento {
-                        max-width: 900px;
-                        margin: 0 auto;
-                        background: white;
-                        border-radius: 16px;
-                        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-                        overflow: hidden;
-                    }
-                    .header {
-                        background: linear-gradient(135deg, #019DF4, #00B4F0);
-                        color: white;
-                        padding: 25px 30px;
-                        text-align: center;
-                    }
-                    .header h1 {
-                        font-size: 24px;
-                        margin-bottom: 5px;
-                    }
-                    .header p {
-                        font-size: 14px;
-                        opacity: 0.9;
-                    }
-                    .content {
-                        padding: 25px 30px;
-                    }
-                    .section {
-                        margin-bottom: 30px;
-                        border: 1px solid #e0e0e0;
-                        border-radius: 12px;
-                        overflow: hidden;
-                    }
-                    .section-title {
-                        background: #f8f9fa;
-                        padding: 12px 20px;
-                        font-weight: bold;
-                        font-size: 16px;
-                        color: #019DF4;
-                        border-bottom: 2px solid #019DF4;
-                    }
-                    .section-body {
-                        padding: 20px;
-                    }
-                    .info-grid {
-                        display: grid;
-                        grid-template-columns: 150px 1fr;
-                        gap: 10px;
-                        margin-bottom: 15px;
-                    }
-                    .info-label {
-                        font-weight: bold;
-                        color: #555;
-                    }
-                    .resultado-final {
-                        background: #f0f7ff;
-                        padding: 12px 20px;
-                        border-radius: 8px;
-                        margin-top: 15px;
-                        font-weight: bold;
-                        text-align: center;
-                    }
-                    .footer {
-                        background: #f8f9fa;
-                        padding: 15px 30px;
-                        text-align: center;
-                        font-size: 11px;
-                        color: #888;
-                        border-top: 1px solid #e0e0e0;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                    }
-                    th, td {
-                        padding: 10px;
-                        border: 1px solid #ddd;
-                    }
-                    .badge-urgente {
-                        background: #d93025;
-                        color: white;
-                        padding: 2px 8px;
-                        border-radius: 12px;
-                        font-size: 11px;
-                    }
-                    .nota-informativa {
-                        background: #fff8e0;
-                        padding: 15px;
-                        border-radius: 8px;
-                        margin-top: 15px;
-                        font-size: 13px;
-                        border-left: 4px solid #f39c12;
-                    }
-            <!-- ===== FIN BLOQUE: ESTILOS CSS ===== -->
-                </style>
-            </head>
-            <body>
-                <div class="documento">
-                    <div class="header">
-                        <h1>📋 NOTIFICACIÓN DE RESULTADOS</h1>
-                        <p>Plan de Desarrollo y Acción (PDA) - v1.0</p>
-                    </div>
-                    
-                    <div class="content">
-                        <!-- Datos del documento -->
-                        <div class="section">
-                            <div class="section-title">📄 DATOS DEL DOCUMENTO</div>
-                            <div class="section-body">
-                                <div class="info-grid">
-                                    <div class="info-label">N° Documento:</div>
-                                    <div><strong>${documentoId}</strong></div>
-                                    <div class="info-label">Fecha Emisión:</div>
-                                    <div>${fechaEmision}</div>
-                                    <div class="info-label">Gestor:</div>
-                                    <div><strong>${escapeHtml(agente)}</strong></div>
-                                    <div class="info-label">Emitido por:</div>
-                                    <div>Mesa Calidad Cobranzas</div>
-                                    <div class="info-label">Cuartil del Gestor:</div>
-                                    <div><span style="background: ${cuartil === 'Q4' ? '#d93025' : cuartil === 'Q3' ? '#f39c12' : '#28a745'}; color: white; padding: 2px 12px; border-radius: 12px;">${cuartil}</span></div>
-                                </div>
-                            </div>
-                        </div>
+    console.log('📊 resumenPorTipoData FINAL:', {
+        procesos: resumenPorTipoData.procesos?.total || 0,
+        habilidades: resumenPorTipoData.habilidades?.total || 0,
+        feedback: resumenPorTipoData.feedback?.total || 0
+    });
+
+    // ======================================================
+    // 5. CALCULAR ESTADÍSTICAS
+    // ======================================================
+    let totalFallasGlobal = 0;
+    for (const tipo of tipos) {
+        if (resumenPorTipoData[tipo]) {
+            totalFallasGlobal += resumenPorTipoData[tipo].total || 0;
+        }
+    }
+
+    // Total de submotivos únicos con fallas
+    const totalSubmotivosUnicos = 
+        Object.keys(resumenPorTipoData.procesos?.submotivos || {}).length +
+        Object.keys(resumenPorTipoData.habilidades?.submotivos || {}).length +
+        Object.keys(resumenPorTipoData.feedback?.submotivos || {}).length;
+
+    // ======================================================
+    // 6. SECCIÓN 1: DATOS GENERALES
+    // ======================================================
+    const colorFinal = cuartil === 'Q4' ? '#d93025' : '#28a745';
+    const estadoFinal = cuartil === 'Q4' ? 'NO APRUEBA - Requiere Plan de Mejora' : 'APRUEBA';
+
+    // ======================================================
+    // 7. SECCIÓN 2: CÓDIGOS DE AUDIOS DONDE FALLARON
+    // ======================================================
+    let tablaAudiosHTML = '';
+
+    const evaluacionesConFallas = evaluaciones.filter(ev => ev.fallas && ev.fallas.length > 0);
+    const totalFallasEnAudios = evaluacionesConFallas.reduce((sum, ev) => sum + ev.fallas.length, 0);
+
+    const submotivosUnicosSet = new Set();
+    for (const ev of evaluacionesConFallas) {
+        for (const falla of ev.fallas) {
+            if (falla.submotivo) submotivosUnicosSet.add(falla.submotivo);
+        }
+    }
+
+    if (evaluacionesConFallas.length > 0) {
+        tablaAudiosHTML = `
+            <div style="margin-bottom: 10px; display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 15px; background: #f8f9fa; border-radius: 8px;">
+                <span><strong>🎧 Total audios con fallas:</strong> <span style="color: #d93025; font-weight: bold;">${evaluacionesConFallas.length}</span></span>
+                <span><strong>❌ Total fallas:</strong> <span style="color: #d93025; font-weight: bold;">${totalFallasEnAudios}</span></span>
+                <span><strong>📊 Promedio fallas/audio:</strong> ${(totalFallasEnAudios / evaluacionesConFallas.length).toFixed(1)}</span>
+                <span><strong>🔹 Submotivos únicos:</strong> <span style="color: #fd7e14; font-weight: bold;">${submotivosUnicosSet.size}</span></span>
+            </div>
+            <div style="overflow-x: auto; margin-top: 10px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                    <thead>
+                        <tr style="background: #f0f0f0;">
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 40px;">#</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: left; min-width: 150px;">🎧 ID Llamada</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 120px;">📅 Fecha</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 70px;">📊 Nota</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: center; width: 70px;">❌ Fallas</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">📋 Submotivos que fallaron</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${evaluacionesConFallas.map((ev, idx) => {
+                            const notaColor = ev.nota >= 85 ? '#28a745' : (ev.nota >= 70 ? '#f39c12' : '#d93025');
+                            const idLlamada = ev.idLlamada || ev.idAudio || 'N/A';
+                            
+                            const submotivosBadges = ev.fallas.map(f => {
+                                let color = '#fd7e14';
+                                let tipoLabel = '📚';
+                                if (f.tipo === 'habilidades' || f.tipo === 'habilidad') {
+                                    color = '#7b1fa2';
+                                    tipoLabel = '🎯';
+                                } else if (f.tipo === 'feedback') {
+                                    color = '#019DF4';
+                                    tipoLabel = '💬';
+                                }
+                                return `<span style="background: ${color}; color: white; padding: 2px 8px; border-radius: 4px; margin: 2px; display: inline-block; font-size: 10px;">${tipoLabel} ${f.submotivo}</span>`;
+                            }).join(' ');
+                            
+                            const submotivosUnicosEval = [...new Set(ev.fallas.map(f => f.submotivo))];
+                            
+                            return `
+                                <tr style="border-bottom: 1px solid #eee;">
+                                    <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${idx + 1}</td>
+                                    <td style="padding: 6px; border: 1px solid #ddd; font-weight: bold; font-family: monospace; font-size: 12px;">
+                                        ${escapeHtml(idLlamada)}
+                                    </td>
+                                    <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${ev.fecha || 'N/A'}</td>
+                                    <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: ${notaColor}; font-weight: bold;">${ev.nota || 0}%</td>
+                                    <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">
+                                        <span style="background: #d93025; color: white; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: bold;">${ev.fallas.length}</span>
+                                        <div style="font-size: 9px; color: var(--muted); margin-top: 2px;">${submotivosUnicosEval.length} únicos</div>
+                                    </td>
+                                    <td style="padding: 6px; border: 1px solid #ddd; font-size: 11px; max-width: 400px;">
+                                        ${submotivosBadges || '<span style="color: var(--muted);">Sin submotivos</span>'}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: #f8f9fa; font-weight: bold;">
+                            <td colspan="5" style="padding: 8px; border: 1px solid #ddd; text-align: right;">Total audios con fallas:</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; text-align: left; color: #d93025;">${evaluacionesConFallas.length} audios</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `;
+    } else {
+        tablaAudiosHTML = '<div style="color: #28a745; padding: 15px; text-align: center; font-size: 14px;">✅ No se detectaron fallas en los audios</div>';
+    }
+
+    // ======================================================
+    // 8. SECCIÓN 3: DESGLOSE DE FALLAS POR TIPO DE ACCIÓN
+    // ======================================================
+    let desgloseTipoHTML = '';
+
+    const tieneDatos = Object.keys(resumenPorTipoData).length > 0;
+
+    if (tieneDatos && totalFallasGlobal > 0) {
+        for (const tipo of tipos) {
+            const dataTipo = resumenPorTipoData[tipo];
+            
+            if (dataTipo && dataTipo.total > 0) {
+                const submotivosList = Object.entries(dataTipo.submotivos || {})
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([sub, count]) => {
+                        const evaluacionesDondeFallo = (dataTipo.evaluaciones && dataTipo.evaluaciones[sub]) || [];
+                        const evalList = evaluacionesDondeFallo.length > 0 
+                            ? evaluacionesDondeFallo.map(e => 
+                                `<span style="background: #f8f9fa; padding: 2px 10px; border-radius: 4px; margin: 2px; font-size: 11px; font-family: monospace;">${e}</span>`
+                              ).join(' ')
+                            : '<span style="color: var(--muted);">No registrado</span>';
                         
-                        <!-- Resultados de evaluaciones -->
-                        <div class="section">
-                            <div class="section-title">📊 1. RESULTADOS DE EVALUACIONES</div>
-                            <div class="section-body">
-                                <div class="info-grid">
-                                    <div class="info-label">Período analizado:</div>
-                                    <div>${periodoDesde} al ${periodoHasta}</div>
-                                    <div class="info-label">Total escuchas:</div>
-                                    <div>${totalEvals}</div>
+                        return `
+                            <div style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                    <div>
+                                        <span style="font-weight: 600; font-size: 14px;">❌ ${sub}</span>
+                                        <span style="background: ${coloresTipo[tipo]}; color: white; padding: 2px 14px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: 8px;">${count} ocurrencia(s)</span>
+                                    </div>
                                 </div>
-                                ${tablaResultados}
-                                <div class="resultado-final" style="background: ${colorFinal}20; color: ${colorFinal};">
-                                    ▶ RESULTADO: ${estadoFinal}
+                                <div style="margin-top: 6px; font-size: 12px; color: var(--muted);">
+                                    <strong>📅 Evaluaciones donde falló:</strong>
+                                    <div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
+                                        ${evalList}
+                                    </div>
                                 </div>
                             </div>
+                        `;
+                    }).join('');
+
+                desgloseTipoHTML += `
+                    <div style="margin-bottom: 25px; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden;">
+                        <div style="background: ${coloresTipo[tipo]}; color: white; padding: 12px 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 15px;">${iconosTipo[tipo]} ${nombresTipo[tipo]}</span>
+                            <span style="background: rgba(255,255,255,0.2); padding: 3px 16px; border-radius: 20px; font-size: 13px;">${dataTipo.total} ocurrencias</span>
                         </div>
-                        
-                        <!-- Hallazgos -->
-                        <div class="section">
-                            <div class="section-title">🔍 2. HALLAZGOS - ÍTEMS EVALUADOS COMO "NO CUMPLE"</div>
-                            <div class="section-body">
-                                <p style="margin-bottom: 15px;">Los siguientes comportamientos fueron identificados como incumplimientos durante las auditorías:</p>
-                                ${itemsCriticosHTML}
-                                ${itemsNoCriticosHTML}
-                                ${itemsCriticos.length === 0 && itemsNoCriticos.length === 0 ? '<p style="text-align: center; color: #28a745;">✅ No se encontraron fallas en las evaluaciones</p>' : ''}
-                            </div>
-                        </div>
-                        
-                        <!-- Expectativa de mejora -->
-                        <div class="section">
-                            <div class="section-title">🎯 3. EXPECTATIVA DE MEJORA</div>
-                            <div class="section-body">
-                                <p style="margin-bottom: 15px;">Para las próximas evaluaciones, se espera que el gestor demuestre mejora en los siguientes aspectos:</p>
-                                <ul style="margin-left: 25px; margin-bottom: 15px;">
-                                    ${expectativaItems}
-                                </ul>
-                                <div style="background: #e8f5e9; padding: 12px; border-radius: 8px;">
-                                    <strong>▶ META ESPERADA:</strong> Alcanzar nota mínima de 85%\n
-                                    <strong>▶ PLAZO:</strong> Próximas 2 evaluaciones
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Próxima verificación -->
-                        <div class="section">
-                            <div class="section-title">📅 4. PRÓXIMA VERIFICACIÓN</div>
-                            <div class="section-body">
-                                <div class="info-grid">
-                                    <div class="info-label">Fecha estimada nueva evaluación:</div>
-                                    <div><strong>${fechaProximaEvaluacion || 'Por definir'}</strong></div>
-                                </div>
-                                <div class="nota-informativa">
-                                    <strong>⚠️ NOTA:</strong> Esta es una NOTIFICACIÓN INFORMATIVA. El gestor deberá revisar los hallazgos y ajustar su desempeño. \n No requiere firma ni compromiso bilateral.\n\n                            
-                                </div>
-                            </div>
+                        <div style="padding: 16px;">
+                            ${submotivosList || '<div style="color: var(--muted); font-size: 13px; text-align: center;">No hay submotivos en esta categoría</div>'}
                         </div>
                     </div>
-                    
-                    <div class="footer">
-                        Documento generado automáticamente por Sistema MECA\n
-                        © Auditoría Calidad Cobranza - No requiere respuesta del gestor
-                    </div>
-                </div>
-            </body>
-            </html>
+                `;
+            }
+        }
+    }
+
+    if (!desgloseTipoHTML) {
+        desgloseTipoHTML = `
+            <div style="text-align: center; padding: 30px; color: var(--muted); background: #f8f9fa; border-radius: 10px; border: 1px solid #e0e0e0;">
+                <div style="font-size: 48px; margin-bottom: 15px;">📊</div>
+                <strong style="font-size: 16px;">No se detectaron fallas que requieran acción específica.</strong>
+                <p style="margin-top: 10px; font-size: 14px;">El gestor cumplió con todos los protocolos en este ciclo.</p>
+                <p style="margin-top: 5px; font-size: 12px; color: var(--muted);">(Datos recibidos: ${evaluaciones.length} evaluaciones, ${totalFallasGlobal} fallas totales)</p>
+            </div>
         `;
     }
+
+    // ======================================================
+    // 9. SECCIÓN 4: RECOMENDACIÓN DE ACCIÓN
+    // ======================================================
+    let recomendacionHTML = '';
+
+    const todosSubmotivos = {};
+    for (const tipo of tipos) {
+        const dataTipo = resumenPorTipoData[tipo];
+        if (dataTipo && dataTipo.submotivos) {
+            for (const [sub, count] of Object.entries(dataTipo.submotivos)) {
+                todosSubmotivos[sub] = (todosSubmotivos[sub] || 0) + count;
+            }
+        }
+    }
+
+    const topSubmotivos = Object.entries(todosSubmotivos)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+
+    let prioridad = '🟢 BAJA';
+    let prioridadColor = '#28a745';
+    let prioridadTexto = 'Sin acción urgente';
+
+    if (totalFallasGlobal >= 20) {
+        prioridad = '🔴 ALTA';
+        prioridadColor = '#d93025';
+        prioridadTexto = 'Requiere intervención inmediata';
+    } else if (totalFallasGlobal >= 10) {
+        prioridad = '🟡 MEDIA';
+        prioridadColor = '#f39c12';
+        prioridadTexto = 'Requiere atención prioritaria';
+    } else if (totalFallasGlobal >= 5) {
+        prioridad = '🟠 MODERADA';
+        prioridadColor = '#fd7e14';
+        prioridadTexto = 'Requiere seguimiento';
+    } else if (totalFallasGlobal > 0) {
+        prioridad = '🟢 BAJA';
+        prioridadColor = '#28a745';
+        prioridadTexto = 'Requiere revisión';
+    }
+
+    const tiposNecesarios = [];
+    if (resumenPorTipoData.procesos?.total > 0) tiposNecesarios.push('📚 Capacitación de Procesos (ECN)');
+    if (resumenPorTipoData.habilidades?.total > 0) tiposNecesarios.push('🎯 Capacitación de Habilidades Blandas (ENC)');
+    if (resumenPorTipoData.feedback?.total > 0) tiposNecesarios.push('💬 Feedback Directo (ENC/ECUF)');
+
+    let recomendacionTexto = '';
+    if (tiposNecesarios.length === 0) {
+        recomendacionTexto = '✅ No se requiere acción específica. El gestor cumplió con todos los protocolos.';
+    } else if (tiposNecesarios.length === 1) {
+        recomendacionTexto = `${prioridad}: ${tiposNecesarios[0]}`;
+    } else {
+        recomendacionTexto = `${prioridad}: ${tiposNecesarios.join(' | ')}`;
+    }
+
+    let submotivosCriticos = '';
+    if (topSubmotivos.length > 0) {
+        submotivosCriticos = topSubmotivos.map(([sub, count]) => 
+            `<li><strong>${sub}</strong> (${count} ocurrencias)</li>`
+        ).join('');
+    }
+
+    recomendacionHTML = `
+        <div style="background: #fff8e0; padding: 20px; border-radius: 10px; border-left: 5px solid ${prioridadColor};">
+            <div style="font-size: 16px; font-weight: bold; color: ${prioridadColor}; margin-bottom: 10px;">
+                ${prioridad} - ${prioridadTexto}
+            </div>
+            <div style="font-size: 14px; margin-bottom: 15px;">
+                <strong>📌 Recomendación:</strong> ${recomendacionTexto}
+            </div>
+            ${topSubmotivos.length > 0 ? `
+                <div style="margin-top: 10px; padding: 15px; background: white; border-radius: 8px;">
+                    <strong style="font-size: 13px;">🔥 Submotivos con mayor frecuencia de fallas:</strong>
+                    <ul style="margin-top: 8px; padding-left: 20px; font-size: 13px;">
+                        ${submotivosCriticos}
+                    </ul>
+                </div>
+            ` : ''}
+            <div style="margin-top: 15px; font-size: 12px; color: var(--muted);">
+                <strong>📊 Resumen de fallas:</strong>
+                ${resumenPorTipoData.procesos?.total > 0 ? `📚 Procesos: ${resumenPorTipoData.procesos.total} | ` : ''}
+                ${resumenPorTipoData.habilidades?.total > 0 ? `🎯 Habilidades: ${resumenPorTipoData.habilidades.total} | ` : ''}
+                ${resumenPorTipoData.feedback?.total > 0 ? `💬 Feedback: ${resumenPorTipoData.feedback.total}` : ''}
+                ${totalFallasGlobal === 0 ? '✅ Sin fallas registradas' : ''}
+                <span style="margin-left: 15px;">📊 Total fallas: <strong>${totalFallasGlobal}</strong></span>
+            </div>
+            ${tiposNecesarios.length > 0 ? `
+                <div style="margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 8px; font-size: 13px;">
+                    <strong>📌 Próximo paso:</strong> Enviar este informe al área de <strong>Operaciones</strong> para la gestión correspondiente.
+                </div>
+            ` : ''}
+        </div>
+    `;
+
+    // ======================================================
+    // 10. VERSIÓN DE MATRIZ UTILIZADA
+    // ======================================================
+    let versionMatrizHTML = '';
+    if (versionMatriz) {
+        const estadoVersion = versionMatriz.activa ? 'ACTIVA' : 'HISTÓRICA';
+        versionMatrizHTML = `
+            <div style="background: #f0f7ff; padding: 10px 15px; border-radius: 8px; margin-top: 15px; font-size: 12px; color: var(--muted);">
+                <strong>📌 Matriz utilizada:</strong> ${versionMatriz.version || 'v2.0.0'} 
+                (${estadoVersion}) - vigente desde ${versionMatriz.fecha_vigencia ? new Date(versionMatriz.fecha_vigencia).toLocaleDateString('es-ES') : 'N/A'}
+            </div>
+        `;
+    }
+
+    // ======================================================
+    // 11. HTML COMPLETO
+    // ======================================================
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe PDA - ${agente}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; background: #f0f2f5; line-height: 1.6; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; padding: 25px 35px; }
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+        .content { padding: 25px 35px; }
+        .section { margin-bottom: 30px; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; }
+        .section-title { background: #f8f9fa; padding: 14px 20px; font-weight: bold; font-size: 16px; color: #019DF4; border-bottom: 2px solid #019DF4; display: flex; justify-content: space-between; align-items: center; }
+        .section-body { padding: 20px; }
+        .info-grid { display: grid; grid-template-columns: 180px 1fr; gap: 12px; margin-bottom: 10px; }
+        .info-label { font-weight: bold; color: #555; }
+        .badge-q4 { background: #d93025; color: white; padding: 3px 14px; border-radius: 20px; font-size: 13px; }
+        .badge-q1 { background: #1a7f37; color: white; padding: 3px 14px; border-radius: 20px; font-size: 13px; }
+        .badge-q2 { background: #019DF4; color: white; padding: 3px 14px; border-radius: 20px; font-size: 13px; }
+        .badge-q3 { background: #f39c12; color: white; padding: 3px 14px; border-radius: 20px; font-size: 13px; }
+        .resultado-final { background: #f0f7ff; padding: 15px 20px; border-radius: 8px; margin-top: 15px; font-weight: bold; text-align: center; }
+        .footer { background: #f8f9fa; padding: 15px 30px; text-align: center; font-size: 11px; color: #888; border-top: 1px solid #e0e0e0; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 10px; border: 1px solid #ddd; }
+        th { background: #f8f9fa; text-align: left; }
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; border-radius: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>📋 NOTIFICACIÓN DE RESULTADOS - PDA</h1>
+            <p>Plan de Desarrollo y Acción - Sistema MECA</p>
+        </div>
+
+        <div class="content">
+            <!-- SECCIÓN 1: DATOS GENERALES -->
+            <div class="section">
+                <div class="section-title">📌 1. DATOS DEL GESTOR Y CICLO</div>
+                <div class="section-body">
+                    <div class="info-grid">
+                        <div class="info-label">👤 Gestor:</div>
+                        <div><strong>${escapeHtml(agente)}</strong></div>
+                        <div class="info-label">📊 Ciclo Basal:</div>
+                        <div>#${cicloNumero || 'N/A'}</div>
+                        <div class="info-label">📅 Período:</div>
+                        <div>${escapeHtml(periodoDesde)} → ${escapeHtml(periodoHasta)}</div>
+                        <div class="info-label">📞 Evaluaciones:</div>
+                        <div>${totalEvals}/5</div>
+                        <div class="info-label">📈 Promedio:</div>
+                        <div><strong style="color: ${colorFinal}; font-size: 18px;">${promedioFinal}%</strong></div>
+                        <div class="info-label">🏷️ Cuartil:</div>
+                        <div><span class="badge-q4">${cuartil}</span></div>
+                        <div class="info-label">📋 Fecha informe:</div>
+                        <div>${fechaEmision}</div>
+                        ${versionMatriz ? `
+                        <div class="info-label">📌 Matriz usada:</div>
+                        <div>${versionMatriz.version || 'v2.0.0'} (${versionMatriz.activa ? 'ACTIVA' : 'HISTÓRICA'})</div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECCIÓN 2: CÓDIGOS DE AUDIOS DONDE FALLARON -->
+            <div class="section">
+                <div class="section-title">🎧 2. CÓDIGOS DE AUDIOS DONDE FALLARON</div>
+                <div class="section-body">
+                    ${tablaAudiosHTML}
+                </div>
+            </div>
+
+            <!-- SECCIÓN 3: DESGLOSE DE FALLAS POR TIPO DE ACCIÓN -->
+            <div class="section">
+                <div class="section-title">📊 3. DESGLOSE DE FALLAS POR TIPO DE ACCIÓN</div>
+                <div class="section-body">
+                    ${desgloseTipoHTML}
+                </div>
+            </div>
+
+            <!-- SECCIÓN 4: RECOMENDACIÓN DE ACCIÓN -->
+            <div class="section">
+                <div class="section-title">💡 4. RECOMENDACIÓN DE ACCIÓN</div>
+                <div class="section-body">
+                    ${recomendacionHTML}
+                </div>
+            </div>
+
+            <!-- SECCIÓN 5: PRÓXIMA VERIFICACIÓN -->
+            <div class="section">
+                <div class="section-title">📅 5. PRÓXIMA VERIFICACIÓN</div>
+                <div class="section-body">
+                    <div class="info-grid">
+                        <div class="info-label">📅 Fecha estimada nueva evaluación:</div>
+                        <div><strong>${fechaProximaEvaluacion}</strong></div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 12px; background: #fff8e0; border-radius: 8px; border-left: 4px solid #f39c12; font-size: 13px;">
+                        <strong>⚠️ NOTA:</strong> Esta es una NOTIFICACIÓN INFORMATIVA. El gestor deberá revisar los hallazgos y ajustar su desempeño.
+                        ${tiposNecesarios.length > 0 ? `<br><br>📌 <strong>Próximo paso:</strong> Enviar este informe al área de Operaciones para la gestión correspondiente.` : ''}
+                    </div>
+                    ${versionMatrizHTML}
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Documento generado automáticamente por Sistema MECA - © Auditoría Calidad Cobranzas<br>
+            Este informe debe ser enviado al área de Operaciones para su gestión.
+        </div>
+    </div>
+</body>
+</html>`;
+}
     // ===== FIN FUNCIÓN: generarDocumentoHTML ===============================
 
     // ===== 20. INICIO FUNCIÓN: generarDocumentoTexto ======================
-    function generarDocumentoTexto(data) {
+    generarDocumentoTexto = function(data) {
+    console.log('📄 Generando documento TXT...');
+    
+    if (!data) {
+        console.error('❌ data es undefined o null');
+        return 'Error: Datos no disponibles';
+    }
+    
     const {
-        documentoId, fechaEmision, agente, periodoDesde, periodoHasta,
-        totalEvals, promedioFinal, promedioENC, promedioECUF, promedioECN,
-        pctENC, pctECUF, pctECN, itemsCriticos, itemsNoCriticos,
-        fechaProximaEvaluacion
+        documentoId = 'N/A',
+        fechaEmision = new Date().toLocaleDateString('es-ES'),
+        agente = 'Sin agente',
+        periodoDesde = 'N/A',
+        periodoHasta = 'N/A',
+        totalEvals = 0,
+        promedioFinal = 0,
+        promedioENC = 0,
+        promedioECUF = 0,
+        promedioECN = 0,
+        pctENC = 0,
+        pctECUF = 0,
+        pctECN = 0,
+        cuartil = 'Q4',
+        fechaProximaEvaluacion = 'N/A'
     } = data;
 
-    // 🔴 Calcular estado usando el sistema de cuartiles (síncrono para este caso)
-    const criterios = obtenerCriteriosPorDefecto();
-    let resultadoCuartil = null;
-    for (const c of criterios) {
-        if (promedioFinal >= c.limite_inferior && promedioFinal <= c.limite_superior) {
-            resultadoCuartil = c;
-            break;
-        }
-    }
-    if (!resultadoCuartil) resultadoCuartil = criterios[3]; // Q4 por defecto
+    const estadoFinal = cuartil === 'Q4' ? 'NO APROBADO - Requiere Plan de Mejora' : 'APRUEBA';
 
-    const esAprobado = resultadoCuartil.cuartil === 'Q1' || resultadoCuartil.cuartil === 'Q2';
-    const estadoFinal = esAprobado ? 'APRUEBA' : 'NO APROBADO - Requiere Plan de Mejora';
-    const estadoIcono = esAprobado ? '🟢' : '🔴';
-
-    let texto = `
-    ╔═══════════════════════════════════════════════════════════════════════════════╗
-    ║                       NOTIFICACIÓN DE RESULTADOS                               ║
-    ║                 Plan de Desarrollo y Acción (PDA) - v1.0                       ║
-    ╠═══════════════════════════════════════════════════════════════════════════════╣
-    ║                                                                               ║
-    ║  📄 DOCUMENTO N°: ${documentoId.padEnd(50)}║
-    ║  📅 EMITIDO: ${fechaEmision.padEnd(53)}║
-    ║  👤 GESTOR: ${agente.padEnd(53)}║
-    ║  👤 EMITIDO POR: Mesa Calidad Cobranzas${' '.repeat(29)}║
-    ║                                                                               ║
-    ╠═══════════════════════════════════════════════════════════════════════════════╣
-    ║ 1. RESULTADOS DE EVALUACIONES                                                 ║
-    ╠═══════════════════════════════════════════════════════════════════════════════╣
-    ║                                                                               ║
-    ║  Período analizado: ${periodoDesde} al ${periodoHasta}${' '.repeat(33)}║
-    ║  Total escuchas: ${totalEvals}${' '.repeat(52)}║
-    ║                                                                               ║
-    ║  ┌───────────────┬───────────┬─────────┬───────────────────────┐             ║
-    ║  │  INDICADOR    │  PUNTAJE  │  META   │       ESTADO           │             ║
-    ║  ├───────────────┼───────────┼─────────┼───────────────────────┤             ║
-    ║  │ ENC (Cliente) │ ${promedioENC}/${obtenerPesosActuales().ENC} (${pctENC}%) │ ≥ 90%   │ ${pctENC >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
-    ║  │ ECUF (Negocio)│ ${promedioECUF}/${obtenerPesosActuales().ECUF} (${pctECUF}%) │ ≥ 90%   │ ${pctECUF >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
-    ║  │ ECN (Proceso) │ ${promedioECN}/${obtenerPesosActuales().ECN} (${pctECN}%) │ ≥ 90%   │ ${pctECN >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
-    ║  │ NOTA FINAL    │ ${promedioFinal}%        │ ≥ 85%   │ ${estadoIcono} ${estadoFinal}${' '.repeat(9)}│             ║
-    ║  └───────────────┴───────────┴─────────┴───────────────────────┘             ║
-    ║                                                                               ║
-    ║  ▶ RESULTADO: ${estadoFinal}${' '.repeat(31)}║
-    ║                                                                               ║
-    ╠═══════════════════════════════════════════════════════════════════════════════╣
-    ║ 2. HALLAZGOS - ÍTEMS EVALUADOS COMO "NO CUMPLE"                               ║
-    ╠═══════════════════════════════════════════════════════════════════════════════╣
-    ║                                                                               ║
-    `;
-
-    itemsCriticos.forEach(item => {
-        texto += `
-    ║  🔴 ${item.submotivo.padEnd(54)}║
-    ║     • Bloque: ${(item.bloque || 'Sin bloque').padEnd(46)}║
-    ║     • Atributo: ${(item.atributo || 'Sin atributo').padEnd(44)}║
-    ║     • Ocurrencias: ${item.ocurrencias} veces${' '.repeat(40)}║
-    ║     • Peso: ${item.peso}%${' '.repeat(48)}║
-    ║                                                                               ║
-    `;
-    });
-
-    itemsNoCriticos.slice(0, 5).forEach(item => {
-        texto += `
-    ║  🟡 ${item.submotivo.padEnd(54)}║
-    ║     • Bloque: ${(item.bloque || 'Sin bloque').padEnd(46)}║
-    ║     • Atributo: ${(item.atributo || 'Sin atributo').padEnd(44)}║
-    ║     • Ocurrencias: ${item.ocurrencias} veces${' '.repeat(40)}║
-    ║     • Peso: ${item.peso}%${' '.repeat(48)}║
-    ║                                                                               ║
-    `;
-    });
-
-    texto += `
-    ╠═══════════════════════════════════════════════════════════════════════════════╣
-    ║ 3. EXPECTATIVA DE MEJORA                                                      ║
-    ╠═══════════════════════════════════════════════════════════════════════════════╣
-    ║                                                                               ║
-    ║  Para las próximas evaluaciones, se espera que el gestor demuestre mejora     ║
-    ║  en los siguientes aspectos:                                                  ║
-    ║                                                                               ║
-    `;
-
-    itemsCriticos.slice(0, 3).forEach(item => {
-        texto += `║  ✓ ${item.submotivo.padEnd(55)}║\n`;
-    });
-    if (itemsNoCriticos.length > 0) {
-        texto += `║  ✓ ${itemsNoCriticos[0].submotivo.padEnd(55)}║\n`;
+    // Función auxiliar para padding
+    function padRight(str, len) {
+        if (!str) str = '';
+        if (str.length >= len) return str;
+        return str + ' '.repeat(len - str.length);
     }
 
-    texto += `
-    ║                                                                               ║
-    ║  ▶ META ESPERADA: Alcanzar nota mínima de 85%                                 ║
-    ║  ▶ PLAZO: Próximas 5 evaluaciones                                             ║
-    ║                                                                               ║
-    ╠═══════════════════════════════════════════════════════════════════════════════╣
-    ║ 4. PRÓXIMA VERIFICACIÓN                                                       ║
-    ╠═══════════════════════════════════════════════════════════════════════════════╣
-    ║                                                                               ║
-    ║  📅 Fecha estimada de nueva evaluación: ${(fechaProximaEvaluacion || 'Por definir').padEnd(30)}║
-    ║                                                                               ║
-    ║  ⚠️ NOTA: Esta es una NOTIFICACIÓN INFORMATIVA. El gestor deberá revisar      ║
-    ║  los hallazgos y ajustar su desempeño. No requiere firma ni compromiso        ║
-    ║  bilateral.                                                                   ║
-    ║                                                                               ║
-    ║  Si persisten las mismas fallas después de 2 evaluaciones, se escalará el     ║
-    ║  caso a Gerencia.                                                             ║
-    ║                                                                               ║
-    ╠═══════════════════════════════════════════════════════════════════════════════╣
-    ║  Documento generado automáticamente por Sistema MECA                          ║
-    ║  © Auditoría Calidad Cobranza - No requiere respuesta del gestor              ║
-    ╚═══════════════════════════════════════════════════════════════════════════════╝
+    return `
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                       NOTIFICACIÓN DE RESULTADOS                               ║
+║                 Plan de Desarrollo y Acción (PDA)                              ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  📄 DOCUMENTO N°: ${padRight(documentoId, 50)}║
+║  📅 EMITIDO: ${padRight(fechaEmision, 53)}║
+║  👤 GESTOR: ${padRight(agente, 53)}║
+║  👤 EMITIDO POR: Mesa Calidad Cobranzas${' '.repeat(29)}║
+║                                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║ 1. RESULTADOS DE EVALUACIONES                                                 ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  Período analizado: ${padRight(periodoDesde + ' al ' + periodoHasta, 48)}║
+║  Total escuchas: ${padRight(String(totalEvals), 52)}║
+║                                                                               ║
+║  ┌───────────────┬───────────┬─────────┬───────────────────────┐             ║
+║  │  INDICADOR    │  PUNTAJE  │  META   │       ESTADO           │             ║
+║  ├───────────────┼───────────┼─────────┼───────────────────────┤             ║
+║  │ ENC (Cliente) │ ${padRight(promedioENC + ' (' + pctENC + '%)', 9)} │ ≥ 90%   │ ${pctENC >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+║  │ ECUF (Negocio)│ ${padRight(promedioECUF + ' (' + pctECUF + '%)', 9)} │ ≥ 90%   │ ${pctECUF >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+║  │ ECN (Proceso) │ ${padRight(promedioECN + ' (' + pctECN + '%)', 9)} │ ≥ 90%   │ ${pctECN >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+║  │ NOTA FINAL    │ ${padRight(promedioFinal + '%', 9)} │ ≥ 85%   │ ${cuartil === 'Q4' ? '🔴 NO APRUEBA' : '🟢 APRUEBA'}${' '.repeat(9)}│             ║
+║  └───────────────┴───────────┴─────────┴───────────────────────┘             ║
+║                                                                               ║
+║  ▶ RESULTADO: ${padRight(estadoFinal, 48)}║
+║                                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║ 2. PRÓXIMA VERIFICACIÓN                                                       ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║                                                                               ║
+║  📅 Fecha estimada de nueva evaluación: ${padRight(fechaProximaEvaluacion, 30)}║
+║                                                                               ║
+║  ⚠️ NOTA: Esta es una NOTIFICACIÓN INFORMATIVA. El gestor deberá revisar      ║
+║  los hallazgos y ajustar su desempeño. No requiere firma ni compromiso        ║
+║  bilateral.                                                                   ║
+║                                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  Documento generado automáticamente por Sistema MECA                          ║
+║  © Auditoría Calidad Cobranzas - No requiere respuesta del gestor              ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
     `;
-
-    return texto;
-}
+};
     // ===== FIN FUNCIÓN: generarDocumentoTexto ==============================
 
     // ===== 21. INICIO FUNCIÓN: mostrarModalDocumentoProfesional ===========
@@ -30994,28 +33042,52 @@ async function showTab(tabName, event) {
         }
 
         if (tabName === 'historialAgente') {
-            if (typeof cargarSelectAgentesHistorial === 'function') cargarSelectAgentesHistorial();
-            if (typeof cargarLideresEnSelectRanking === 'function') await cargarLideresEnSelectRanking();
-            if (typeof inicializarBuscadorGestores === 'function') inicializarBuscadorGestores();
-            if (typeof cargarMesesParaSelectorQ3 === 'function') await cargarMesesParaSelectorQ3();
-            if (typeof cargarMesesParaSelectorQ4 === 'function') await cargarMesesParaSelectorQ4();
-            
-            const resumenAgente = document.getElementById('resumenAgente');
-            const historialContainer = document.getElementById('historialContainer');
-            const btnExportar = document.getElementById('btnExportarHistorial');
-            if (resumenAgente) resumenAgente.style.display = 'none';
-            if (historialContainer) historialContainer.style.display = 'none';
-            if (btnExportar) btnExportar.style.display = 'none';
-            
-            setTimeout(() => {
-                if (typeof cargarEvolucionCuartilesPorGestor === 'function') {
-                    cargarEvolucionCuartilesPorGestor();
-                }
-                if (typeof inicializarFiltrosEvolucionCuartiles === 'function') {
-                    inicializarFiltrosEvolucionCuartiles();
-                }
-            }, 200);
+        // 1. Funciones de historial
+        if (typeof cargarSelectAgentesHistorial === 'function') cargarSelectAgentesHistorial();
+        if (typeof cargarLideresEnSelectRanking === 'function') await cargarLideresEnSelectRanking();
+        if (typeof inicializarBuscadorGestores === 'function') inicializarBuscadorGestores();
+        
+        // 2. Ocultar resumen inicial
+        const resumenAgente = document.getElementById('resumenAgente');
+        const historialContainer = document.getElementById('historialContainer');
+        const btnExportar = document.getElementById('btnExportarHistorial');
+        if (resumenAgente) resumenAgente.style.display = 'none';
+        if (historialContainer) historialContainer.style.display = 'none';
+        if (btnExportar) btnExportar.style.display = 'none';
+        
+        // 🔴 3. CARGAR MESES (esperar que terminen)
+        if (typeof cargarMesesParaSelectorQ4 === 'function') {
+            await cargarMesesParaSelectorQ4();
+            console.log('✅ Meses Q4 cargados');
         }
+        if (typeof cargarMesesParaSelectorQ3 === 'function') {
+            await cargarMesesParaSelectorQ3();
+            console.log('✅ Meses Q3 cargados');
+        }
+        
+        // 🔴 4. ESPERAR RENDERIZADO (100ms)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // 🔴 5. CARGAR AGENTES
+        if (typeof cargarAgentesQ4PorMes === 'function') {
+            await cargarAgentesQ4PorMes();
+            console.log('✅ Agentes Q4 cargados');
+        }
+        if (typeof cargarAgentesQ3PorMes === 'function') {
+            await cargarAgentesQ3PorMes();
+            console.log('✅ Agentes Q3 cargados');
+        }
+        
+        // 6. Evolución de cuartiles
+        setTimeout(() => {
+            if (typeof cargarEvolucionCuartilesPorGestor === 'function') {
+                cargarEvolucionCuartilesPorGestor();
+            }
+            if (typeof inicializarFiltrosEvolucionCuartiles === 'function') {
+                inicializarFiltrosEvolucionCuartiles();
+            }
+        }, 200);
+    }
 
         if (tabName === 'cuartiles') {
             if (typeof cargarCriteriosCuartilesTabla === 'function') {
@@ -32044,127 +34116,146 @@ async function showTab(tabName, event) {
     }
     // ===== FIN FUNCIÓN: crearPDAEnPostgreSQL =================================
 
-    // ===== 33. INICIO FUNCIÓN: crearAccionesPDADesdeMatriz =================
-    async function crearAccionesPDADesdeMatriz(pdaId, itemsFallados) {
-        console.log('🔧 ===== CREANDO ACCIONES PARA PDA =====');
-        console.log('📋 PDA ID:', pdaId);
-        console.log('📋 Items fallados recibidos:', itemsFallados);
-        console.log('📋 Cantidad de items:', itemsFallados?.length || 0);
+   
+// ======================================================
+// FUNCIÓN: crearAccionesPDADesdeMatriz (CORREGIDA - CONSULTA DIRECTA)
+// ======================================================
 
-        const db = getDB();
-        if (!db) {
-            console.error('❌ Base de datos no disponible');
-            alert('❌ Error: Base de datos no disponible');
+async function crearAccionesPDADesdeMatriz(pdaId, itemsFallados) {
+    console.log('🔧 ===== CREANDO ACCIONES PARA PDA =====');
+    console.log('📋 PDA ID:', pdaId);
+    console.log('📋 Items fallados recibidos:', itemsFallados.length);
+    console.log('📋 Items:', itemsFallados.map(i => i.submotivo).join(', '));
+
+    const db = getDB();
+    if (!db) {
+        console.error('❌ Base de datos no disponible');
+        alert('❌ Error: Base de datos no disponible');
+        return false;
+    }
+
+    if (!itemsFallados || itemsFallados.length === 0) {
+        console.warn('⚠️ No hay items fallados para crear acciones');
+        alert('⚠️ No se encontraron fallas para generar acciones');
+        return false;
+    }
+
+    try {
+        // 1. Obtener la versión activa
+        const { data: version, error: versionError } = await db
+            .from('versiones_matriz')
+            .select('id')
+            .eq('activa', true)
+            .limit(1);
+
+        if (versionError || !version || version.length === 0) {
+            console.error('❌ No hay versión activa');
             return false;
         }
 
-        if (!itemsFallados || itemsFallados.length === 0) {
-            console.warn('⚠️ No hay items fallados para crear acciones');
-            alert('⚠️ No se encontraron fallas para generar acciones');
+        const versionId = version[0].id;
+        console.log(`📌 Versión activa ID: ${versionId}`);
+
+        // 2. Obtener TODOS los submotivos de la versión activa con su clasificación
+        // Consulta directa: obtener todos los submotivos activos
+        const { data: todosSubmotivos, error: subError } = await db
+            .from('version_sub_motivos')
+            .select('codigo, clasificacion, version_atributo_id')
+            .eq('activo', true);
+
+        if (subError) {
+            console.error('❌ Error obteniendo submotivos:', subError);
             return false;
         }
 
-        // Mapeo manual de tipo_accion y atributo por submotivo
-        const mapeoAcciones = {
-            // ========== FEEDBACK ==========
-            'No_Deja_en_Espera_al_Cliente': { tipo: 'feedback', atributo: 'GESTION DE ESPERA' },
-            'No_Corta_Llamada': { tipo: 'feedback', atributo: 'CORTE / ABANDONO DE LLAMADA' },
-            'No_Perjudica_imagen_Movistar': { tipo: 'feedback', atributo: 'IMAGEN CORPORATIVA' },
-            'No_Compara_con_otros_clientes': { tipo: 'feedback', atributo: 'IMAGEN CORPORATIVA' },
-            'No_Induce Baja': { tipo: 'feedback', atributo: 'IMAGEN CORPORATIVA' },
-            'No_Induce Baja/Reclamo': { tipo: 'feedback', atributo: 'IMAGEN CORPORATIVA' },
-            'No_Genera_conflicto_con_cliente': { tipo: 'habilidades', atributo: 'RESPETO AL CLIENTE' },
-            'Amabilidad': { tipo: 'habilidades', atributo: 'RESPETO AL CLIENTE' },
+        console.log(`📊 Submotivos activos en BD: ${todosSubmotivos.length}`);
 
-            // ========== PROCESO ==========
-            'Cumple_Speech': { tipo: 'proceso', atributo: 'PROTOCOLOS DE ATENCION' },
-            'Especifica_Motivo_Llamada': { tipo: 'proceso', atributo: 'PROTOCOLOS DE ATENCION' },
-            'Menciona_Numero_Servicio': { tipo: 'proceso', atributo: 'PROTOCOLOS DE ATENCION' },
-            'Brinda_informacion_correcta': { tipo: 'proceso', atributo: 'BRINDA INFORMACION' },
-            'No_Repite_Información': { tipo: 'proceso', atributo: 'BRINDA INFORMACION' },
-            'Informa_Campañas': { tipo: 'proceso', atributo: 'BRINDA INFORMACION' },
-            'Identifica_Responsable_de_Pago': { tipo: 'proceso', atributo: 'SONDEO' },
-            'Valida_Pago_de_Deuda': { tipo: 'proceso', atributo: 'SONDEO' },
-            'Pregunta_motivo_no_pago': { tipo: 'proceso', atributo: 'MOTIVO DE NO PAGO' },
-            'Prioriza_pagos_APP_Digitales': { tipo: 'proceso', atributo: 'LUGARES DE PAGO' },
-            'Prioriza_pagos_Bancos/Agentes': { tipo: 'proceso', atributo: 'LUGARES DE PAGO' },
-            'Confirma_Compromiso_de_Pago': { tipo: 'proceso', atributo: 'CIERRE' },
-            'Cierre_correcto': { tipo: 'proceso', atributo: 'CIERRE' },
-            'Tipificacion_correcta': { tipo: 'proceso', atributo: 'TIPIFICACION' },
-
-            // ========== HABILIDADES ==========
-            'No_Interrumpe_Dialogo': { tipo: 'habilidades', atributo: 'ESCUCHA ACTIVA' },
-            'No_Omite_Preguntas_del_Cliente': { tipo: 'habilidades', atributo: 'ESCUCHA ACTIVA' },
-            'Genera_Compromiso_de_Pago': { tipo: 'habilidades', atributo: 'NEGOCIACION Y REBATE' },
-            'Maneja_Objeciones': { tipo: 'habilidades', atributo: 'NEGOCIACION Y REBATE' },
-            'Resuelve_dudas': { tipo: 'habilidades', atributo: 'NEGOCIACION Y REBATE' },
-            'No_Usa_Jergas': { tipo: 'habilidades', atributo: 'LENGUAJE Y COMUNICACIÓN' },
-            'Transmite_Seguridad/confianza': { tipo: 'habilidades', atributo: 'LENGUAJE Y COMUNICACIÓN' },
-            'Tono_de_Voz/ Vocalizacion': { tipo: 'habilidades', atributo: 'LENGUAJE Y COMUNICACIÓN' }
-        };
-
-        // Obtener el ID máximo actual
-        let nextId = 1;
-        try {
-            const { data: maxIdData, error: maxIdError } = await db
-                .from('pda_acciones')
-                .select('id')
-                .order('id', { ascending: false })
+        // 3. Obtener atributos para cada submotivo
+        const mapaSubmotivos = {};
+        for (const sub of todosSubmotivos) {
+            const { data: atributo, error: attrError } = await db
+                .from('version_atributos')
+                .select('nombre')
+                .eq('id', sub.version_atributo_id)
                 .limit(1);
 
-            if (!maxIdError && maxIdData && maxIdData.length > 0) {
-                nextId = maxIdData[0].id + 1;
-                console.log('📝 Siguiente ID disponible:', nextId);
-            } else {
-                nextId = Date.now();
-                console.log('📝 Usando timestamp como ID inicial:', nextId);
-            }
-        } catch (e) {
-            console.warn('Error obteniendo max ID, usando timestamp:', e);
-            nextId = Date.now();
+            const nombreAtributo = (atributo && atributo.length > 0) ? atributo[0].nombre : 'Sin atributo';
+
+            mapaSubmotivos[sub.codigo] = {
+                clasificacion: sub.clasificacion || 'PROCESO',
+                atributo: nombreAtributo
+            };
         }
 
-        // Construir acciones
-        const acciones = [];
-        let contador = 0;
-        let sinMapeo = [];
+        console.log(`📊 Mapa de submotivos construido: ${Object.keys(mapaSubmotivos).length} submotivos`);
 
+        // 4. Verificar que los submotivos de itemsFallados estén en el mapa
+        const noEncontrados = [];
         for (const item of itemsFallados) {
-            const config = mapeoAcciones[item.submotivo];
-
-            if (!config) {
-                console.warn(`⚠️ Submotivo sin mapeo: ${item.submotivo}`);
-                sinMapeo.push(item.submotivo);
-                // Asignar tipo por defecto como 'proceso'
-                acciones.push({
-                    id: nextId + contador,
-                    pda_id: pdaId,
-                    atributo: item.atributo || 'Sin clasificar',
-                    submotivo: item.submotivo,
-                    tipo_accion: 'proceso',
-                    requiere_codigo: true,
-                    completado: false,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                });
-            } else {
-                acciones.push({
-                    id: nextId + contador,
-                    pda_id: pdaId,
-                    atributo: config.atributo,
-                    submotivo: item.submotivo,
-                    tipo_accion: config.tipo,
-                    requiere_codigo: (config.tipo !== 'feedback'), // feedback no requiere código
-                    completado: false,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                });
+            if (!mapaSubmotivos[item.submotivo]) {
+                noEncontrados.push(item.submotivo);
             }
-            contador++;
         }
 
-        if (sinMapeo.length > 0) {
-            console.log('📋 Submotivos sin mapeo:', sinMapeo);
+        if (noEncontrados.length > 0) {
+            console.warn(`⚠️ Submotivos no encontrados en el mapa:`, noEncontrados);
+            // Continuar de todas formas, se usarán valores por defecto
+        }
+
+        // 5. Obtener ID máximo para acciones
+        const { data: maxIdData } = await db
+            .from('pda_acciones')
+            .select('id')
+            .order('id', { ascending: false })
+            .limit(1);
+
+        let nextId = 1;
+        if (maxIdData && maxIdData.length > 0 && maxIdData[0].id !== null && maxIdData[0].id !== undefined) {
+            nextId = Number(maxIdData[0].id) + 1;
+            console.log(`📝 Siguiente ID: ${nextId}`);
+        } else {
+            nextId = Math.floor(Date.now() * 1000);
+            console.log(`📝 Usando timestamp: ${nextId}`);
+        }
+
+        // 6. Construir acciones
+        const acciones = [];
+        for (let i = 0; i < itemsFallados.length; i++) {
+            const item = itemsFallados[i];
+            const info = mapaSubmotivos[item.submotivo];
+
+            let tipoAccion = 'proceso';
+            let requiereCodigo = true;
+            let atributo = item.atributo || 'Sin atributo';
+
+            if (info) {
+                atributo = info.atributo || atributo;
+                if (info.clasificacion === 'PROCESO') {
+                    tipoAccion = 'proceso';
+                    requiereCodigo = true;
+                } else if (info.clasificacion === 'HABILIDADES BLANDAS') {
+                    tipoAccion = 'habilidades';
+                    requiereCodigo = true;
+                } else if (info.clasificacion === 'FEEDBACK') {
+                    tipoAccion = 'feedback';
+                    requiereCodigo = false;
+                }
+                console.log(`   ${item.submotivo} → ${info.clasificacion} → ${tipoAccion}`);
+            } else {
+                console.log(`   ${item.submotivo} → SIN CLASIFICACION (usando fallback: proceso)`);
+            }
+
+            acciones.push({
+                id: String(nextId + i),
+                pda_id: String(pdaId),
+                atributo: atributo,
+                submotivo: item.submotivo,
+                tipo_accion: tipoAccion,
+                requiere_codigo: requiereCodigo,
+                completado: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            });
         }
 
         if (acciones.length === 0) {
@@ -32174,41 +34265,42 @@ async function showTab(tabName, event) {
         }
 
         console.log(`📝 Insertando ${acciones.length} acciones...`);
-        console.log('📋 Primera acción:', acciones[0]);
-        console.log('📋 Última acción:', acciones[acciones.length - 1]);
 
-        try {
-            // Insertar todas las acciones de una vez
-            const { data, error } = await db
+        // 7. Insertar todas las acciones
+        let insertadas = 0;
+        for (const accion of acciones) {
+            const { error } = await db
                 .from('pda_acciones')
-                .insert(acciones)
-                .select();
+                .insert(accion);
 
             if (error) {
-                console.error('❌ Error insertando acciones:', error);
-                console.error('Detalle del error:', JSON.stringify(error, null, 2));
-                alert(`❌ Error al guardar las acciones: ${error.message}\n\nDetalle: ${error.details || 'Sin detalles'}`);
-                return false;
+                console.error('❌ Error insertando acción:', error);
+                console.error('   Datos:', accion);
+            } else {
+                insertadas++;
             }
-
-            console.log(`✅ CREADAS ${data?.length || 0} acciones para PDA ${pdaId}`);
-
-            // Mostrar resumen por tipo
-            const resumen = {
-                feedback: acciones.filter(a => a.tipo_accion === 'feedback').length,
-                proceso: acciones.filter(a => a.tipo_accion === 'proceso').length,
-                habilidades: acciones.filter(a => a.tipo_accion === 'habilidades').length
-            };
-            console.log('📋 RESUMEN DE ACCIONES CREADAS:', resumen);
-
-            return true;
-
-        } catch (error) {
-            console.error('❌ Error inesperado creando acciones:', error);
-            alert('❌ Error inesperado al crear las acciones: ' + error.message);
-            return false;
         }
+
+        console.log(`✅ CREADAS ${insertadas} acciones para PDA ${pdaId}`);
+
+        // Resumen por tipo
+        const resumen = {
+            feedback: acciones.filter(a => a.tipo_accion === 'feedback').length,
+            proceso: acciones.filter(a => a.tipo_accion === 'proceso').length,
+            habilidades: acciones.filter(a => a.tipo_accion === 'habilidades').length
+        };
+        console.log('📋 RESUMEN DE ACCIONES CREADAS:', resumen);
+
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error inesperado:', error);
+        alert('❌ Error al crear acciones: ' + error.message);
+        return false;
     }
+}
+
+console.log('✅ crearAccionesPDADesdeMatriz actualizada');
     // ===== FIN FUNCIÓN: crearAccionesPDADesdeMatriz ========================
     
     // ===== 34. INICIO FUNCIÓN: crearCicloEvaluacion ========================
@@ -32419,6 +34511,359 @@ async function showTab(tabName, event) {
         return new Date();
     }
     // ===== FIN FUNCIÓN: parseFechaDeString =================================
+
+    // ======================================================
+// FUNCIÓN: guardarAccionesPDA
+// ======================================================
+
+async function guardarAccionesPDA(pdaId, informe) {
+    console.log(`📝 Guardando acciones para PDA #${pdaId}`);
+
+    const db = getDB();
+    if (!db) return false;
+
+    try {
+        // Obtener ID máximo en pda_acciones
+        const { data: maxIdData } = await db
+            .from('pda_acciones')
+            .select('id')
+            .order('id', { ascending: false })
+            .limit(1);
+
+        let nextId = 1;
+        if (maxIdData && maxIdData.length > 0) {
+            nextId = Number(maxIdData[0].id) + 1;
+            console.log(`   ID máximo actual: ${maxIdData[0].id}, próximo ID: ${nextId}`);
+        } else {
+            nextId = Math.floor(Date.now() * 1000);
+            console.log(`   No hay registros, usando timestamp: ${nextId}`);
+        }
+
+        // Recolectar todas las fallas únicas
+        const fallasUnicas = {};
+        for (const ev of informe.evaluaciones) {
+            for (const falla of ev.fallas) {
+                if (!fallasUnicas[falla.submotivo]) {
+                    fallasUnicas[falla.submotivo] = {
+                        submotivo: falla.submotivo,
+                        atributo: falla.atributo || 'Sin atributo',
+                        tipo: falla.tipo || 'proceso',
+                        requiere_codigo: falla.tipo !== 'feedback'
+                    };
+                }
+            }
+        }
+
+        const acciones = Object.values(fallasUnicas).map((f, i) => ({
+            id: nextId + i,
+            pda_id: pdaId,
+            atributo: f.atributo,
+            submotivo: f.submotivo,
+            tipo_accion: f.tipo,
+            requiere_codigo: f.requiere_codigo,
+            completado: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }));
+
+        if (acciones.length === 0) {
+            console.log('⚠️ No hay acciones para guardar');
+            return true;
+        }
+
+        console.log(`📤 Insertando ${acciones.length} acciones...`);
+        console.log('   Tipos:', [...new Set(acciones.map(a => a.tipo_accion))]);
+
+        for (const accion of acciones) {
+            const { error } = await db
+                .from('pda_acciones')
+                .insert(accion);
+
+            if (error) {
+                console.error('❌ Error insertando acción:', error);
+                console.error('   Datos:', accion);
+            }
+        }
+
+        console.log(`✅ ${acciones.length} acciones guardadas`);
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error guardando acciones:', error);
+        return false;
+    }
+}
+
+// ======================================================
+// FUNCIÓN: guardarCicloBasalPDA
+// ======================================================
+
+async function guardarCicloBasalPDA(pdaId, informe) {
+    console.log(`📝 Guardando ciclo basal para PDA #${pdaId}`);
+
+    const db = getDB();
+    if (!db) return false;
+
+    try {
+        const { data: maxIdData } = await db
+            .from('pda_ciclos_evaluacion')
+            .select('id')
+            .order('id', { ascending: false })
+            .limit(1);
+
+        let nextId = 1;
+        if (maxIdData && maxIdData.length > 0 && maxIdData[0].id !== null && maxIdData[0].id !== undefined) {
+            nextId = Number(maxIdData[0].id) + 1;
+            console.log(`   ID máximo ciclos: ${maxIdData[0].id}, nuevo: ${nextId}`);
+        } else {
+            console.log('   📭 Tabla pda_ciclos_evaluacion vacía, empezando desde ID: 1');
+        }
+
+        // 🔴 CORREGIDO: Asegurar que las fechas NO sean null
+        const fechaInicio = informe.ciclo.fechaInicio !== 'N/A' 
+            ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaInicio) 
+            : new Date().toISOString().split('T')[0]; // Fecha actual como fallback
+
+        const fechaFin = informe.ciclo.fechaFin !== 'N/A' 
+            ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaFin) 
+            : new Date().toISOString().split('T')[0]; // Fecha actual como fallback
+
+        const cicloData = {
+            id: nextId,
+            agente: informe.agente,
+            tipo_ciclo: 'basal',
+            pda_origen_id: pdaId,
+            fecha_inicio: fechaInicio,  // 🔴 AHORA SIEMPRE TIENE VALOR
+            fecha_fin: fechaFin,        // 🔴 AHORA SIEMPRE TIENE VALOR
+            total_evaluaciones: informe.ciclo.totalEvaluaciones,
+            promedio_nota: parseFloat(informe.ciclo.promedio),
+            cuartil: informe.ciclo.cuartil,
+            mejora_detectada: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        console.log('📤 Insertando ciclo basal:', cicloData);
+
+        const { error } = await db
+            .from('pda_ciclos_evaluacion')
+            .insert(cicloData);
+
+        if (error) {
+            console.error('❌ Error guardando ciclo:', error);
+            return false;
+        }
+
+        console.log(`✅ Ciclo basal guardado: #${nextId}`);
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        return false;
+    }
+}
+
+// ======================================================
+// FUNCIÓN: guardarDocumentoPDA
+// ======================================================
+
+async function guardarDocumentoPDA(pdaId, informe) {
+    console.log(`📄 Guardando documento para PDA #${pdaId}`);
+
+    const db = getDB();
+    if (!db) return false;
+
+    try {
+        const { data: maxIdData } = await db
+            .from('pda_documentos')
+            .select('id')
+            .order('id', { ascending: false })
+            .limit(1);
+
+        let nextId = 1;
+        if (maxIdData && maxIdData.length > 0 && maxIdData[0].id !== null && maxIdData[0].id !== undefined) {
+            nextId = Number(maxIdData[0].id) + 1;
+            console.log(`   ID máximo documentos: ${maxIdData[0].id}, nuevo: ${nextId}`);
+        } else {
+            console.log('   📭 Tabla pda_documentos vacía, empezando desde ID: 1');
+        }
+
+        const docId = `PDA-${informe.agente.substring(0, 3)}-${informe.ciclo.numero}-${Date.now().toString().slice(-6)}`;
+
+        // Obtener los submotivos fallados
+        let submotivosFallados = [];
+        if (informe.detalleQuiebres && informe.detalleQuiebres.resumen) {
+            submotivosFallados = Object.keys(informe.detalleQuiebres.resumen.submotivosMasFrecuentes || {});
+        }
+        if (submotivosFallados.length === 0 && informe.evaluaciones) {
+            const fallasSet = new Set();
+            for (const ev of informe.evaluaciones) {
+                for (const falla of (ev.fallas || [])) {
+                    if (falla.submotivo) fallasSet.add(falla.submotivo);
+                }
+            }
+            submotivosFallados = Array.from(fallasSet);
+        }
+
+        // 🔴 CORREGIDO: Asegurar que las fechas NO sean null
+        const periodoDesde = informe.ciclo.fechaInicio !== 'N/A' 
+            ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaInicio) 
+            : new Date().toISOString().split('T')[0];
+
+        const periodoHasta = informe.ciclo.fechaFin !== 'N/A' 
+            ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaFin) 
+            : new Date().toISOString().split('T')[0];
+
+        const docData = {
+            id: nextId,
+            documento_id: docId,
+            agente: informe.agente,
+            fecha_emision: new Date().toISOString().split('T')[0],
+            periodo_desde: periodoDesde,
+            periodo_hasta: periodoHasta,
+            total_evaluaciones: informe.ciclo.totalEvaluaciones,
+            promedio_final: parseFloat(informe.ciclo.promedio),
+            cuartil: informe.ciclo.cuartil,
+            items_fallados: JSON.stringify(submotivosFallados),
+            fecha_proxima_evaluacion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            estado: 'generado',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        console.log('📤 Insertando documento:', docData);
+
+        const { error } = await db
+            .from('pda_documentos')
+            .insert(docData);
+
+        if (error) {
+            console.error('❌ Error guardando documento:', error);
+            return false;
+        }
+
+        console.log(`✅ Documento guardado: #${nextId} (${docId})`);
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        return false;
+    }
+}
+
+// ======================================================
+// FUNCIÓN: guardarPDAEnBaseDeDatos (COMPLETA)
+// ======================================================
+
+async function guardarPDAEnBaseDeDatos(informe) {
+    console.log(`💾 Guardando PDA completo para ${informe.agente}`);
+
+    const db = getDB();
+    if (!db) {
+        alert('❌ Base de datos no disponible');
+        return false;
+    }
+
+    try {
+        // ======================================================
+        // 1. GENERAR ID PARA PDA_CABECERA
+        // ======================================================
+        
+        const { data: maxIdData } = await db
+            .from('pda_cabecera')
+            .select('id')
+            .order('id', { ascending: false })
+            .limit(1);
+
+        let nuevoId = 1;
+        if (maxIdData && maxIdData.length > 0 && maxIdData[0].id !== null && maxIdData[0].id !== undefined) {
+            nuevoId = Number(maxIdData[0].id) + 1;
+            console.log(`   ID máximo cabecera: ${maxIdData[0].id}, nuevo: ${nuevoId}`);
+        } else {
+            console.log('   📭 Tabla pda_cabecera vacía, empezando desde ID: 1');
+        }
+
+        // ======================================================
+        // 2. INSERTAR EN PDA_CABECERA
+        // ======================================================
+        
+        const pdaData = {
+            id: nuevoId,
+            agente: informe.agente,
+            fecha_deteccion: new Date().toISOString().split('T')[0],
+            fecha_inicio_ciclo_basal: informe.ciclo.fechaInicio !== 'N/A' ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaInicio) : null,
+            fecha_fin_ciclo_basal: informe.ciclo.fechaFin !== 'N/A' ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaFin) : null,
+            ciclo_basal_numero: informe.ciclo.numero,
+            promedio_basal: parseFloat(informe.ciclo.promedio),
+            cuartil_basal: informe.ciclo.cuartil,
+            estado: 'pendiente',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+
+        console.log('📤 Insertando en pda_cabecera...');
+        console.log('   ID:', pdaData.id, '| Agente:', pdaData.agente, '| Ciclo:', pdaData.ciclo_basal_numero);
+
+        const { error: cabeceraError } = await db
+            .from('pda_cabecera')
+            .insert(pdaData);
+
+        if (cabeceraError) {
+            console.error('❌ Error en pda_cabecera:', cabeceraError);
+            throw cabeceraError;
+        }
+
+        const pdaId = nuevoId;
+        console.log(`✅ PDA_CABECERA: #${pdaId}`);
+
+        // ======================================================
+        // 3. GUARDAR ACCIONES EN PDA_ACCIONES
+        // ======================================================
+        // Extraer todas las fallas de las evaluaciones
+        const todasLasFallas = [];
+        for (const ev of informe.evaluaciones) {
+            for (const falla of ev.fallas) {
+                todasLasFallas.push(falla);
+            }
+        }
+        await crearAccionesPDADesdeMatriz(pdaId, todasLasFallas);
+
+        // ======================================================
+        // 4. GUARDAR CICLO BASAL EN PDA_CICLOS_EVALUACION
+        // ======================================================
+        await guardarCicloBasalPDA(pdaId, informe);
+
+        // ======================================================
+        // 5. GUARDAR DOCUMENTO EN PDA_DOCUMENTOS
+        // ======================================================
+        await guardarDocumentoPDA(pdaId, informe);
+
+        // ======================================================
+        // 6. RESUMEN FINAL
+        // ======================================================
+        
+        console.log('\n📊 === RESUMEN DE INSERCIÓN ===');
+        console.log(`✅ pda_cabecera: ID ${pdaId}`);
+        console.log(`✅ pda_acciones: ${todasLasFallas.length} acciones`);
+        console.log(`✅ pda_ciclos_evaluacion: guardado`);
+        console.log(`✅ pda_documentos: guardado`);
+
+        alert(`✅ PDA COMPLETO GUARDADO\n\n` +
+            `👤 Agente: ${informe.agente}\n` +
+            `📊 Ciclo: #${informe.ciclo.numero}\n` +
+            `🆔 ID: ${pdaId}`);
+
+        await cargarDatosPDA();
+        return true;
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al guardar: ' + error.message);
+        return false;
+    }
+}
+
+console.log('✅ Todas las funciones de guardado están definidas');
 
     // ===== 40. INICIO FUNCIÓN: agregarBotonLimpiarPDA ======================
     window.limpiarTodosPDA = limpiarTodosPDA;

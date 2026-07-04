@@ -6359,6 +6359,28 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
         }
         return;
     }
+
+    // ======================================================
+// server.js - ENDPOINT PARA ENVIAR CORREO
+// ======================================================
+
+// Instalar dependencias (ejecutar en terminal):
+// npm install nodemailer
+
+// Agregar al inicio de server.js:
+const nodemailer = require('nodemailer');
+
+// Configurar transporte de correo
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: false,
+    auth: {
+        user: process.env.SMTP_USER || 'tu-correo@gmail.com',
+        pass: process.env.SMTP_PASS || 'tu-contraseña'
+    }
+});
+
     
     // ======================================================
     // VISTAS HTML
