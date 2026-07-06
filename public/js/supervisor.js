@@ -8799,7 +8799,8 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     <tr>
                                         <th>Motivo</th>
                                         ${meses.map(m => `<th>${m.label}</th>`).join('')}
-                                        <th>Tendencia</th>
+                                        <th>📊 Tendencia</th>
+                                        <th>📊 Promedio</th>  <!-- ← NUEVA COLUMNA -->
                                     </tr>
                                 </thead>
                                 <tbody id="tablaMotivosEvolutiva">
@@ -8828,7 +8829,8 @@ async function actualizarTablaEvolutivaIndicadores() {
                                         <th>Motivo</th>
                                         <th>Atributo</th>
                                         ${meses.map(m => `<th>${m.label}</th>`).join('')}
-                                        <th>Tendencia</th>
+                                        <th>📊 Tendencia</th>
+                                        <th>📊 Promedio</th>  <!-- ← NUEVA COLUMNA -->
                                     </tr>
                                 </thead>
                                 <tbody id="tablaAtributosEvolutiva">
@@ -8858,7 +8860,8 @@ async function actualizarTablaEvolutivaIndicadores() {
                                         <th>Atributo</th>
                                         <th>Submotivo</th>
                                         ${meses.map(m => `<th>${m.label}</th>`).join('')}
-                                        <th>Tendencia</th>
+                                        <th>📊 Tendencia</th>
+                                        <th>📊 Promedio</th>  <!-- ← NUEVA COLUMNA -->
                                     </tr>
                                 </thead>
                                 <tbody id="tablaSubmotivosEvolutiva">
@@ -8882,127 +8885,257 @@ async function actualizarTablaEvolutivaIndicadores() {
     // NUEVA FUNCIÓN: Generar filas de la tabla evolutiva
     // ======================================================
     function generarFilasJerarquiaEvolutiva(meses, tipo) {
-        // Primero, recolectar todos los items únicos del período
-        const itemsMap = new Map();
+    // ======================================================
+    // 1. FUNCIÓN AUXILIAR: Calcular variación mensual
+    // ======================================================
+    function calcularVariacionMensual(valorActual, valorAnterior) {
+        if (valorAnterior === 0 || valorAnterior === null || valorAnterior === undefined) {
+            return { icono: '🆕', texto: 'Nuevo', color: '#019DF4' };
+        }
+        const cambio = ((valorActual - valorAnterior) / valorAnterior) * 100;
+        if (cambio > 0.1) {
+            return { icono: '▲', texto: `+${cambio.toFixed(1)}%`, color: '#28a745' };
+        } else if (cambio < -0.1) {
+            return { icono: '▼', texto: `${cambio.toFixed(1)}%`, color: '#d93025' };
+        } else {
+            return { icono: '➡️', texto: 'Estable', color: '#6c757d' };
+        }
+    }
+
+    // ======================================================
+    // 2. FUNCIÓN AUXILIAR: Calcular tendencia total
+    // ======================================================
+    function calcularTendenciaTotal(valores) {
+        const validos = valores.filter(v => v !== null && v.fallas > 0);
+        if (validos.length < 2) {
+            return { icono: '🆕', texto: 'Sin datos', color: '#6c757d' };
+        }
+        const primerValor = validos[0].fallas;
+        const ultimoValor = validos[validos.length - 1].fallas;
+        if (primerValor === 0) {
+            return { icono: '🆕', texto: 'Nuevo', color: '#019DF4' };
+        }
+        const cambio = ((ultimoValor - primerValor) / primerValor) * 100;
+        if (cambio > 2) {
+            return { icono: '📈', texto: `+${cambio.toFixed(1)}%`, color: '#28a745' };
+        } else if (cambio < -2) {
+            return { icono: '📉', texto: `${cambio.toFixed(1)}%`, color: '#d93025' };
+        } else {
+            return { icono: '➡️', texto: 'Estable', color: '#6c757d' };
+        }
+    }
+
+    // ======================================================
+    // 3. RECOLECTAR ITEMS ÚNICOS (código existente)
+    // ======================================================
+    const itemsMap = new Map();
+    
+    for (const mes of meses) {
+        let items = [];
+        if (tipo === 'bloques') items = mes.bloques || [];
+        else if (tipo === 'atributos') items = mes.atributos || [];
+        else items = mes.submotivos || [];
         
-        for (const mes of meses) {
-            let items = [];
-            if (tipo === 'bloques') items = mes.bloques || [];
-            else if (tipo === 'atributos') items = mes.atributos || [];
-            else items = mes.submotivos || [];
+        for (const item of items) {
+            let key = '';
+            let displayName = '';
             
-            for (const item of items) {
-                let key = '';
-                let displayName = '';
-                
-                if (tipo === 'bloques') {
-                    key = item.nombre;
-                    displayName = `📁 ${item.nombre}`;
-                } else if (tipo === 'atributos') {
-                    key = `${item.bloque}|${item.atributo}`;
-                    displayName = `🏷️ ${item.atributo}`;
-                } else {
-                    key = `${item.bloque}|${item.atributo}|${item.submotivo}`;
-                    displayName = `🔬 ${item.submotivo}`;
-                }
-                
-                if (!itemsMap.has(key)) {
-                    itemsMap.set(key, {
-                        key: key,
-                        bloque: item.bloque,
-                        atributo: item.atributo,
-                        submotivo: item.submotivo,
-                        nombre: displayName,
-                        valores: new Array(meses.length).fill(null),
-                        gestoresPorMes: new Array(meses.length).fill(null)
-                    });
-                }
-                
-                const itemData = itemsMap.get(key);
-                const idx = meses.findIndex(m => m.clave === mes.clave);
-                if (idx !== -1) {
-                    itemData.valores[idx] = {
-                        fallas: item.fallas,
-                        porcentaje: item.porcentaje.toFixed(1)
-                    };
-                    itemData.gestoresPorMes[idx] = item.gestores || [];
-                }
+            if (tipo === 'bloques') {
+                key = item.nombre;
+                displayName = `📁 ${item.nombre}`;
+            } else if (tipo === 'atributos') {
+                key = `${item.bloque}|${item.atributo}`;
+                displayName = `🏷️ ${item.atributo}`;
+            } else {
+                key = `${item.bloque}|${item.atributo}|${item.submotivo}`;
+                displayName = `🔬 ${item.submotivo}`;
+            }
+            
+            if (!itemsMap.has(key)) {
+                itemsMap.set(key, {
+                    key: key,
+                    bloque: item.bloque,
+                    atributo: item.atributo,
+                    submotivo: item.submotivo,
+                    nombre: displayName,
+                    valores: new Array(meses.length).fill(null),
+                    gestoresPorMes: new Array(meses.length).fill(null)
+                });
+            }
+            
+            const itemData = itemsMap.get(key);
+            const idx = meses.findIndex(m => m.clave === mes.clave);
+            if (idx !== -1) {
+                itemData.valores[idx] = {
+                    fallas: item.fallas,
+                    porcentaje: item.porcentaje.toFixed(1)
+                };
+                itemData.gestoresPorMes[idx] = item.gestores || [];
             }
         }
+    }
+    
+    // ======================================================
+    // 4. ORDENAR POR TOTAL DE FALLAS
+    // ======================================================
+    const itemsArray = Array.from(itemsMap.values());
+    for (const item of itemsArray) {
+        item.totalFallas = item.valores.reduce((sum, v) => sum + (v?.fallas || 0), 0);
+    }
+    itemsArray.sort((a, b) => b.totalFallas - a.totalFallas);
+    
+    let topLimit = 3;
+    if (tipo === 'atributos') topLimit = 10;
+    if (tipo === 'submotivos') topLimit = 10;
+    
+    const topItems = itemsArray.slice(0, topLimit);
+    
+    // ════════════════════════════════════════════════════════
+    // 🔴 CAMBIO IMPORTANTE: INICIAR HTML VACÍO (SIN ENCABEZADO)
+    // ════════════════════════════════════════════════════════
+    let html = '';  // ← ESTO ES LO QUE CAMBIA
+    
+    // ======================================================
+    // 6. GENERAR FILAS DE DATOS
+    // ======================================================
+    for (const item of topItems) {
+        html += `<tr onclick="verAgentesJerarquia('${tipo}', '${item.key.replace(/'/g, "\\'")}', window.datosJerarquiaEvolutivos)" style="cursor: pointer;">`;
         
-        // Ordenar por total de fallas (suma de todos los meses)
-        const itemsArray = Array.from(itemsMap.values());
-        for (const item of itemsArray) {
-            item.totalFallas = item.valores.reduce((sum, v) => sum + (v?.fallas || 0), 0);
+        // Columnas según el tipo
+        if (tipo === 'bloques') {
+            html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
+        } else if (tipo === 'atributos') {
+            html += `<td style="padding: 6px 8px;">📁 ${item.bloque || '-'}</td>`;
+            html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
+        } else {
+            html += `<td style="padding: 6px 8px;">📁 ${item.bloque || '-'}</td>`;
+            html += `<td style="padding: 6px 8px;">🏷️ ${item.atributo || '-'}</td>`;
+            html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
         }
         
-        // Ordenar y limitar según el tipo
-        itemsArray.sort((a, b) => b.totalFallas - a.totalFallas);
+        // ======================================================
+        // 7. VALORES POR MES CON VARIACIÓN
+        // ======================================================
+        for (let i = 0; i < meses.length; i++) {
+            const valor = item.valores[i];
+            let celdaHtml = '';
+            
+            if (valor && valor.fallas > 0) {
+                let variacionHtml = '';
+                if (i > 0) {
+                    const valorAnterior = item.valores[i - 1];
+                    if (valorAnterior && valorAnterior.fallas > 0) {
+                        const variacion = calcularVariacionMensual(valor.fallas, valorAnterior.fallas);
+                        variacionHtml = `<span style="color: ${variacion.color}; font-size: 10px; display: block; margin-top: 2px;">
+                            ${variacion.icono} ${variacion.texto}
+                        </span>`;
+                    } else if (valorAnterior && valorAnterior.fallas === 0 && valor.fallas > 0) {
+                        variacionHtml = `<span style="color: #019DF4; font-size: 10px; display: block; margin-top: 2px;">🆕 Nuevo</span>`;
+                    }
+                }
+                
+                celdaHtml = `
+                    <div><strong>${valor.porcentaje}%</strong> <span style="font-size: 11px; color: var(--muted);">(${valor.fallas})</span></div>
+                    ${variacionHtml}
+                `;
+            } else {
+                celdaHtml = `<span style="color: var(--muted);">-</span>`;
+            }
+            
+            html += `<td style="padding: 6px 4px; text-align: center; vertical-align: middle;">${celdaHtml}</td>`;
+        }
         
-        let topLimit = 3;
-        if (tipo === 'atributos') topLimit = 10;
-        if (tipo === 'submotivos') topLimit = 10;
+        // ======================================================
+        // 8. COLUMNA DE TENDENCIA TOTAL
+        // ======================================================
+        const tendencia = calcularTendenciaTotal(item.valores);
+        html += `<td style="text-align: center; color: ${tendencia.color}; font-weight: bold; padding: 6px 4px;">
+            ${tendencia.icono} ${tendencia.texto}
+        </td>`;
         
-        const topItems = itemsArray.slice(0, topLimit);
+        // ======================================================
+        // 9. COLUMNA DE PROMEDIO
+        // ======================================================
+        const valoresValidos = item.valores.filter(v => v !== null && v.fallas > 0);
+        let promedioErrores = 0;
+        let promedioPorcentaje = 0;
+        if (valoresValidos.length > 0) {
+            const sumFallas = valoresValidos.reduce((sum, v) => sum + v.fallas, 0);
+            const sumPorcentaje = valoresValidos.reduce((sum, v) => sum + parseFloat(v.porcentaje), 0);
+            promedioErrores = sumFallas / valoresValidos.length;
+            promedioPorcentaje = sumPorcentaje / valoresValidos.length;
+        }
         
-        // Generar HTML de las filas
-        let html = '';
+        html += `<td style="text-align: center; padding: 6px 4px; background: #f8fafc; font-weight: bold; color: ${promedioErrores > 5 ? '#d93025' : (promedioErrores > 2 ? '#f39c12' : '#28a745')};">
+            <div>${promedioPorcentaje > 0 ? promedioPorcentaje.toFixed(1) : 0}%</div>
+            <span style="font-size: 10px; color: var(--muted);">(${promedioErrores > 0 ? promedioErrores.toFixed(1) : 0})</span>
+        </td>`;
+        
+        html += `</tr>`;
+    }
+    
+    // ======================================================
+    // 10. FILA TOTAL AL FINAL
+    // ======================================================
+    if (topItems.length > 0) {
+        const totalFallasPorMes = new Array(meses.length).fill(0);
+        let totalFallasGlobal = 0;
+        let mesesConDatos = 0;
         
         for (const item of topItems) {
-            // Calcular tendencia (comparar primer mes vs último mes con datos)
-            let tendencia = { icono: '➡️', texto: 'Estable', clase: 'tendencia-stable' };
-            const valoresValidos = item.valores.filter(v => v !== null);
-            if (valoresValidos.length >= 2) {
-                const primerValor = valoresValidos[0].fallas;
-                const ultimoValor = valoresValidos[valoresValidos.length - 1].fallas;
-                if (ultimoValor < primerValor) {
-                    const cambio = ((primerValor - ultimoValor) / primerValor * 100).toFixed(1);
-                    tendencia = { icono: '📉', texto: `${cambio}%`, clase: 'tendencia-down' };
-                } else if (ultimoValor > primerValor) {
-                    const cambio = ((ultimoValor - primerValor) / primerValor * 100).toFixed(1);
-                    tendencia = { icono: '📈', texto: `+${cambio}%`, clase: 'tendencia-up' };
-                }
-            }
-            
-            // Guardar datos del item para el modal de agentes
-            const itemId = `item-${tipo}-${item.key.replace(/[|]/g, '-')}`;
-            
-            html += `<tr onclick="verAgentesJerarquia('${tipo}', '${item.key.replace(/'/g, "\\'")}', window.datosJerarquiaEvolutivos)" style="cursor: pointer;">`;
-            
-            // Columnas según el tipo
-            if (tipo === 'bloques') {
-                html += `<td><strong>${item.nombre}</strong></td>`;
-            } else if (tipo === 'atributos') {
-                html += `<td>📁 ${item.bloque || '-'}</td>`;
-                html += `<td><strong>${item.nombre}</strong></td>`;
-            } else {
-                html += `<td>📁 ${item.bloque || '-'}</td>`;
-                html += `<td>🏷️ ${item.atributo || '-'}</td>`;
-                html += `<td><strong>${item.nombre}</strong></td>`;
-            }
-            
-            // Valores por mes
             for (let i = 0; i < meses.length; i++) {
-                const valor = item.valores[i];
-                if (valor && valor.fallas > 0) {
-                    html += `<td title="${valor.fallas} fallas">${valor.porcentaje}%<br><span style="font-size: 9px; color: var(--muted);">(${valor.fallas})</span></td>`;
-                } else {
-                    html += `<td style="color: var(--muted);">-</td>`;
+                const val = item.valores[i];
+                if (val) {
+                    totalFallasPorMes[i] += val.fallas;
+                    totalFallasGlobal += val.fallas;
                 }
             }
-            
-            // Tendencia
-            html += `<td class="${tendencia.clase}">${tendencia.icono} ${tendencia.texto}</td>`;
-            html += `</tr>`;
         }
         
-        if (topItems.length === 0) {
-            const colspan = tipo === 'bloques' ? 2 + meses.length : (tipo === 'atributos' ? 3 + meses.length : 4 + meses.length);
-            html += `<tr><td colspan="${colspan}" style="text-align: center;">No hay datos en este período</td></tr>`;
+        for (const total of totalFallasPorMes) {
+            if (total > 0) mesesConDatos++;
         }
         
-        return html;
+        const promedioGlobalErrores = mesesConDatos > 0 ? (totalFallasGlobal / mesesConDatos) : 0;
+        
+        let colspan = 1;
+        if (tipo === 'bloques') colspan = 1;
+        else if (tipo === 'atributos') colspan = 2;
+        else if (tipo === 'submotivos') colspan = 3;
+        
+        html += `<tr style="background: #f0f7ff; font-weight: bold; border-top: 2px solid var(--accent);">
+            <td colspan="${colspan}" style="text-align: right; padding: 8px;">
+                <strong>📊 TOTAL</strong>
+            </td>`;
+        
+        for (let i = 0; i < meses.length; i++) {
+            const totalFallas = totalFallasPorMes[i] || 0;
+            html += `<td style="text-align: center; padding: 8px;">
+                <strong>100%</strong>
+                <span style="font-size: 11px; color: var(--muted);">(${totalFallas})</span>
+            </td>`;
+        }
+        
+        html += `<td style="text-align: center; color: var(--muted);">-</td>`;
+        html += `<td style="text-align: center; padding: 8px; background: #f8fafc; font-weight: bold; color: ${promedioGlobalErrores > 10 ? '#d93025' : (promedioGlobalErrores > 5 ? '#f39c12' : '#28a745')};">
+            <div>${mesesConDatos > 0 ? '100%' : '0%'}</div>
+            <span style="font-size: 11px; color: var(--muted);">(${promedioGlobalErrores.toFixed(1)})</span>
+        </td>`;
+        
+        html += `</tr>`;
     }
+    
+    // ======================================================
+    // 11. MENSAJE SI NO HAY DATOS
+    // ======================================================
+    if (topItems.length === 0) {
+        const columnasFijas = tipo === 'bloques' ? 1 : (tipo === 'atributos' ? 2 : 3);
+        const colspan = columnasFijas + meses.length + 2;
+        html += `<tr><td colspan="${colspan}" style="text-align: center; padding: 20px; color: var(--muted);">No hay datos en este período</td></tr>`;
+    }
+    
+    return html;
+}
 
     // ======================================================
     // NUEVA FUNCIÓN: Toggle expandir/contraer sección
@@ -9023,6 +9156,7 @@ async function actualizarTablaEvolutivaIndicadores() {
             }
         }
     }
+
 
     // ======================================================
     // FUNCIÓN CORREGIDA - verAgentesJerarquia (Estructura Vertical)
@@ -32934,6 +33068,9 @@ async function eliminarTarea(tareaId, nombreTarea) {
     }
 }
 
+
+
+
 // ======================================================================================
 // BLOQUE 14: FUNCIONES AUXILIARES Y DE NAVEGACIÓN
 // ======================================================================================
@@ -33042,52 +33179,52 @@ async function showTab(tabName, event) {
         }
 
         if (tabName === 'historialAgente') {
-        // 1. Funciones de historial
-        if (typeof cargarSelectAgentesHistorial === 'function') cargarSelectAgentesHistorial();
-        if (typeof cargarLideresEnSelectRanking === 'function') await cargarLideresEnSelectRanking();
-        if (typeof inicializarBuscadorGestores === 'function') inicializarBuscadorGestores();
-        
-        // 2. Ocultar resumen inicial
-        const resumenAgente = document.getElementById('resumenAgente');
-        const historialContainer = document.getElementById('historialContainer');
-        const btnExportar = document.getElementById('btnExportarHistorial');
-        if (resumenAgente) resumenAgente.style.display = 'none';
-        if (historialContainer) historialContainer.style.display = 'none';
-        if (btnExportar) btnExportar.style.display = 'none';
-        
-        // 🔴 3. CARGAR MESES (esperar que terminen)
-        if (typeof cargarMesesParaSelectorQ4 === 'function') {
-            await cargarMesesParaSelectorQ4();
-            console.log('✅ Meses Q4 cargados');
-        }
-        if (typeof cargarMesesParaSelectorQ3 === 'function') {
-            await cargarMesesParaSelectorQ3();
-            console.log('✅ Meses Q3 cargados');
-        }
-        
-        // 🔴 4. ESPERAR RENDERIZADO (100ms)
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // 🔴 5. CARGAR AGENTES
-        if (typeof cargarAgentesQ4PorMes === 'function') {
-            await cargarAgentesQ4PorMes();
-            console.log('✅ Agentes Q4 cargados');
-        }
-        if (typeof cargarAgentesQ3PorMes === 'function') {
-            await cargarAgentesQ3PorMes();
-            console.log('✅ Agentes Q3 cargados');
-        }
-        
-        // 6. Evolución de cuartiles
-        setTimeout(() => {
-            if (typeof cargarEvolucionCuartilesPorGestor === 'function') {
-                cargarEvolucionCuartilesPorGestor();
+            // 1. Funciones de historial
+            if (typeof cargarSelectAgentesHistorial === 'function') cargarSelectAgentesHistorial();
+            if (typeof cargarLideresEnSelectRanking === 'function') await cargarLideresEnSelectRanking();
+            if (typeof inicializarBuscadorGestores === 'function') inicializarBuscadorGestores();
+            
+            // 2. Ocultar resumen inicial
+            const resumenAgente = document.getElementById('resumenAgente');
+            const historialContainer = document.getElementById('historialContainer');
+            const btnExportar = document.getElementById('btnExportarHistorial');
+            if (resumenAgente) resumenAgente.style.display = 'none';
+            if (historialContainer) historialContainer.style.display = 'none';
+            if (btnExportar) btnExportar.style.display = 'none';
+            
+            // 🔴 3. CARGAR MESES (esperar que terminen)
+            if (typeof cargarMesesParaSelectorQ4 === 'function') {
+                await cargarMesesParaSelectorQ4();
+                console.log('✅ Meses Q4 cargados');
             }
-            if (typeof inicializarFiltrosEvolucionCuartiles === 'function') {
-                inicializarFiltrosEvolucionCuartiles();
+            if (typeof cargarMesesParaSelectorQ3 === 'function') {
+                await cargarMesesParaSelectorQ3();
+                console.log('✅ Meses Q3 cargados');
             }
-        }, 200);
-    }
+            
+            // 🔴 4. ESPERAR RENDERIZADO (100ms)
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // 🔴 5. CARGAR AGENTES
+            if (typeof cargarAgentesQ4PorMes === 'function') {
+                await cargarAgentesQ4PorMes();
+                console.log('✅ Agentes Q4 cargados');
+            }
+            if (typeof cargarAgentesQ3PorMes === 'function') {
+                await cargarAgentesQ3PorMes();
+                console.log('✅ Agentes Q3 cargados');
+            }
+            
+            // 6. Evolución de cuartiles
+            setTimeout(() => {
+                if (typeof cargarEvolucionCuartilesPorGestor === 'function') {
+                    cargarEvolucionCuartilesPorGestor();
+                }
+                if (typeof inicializarFiltrosEvolucionCuartiles === 'function') {
+                    inicializarFiltrosEvolucionCuartiles();
+                }
+            }, 200);
+        }
 
         if (tabName === 'cuartiles') {
             if (typeof cargarCriteriosCuartilesTabla === 'function') {
@@ -33155,6 +33292,16 @@ async function showTab(tabName, event) {
                 setTimeout(cargarTranscripciones, 500);
             }
         }
+
+        if (tabName === 'reportespda') {
+            // Esperar a que el DOM se actualice
+            setTimeout(async () => {
+                if (typeof cargarEstadoReportes === 'function') {
+                    await cargarEstadoReportes();
+                }
+            }, 300);
+        }
+
 
     } catch (error) {
         console.error(`❌ Error en acciones de pestaña ${tabName}:`, error);
@@ -39941,6 +40088,394 @@ async function testSharepointConexion() {
         resultDiv.style.color = 'var(--danger)';
     }
 }
+
+// =============================================
+// FUNCIONES PARA REPORTES AUTOMÁTICOS
+// =============================================
+
+let estadoReportesCache = null;
+
+/**
+ * Actualiza la tabla de tareas programadas
+ */
+function actualizarTablaTareasReportes(tareas) {
+    console.log('📋 Actualizando tabla de tareas...', tareas?.length || 0);
+    
+    const tbody = document.getElementById('tablaTareasReportes');
+    if (!tbody) {
+        console.warn('⚠️ tablaTareasReportes no encontrada');
+        return;
+    }
+    
+    if (!tareas || tareas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">📭 No hay tareas programadas</td></tr>';
+        return;
+    }
+    
+    let html = '';
+    for (const t of tareas) {
+        const estadoBadge = t.estado === 'activo' 
+            ? '<span class="badge" style="background: #28a745;">✅ Activo</span>'
+            : '<span class="badge" style="background: #6c757d;">⏸️ Inactivo</span>';
+        
+        const frecuenciaMap = {
+            'diaria': '📅 Diaria',
+            'semanal': '📅 Semanal',
+            'mensual': '📅 Mensual',
+            'intervalo': '⏱️ Intervalo',
+            'manual': '✋ Manual'
+        };
+        
+        html += `
+            <tr>
+                <td>${t.id || '-'}</td>
+                <td><strong>${escapeHtml(t.nombre || 'Sin nombre')}</strong></td>
+                <td>${t.tipo || '-'}</td>
+                <td>${frecuenciaMap[t.frecuencia] || t.frecuencia || '-'}</td>
+                <td>${t.hora || '-'}</td>
+                <td>${t.ultima_ejecucion || 'Nunca'}</td>
+                <td>${estadoBadge}</td>
+            </tr>
+        `;
+    }
+    tbody.innerHTML = html;
+    console.log(`✅ ${tareas.length} tareas cargadas en la tabla`);
+}
+
+/**
+ * Actualiza la tabla de reportes generados
+ */
+function actualizarTablaReportes(archivos) {
+    console.log('📄 Actualizando tabla de reportes...', archivos?.length || 0);
+    
+    const tbody = document.getElementById('tablaUltimosReportes');
+    if (!tbody) {
+        console.warn('⚠️ tablaUltimosReportes no encontrada');
+        return;
+    }
+    
+    if (!archivos || archivos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">📭 No hay reportes generados aún</td></tr>';
+        return;
+    }
+    
+    let html = '';
+    for (const r of archivos.slice(0, 20)) {
+        const fecha = r.fecha || 'N/A';
+        const tamanio = r.tamanio ? (r.tamanio / 1024).toFixed(1) + ' KB' : '0 KB';
+        const nombre = r.nombre || 'sin_nombre.html';
+        
+        // Determinar estado (si tiene error)
+        const estadoBadge = r.estado === 'error' 
+            ? '<span class="badge" style="background: #d93025;">❌ Error</span>'
+            : '<span class="badge" style="background: #28a745;">✅ Exitoso</span>';
+        
+        html += `
+            <tr>
+                <td><strong>${escapeHtml(nombre)}</strong></td>
+                <td>${fecha}</td>
+                <td>${tamanio}</td>
+                <td>${estadoBadge}</td>
+                <td>
+                    <button onclick="verReporte('${escapeHtml(nombre)}')" 
+                            style="background: var(--accent); padding: 4px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 5px;">
+                        👁️ Ver
+                    </button>
+                    <button onclick="descargarReporte('${escapeHtml(nombre)}')" 
+                            style="background: var(--ok); padding: 4px 10px; border: none; border-radius: 4px; color: white; cursor: pointer;">
+                        📥
+                    </button>
+                </td>
+            </tr>
+        `;
+    }
+    tbody.innerHTML = html;
+    console.log(`✅ ${archivos.length} reportes cargados en la tabla`);
+}
+
+/**
+ * Carga la lista de reportes generados
+ */
+async function cargarListaReportes() {
+    console.log('📋 Cargando lista de reportes...');
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('http://localhost:5000/api/reportes/listar', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Error al listar reportes');
+        }
+        
+        actualizarTablaReportes(result.archivos || []);
+        
+    } catch (error) {
+        console.error('❌ Error cargando reportes:', error);
+        const tbody = document.getElementById('tablaUltimosReportes');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+        }
+    }
+}
+
+/**
+ * Ver un reporte en una nueva pestaña
+ */
+function verReporte(nombre) {
+    if (!nombre) {
+        alert('⚠️ No hay reporte para ver');
+        return;
+    }
+    const url = `http://localhost:5000/api/reportes/descargar/${encodeURIComponent(nombre)}`;
+    window.open(url, '_blank');
+}
+
+/**
+ * Descarga un reporte
+ */
+async function descargarReporte(nombre) {
+    if (!nombre) {
+        alert('⚠️ No hay reporte para descargar');
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`http://localhost:5000/api/reportes/descargar/${encodeURIComponent(nombre)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nombre;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        console.log(`✅ Reporte descargado: ${nombre}`);
+        
+    } catch (error) {
+        console.error('Error descargando:', error);
+        alert('❌ Error al descargar: ' + error.message);
+    }
+}
+
+/**
+ * Carga el estado del sistema de reportes
+ */
+async function cargarEstadoReportes() {
+    console.log('📊 Cargando estado de reportes...');
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('http://localhost:5000/api/reportes/estado', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('📊 Estado recibido:', result);
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Error al obtener estado');
+        }
+        
+        // 1. Actualizar badge del scheduler
+        const badge = document.getElementById('schedulerBadge');
+        const info = document.getElementById('schedulerInfo');
+        
+        if (badge) {
+            if (result.scheduler_activo) {
+                badge.textContent = '✅ Activo';
+                badge.style.background = '#28a745';
+                badge.style.color = 'white';
+            } else {
+                badge.textContent = '⏸️ Inactivo';
+                badge.style.background = '#d93025';
+                badge.style.color = 'white';
+            }
+        }
+        
+        if (info) {
+            if (result.scheduler_activo) {
+                info.textContent = '✅ El scheduler de reportes está ejecutándose correctamente.';
+                info.style.color = '#28a745';
+            } else {
+                info.textContent = '⚠️ El scheduler de reportes NO está corriendo. Ejecute manualmente o reinicie.';
+                info.style.color = '#d93025';
+            }
+        }
+        
+        // 2. Actualizar tabla de tareas
+        actualizarTablaTareasReportes(result.tareas || []);
+        
+        // 3. Actualizar tabla de reportes
+        if (result.ultimos_reportes && result.ultimos_reportes.length > 0) {
+            actualizarTablaReportes(result.ultimos_reportes);
+        } else {
+            // Si no hay reportes en el estado, listarlos directamente
+            await cargarListaReportes();
+        }
+        
+        console.log('✅ Estado de reportes actualizado');
+        
+    } catch (error) {
+        console.error('Error cargando estado de reportes:', error);
+        const badge = document.getElementById('schedulerBadge');
+        if (badge) {
+            badge.textContent = '❌ Error';
+            badge.style.background = '#d93025';
+            badge.style.color = 'white';
+        }
+    }
+}
+
+/**
+ * Genera un reporte manualmente desde la interfaz
+ */
+async function generarReporteManual(tipo = 'todos') {
+    const nombres = {
+        'todos': 'Todos los reportes',
+        'pda': 'Reporte PDA',
+        'mensual': 'Informe Mensual'
+    };
+    
+    if (!confirm(`⚠️ ¿Generar ${nombres[tipo] || tipo} ahora?\n\nEste proceso puede tomar unos segundos.`)) {
+        return;
+    }
+    
+    // Mostrar indicador de carga
+    const statusDiv = document.getElementById('reporteEjecucionStatus');
+    const mensaje = document.getElementById('reporteEjecucionMensaje');
+    
+    if (statusDiv) {
+        statusDiv.style.display = 'block';
+        if (mensaje) {
+            mensaje.textContent = '⏳ Generando reporte... Esto puede tomar unos segundos.';
+            mensaje.style.color = 'var(--accent)';
+        }
+    }
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('http://localhost:5000/api/reportes/ejecutar', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ tipo })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || `HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            if (mensaje) {
+                mensaje.textContent = `✅ ${result.message || 'Reporte generado correctamente'}`;
+                mensaje.style.color = '#28a745';
+            }
+            // Recargar la lista de reportes
+            setTimeout(() => {
+                cargarListaReportes();
+                // También actualizar estado completo
+                cargarEstadoReportes();
+            }, 1500);
+        } else {
+            throw new Error(result.error || 'Error desconocido');
+        }
+        
+    } catch (error) {
+        console.error('Error generando reporte:', error);
+        if (mensaje) {
+            mensaje.textContent = `❌ Error: ${error.message}`;
+            mensaje.style.color = '#d93025';
+        }
+        alert('❌ Error al generar reporte: ' + error.message);
+    }
+    
+    // Ocultar después de 5 segundos
+    setTimeout(() => {
+        if (statusDiv) {
+            statusDiv.style.display = 'none';
+        }
+    }, 8000);
+}
+
+
+/**
+ * Abre la carpeta de reportes en el explorador
+ */
+function abrirCarpetaReportes() {
+    // En Windows, abre el explorador de archivos
+    window.open('file:///C:/MECA_ML/reportes_generados', '_blank');
+}
+
+/**
+ * Verifica si el scheduler de reportes está corriendo
+ */
+async function verificarSchedulerReportes() {
+    try {
+        const result = await API.verificarSchedulerReportes();
+        return result.running;
+    } catch (error) {
+        console.error('Error verificando scheduler:', error);
+        return false;
+    }
+}
+
+
+
+// =============================================
+// INICIALIZAR AL CARGAR LA PESTAÑA
+// =============================================
+
+// Sobrescribir showTab para cargar reportes al abrir la pestaña
+const originalShowTab = window.showTab || function() {};
+
+window.showTab = function(tabName, event) {
+    // Llamar a la función original
+    if (typeof originalShowTab === 'function') {
+        originalShowTab(tabName, event);
+    }
+    
+    // Si es la pestaña de reportes automáticos, cargar estado
+    if (tabName === 'reportesAuto') {
+        setTimeout(cargarEstadoReportes, 300);
+    }
+};
+
+// Cargar estado al iniciar si la pestaña está visible
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        const tabReportesAuto = document.getElementById('tab-reportesAuto');
+        if (tabReportesAuto && tabReportesAuto.classList.contains('active')) {
+            cargarEstadoReportes();
+        }
+    }, 500);
+});
 
 // ======================================================
 // FUNCIÓN PARA ACTUALIZAR HEADER CON DATOS DEL USUARIO

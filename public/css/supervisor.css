@@ -1879,24 +1879,40 @@ td {
     max-width: 1200px !important;
 }
 
+/* ======================================================
+   FILAS DINÁMICAS - SE AJUSTAN AL NÚMERO DE ELEMENTOS
+   ====================================================== */
+
+/* PRIMARY - dinámica (máximo 4 columnas) */
 .kpi-row-primary {
-    grid-template-columns: repeat(5, 1fr) !important;  /* ← 5 columnas en lugar de 6 */
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;  /* ← AUTO-FIT */
     gap: 12px !important;
+    margin-bottom: 25px !important;  /* ← SEPARACIÓN ENTRE FILAS */
 }
 
+/* SECONDARY - dinámica (máximo 4 columnas) */
 .kpi-row-secondary {
-    grid-template-columns: repeat(4, 1fr) !important;  /* ← 4 columnas en lugar de 6 */
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important;  /* ← AUTO-FIT */
     gap: 20px !important;
+    margin-bottom: 25px !important;  /* ← SEPARACIÓN ENTRE FILAS SECONDARY */
+}
+
+/* Última fila secondary sin margen inferior */
+.kpi-row-secondary:last-of-type {
+    margin-bottom: 0 !important;
 }
 
 /* Cards - centradas */
 .kpi-card {
     text-align: center !important;
-    display: flex !important;
+    display: flex;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
     width: 100% !important;
+    min-height: 80px !important;  /* Altura uniforme */
 }
 
 .kpi-card .kpi-label,

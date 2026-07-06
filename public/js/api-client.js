@@ -2291,6 +2291,8 @@ const API = (function() {
         return await response.json();
     }
 
+    
+
     // ======================================================
     // Módulo: Autenticación - Verificar Token (Navegador)
     // ======================================================
@@ -3112,7 +3114,114 @@ const API = (function() {
         
         return await response.json();
     }
-    
+
+    // =============================================
+    // API - REPORTES AUTOMÁTICOS
+    // =============================================
+
+    /**
+     * Obtiene el estado del sistema de reportes
+     */
+    async function obtenerEstadoReportes() {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('/api/reportes/estado', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al obtener estado');
+        }
+        return response.json();
+    }
+
+    /**
+     * Ejecuta un reporte manualmente
+     * @param {string} tipo - 'todos', 'pda', 'mensual'
+     */
+    async function ejecutarReporte(tipo = 'todos') {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('/api/reportes/ejecutar', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ tipo })
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al ejecutar reporte');
+        }
+        return response.json();
+    }
+
+    /**
+     * Lista los reportes generados
+     */
+    async function listarReportes() {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('/api/reportes/listar', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al listar reportes');
+        }
+        return response.json();
+    }
+
+    /**
+     * Descarga un reporte
+     * @param {string} nombre - Nombre del archivo
+     */
+    async function descargarReporte(nombre) {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`/api/reportes/descargar/${encodeURIComponent(nombre)}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al descargar');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nombre;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }
+
+    /**
+     * Verifica si el scheduler de reportes está corriendo
+     */
+    async function verificarSchedulerReportes() {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('/api/reportes/scheduler/status', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al verificar scheduler');
+        }
+        return response.json();
+    }
+
+        
     // ======================================================
     // API PÚBLICA - Exportación de todos los métodos
     // ======================================================
@@ -3320,7 +3429,17 @@ const API = (function() {
         subirAudio,
         transcribirAudioEspecifico,
         analizarTranscripcion,
-        
+
+        // =============================================
+        // API - REPORTES AUTOMÁTICOS
+        // =============================================
+        obtenerEstadoReportes,
+        ejecutarReporte,
+        listarReportes,
+        descargarReporte,
+        verificarSchedulerReportes,
+
+
         // Utilidad: cambiar modo de un módulo (para pruebas)
         setModo: (modulo, modo) => {
             if (MODO.hasOwnProperty(modulo)) {
