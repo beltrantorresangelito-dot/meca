@@ -4992,7 +4992,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                 <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 18px;">🏆</span>
-                        <strong>DISTRIBUCIÓN POR CUARTILES</strong>
+                        <strong>DISTRIBUCIÓN POR CATEGORIA</strong>
                     </div>
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <span style="font-size: 11px;">Q4:${ultimosValores.q4 || 0} gestores (${tendencias.q4.texto})</span>
@@ -5021,7 +5021,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                                 <td style="padding: 8px; text-align: center; ${tendencias.q3.color}">${tendencias.q3.icono} ${tendencias.q3.texto}</td>
                             </tr>
                             <tr>
-                                <td style="padding: 8px;"><strong>🔴 Gestores Q4 (Riesgo)</strong></td>
+                                <td style="padding: 8px;"><strong>🔴 Gestores Q4 (Crítico)</strong></td>
                                 ${generarFilaConTendenciaGlobal('q4', mesesValidos, indicadoresPorMes, false, 0)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.q4.color}">${tendencias.q4.icono} ${tendencias.q4.texto}</td>
                             </tr>
@@ -7017,7 +7017,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                         stack: 'cuartiles'
                     },
                     {
-                        label: '🔴 Q4 (Riesgo)',
+                        label: '🔴 Q4 (Crítico)',
                         data: dataQ4,
                         backgroundColor: '#d93025',
                         borderColor: '#d93025',
@@ -7423,7 +7423,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                         categoryPercentage: 0.8
                     },
                     {
-                        label: '🔴 Q4 (Riesgo)',
+                        label: '🔴 Q4 (Crítico)',
                         data: dataQ4,
                         backgroundColor: '#d93025',
                         borderColor: '#d93025',

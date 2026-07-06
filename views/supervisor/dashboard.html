@@ -321,28 +321,28 @@
                 <div class="kpi-row kpi-row-secondary" >
                     <!-- Q1 - Excelente -->
                     <div class="kpi-card" style="background: linear-gradient(135deg, #1a7f37, #28a745);">
-                        <div class="kpi-label">🏆 % Gestores Q1</div>
+                        <div class="kpi-label">🏆 % Gestores Q1 (Excelente)</div>
                         <div class="kpi-value" id="kpiPorcentajeQ1">0%</div>
                         <div class="kpi-detail" id="kpiPorcentajeQ1Detalle">0 gestores</div>
                     </div>
 
                     <!-- Q2 - Bueno -->
                     <div class="kpi-card" style="background: linear-gradient(135deg, #019DF4, #00B4F0);">
-                        <div class="kpi-label">📈 % Gestores Q2</div>
+                        <div class="kpi-label">📈 % Gestores Q2 (Bueno)</div>
                         <div class="kpi-value" id="kpiPorcentajeQ2">0%</div>
                         <div class="kpi-detail" id="kpiPorcentajeQ2Detalle">0 gestores</div>
                     </div>
 
                     <!-- Q3 - Regular -->
                     <div class="kpi-card" style="background: linear-gradient(135deg, #f39c12, #fd7e14);">
-                        <div class="kpi-label">⚠️ % Gestores Q3</div>
+                        <div class="kpi-label">⚠️ % Gestores Q3 (Regular)</div>
                         <div class="kpi-value" id="kpiPorcentajeQ3">0%</div>
                         <div class="kpi-detail" id="kpiPorcentajeQ3Detalle">0 gestores</div>
                     </div>
 
                     <!-- Q4 - Crítico -->
                     <div class="kpi-card" style="background: linear-gradient(135deg, #c61d03, #cc0000);">
-                        <div class="kpi-label">⚠️ % Gestores Q4</div>
+                        <div class="kpi-label">⚠️ % Gestores Q4 (Crítico)</div>
                         <div class="kpi-value" id="kpiTasaQuiebre">0%</div>
                         <div class="kpi-detail" id="kpiTasaQuiebreDetalle">0 gestores</div>
                     </div>
@@ -529,7 +529,7 @@
 
                     <!-- GRÁFICO DE BARRAS COMPARATIVO POR CUARTILES -->
                     <div class="card" style="margin-bottom: 25px;">
-                        <h3>📊 Comparativa de Desempeño por Cuartiles</h3>
+                        <h3>📊 Comparativa de Desempeño por Categoria</h3>
                         <div style="height: 350px;">
                             <canvas id="chartComparativa"></canvas>
                         </div>
@@ -538,12 +538,12 @@
 
                     <!-- GRÁFICO EVOLUTIVO DE CUARTILES POR FECHA -->
                     <div class="card" style="margin-bottom: 25px;">
-                        <h3>📈 Evolutivo de Cuartiles por Período</h3>
+                        <h3>📈 Evolutivo de Categorias por Período</h3>
                         <div style="height: 400px;">
                             <canvas id="chartEvolutivoCuartiles"></canvas>
                         </div>
                         <div style="margin-top: 10px; font-size: 11px; color: var(--muted); text-align: center;">
-                            * Evolución de la cantidad de gestores en cada cuartil a lo largo del tiempo
+                            * Evolución de la cantidad de gestores en cada categoria a lo largo del tiempo
                         </div>
                     </div>
 
@@ -632,7 +632,7 @@
                 <!-- ====================================================== -->
                 <div class="card" style="margin-top: 25px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
-                        <h3 style="margin: 0;">📊 Evolución de Cuartiles por Gestor</h3>
+                        <h3 style="margin: 0;">📊 Evolución de Categorias por Gestor</h3>
                         <div style="display: flex; gap: 10px; align-items: center;">
                             <div>
                                 <label style="font-size: 11px;">Período:</label>
@@ -842,7 +842,7 @@
                                 </select>
                         </div>
                         <div style="min-width: 120px;">
-                            <label style="font-size: 12px;">🎯 Cuartil Global</label>
+                            <label style="font-size: 12px;">🎯 Categoria Global</label>
                             <select id="filtroCuartilGP" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--line);">
                                     <option value="todos">Todos</option>
                                     <option value="Q1">🏆 Q1 (Excelente)</option>
@@ -865,7 +865,7 @@
                                     <th style="width: 40px; padding: 12px;"></th>
                                     <th style="padding: 12px;">👤 Gestor</th>
                                     <th style="padding: 12px;">📊 Promedio Global</th>
-                                    <th style="padding: 12px;">🏆 Cuartil</th>
+                                    <th style="padding: 12px;">🏆 Categoria</th>
                                     <th style="padding: 12px;">🎯 ENC</th>
                                     <th style="padding: 12px;">⚠️ ECUF</th>
                                     <th style="padding: 12px;">💰 ECN</th>
