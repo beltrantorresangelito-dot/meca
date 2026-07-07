@@ -16,7 +16,7 @@
     let auditoresExcluidosGlobal = [];      
     let todosLosAuditoresGlobal = [];       
     let liderSeleccionadoActual = 'todos';  
-    let filtroPeriodoActual = 'mes';
+    let filtroPeriodoActual = 'todos';
     let filtroDiaDesde = null;
     let filtroDiaHasta = null;
     let filtroSemanaAnio = null;
@@ -123,6 +123,236 @@ const matrizCacheStore = {};
         // Ignorar errores de localStorage
     }
 })();
+
+// ======================================================
+// FUNCIÓN: obtenerRangoFechasActivo (CORREGIDA - MES FINAL)
+// ======================================================
+function obtenerRangoFechasActivo() {
+    const periodoSelect = document.getElementById('filtroPeriodoReportes');
+    const periodo = periodoSelect?.value || filtroPeriodoActual || 'mes';
+    
+    // 🔴 FUNCIÓN AUXILIAR: Validar fecha
+    function esFechaValida(fecha) {
+        return fecha && !isNaN(fecha.getTime());
+    }
+    
+    // 🔴 FUNCIÓN AUXILIAR: Obtener último día del mes
+    function ultimoDiaDelMes(anio, mes) {
+        // mes es 1-12, pasamos mes+1 para obtener el último día del mes correcto
+        return new Date(anio, mes, 0).getDate();
+    }
+    
+    // Caso 1: Período "dia" - usar fechas de inicio/fin
+    if (periodo === 'dia') {
+        const inicioInput = document.getElementById('filtroFechaInicioReportes');
+        const finInput = document.getElementById('filtroFechaFinReportes');
+        const fechaInicioStr = inicioInput?.value;
+        const fechaFinStr = finInput?.value;
+        
+        if (fechaInicioStr && fechaFinStr) {
+            const fechaInicio = new Date(fechaInicioStr + 'T00:00:00');
+            const fechaFin = new Date(fechaFinStr + 'T23:59:59');
+            if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                return { 
+                    fechaInicio: fechaInicio, 
+                    fechaFin: fechaFin,
+                    periodo: 'dia',
+                    tieneFiltro: true
+                };
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Caso 2: Período "mes" - usar el mes seleccionado
+    if (periodo === 'mes') {
+        const mesSelect = document.getElementById('filtroMesSelect');
+        const mesVal = mesSelect?.value;
+        if (mesVal) {
+            const [anioStr, mesStr] = mesVal.split('-');
+            const anio = parseInt(anioStr);
+            const mes = parseInt(mesStr);
+            if (!isNaN(anio) && !isNaN(mes) && mes >= 1 && mes <= 12) {
+                // 🔴 CORREGIDO: fechaInicio = primer día del mes
+                const fechaInicio = new Date(anio, mes - 1, 1);
+                
+                // 🔴 CORREGIDO: fechaFin = último día del MISMO mes
+                // Para obtener el último día de julio (mes=7), usamos new Date(anio, 8, 0)
+                // porque el mes 8 es agosto y el día 0 da el último día de julio
+                const fechaFin = new Date(anio, mes, 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    console.log(`📅 Rango MES: ${fechaInicio.toLocaleDateString()} → ${fechaFin.toLocaleDateString()}`);
+                    return { 
+                        fechaInicio: fechaInicio, 
+                        fechaFin: fechaFin,
+                        periodo: 'mes',
+                        tieneFiltro: true
+                    };
+                }
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Caso 3: Período "trimestre" - usar el trimestre seleccionado
+    if (periodo === 'trimestre') {
+        const trimSelect = document.getElementById('filtroTrimSelect');
+        const trimVal = trimSelect?.value;
+        if (trimVal) {
+            const [anioStr, qStr] = trimVal.split('-Q');
+            const anio = parseInt(anioStr);
+            const trimestre = parseInt(qStr);
+            if (!isNaN(anio) && !isNaN(trimestre) && trimestre >= 1 && trimestre <= 4) {
+                const mesInicio = (trimestre - 1) * 3 + 1;
+                const mesFin = trimestre * 3; // Último mes del trimestre
+                
+                // 🔴 CORREGIDO: fechaInicio = primer día del trimestre
+                const fechaInicio = new Date(anio, mesInicio - 1, 1);
+                
+                // 🔴 CORREGIDO: fechaFin = último día del ÚLTIMO mes del trimestre
+                // Ej: Trimestre 2 (Abr-Jun) → mesFin=6 → new Date(anio, 7, 0) = último día de junio
+                const fechaFin = new Date(anio, mesFin, 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    console.log(`📅 Rango TRIMESTRE: ${fechaInicio.toLocaleDateString()} → ${fechaFin.toLocaleDateString()}`);
+                    return { 
+                        fechaInicio: fechaInicio, 
+                        fechaFin: fechaFin,
+                        periodo: 'trimestre',
+                        tieneFiltro: true
+                    };
+                }
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Caso 4: Período "anio" - usar el año seleccionado
+    if (periodo === 'anio') {
+        const anioSelect = document.getElementById('filtroAnioSelect');
+        const anioVal = anioSelect?.value;
+        if (anioVal) {
+            const anio = parseInt(anioVal);
+            if (!isNaN(anio)) {
+                const fechaInicio = new Date(anio, 0, 1);
+                const fechaFin = new Date(anio, 11, 31);
+                fechaFin.setHours(23, 59, 59, 999);
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    return { 
+                        fechaInicio: fechaInicio, 
+                        fechaFin: fechaFin,
+                        periodo: 'anio',
+                        tieneFiltro: true
+                    };
+                }
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Caso 5: Período "rango" - usar los rangos seleccionados
+    if (periodo === 'rango') {
+        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        
+        if (tipoRango === 'dia') {
+            const inicio = document.getElementById('filtroRangoDiaInicio')?.value;
+            const fin = document.getElementById('filtroRangoDiaFin')?.value;
+            if (inicio && fin) {
+                const fechaInicio = new Date(inicio + 'T00:00:00');
+                const fechaFin = new Date(fin + 'T23:59:59');
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    return { fechaInicio, fechaFin, periodo: 'rango', tieneFiltro: true };
+                }
+            }
+        } else if (tipoRango === 'mes') {
+            const inicio = document.getElementById('filtroRangoMesInicio')?.value;
+            const fin = document.getElementById('filtroRangoMesFin')?.value;
+            if (inicio && fin) {
+                const [anioI, mesI] = inicio.split('-');
+                const [anioF, mesF] = fin.split('-');
+                
+                // 🔴 CORREGIDO: fechaInicio = primer día del mes inicio
+                const fechaInicio = new Date(parseInt(anioI), parseInt(mesI) - 1, 1);
+                
+                // 🔴 CORREGIDO: fechaFin = último día del mes fin
+                const fechaFin = new Date(parseInt(anioF), parseInt(mesF), 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    console.log(`📅 Rango MES: ${fechaInicio.toLocaleDateString()} → ${fechaFin.toLocaleDateString()}`);
+                    return { fechaInicio, fechaFin, periodo: 'rango', tieneFiltro: true };
+                }
+            }
+        } else if (tipoRango === 'trimestre') {
+            const inicio = document.getElementById('filtroRangoTrimInicio')?.value;
+            const fin = document.getElementById('filtroRangoTrimFin')?.value;
+            if (inicio && fin) {
+                const [anioI, qI] = inicio.split('-Q');
+                const [anioF, qF] = fin.split('-Q');
+                const mesInicioI = (parseInt(qI) - 1) * 3 + 1;
+                const mesFinF = parseInt(qF) * 3;
+                
+                // 🔴 CORREGIDO: fechaInicio = primer día del trimestre inicio
+                const fechaInicio = new Date(parseInt(anioI), mesInicioI - 1, 1);
+                
+                // 🔴 CORREGIDO: fechaFin = último día del trimestre fin
+                const fechaFin = new Date(parseInt(anioF), mesFinF, 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    console.log(`📅 Rango TRIMESTRE: ${fechaInicio.toLocaleDateString()} → ${fechaFin.toLocaleDateString()}`);
+                    return { fechaInicio, fechaFin, periodo: 'rango', tieneFiltro: true };
+                }
+            }
+        } else if (tipoRango === 'anio') {
+            const inicio = document.getElementById('filtroRangoAnioInicio')?.value;
+            const fin = document.getElementById('filtroRangoAnioFin')?.value;
+            if (inicio && fin) {
+                const fechaInicio = new Date(parseInt(inicio), 0, 1);
+                const fechaFin = new Date(parseInt(fin), 11, 31);
+                fechaFin.setHours(23, 59, 59, 999);
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    return { fechaInicio, fechaFin, periodo: 'rango', tieneFiltro: true };
+                }
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Caso 6: Período "multiples" - usar los múltiples períodos seleccionados
+    if (periodo === 'multiples') {
+        if (filtroMultiples && filtroMultiples.length > 0) {
+            const fechas = filtroMultiples
+                .map(f => {
+                    const [anio, mes] = f.split('-');
+                    return new Date(parseInt(anio), parseInt(mes) - 1, 1);
+                })
+                .filter(d => esFechaValida(d))
+                .sort((a, b) => a - b);
+            
+            if (fechas.length > 0) {
+                const fechaInicio = fechas[0];
+                const ultimoMes = fechas[fechas.length - 1];
+                // 🔴 CORREGIDO: fechaFin = último día del último mes seleccionado
+                const fechaFin = new Date(ultimoMes.getFullYear(), ultimoMes.getMonth() + 1, 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    console.log(`📅 Rango MULTIPLES: ${fechaInicio.toLocaleDateString()} → ${fechaFin.toLocaleDateString()}`);
+                    return { fechaInicio, fechaFin, periodo: 'multiples', tieneFiltro: true };
+                }
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Sin filtro activo
+    return { tieneFiltro: false };
+}
+
 
 // ======================================================
 // FUNCIÓN: obtenerVersionMatrizPorFecha
@@ -4511,12 +4741,10 @@ let indicadoresEvolutivosExpandido = {
 
 
 // ======================================================
-// FUNCIÓN PRINCIPAL: Generar tabla evolutiva
+// FUNCIÓN PRINCIPAL: Generar tabla evolutiva (CORREGIDA)
 // ======================================================
 async function generarTablaEvolutivaIndicadores(evaluacionesFiltradas) {
-    console.log('📊 Generando tabla evolutiva de indicadores...');
-    
-
+    console.log('📊 generarTablaEvolutivaIndicadores - INICIO');
     
     const container = document.getElementById('tablaEvolutivaContainer');
     if (!container) {
@@ -4524,20 +4752,36 @@ async function generarTablaEvolutivaIndicadores(evaluacionesFiltradas) {
         return;
     }
     
+    // 🔴 VALIDACIÓN ROBUSTA
     if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos para mostrar</div>';
+        console.log('⚠️ No hay evaluaciones filtradas');
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos en el período seleccionado</div>';
         return;
     }
     
-    // 1. Obtener meses disponibles
+    console.log(`📊 Evaluaciones filtradas: ${evaluacionesFiltradas.length}`);
+    
+    // 1. Obtener meses disponibles (YA FILTRADOS)
     const mesesData = await obtenerMesesConDatos(evaluacionesFiltradas);
-    if (mesesData.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📅 No hay suficientes meses con datos</div>';
+    
+    // 🔴 VALIDACIÓN: Si no hay meses, mostrar mensaje
+    if (!mesesData || mesesData.length === 0) {
+        console.log('⚠️ No hay meses con datos en el período seleccionado');
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📅 No hay meses con datos en el período seleccionado</div>';
         return;
     }
+    
+    console.log(`📅 ${mesesData.length} meses encontrados:`, mesesData.map(m => m.label).join(', '));
     
     // 2. Calcular indicadores por mes
     const indicadoresPorMes = await calcularIndicadoresPorMes(evaluacionesFiltradas, mesesData);
+    
+    // 🔴 VALIDACIÓN: Verificar que indicadoresPorMes no esté vacío
+    if (!indicadoresPorMes || Object.keys(indicadoresPorMes).length === 0) {
+        console.log('⚠️ No se pudieron calcular indicadores');
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos suficientes para calcular indicadores</div>';
+        return;
+    }
     
     // 3. Generar HTML
     const html = generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes);
@@ -4550,14 +4794,31 @@ async function generarTablaEvolutivaIndicadores(evaluacionesFiltradas) {
 }
 
 // ======================================================
-// Obtener meses disponibles con datos
+// Obtener meses disponibles con datos (VERSIÓN CORREGIDA)
 // ======================================================
 async function obtenerMesesConDatos(evaluaciones) {
+    // 🔴 VALIDACIÓN: Si no hay evaluaciones, retornar array vacío
+    if (!evaluaciones || evaluaciones.length === 0) {
+        console.log('⚠️ No hay evaluaciones para obtener meses');
+        return [];
+    }
+    
+    const rango = obtenerRangoFechasActivo();
+    console.log(`📅 Rango activo: ${rango.tieneFiltro ? 'SÍ' : 'NO'}`);
+    if (rango.tieneFiltro) {
+        console.log(`   Desde: ${rango.fechaInicio.toLocaleDateString()} Hasta: ${rango.fechaFin.toLocaleDateString()}`);
+    }
+    
     const mesesSet = new Set();
     
     for (const evalItem of evaluaciones) {
         const fecha = obtenerFechaEvaluacion(evalItem);
         if (!fecha) continue;
+        
+        // Filtrar por rango de fechas
+        if (rango && rango.tieneFiltro) {
+            if (fecha < rango.fechaInicio || fecha > rango.fechaFin) continue;
+        }
         
         const anio = fecha.getFullYear();
         const mes = fecha.getMonth() + 1;
@@ -4565,28 +4826,59 @@ async function obtenerMesesConDatos(evaluaciones) {
         mesesSet.add(clave);
     }
     
-    const meses = Array.from(mesesSet).sort();
+    // 🔴 CONVERTIR A ARRAY Y ORDENAR
+    const mesesArray = Array.from(mesesSet).sort();
+    
+    if (mesesArray.length === 0) {
+        console.log('⚠️ No se encontraron meses en el rango seleccionado');
+        return [];
+    }
+    
     const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     
-    return meses.map(clave => {
+    // 🔴 RETORNAR CON LA ESTRUCTURA COMPLETA
+    const resultado = mesesArray.map(clave => {
         const [anio, mes] = clave.split('-');
+        const mesNum = parseInt(mes);
         return {
             clave: clave,
-            label: `${mesesNombres[parseInt(mes) - 1]} ${anio}`,
+            label: `${mesesNombres[mesNum - 1]} ${anio}`,
             anio: parseInt(anio),
-            mes: parseInt(mes),
-            orden: parseInt(anio) * 12 + parseInt(mes)
+            mes: mesNum,
+            orden: parseInt(anio) * 12 + mesNum
         };
     }).sort((a, b) => a.orden - b.orden);
+    
+    console.log(`✅ ${resultado.length} meses encontrados:`, resultado.map(m => m.label).join(', '));
+    return resultado;
 }
 
 // ======================================================
-// Calcular todos los indicadores por mes
+// Calcular todos los indicadores por mes (CORREGIDA)
 // ======================================================
 async function calcularIndicadoresPorMes(evaluaciones, mesesData) {
+    console.log('📊 calcularIndicadoresPorMes - INICIO');
+    
+    // 🔴 VALIDACIÓN INICIAL
+    if (!evaluaciones || evaluaciones.length === 0) {
+        console.log('⚠️ No hay evaluaciones para calcular indicadores');
+        return {};
+    }
+    
+    if (!mesesData || mesesData.length === 0) {
+        console.log('⚠️ No hay meses para calcular indicadores');
+        return {};
+    }
+    
     const resultados = {};
     
     for (const mes of mesesData) {
+        // 🔴 VALIDAR QUE 'mes' TENGA LA ESTRUCTURA CORRECTA
+        if (!mes || !mes.clave) {
+            console.warn('⚠️ Mes inválido, saltando:', mes);
+            continue;
+        }
+        
         // Filtrar evaluaciones del mes
         const evaluacionesMes = evaluaciones.filter(evalItem => {
             const fecha = obtenerFechaEvaluacion(evalItem);
@@ -4599,84 +4891,79 @@ async function calcularIndicadoresPorMes(evaluaciones, mesesData) {
             continue;
         }
         
+        // ========== CALCULAR INDICADORES ==========
         const totalEval = evaluacionesMes.length;
-        const promedioRawENC = (evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalENC), 0) / totalEval).toFixed(1);
-        const promedioRawECUF = (evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalECUF), 0) / totalEval).toFixed(1);
-        const promedioRawECN = (evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalECN), 0) / totalEval).toFixed(1);
-        const porcentajes = calcularPromediosMotivosPorcentaje(evaluacionesMes);
-        const pctPromedioMotivoENC = Math.round(Number(porcentajes.promedioENC));
-        const pctPromedioMotivoECUF = Math.round(Number(porcentajes.promedioECUF));
-        const pctPromedioMotivoECN = Math.round(Number(porcentajes.promedioECN));
-        const matrizDominante = obtenerMatrizDominante(evaluacionesMes);
-        const encDetalleText = matrizDominante ? `${promedioRawENC}/${matrizDominante.pesos.ENC} pts` : `${promedioRawENC} pts`;
-        const ecufDetalleText = matrizDominante ? `${promedioRawECUF}/${matrizDominante.pesos.ECUF} pts` : `${promedioRawECUF} pts`;
-        const ecnDetalleText = matrizDominante ? `${promedioRawECN}/${matrizDominante.pesos.ECN} pts` : `${promedioRawECN} pts`;
-        const sumaNotas = evaluacionesMes.reduce((sum, evalItem) => {
-            const fecha = obtenerFechaEvaluacion(evalItem);
-            const matriz = getMatrizByFecha(fecha);
-            const notaPorcentaje = calcularNotaPorcentaje(evalItem, matriz.pesos);
-            return sum + (isNaN(notaPorcentaje) ? 0 : notaPorcentaje);
-        }, 0);
+        
+        // Promedio General
+        const sumaNotas = evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.notaFinal || e.nota_final), 0);
         const promedioGeneral = totalEval > 0 ? (sumaNotas / totalEval).toFixed(1) : '0.0';
         
-        // ========== % LLAMADAS CON NOTA < 85% ==========
+        // Promedios RAW por motivo
+        const sumENC = evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalENC || e.total_enc), 0);
+        const sumECUF = evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalECUF || e.total_ecuf), 0);
+        const sumECN = evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalECN || e.total_ecn), 0);
+        
+        const promedioRawENC = totalEval > 0 ? (sumENC / totalEval).toFixed(1) : '0.0';
+        const promedioRawECUF = totalEval > 0 ? (sumECUF / totalEval).toFixed(1) : '0.0';
+        const promedioRawECN = totalEval > 0 ? (sumECN / totalEval).toFixed(1) : '0.0';
+        
+        // % Llamadas con nota < 85%
         let quiebres = 0;
         for (const evalItem of evaluacionesMes) {
-            const fecha = obtenerFechaEvaluacion(evalItem);
-            const matriz = getMatrizByFecha(fecha);
-            const notaPorcentaje = calcularNotaPorcentaje(evalItem, matriz.pesos);
-            if (notaPorcentaje < 85) quiebres++;
+            const nota = numeroSeguro(evalItem.notaFinal || evalItem.nota_final);
+            if (nota < 85) quiebres++;
         }
-        const pctQuiebres = totalEval > 0 ? ((quiebres / totalEval) * 100).toFixed(1) : 0;
+        const pctQuiebres = totalEval > 0 ? ((quiebres / totalEval) * 100).toFixed(1) : '0.0';
         
-        // ========== MOTIVOS DE IMPACTO (según matriz de cada evaluación) ==========
+        // Motivos de impacto (según matriz de cada evaluación)
         let conENC = 0, conECUF = 0, conECN = 0;
         for (const evalItem of evaluacionesMes) {
             const fecha = obtenerFechaEvaluacion(evalItem);
             const matriz = getMatrizByFecha(fecha);
             const pesos = matriz.pesos;
             
-            if ((evalItem.totalENC || 0) < pesos.ENC) conENC++;
-            if ((evalItem.totalECUF || 0) < pesos.ECUF) conECUF++;
-            if ((evalItem.totalECN || 0) < pesos.ECN) conECN++;
+            if (numeroSeguro(evalItem.totalENC || evalItem.total_enc) < pesos.ENC) conENC++;
+            if (numeroSeguro(evalItem.totalECUF || evalItem.total_ecuf) < pesos.ECUF) conECUF++;
+            if (numeroSeguro(evalItem.totalECN || evalItem.total_ecn) < pesos.ECN) conECN++;
         }
         
-        const pctENC = totalEval > 0 ? ((conENC / totalEval) * 100).toFixed(1) : 0;
-        const pctECUF = totalEval > 0 ? ((conECUF / totalEval) * 100).toFixed(1) : 0;
-        const pctECN = totalEval > 0 ? ((conECN / totalEval) * 100).toFixed(1) : 0;
+        const pctENC = totalEval > 0 ? ((conENC / totalEval) * 100).toFixed(1) : '0.0';
+        const pctECUF = totalEval > 0 ? ((conECUF / totalEval) * 100).toFixed(1) : '0.0';
+        const pctECN = totalEval > 0 ? ((conECN / totalEval) * 100).toFixed(1) : '0.0';
         
-        // ========== PROMEDIO POR MOTIVO (convertido a porcentaje según matriz) ==========
+        // Promedio porcentual por motivo (según matriz)
         let sumaPctENC = 0, sumaPctECUF = 0, sumaPctECN = 0;
         for (const evalItem of evaluacionesMes) {
             const fecha = obtenerFechaEvaluacion(evalItem);
             const matriz = getMatrizByFecha(fecha);
             const pesos = matriz.pesos;
             
-            const pctENC = Math.min(((evalItem.totalENC || 0) / pesos.ENC) * 100, 100);
-            const pctECUF = Math.min(((evalItem.totalECUF || 0) / pesos.ECUF) * 100, 100);
-            const pctECN = Math.min(((evalItem.totalECN || 0) / pesos.ECN) * 100, 100);
+            const pctENC = Math.min((numeroSeguro(evalItem.totalENC || evalItem.total_enc) / pesos.ENC) * 100, 100);
+            const pctECUF = Math.min((numeroSeguro(evalItem.totalECUF || evalItem.total_ecuf) / pesos.ECUF) * 100, 100);
+            const pctECN = Math.min((numeroSeguro(evalItem.totalECN || evalItem.total_ecn) / pesos.ECN) * 100, 100);
             
             sumaPctENC += pctENC;
             sumaPctECUF += pctECUF;
             sumaPctECN += pctECN;
         }
         
-        const promedioENC = (sumaPctENC / totalEval).toFixed(1);
-        const promedioECUF = (sumaPctECUF / totalEval).toFixed(1);
-        const promedioECN = (sumaPctECN / totalEval).toFixed(1);
+        const promedioENC = totalEval > 0 ? (sumaPctENC / totalEval).toFixed(1) : '0.0';
+        const promedioECUF = totalEval > 0 ? (sumaPctECUF / totalEval).toFixed(1) : '0.0';
+        const promedioECN = totalEval > 0 ? (sumaPctECN / totalEval).toFixed(1) : '0.0';
         
-        // ========== TOTAL GESTORES ÚNICOS ==========
+        // Total gestores únicos
         const gestoresSet = new Set();
         evaluacionesMes.forEach(e => { if (e.agente) gestoresSet.add(e.agente); });
         const totalGestores = gestoresSet.size;
         
-        // ========== RANKING Y CUARTILES ==========
+        // Ranking y cuartiles
         const ranking = await construirRankingAgentes(evaluacionesMes);
         const q1 = ranking.filter(a => a.cuartil === 'Q1').length;
         const q2 = ranking.filter(a => a.cuartil === 'Q2').length;
         const q3 = ranking.filter(a => a.cuartil === 'Q3').length;
         const q4 = ranking.filter(a => a.cuartil === 'Q4').length;
         
+        // 🔴 ASIGNAR TODAS LAS VARIABLES CORRECTAMENTE
         resultados[mes.clave] = {
             totalEval: totalEval,
             totalGestores: totalGestores,
@@ -4695,22 +4982,39 @@ async function calcularIndicadoresPorMes(evaluaciones, mesesData) {
         };
     }
     
+    console.log(`✅ Indicadores calculados para ${Object.keys(resultados).length} meses`);
     return resultados;
 }
 
 // ======================================================
-// Generar HTML de la tabla evolutiva
-// ======================================================
-// ======================================================
-// GENERAR HTML DE LA TABLA EVOLUTIVA (COMPLETO)
+// GENERAR HTML DE LA TABLA EVOLUTIVA (COMPLETA CON VALIDACIONES)
 // ======================================================
 function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
-    // Filtrar meses con datos
-    const mesesValidos = mesesData.filter(m => indicadoresPorMes[m.clave] !== null);
+    console.log('📊 generarHTMLTablaEvolutiva - INICIO');
     
-    if (mesesValidos.length === 0) {
+    // 🔴 VALIDACIÓN ROBUSTA
+    if (!mesesData || !Array.isArray(mesesData) || mesesData.length === 0) {
+        console.log('⚠️ mesesData inválido o vacío');
         return '<div style="text-align: center; padding: 40px;">📊 No hay datos suficientes</div>';
     }
+    
+    if (!indicadoresPorMes || typeof indicadoresPorMes !== 'object') {
+        console.log('⚠️ indicadoresPorMes inválido');
+        return '<div style="text-align: center; padding: 40px;">📊 No hay datos de indicadores</div>';
+    }
+    
+    // Filtrar meses con datos
+    const mesesValidos = mesesData.filter(m => {
+        if (!m || !m.clave) return false;
+        return indicadoresPorMes[m.clave] !== null && indicadoresPorMes[m.clave] !== undefined;
+    });
+    
+    if (mesesValidos.length === 0) {
+        console.log('⚠️ No hay meses válidos con datos');
+        return '<div style="text-align: center; padding: 40px;">📊 No hay datos suficientes</div>';
+    }
+    
+    console.log(`📊 ${mesesValidos.length} meses válidos para la tabla`);
     
     // 🔵 FECHA DE CAMBIO DE MATRIZ: 1 de junio 2026
     const FECHA_CAMBIO = new Date(2026, 5, 1);
@@ -4776,7 +5080,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                 gap: 5px;
                 font-size: 12px;
             ">
-                🔵 Mar - May: <strong>ENC 30 | ECUF 30 | ECN 70</strong>
+                🔵 Mar - May: <strong>ENC 30 | ECUF 30 | ECN 40</strong>
                 <span style="font-size: 10px; color: #6c757d; font-weight: 400;">(ANTERIOR)</span>
             </span>
             <span style="
@@ -4892,59 +5196,11 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                                 ${generarFilaConTendenciaGlobal('promedioGeneral', mesesValidos, indicadoresPorMes, true, 1)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.promedioGeneral.color}">${tendencias.promedioGeneral.icono} ${tendencias.promedioGeneral.texto}</td>
                             </tr>
-                            <!--
-                            <tr>                                
-                                <td style="padding: 8px;"><strong>⚠️ % Llamadas con NOTA &lt; 85%</strong></td>
-                                ${generarFilaConTendenciaGlobal('pctQuiebres', mesesValidos, indicadoresPorMes, true, 1)}
-                                <td style="padding: 8px; text-align: center; ${tendencias.pctQuiebres.color}">${tendencias.pctQuiebres.icono} ${tendencias.pctQuiebres.texto}</td>
-                            </tr>
-                            -->
                         </tbody>
                     </table>
                 </div>
             </div>
             
-            <!-- ====================================================== -->
-            <!-- SECCIÓN MOTIVOS DE IMPACTO -->
-            <!-- ====================================================== -->
-            <!--
-            <div class="indicador-seccion" data-seccion="motivos" style="margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
-                <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 18px;">🎯</span>
-                        <strong>MOTIVOS DE IMPACTO</strong>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <span style="font-size: 11px;">ENC:${ultimosValores.pctENC || 0}% | ECUF:${ultimosValores.pctECUF || 0}% | ECN:${ultimosValores.pctECN || 0}%</span>
-                        <span class="indicador-expand" style="font-size: 12px;">▼</span>
-                    </div>
-                </div>
-                <div class="indicador-contenido" style="display: none; padding: 15px; overflow-x: auto;">
-                    <table style="width: 100%; min-width: 600px; font-size: 12px; border-collapse: collapse;">
-                        <thead>
-                            <tr><th style="text-align: left; padding: 8px;">Indicador</th>${headers}<th style="padding: 8px; text-align: center;">Tendencia</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr style="border-bottom: 1px solid #e0e0e0;">
-                                <td style="padding: 8px;"><strong>🎯 % Llamadas con ENC &lt; 30</strong></td>
-                                ${generarFilaConTendenciaGlobal('pctENC', mesesValidos, indicadoresPorMes, true, 1)}
-                                <td style="padding: 8px; text-align: center; ${tendencias.pctENC.color}">${tendencias.pctENC.icono} ${tendencias.pctENC.texto}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #e0e0e0;">
-                                <td style="padding: 8px;"><strong>⚠️ % Llamadas con ECUF &lt; 30</strong></td>
-                                ${generarFilaConTendenciaGlobal('pctECUF', mesesValidos, indicadoresPorMes, true, 1)}
-                                <td style="padding: 8px; text-align: center; ${tendencias.pctECUF.color}">${tendencias.pctECUF.icono} ${tendencias.pctECUF.texto}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px;"><strong>💰 % Llamadas con ECN &lt; 40</strong></td>
-                                ${generarFilaConTendenciaGlobal('pctECN', mesesValidos, indicadoresPorMes, true, 1)}
-                                <td style="padding: 8px; text-align: center; ${tendencias.pctECN.color}">${tendencias.pctECN.icono} ${tendencias.pctECN.texto}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            -->
             <!-- ====================================================== -->
             <!-- SECCIÓN NOTA PROMEDIO POR MOTIVO -->
             <!-- ====================================================== -->
@@ -4952,7 +5208,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                 <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 18px;">📊</span>
-                        <strong>NOTA PROMEDIO POR MOTIVO</strong>
+                        <strong>NOTA PROMEDIO POR FRENTE DE IMPACTO</strong>
                     </div>
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <span style="font-size: 11px;">ENC:${ultimosValores.promedioENC || 0}% | ECUF:${ultimosValores.promedioECUF || 0}% | ECN:${ultimosValores.promedioECN || 0}%</span>
@@ -4986,7 +5242,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
             </div>
             
             <!-- ====================================================== -->
-            <!-- SECCIÓN DISTRIBUCIÓN POR CUARTILES -->
+            <!-- SECCIÓN DISTRIBUCIÓN POR CATEGORIA -->
             <!-- ====================================================== -->
             <div class="indicador-seccion" data-seccion="cuartiles" style="margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
                 <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
@@ -5290,6 +5546,7 @@ function exportarIndicadoresCSV() {
 // Actualizar tabla evolutiva desde reportes
 // ======================================================
 async function actualizarTablaEvolutivaIndicadores() {
+    // 🔴 USAR LAS EVALUACIONES FILTRADAS, NO LAS GLOBALES
     const evaluacionesFiltradas = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
     if (evaluacionesFiltradas.length === 0) return;
     
@@ -5531,152 +5788,157 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
     // ===== FIN FUNCIÓN: generarGraficosReportes =============================
     
-        // ===== 7. INICIO FUNCIÓN: generarGraficoGestionLlamadas (VERSIÓN HORIZONTAL Y FORZADA) =====
+    // ===== 7. INICIO FUNCIÓN: generarGraficoGestionLlamadas (VERSIÓN CON PERÍODO) =====
     let chartGestionLlamadas = null;
-    function generarGraficoGestionLlamadas(evaluacionesFiltradas) {
-        console.log('📞 generarGraficoGestionLlamadas (Horizontal forzado) - Iniciando...');
 
-        const canvas = document.getElementById('chartGestionLlamadas');
-        if (!canvas) {
-            console.error('❌ Canvas chartGestionLlamadas no encontrado');
-            return;
+function generarGraficoGestionLlamadas(evaluacionesFiltradas, periodo) {
+    console.log('📞 generarGraficoGestionLlamadas - INICIANDO...');
+    console.log(`   Período recibido: ${periodo}`);
+
+    const canvas = document.getElementById('chartGestionLlamadas');
+    if (!canvas) {
+        console.error('❌ Canvas chartGestionLlamadas no encontrado');
+        return;
+    }
+
+    // 🔴 DESTRUIR GRÁFICO EXISTENTE
+    if (chartGestionLlamadas) {
+        try {
+            chartGestionLlamadas.destroy();
+            chartGestionLlamadas = null;
+            console.log('✅ Gráfico chartGestionLlamadas destruido');
+        } catch (e) {
+            console.warn('Error destruyendo gráfico:', e);
         }
+    }
 
-        // 1. Destruir gráfico existente
-        if (chartGestionLlamadas) {
-            try {
-                chartGestionLlamadas.destroy();
-                chartGestionLlamadas = null;
-            } catch (e) {
-                console.warn('Error destruyendo gráfico:', e);
-            }
-        }
+    // 2. Validar datos
+    if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
+        console.warn('⚠️ No hay evaluaciones filtradas para el gráfico');
+        mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
+        return;
+    }
 
-        // 2. Validar datos
-        if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
-            console.warn('⚠️ No hay evaluaciones filtradas para el gráfico');
-            mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
-            return;
-        }
+    // 🔴 DETERMINAR PERÍODO EFECTIVO - MANEJA TODOS LOS CASOS
+    let periodoEfectivo = periodo || 'mes';
+    console.log(`   Período inicial: ${periodoEfectivo}`);
+    
+    if (periodoEfectivo === 'todos') {
+        periodoEfectivo = 'mes';
+        console.log('   "todos" → "mes"');
+    }
+    
+    if (periodoEfectivo === 'rango') {
+        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        if (tipoRango === 'mes') periodoEfectivo = 'mes';
+        else if (tipoRango === 'trimestre') periodoEfectivo = 'trimestre';
+        else if (tipoRango === 'anio') periodoEfectivo = 'anio';
+        else if (tipoRango === 'dia') periodoEfectivo = 'dia';
+        else periodoEfectivo = 'mes';
+        console.log(`   Rango mapeado a: ${periodoEfectivo}`);
+    }
+    
+    if (periodoEfectivo === 'multiples') {
+        const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+        if (tipoMultiples === 'mes') periodoEfectivo = 'mes';
+        else if (tipoMultiples === 'trimestre') periodoEfectivo = 'trimestre';
+        else if (tipoMultiples === 'anio') periodoEfectivo = 'anio';
+        else if (tipoMultiples === 'dia') periodoEfectivo = 'dia';
+        else periodoEfectivo = 'mes';
+        console.log(`   Múltiples mapeado a: ${periodoEfectivo}`);
+    }
+    
+    console.log(`   Período EFECTIVO final: ${periodoEfectivo}`);
 
-        // 3. Agrupar los datos por mes
-        const periodo = 'mes';
-        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
+    // 3. Agrupar los datos por el período efectivo
+    const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodoEfectivo);
 
-        if (datosAgrupados.length === 0) {
-            mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
-            return;
-        }
+    if (datosAgrupados.length === 0) {
+        mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
+        return;
+    }
 
-        // 4. Preparar los datos
-        const labels = datosAgrupados.map(item => item.label);
-        
-        // Arrays para almacenar cantidades reales
-        const cantidadesCompletas = [];
-        const cantidadesIncompletas = [];
-        
-        // Arrays para porcentajes (lo que se grafica)
-        const dataCompletas = datosAgrupados.map(item => {
-            const totalPeriodo = item.evaluaciones.length;
-            if (totalPeriodo === 0) return 0;
-            const completas = item.evaluaciones.filter(e => (e.notaFinal || 0) >= 85).length;
-            cantidadesCompletas.push(completas);
-            cantidadesIncompletas.push(totalPeriodo - completas);
-            return Math.round((completas / totalPeriodo) * 100);
-        });
+    // 4. Preparar los datos
+    const labels = datosAgrupados.map(item => item.label);
+    
+    const cantidadesCompletas = [];
+    const cantidadesIncompletas = [];
+    
+    const dataCompletas = datosAgrupados.map(item => {
+        const totalPeriodo = item.evaluaciones.length;
+        if (totalPeriodo === 0) return 0;
+        const completas = item.evaluaciones.filter(e => (e.notaFinal || 0) >= 85).length;
+        cantidadesCompletas.push(completas);
+        cantidadesIncompletas.push(totalPeriodo - completas);
+        return Math.round((completas / totalPeriodo) * 100);
+    });
 
-        const dataIncompletas = datosAgrupados.map((item, idx) => {
-            const totalPeriodo = item.evaluaciones.length;
-            if (totalPeriodo === 0) return 0;
-            const incompletas = cantidadesIncompletas[idx];
-            return Math.round((incompletas / totalPeriodo) * 100);
-        });
+    const dataIncompletas = datosAgrupados.map((item, idx) => {
+        const totalPeriodo = item.evaluaciones.length;
+        if (totalPeriodo === 0) return 0;
+        const incompletas = cantidadesIncompletas[idx];
+        return Math.round((incompletas / totalPeriodo) * 100);
+    });
 
-        // 5. Configurar el gráfico
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+    // 5. Configurar el gráfico
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-        canvas.width = canvas.clientWidth;
-        canvas.height = canvas.clientHeight;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        chartGestionLlamadas = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: '✅ Gestionadas (≥85%)',
-                        data: dataCompletas,
-                        backgroundColor: 'rgba(26, 127, 55, 0.85)',
-                        borderColor: '#1a7f37',
-                        borderWidth: 2,
-                        borderRadius: 8,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8,
-                        stack: 'gestion'
-                    },
-                    {
-                        label: '❌ No gestionadas (<85%)',
-                        data: dataIncompletas,
-                        backgroundColor: 'rgba(217, 48, 37, 0.85)',
-                        borderColor: '#d93025',
-                        borderWidth: 2,
-                        borderRadius: 8,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8,
-                        stack: 'gestion'
-                    }
-                ]
+    chartGestionLlamadas = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '✅ Gestionadas (≥85%)',
+                    data: dataCompletas,
+                    backgroundColor: 'rgba(26, 127, 55, 0.85)',
+                    borderColor: '#1a7f37',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8,
+                    stack: 'gestion'
+                },
+                {
+                    label: '❌ No gestionadas (<85%)',
+                    data: dataIncompletas,
+                    backgroundColor: 'rgba(217, 48, 37, 0.85)',
+                    borderColor: '#d93025',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8,
+                    stack: 'gestion'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                layout: {
-                    padding: {
-                        top: 25,  // Espacio extra arriba para que no se corten las etiquetas
-                        bottom: 10
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                let label = context.dataset.label || '';
-                                let porcentaje = context.raw;
-                                const idx = context.dataIndex;
-                                let cantidadReal = 0;
-                                let totalPeriodo = datosAgrupados[idx].evaluaciones.length;
-                                
-                                if (context.dataset.label.includes('Gestionadas')) {
-                                    cantidadReal = cantidadesCompletas[idx];
-                                } else {
-                                    cantidadReal = cantidadesIncompletas[idx];
-                                }
-                                
-                                return `${label}: ${porcentaje}% (${cantidadReal} de ${totalPeriodo} llamadas)`;
-                            }
-                        }
-                    },
-                    legend: {
-                        position: 'bottom',
-                        labels: { font: { size: 11, weight: 'bold' }, usePointStyle: true }
-                    },
-                    datalabels: {
-                        // 🔴 ANCLAJE: 'end' para ponerlo al final de la barra (horizontal)
-                        anchor: 'end',
-                        align: 'end',
-                        offset: 8,  // Separación de la barra
-                        
-                        formatter: function (value, context) {
-                            if (value === 0) return '';
-                            
+            layout: {
+                padding: {
+                    top: 25,
+                    bottom: 10
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            let porcentaje = context.raw;
                             const idx = context.dataIndex;
                             let cantidadReal = 0;
+                            let totalPeriodo = datosAgrupados[idx].evaluaciones.length;
                             
                             if (context.dataset.label.includes('Gestionadas')) {
                                 cantidadReal = cantidadesCompletas[idx];
@@ -5684,87 +5946,110 @@ async function actualizarTablaEvolutivaIndicadores() {
                                 cantidadReal = cantidadesIncompletas[idx];
                             }
                             
-                            // 🔴 FORMATO HORIZONTAL: "75% (15)"
-                            return `${value}% (${cantidadReal})`;
-                        },
-                        backgroundColor: function (context) {
-                            // Fondo con opacidad para mejor legibilidad
-                            return context.dataset.label.includes('Gestionadas') ? '#1a7f37' : '#d93025';
-                        },
-                        borderRadius: 12,
-                        padding: { left: 8, right: 8, top: 3, bottom: 3 },
-                        color: 'white',
-                        font: { 
-                            weight: 'bold', 
-                            size: 10,
-                            family: 'system-ui, monospace'
-                        },
-                        // 🔴 FORZAR VISUALIZACIÓN SIEMPRE (incluso en barras pequeñas)
-                        // Esto se logra con 'clip: false' y ajustando el offset
-                        clip: false
+                            return `${label}: ${porcentaje}% (${cantidadReal} de ${totalPeriodo} llamadas)`;
+                        }
                     }
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        title: {
-                            display: true,
-                            text: 'Porcentaje de Llamadas (%)',
-                            color: 'var(--muted)',
-                            font: { weight: 'bold', size: 11 }
-                        },
-                        grid: { display: false },
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            },
-                            stepSize: 20,
-                            color: '#555'
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { size: 11, weight: 'bold' }, usePointStyle: true }
+                },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'end',
+                    offset: 8,
+                    formatter: function (value, context) {
+                        if (value === 0) return '';
+                        
+                        const idx = context.dataIndex;
+                        let cantidadReal = 0;
+                        
+                        if (context.dataset.label.includes('Gestionadas')) {
+                            cantidadReal = cantidadesCompletas[idx];
+                        } else {
+                            cantidadReal = cantidadesIncompletas[idx];
                         }
+                        
+                        return `${value}% (${cantidadReal})`;
                     },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Mes',
-                            color: 'var(--muted)',
-                            font: { weight: 'bold', size: 11 }
+                    backgroundColor: function (context) {
+                        return context.dataset.label.includes('Gestionadas') ? '#1a7f37' : '#d93025';
+                    },
+                    borderRadius: 12,
+                    padding: { left: 8, right: 8, top: 3, bottom: 3 },
+                    color: 'white',
+                    font: { 
+                        weight: 'bold', 
+                        size: 10,
+                        family: 'system-ui, monospace'
+                    },
+                    clip: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Porcentaje de Llamadas (%)',
+                        color: 'var(--muted)',
+                        font: { weight: 'bold', size: 11 }
+                    },
+                    grid: { display: false },
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
                         },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45,
-                            autoSkip: true,
-                            maxTicksLimit: 12,
-                            color: '#555'
-                        },
-                        grid: { display: false }
+                        stepSize: 20,
+                        color: '#555'
                     }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: periodoEfectivo === 'mes' ? 'Mes' : 
+                              (periodoEfectivo === 'trimestre' ? 'Trimestre' : 
+                              (periodoEfectivo === 'anio' ? 'Año' : 
+                              (periodoEfectivo === 'dia' ? 'Día' : 'Período'))),
+                        color: 'var(--muted)',
+                        font: { weight: 'bold', size: 11 }
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 12,
+                        color: '#555'
+                    },
+                    grid: { display: false }
                 }
             }
-        });
-
-        // 6. Actualizar el texto de información
-        let sumaCompletasPct = 0, sumaIncompletasPct = 0;
-        let totalCompletasAbs = 0, totalIncompletasAbs = 0;
-        
-        for (let i = 0; i < datosAgrupados.length; i++) {
-            sumaCompletasPct += dataCompletas[i];
-            sumaIncompletasPct += dataIncompletas[i];
-            totalCompletasAbs += cantidadesCompletas[i];
-            totalIncompletasAbs += cantidadesIncompletas[i];
         }
-        
-        const promedioCompletas = (sumaCompletasPct / datosAgrupados.length).toFixed(1);
-        const promedioIncompletas = (sumaIncompletasPct / datosAgrupados.length).toFixed(1);
-        const totalGeneral = totalCompletasAbs + totalIncompletasAbs;
-        
-        const infoDiv = document.getElementById('gestionLlamadasInfo');
-        if (infoDiv) {
-            infoDiv.innerHTML = `📊 Total: ${totalGeneral} llamadas | ✅ Completas: ${totalCompletasAbs} (${promedioCompletas}% promedio) | ❌ Incompletas: ${totalIncompletasAbs} (${promedioIncompletas}% promedio)`;
-        }
+    });
 
-        console.log('✅ Gráfico Gestión de Llamadas (horizontal forzado) actualizado');
+    // 6. Actualizar el texto de información
+    let sumaCompletasPct = 0, sumaIncompletasPct = 0;
+    let totalCompletasAbs = 0, totalIncompletasAbs = 0;
+    
+    for (let i = 0; i < datosAgrupados.length; i++) {
+        sumaCompletasPct += dataCompletas[i];
+        sumaIncompletasPct += dataIncompletas[i];
+        totalCompletasAbs += cantidadesCompletas[i];
+        totalIncompletasAbs += cantidadesIncompletas[i];
     }
+    
+    const promedioCompletas = (sumaCompletasPct / datosAgrupados.length).toFixed(1);
+    const promedioIncompletas = (sumaIncompletasPct / datosAgrupados.length).toFixed(1);
+    const totalGeneral = totalCompletasAbs + totalIncompletasAbs;
+    
+    const infoDiv = document.getElementById('gestionLlamadasInfo');
+    if (infoDiv) {
+        infoDiv.innerHTML = `📊 Total: ${totalGeneral} llamadas | ✅ Completas: ${totalCompletasAbs} (${promedioCompletas}% promedio) | ❌ Incompletas: ${totalIncompletasAbs} (${promedioIncompletas}% promedio)`;
+    }
+
+    console.log(`✅ Gráfico Gestión de Llamadas actualizado (período: ${periodoEfectivo})`);
+}
     // ===== FIN FUNCIÓN: generarGraficoGestionLlamadas =======================
     
     // ===== 8. INICIO FUNCIÓN: generarEvolutivoAudiosAgrupado ===============
@@ -5801,6 +6086,10 @@ async function actualizarTablaEvolutivaIndicadores() {
             }
             return;
         }
+
+        // 🔴 USAR EL PERÍODO RECIBIDO (YA VIENE DE aplicarFiltroReportes)
+        const periodoEfectivo = periodo || 'mes';
+        console.log(`📊 Generando gráfico de audios con período: ${periodoEfectivo}`);
 
         const labels = datosAgrupados.map(item => item.label);
         const dataCantidad = datosAgrupados.map(item => item.count);
@@ -5897,7 +6186,13 @@ async function actualizarTablaEvolutivaIndicadores() {
                         ticks: { callback: (v) => Math.round(v) + '%', stepSize: 20, color: '#d93025' }
                     },
                     x: {
-                        title: { display: true, text: periodo === 'dia' ? 'Fecha (Día)' : (periodo === 'semana' ? 'Semana' : (periodo === 'mes' ? 'Mes' : (periodo === 'trimestre' ? 'Trimestre' : 'Año'))) },
+                        title: { 
+                            display: true, 
+                            text: periodoEfectivo === 'dia' ? 'Fecha (Día)' : 
+                                (periodoEfectivo === 'semana' ? 'Semana' : 
+                                (periodoEfectivo === 'mes' ? 'Mes' : 
+                                (periodoEfectivo === 'trimestre' ? 'Trimestre' : 'Año'))) 
+                        },
                         ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 12 },
                         grid: { display: false }
                     }
@@ -5908,9 +6203,10 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
     // ===== FIN FUNCIÓN: generarEvolutivoAudiosAgrupado ======================
 
-        // ===== 9. INICIO FUNCIÓN: generarDistribucionRangosAgrupado (CON LEYENDA INTERACTIVA MEJORADA) =====
-    function generarDistribucionRangosAgrupado(evaluacionesFiltradas) {
-        console.log('🔵 generarDistribucionRangosAgrupado - CON LEYENDA INTERACTIVA MEJORADA');
+    // ===== 9. INICIO FUNCIÓN: generarDistribucionRangosAgrupado (VERSIÓN CON PERÍODO) =====
+    function generarDistribucionRangosAgrupado(evaluacionesFiltradas, periodo) {
+        console.log('🔵 generarDistribucionRangosAgrupado - INICIANDO...');
+        console.log(`   Período recibido: ${periodo}`);
 
         const canvasId = 'chartDistribucionRangos';
         const canvas = document.getElementById(canvasId);
@@ -5919,15 +6215,15 @@ async function actualizarTablaEvolutivaIndicadores() {
             return;
         }
 
-        // 1. Destruir gráfico existente
+        // 🔴 DESTRUIR GRÁFICO EXISTENTE
         if (window.chartDistribucionRangos && typeof window.chartDistribucionRangos.destroy === 'function') {
             try {
                 window.chartDistribucionRangos.destroy();
+                window.chartDistribucionRangos = null;
                 console.log('✅ Gráfico chartDistribucionRangos destruido');
             } catch (e) {
                 console.warn('Error destruyendo gráfico:', e);
             }
-            window.chartDistribucionRangos = null;
         }
 
         // 2. Validar datos
@@ -5937,9 +6233,42 @@ async function actualizarTablaEvolutivaIndicadores() {
             return;
         }
 
-        // 3. Agrupar los datos por mes
-        const periodo = 'mes';
-        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
+        // 🔴 DETERMINAR PERÍODO EFECTIVO - MANEJA TODOS LOS CASOS
+        let periodoEfectivo = periodo || 'mes';
+        console.log(`   Período inicial: ${periodoEfectivo}`);
+        
+        // Si es 'todos', usar 'mes'
+        if (periodoEfectivo === 'todos') {
+            periodoEfectivo = 'mes';
+            console.log('   "todos" → "mes"');
+        }
+        
+        // Si es 'rango', obtener el subtipo
+        if (periodoEfectivo === 'rango') {
+            const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+            if (tipoRango === 'mes') periodoEfectivo = 'mes';
+            else if (tipoRango === 'trimestre') periodoEfectivo = 'trimestre';
+            else if (tipoRango === 'anio') periodoEfectivo = 'anio';
+            else if (tipoRango === 'dia') periodoEfectivo = 'dia';
+            else periodoEfectivo = 'mes';
+            console.log(`   Rango mapeado a: ${periodoEfectivo}`);
+        }
+        
+        // Si es 'multiples', obtener el subtipo
+        if (periodoEfectivo === 'multiples') {
+            const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+            if (tipoMultiples === 'mes') periodoEfectivo = 'mes';
+            else if (tipoMultiples === 'trimestre') periodoEfectivo = 'trimestre';
+            else if (tipoMultiples === 'anio') periodoEfectivo = 'anio';
+            else if (tipoMultiples === 'dia') periodoEfectivo = 'dia';
+            else periodoEfectivo = 'mes';
+            console.log(`   Múltiples mapeado a: ${periodoEfectivo}`);
+        }
+        
+        console.log(`   Período EFECTIVO final: ${periodoEfectivo}`);
+
+        // 3. Agrupar los datos por el período efectivo
+        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodoEfectivo);
 
         if (datosAgrupados.length === 0) {
             mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
@@ -5954,7 +6283,6 @@ async function actualizarTablaEvolutivaIndicadores() {
         const cantidadesRegular = [];
         const cantidadesCritico = [];
         
-        // Totales acumulados para la leyenda
         let totalExcelente = 0, totalBien = 0, totalRegular = 0, totalCritico = 0;
         let sumaExcelentePct = 0, sumaBienPct = 0, sumaRegularPct = 0, sumaCriticoPct = 0;
         
@@ -6008,7 +6336,7 @@ async function actualizarTablaEvolutivaIndicadores() {
         const promedioRegular = (sumaRegularPct / datosAgrupados.length).toFixed(1);
         const promedioCritico = (sumaCriticoPct / datosAgrupados.length).toFixed(1);
 
-        // 5. Configurar el gráfico con leyenda personalizada
+        // 5. Configurar el gráfico
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
@@ -6105,16 +6433,13 @@ async function actualizarTablaEvolutivaIndicadores() {
                             }
                         }
                     },
-                    // 🔴 CLAVE: Personalizar la leyenda para mostrar cantidad + porcentaje
                     legend: {
                         position: 'bottom',
                         labels: {
-                            // Esta función personaliza el texto de cada elemento de la leyenda
                             generateLabels: function(chart) {
                                 const datasets = chart.data.datasets;
                                 const labels = [];
                                 
-                                // Datos acumulados para mostrar en la leyenda
                                 const totals = {
                                     '🏆 Excelente (97-100%)': { cantidad: totalExcelente, pct: promedioExcelente },
                                     '📈 Bueno (90-96%)': { cantidad: totalBien, pct: promedioBien },
@@ -6137,7 +6462,6 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     });
                                 }
                                 
-                                // Agregar item de total general al final
                                 labels.push({
                                     text: `📊 TOTAL: ${totalGeneral} llamadas`,
                                     fillStyle: 'transparent',
@@ -6160,7 +6484,6 @@ async function actualizarTablaEvolutivaIndicadores() {
                             boxHeight: 16
                         },
                         onClick: function(e, legendItem, legend) {
-                            // 🔴 Mantener la funcionalidad de mostrar/ocultar datasets
                             if (legendItem.datasetIndex !== undefined && legendItem.datasetIndex !== null) {
                                 const ci = legend.chart;
                                 const meta = ci.getDatasetMeta(legendItem.datasetIndex);
@@ -6240,7 +6563,10 @@ async function actualizarTablaEvolutivaIndicadores() {
                     x: {
                         title: {
                             display: true,
-                            text: 'Mes',
+                            text: periodoEfectivo === 'mes' ? 'Mes' : 
+                                (periodoEfectivo === 'trimestre' ? 'Trimestre' : 
+                                (periodoEfectivo === 'anio' ? 'Año' : 
+                                (periodoEfectivo === 'dia' ? 'Día' : 'Período'))),
                             color: 'var(--muted)',
                             font: { weight: 'bold', size: 11 }
                         },
@@ -6259,17 +6585,20 @@ async function actualizarTablaEvolutivaIndicadores() {
             }
         });
 
-        console.log('✅ Gráfico Distribución de Rangos (con leyenda interactiva mejorada) actualizado');
+        console.log(`✅ Gráfico Distribución de Rangos actualizado (período: ${periodoEfectivo})`);
         console.log(`📊 Totales - Excelente: ${totalExcelente} (${promedioExcelente}%), Bueno: ${totalBien} (${promedioBien}%), Regular: ${totalRegular} (${promedioRegular}%), Crítico: ${totalCritico} (${promedioCritico}%)`);
-    }// ===== FIN FUNCIÓN: generarDistribucionRangosAgrupado ===================
+    }
+// ===== FIN FUNCIÓN: generarDistribucionRangosAgrupado ===================
     
-        // ===== 10. INICIO FUNCIÓN: generarEvolutivoAtributosAgrupado (SIN LÍNEAS DE FONDO) =====
+    // ===== 10. INICIO FUNCIÓN: generarEvolutivoAtributosAgrupado (SIN LÍNEAS DE FONDO) =====
     function generarEvolutivoAtributosAgrupado(evaluacionesParam, datosAgrupados, periodo) {
         console.log('📊 generarEvolutivoAtributosAgrupado - INICIANDO...');
-        console.log(`📊 Período recibido: ${periodo}`);
         
         const canvas = document.getElementById('chartEvolutivoAtributos');
-        if (!canvas) return;
+        if (!canvas) {
+            console.error('❌ Canvas chartEvolutivoAtributos no encontrado');
+            return;
+        }
 
         let evaluaciones = evaluacionesParam;
         if (!evaluaciones || evaluaciones.length === 0) {
@@ -6281,17 +6610,27 @@ async function actualizarTablaEvolutivaIndicadores() {
             return;
         }
         
+        // 🔴 USAR EL PERÍODO RECIBIDO O EL SELECCIONADO
+        let periodoEfectivo = periodo || filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
+        console.log(`📊 Período para atributos: ${periodoEfectivo}`);
+        
+        // 🔴 SOLO SI ES 'todos', usar 'mes'
+        if (periodoEfectivo === 'todos') {
+            periodoEfectivo = 'mes';
+            console.log('📊 "todos" seleccionado, usando "mes" para atributos');
+        }
+        
+        // 🔴 NO FORZAR 'mes' SI EL USUARIO SELECCIONÓ 'dia'
+        console.log(`📊 Usando período: ${periodoEfectivo}`);
+        
         if (!datosAgrupados || datosAgrupados.length === 0) {
-            const periodoCalculado = (periodo === 'dia' || !periodo) ? 'mes' : periodo;
-            datosAgrupados = agruparEvaluacionesPorPeriodo(evaluaciones, periodoCalculado);
+            datosAgrupados = agruparEvaluacionesPorPeriodo(evaluaciones, periodoEfectivo);
         }
         
         if (datosAgrupados.length === 0) {
             mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
             return;
         }
-
-        const periodoEfectivo = (periodo === 'dia' || !periodo) ? 'mes' : periodo;
 
         const fallasPorAtributo = {};
         evaluaciones.forEach(evalItem => {
@@ -6420,7 +6759,6 @@ async function actualizarTablaEvolutivaIndicadores() {
                             color: 'var(--muted)',
                             font: { weight: 'bold', size: 11 }
                         },
-                        // 🔴 ELIMINAR LÍNEAS DE FONDO DEL EJE Y
                         grid: { 
                             display: false,
                             drawBorder: true
@@ -6443,7 +6781,6 @@ async function actualizarTablaEvolutivaIndicadores() {
                             autoSkip: true,
                             color: '#555'
                         },
-                        // 🔴 ELIMINAR LÍNEAS DE FONDO DEL EJE X
                         grid: { 
                             display: false
                         } 
@@ -6820,8 +7157,15 @@ async function actualizarTablaEvolutivaIndicadores() {
 
         // 3. Determinar el período a usar
         let periodoEfectivo = periodo || filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
-        if (periodoEfectivo === 'dia') periodoEfectivo = 'mes';
+        console.log(`📊 Período para cuartiles: ${periodoEfectivo}`);
         
+        // 🔴 SOLO SI ES 'todos', usar 'mes'
+        if (periodoEfectivo === 'todos') {
+            periodoEfectivo = 'mes';
+            console.log('📊 "todos" seleccionado, usando "mes" para cuartiles');
+        }
+        
+        // 🔴 NO FORZAR 'mes' SI EL USUARIO SELECCIONÓ 'dia'
         console.log(`📊 Usando período: ${periodoEfectivo}`);
 
         // 4. Agrupar evaluaciones por período (si no se pasaron datosAgrupados)
@@ -6901,25 +7245,21 @@ async function actualizarTablaEvolutivaIndicadores() {
         const labels = periodosOrdenados.map(item => item.label);
 
         // 5. Preparar datos para los 4 cuartiles (Q1, Q2, Q3, Q4)
-        // Arrays para almacenar cantidades reales
         const cantidadesQ1 = [];
         const cantidadesQ2 = [];
         const cantidadesQ3 = [];
         const cantidadesQ4 = [];
         
-        // Arrays para porcentajes (lo que se grafica)
         const dataQ1 = [];
         const dataQ2 = [];
         const dataQ3 = [];
         const dataQ4 = [];
         
-        // Totales acumulados para la leyenda
         let totalQ1 = 0, totalQ2 = 0, totalQ3 = 0, totalQ4 = 0;
         let sumaQ1Pct = 0, sumaQ2Pct = 0, sumaQ3Pct = 0, sumaQ4Pct = 0;
 
         for (const periodoData of periodosOrdenados) {
             if (periodoData.evaluaciones.length > 0) {
-                // Construir ranking para este período específico
                 const rankingPeriodo = await construirRankingAgentes(periodoData.evaluaciones);
                 
                 const q1 = rankingPeriodo.filter(a => a.cuartil === 'Q1').length;
@@ -7017,7 +7357,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                         stack: 'cuartiles'
                     },
                     {
-                        label: '🔴 Q4 (Crítico)',
+                        label: '🔴 Q4 (Riesgo)',
                         data: dataQ4,
                         backgroundColor: '#d93025',
                         borderColor: '#d93025',
@@ -7156,7 +7496,6 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     break;
                             }
                             
-                            // Mostrar formato: "75% (15)"
                             return `${value}% (${cantidadReal})`;
                         },
                         backgroundColor: function (context) {
@@ -7250,284 +7589,243 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
     // ===== FIN FUNCIÓN: mostrarMensajeSinDatosEnCanvasCuartiles =============
     
-    // ===== 15. INICIO FUNCIÓN: generarGraficoComparativaAgrupado (VERSIÓN SIN TOTAL EN LEYENDA) =====
-    async function generarGraficoComparativaAgrupado(evaluacionesFiltradas) {
-        console.log('📊 generarGraficoComparativaAgrupado - VERSIÓN EVOLUTIVA POR MESES');
+    // ===== 15. INICIO FUNCIÓN: generarGraficoComparativaAgrupado (VERSIÓN CON PERÍODO) =====
+    async function generarGraficoComparativaAgrupado(evaluacionesFiltradas, periodo) {
+    console.log('📊 generarGraficoComparativaAgrupado - INICIANDO...');
+    console.log(`   Período recibido: ${periodo}`);
 
-        const canvas = document.getElementById('chartComparativa');
-        if (!canvas) {
-            console.error('❌ Canvas chartComparativa no encontrado');
-            return;
-        }
+    const canvas = document.getElementById('chartComparativa');
+    if (!canvas) {
+        console.error('❌ Canvas chartComparativa no encontrado');
+        return;
+    }
 
-        // 1. Destruir gráfico existente
-        if (window.chartComparativa) {
-            try {
-                if (typeof window.chartComparativa.destroy === 'function') {
-                    window.chartComparativa.destroy();
-                }
-            } catch (e) { }
-            window.chartComparativa = null;
-        }
-
-        // 2. Validar datos
-        if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
-            console.warn('⚠️ No hay evaluaciones filtradas');
-            mostrarMensajeSinDatosEnCanvasComparativa(canvas, '📊 No hay datos en el período seleccionado');
-            return;
-        }
-
-        // 3. Agrupar por mes
-        const periodo = 'mes';
-        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
-
-        if (datosAgrupados.length === 0) {
-            mostrarMensajeSinDatosEnCanvasComparativa(canvas, '📊 No hay datos en el período seleccionado');
-            return;
-        }
-
-        // 4. Para cada período, calcular el desempeño por cuartil (promedio de nota)
-        const labels = datosAgrupados.map(item => item.label);
-        
-        // Arrays para almacenar los datos por período
-        const dataQ1 = [];
-        const dataQ2 = [];
-        const dataQ3 = [];
-        const dataQ4 = [];
-        
-        // Arrays para almacenar cantidades de gestores por cuartil
-        const cantidadesQ1 = [];
-        const cantidadesQ2 = [];
-        const cantidadesQ3 = [];
-        const cantidadesQ4 = [];
-        
-        // Promedios mensuales para la leyenda
-        let sumaQ1Mensual = 0, sumaQ2Mensual = 0, sumaQ3Mensual = 0, sumaQ4Mensual = 0;
-        let sumaPromedioQ1 = 0, sumaPromedioQ2 = 0, sumaPromedioQ3 = 0, sumaPromedioQ4 = 0;
-
-        for (const periodoData of datosAgrupados) {
-            if (periodoData.evaluaciones.length > 0) {
-                // Construir ranking para este período específico
-                const rankingPeriodo = await construirRankingAgentes(periodoData.evaluaciones);
-                
-                // Calcular promedios por cuartil
-                const q1Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q1');
-                const q2Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q2');
-                const q3Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q3');
-                const q4Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q4');
-                
-                const promedioQ1 = q1Agentes.length > 0 
-                    ? Math.round(q1Agentes.reduce((sum, a) => sum + a.promedio, 0) / q1Agentes.length * 10) / 10
-                    : 0;
-                const promedioQ2 = q2Agentes.length > 0 
-                    ? Math.round(q2Agentes.reduce((sum, a) => sum + a.promedio, 0) / q2Agentes.length * 10) / 10
-                    : 0;
-                const promedioQ3 = q3Agentes.length > 0 
-                    ? Math.round(q3Agentes.reduce((sum, a) => sum + a.promedio, 0) / q3Agentes.length * 10) / 10
-                    : 0;
-                const promedioQ4 = q4Agentes.length > 0 
-                    ? Math.round(q4Agentes.reduce((sum, a) => sum + a.promedio, 0) / q4Agentes.length * 10) / 10
-                    : 0;
-                
-                dataQ1.push(promedioQ1);
-                dataQ2.push(promedioQ2);
-                dataQ3.push(promedioQ3);
-                dataQ4.push(promedioQ4);
-                
-                const cantidadQ1 = q1Agentes.length;
-                const cantidadQ2 = q2Agentes.length;
-                const cantidadQ3 = q3Agentes.length;
-                const cantidadQ4 = q4Agentes.length;
-                
-                cantidadesQ1.push(cantidadQ1);
-                cantidadesQ2.push(cantidadQ2);
-                cantidadesQ3.push(cantidadQ3);
-                cantidadesQ4.push(cantidadQ4);
-                
-                // Acumular para promedios mensuales
-                sumaQ1Mensual += cantidadQ1;
-                sumaQ2Mensual += cantidadQ2;
-                sumaQ3Mensual += cantidadQ3;
-                sumaQ4Mensual += cantidadQ4;
-                sumaPromedioQ1 += promedioQ1;
-                sumaPromedioQ2 += promedioQ2;
-                sumaPromedioQ3 += promedioQ3;
-                sumaPromedioQ4 += promedioQ4;
-            } else {
-                dataQ1.push(0);
-                dataQ2.push(0);
-                dataQ3.push(0);
-                dataQ4.push(0);
-                cantidadesQ1.push(0);
-                cantidadesQ2.push(0);
-                cantidadesQ3.push(0);
-                cantidadesQ4.push(0);
+    // 🔴 DESTRUIR GRÁFICO EXISTENTE - MÁS ROBUSTO
+    if (window.chartComparativa) {
+        try {
+            if (typeof window.chartComparativa.destroy === 'function') {
+                window.chartComparativa.destroy();
+                window.chartComparativa = null;
+                console.log('✅ Gráfico chartComparativa destruido');
+            }
+        } catch (e) {
+            console.warn('Error destruyendo gráfico:', e);
+            // Forzar limpieza del canvas
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         }
-
-        const totalMeses = datosAgrupados.length;
-        
-        // Promedio mensual de gestores por cuartil
-        const promedioMensualQ1 = totalMeses > 0 ? Math.round(sumaQ1Mensual / totalMeses) : 0;
-        const promedioMensualQ2 = totalMeses > 0 ? Math.round(sumaQ2Mensual / totalMeses) : 0;
-        const promedioMensualQ3 = totalMeses > 0 ? Math.round(sumaQ3Mensual / totalMeses) : 0;
-        const promedioMensualQ4 = totalMeses > 0 ? Math.round(sumaQ4Mensual / totalMeses) : 0;
-        
-        // Promedio de notas por cuartil en todo el período
-        const promedioNotaQ1 = totalMeses > 0 ? (sumaPromedioQ1 / totalMeses).toFixed(1) : 0;
-        const promedioNotaQ2 = totalMeses > 0 ? (sumaPromedioQ2 / totalMeses).toFixed(1) : 0;
-        const promedioNotaQ3 = totalMeses > 0 ? (sumaPromedioQ3 / totalMeses).toFixed(1) : 0;
-        const promedioNotaQ4 = totalMeses > 0 ? (sumaPromedioQ4 / totalMeses).toFixed(1) : 0;
-
-        // 5. Configurar el gráfico
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
+    }
+    
+    // 🔴 FORZAR LIMPIEZA DEL CANVAS POR SI QUEDA ALGO
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
         canvas.width = canvas.clientWidth;
         canvas.height = canvas.clientHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
 
-        window.chartComparativa = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: '🏆 Q1 (Excelente)',
-                        data: dataQ1,
-                        backgroundColor: '#1a7f37',
-                        borderColor: '#1a7f37',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    },
-                    {
-                        label: '📈 Q2 (Bueno)',
-                        data: dataQ2,
-                        backgroundColor: '#019DF4',
-                        borderColor: '#019DF4',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    },
-                    {
-                        label: '⚠️ Q3 (Regular)',
-                        data: dataQ3,
-                        backgroundColor: '#f39c12',
-                        borderColor: '#f39c12',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    },
-                    {
-                        label: '🔴 Q4 (Crítico)',
-                        data: dataQ4,
-                        backgroundColor: '#d93025',
-                        borderColor: '#d93025',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: {
-                    padding: {
-                        top: 25,
-                        bottom: 10
-                    }
+    // 2. Validar datos
+    if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
+        console.warn('⚠️ No hay evaluaciones filtradas');
+        mostrarMensajeSinDatosEnCanvasComparativa(canvas, '📊 No hay datos en el período seleccionado');
+        return;
+    }
+
+    // 🔴 DETERMINAR PERÍODO EFECTIVO - MANEJA TODOS LOS CASOS
+    let periodoEfectivo = periodo || 'mes';
+    console.log(`   Período inicial: ${periodoEfectivo}`);
+    
+    if (periodoEfectivo === 'todos') {
+        periodoEfectivo = 'mes';
+        console.log('   "todos" → "mes"');
+    }
+    
+    if (periodoEfectivo === 'rango') {
+        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        if (tipoRango === 'mes') periodoEfectivo = 'mes';
+        else if (tipoRango === 'trimestre') periodoEfectivo = 'trimestre';
+        else if (tipoRango === 'anio') periodoEfectivo = 'anio';
+        else if (tipoRango === 'dia') periodoEfectivo = 'dia';
+        else periodoEfectivo = 'mes';
+        console.log(`   Rango mapeado a: ${periodoEfectivo}`);
+    }
+    
+    if (periodoEfectivo === 'multiples') {
+        const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+        if (tipoMultiples === 'mes') periodoEfectivo = 'mes';
+        else if (tipoMultiples === 'trimestre') periodoEfectivo = 'trimestre';
+        else if (tipoMultiples === 'anio') periodoEfectivo = 'anio';
+        else if (tipoMultiples === 'dia') periodoEfectivo = 'dia';
+        else periodoEfectivo = 'mes';
+        console.log(`   Múltiples mapeado a: ${periodoEfectivo}`);
+    }
+    
+    console.log(`   Período EFECTIVO final: ${periodoEfectivo}`);
+
+    // 3. Agrupar por el período efectivo
+    const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodoEfectivo);
+
+    if (datosAgrupados.length === 0) {
+        mostrarMensajeSinDatosEnCanvasComparativa(canvas, '📊 No hay datos en el período seleccionado');
+        return;
+    }
+
+    // 4. Para cada período, calcular el desempeño por cuartil
+    const labels = datosAgrupados.map(item => item.label);
+    
+    const dataQ1 = [];
+    const dataQ2 = [];
+    const dataQ3 = [];
+    const dataQ4 = [];
+    
+    const cantidadesQ1 = [];
+    const cantidadesQ2 = [];
+    const cantidadesQ3 = [];
+    const cantidadesQ4 = [];
+    
+    let sumaQ1Mensual = 0, sumaQ2Mensual = 0, sumaQ3Mensual = 0, sumaQ4Mensual = 0;
+    let sumaPromedioQ1 = 0, sumaPromedioQ2 = 0, sumaPromedioQ3 = 0, sumaPromedioQ4 = 0;
+
+    for (const periodoData of datosAgrupados) {
+        if (periodoData.evaluaciones.length > 0) {
+            const rankingPeriodo = await construirRankingAgentes(periodoData.evaluaciones);
+            
+            const q1Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q1');
+            const q2Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q2');
+            const q3Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q3');
+            const q4Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q4');
+            
+            const promedioQ1 = q1Agentes.length > 0 
+                ? Math.round(q1Agentes.reduce((sum, a) => sum + a.promedio, 0) / q1Agentes.length * 10) / 10
+                : 0;
+            const promedioQ2 = q2Agentes.length > 0 
+                ? Math.round(q2Agentes.reduce((sum, a) => sum + a.promedio, 0) / q2Agentes.length * 10) / 10
+                : 0;
+            const promedioQ3 = q3Agentes.length > 0 
+                ? Math.round(q3Agentes.reduce((sum, a) => sum + a.promedio, 0) / q3Agentes.length * 10) / 10
+                : 0;
+            const promedioQ4 = q4Agentes.length > 0 
+                ? Math.round(q4Agentes.reduce((sum, a) => sum + a.promedio, 0) / q4Agentes.length * 10) / 10
+                : 0;
+            
+            dataQ1.push(promedioQ1);
+            dataQ2.push(promedioQ2);
+            dataQ3.push(promedioQ3);
+            dataQ4.push(promedioQ4);
+            
+            const cantidadQ1 = q1Agentes.length;
+            const cantidadQ2 = q2Agentes.length;
+            const cantidadQ3 = q3Agentes.length;
+            const cantidadQ4 = q4Agentes.length;
+            
+            cantidadesQ1.push(cantidadQ1);
+            cantidadesQ2.push(cantidadQ2);
+            cantidadesQ3.push(cantidadQ3);
+            cantidadesQ4.push(cantidadQ4);
+            
+            sumaQ1Mensual += cantidadQ1;
+            sumaQ2Mensual += cantidadQ2;
+            sumaQ3Mensual += cantidadQ3;
+            sumaQ4Mensual += cantidadQ4;
+            sumaPromedioQ1 += promedioQ1;
+            sumaPromedioQ2 += promedioQ2;
+            sumaPromedioQ3 += promedioQ3;
+            sumaPromedioQ4 += promedioQ4;
+        } else {
+            dataQ1.push(0);
+            dataQ2.push(0);
+            dataQ3.push(0);
+            dataQ4.push(0);
+            cantidadesQ1.push(0);
+            cantidadesQ2.push(0);
+            cantidadesQ3.push(0);
+            cantidadesQ4.push(0);
+        }
+    }
+
+    const totalPeriodos = datosAgrupados.length;
+    
+    const promedioMensualQ1 = totalPeriodos > 0 ? Math.round(sumaQ1Mensual / totalPeriodos) : 0;
+    const promedioMensualQ2 = totalPeriodos > 0 ? Math.round(sumaQ2Mensual / totalPeriodos) : 0;
+    const promedioMensualQ3 = totalPeriodos > 0 ? Math.round(sumaQ3Mensual / totalPeriodos) : 0;
+    const promedioMensualQ4 = totalPeriodos > 0 ? Math.round(sumaQ4Mensual / totalPeriodos) : 0;
+    
+    const promedioNotaQ1 = totalPeriodos > 0 ? (sumaPromedioQ1 / totalPeriodos).toFixed(1) : 0;
+    const promedioNotaQ2 = totalPeriodos > 0 ? (sumaPromedioQ2 / totalPeriodos).toFixed(1) : 0;
+    const promedioNotaQ3 = totalPeriodos > 0 ? (sumaPromedioQ3 / totalPeriodos).toFixed(1) : 0;
+    const promedioNotaQ4 = totalPeriodos > 0 ? (sumaPromedioQ4 / totalPeriodos).toFixed(1) : 0;
+
+    // 5. Configurar el gráfico
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    window.chartComparativa = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '🏆 Q1 (Excelente)',
+                    data: dataQ1,
+                    backgroundColor: '#1a7f37',
+                    borderColor: '#1a7f37',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8
                 },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                const label = context.dataset.label || '';
-                                const promedio = context.raw;
-                                const idx = context.dataIndex;
-                                let cantidadGestores = 0;
-                                
-                                switch(context.dataset.label) {
-                                    case '🏆 Q1 (Excelente)':
-                                        cantidadGestores = cantidadesQ1[idx];
-                                        break;
-                                    case '📈 Q2 (Bueno)':
-                                        cantidadGestores = cantidadesQ2[idx];
-                                        break;
-                                    case '⚠️ Q3 (Regular)':
-                                        cantidadGestores = cantidadesQ3[idx];
-                                        break;
-                                    case '🔴 Q4 (Riesgo)':
-                                        cantidadGestores = cantidadesQ4[idx];
-                                        break;
-                                }
-                                
-                                return `${label}: ${promedio}% (${cantidadGestores} gestor(es))`;
-                            }
-                        }
-                    },
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            // 🔴 LEYENDA CORREGIDA - SIN TOTAL DE GESTORES
-                            generateLabels: function(chart) {
-                                const datasets = chart.data.datasets;
-                                const labels = [];
-                                
-                                // Datos: promedio mensual de gestores por cuartil
-                                const infoPorCuartil = [
-                                    { label: '🏆 Q1 (Excelente)', cantidad: promedioMensualQ1, nota: promedioNotaQ1, color: '#1a7f37' },
-                                    { label: '📈 Q2 (Bueno)', cantidad: promedioMensualQ2, nota: promedioNotaQ2, color: '#019DF4' },
-                                    { label: '⚠️ Q3 (Regular)', cantidad: promedioMensualQ3, nota: promedioNotaQ3, color: '#f39c12' },
-                                    { label: '🔴 Q4 (Riesgo)', cantidad: promedioMensualQ4, nota: promedioNotaQ4, color: '#d93025' }
-                                ];
-                                
-                                for (let i = 0; i < datasets.length; i++) {
-                                    const dataset = datasets[i];
-                                    const info = infoPorCuartil[i];
-                                    
-                                    labels.push({
-                                        text: `${info.label} — ${info.cantidad} gestores/mes (${info.nota}% promedio)`,
-                                        fillStyle: dataset.backgroundColor,
-                                        strokeStyle: dataset.borderColor,
-                                        lineWidth: dataset.borderWidth,
-                                        hidden: chart.getDatasetMeta(i).hidden,
-                                        index: i,
-                                        datasetIndex: i
-                                    });
-                                }
-                                
-                                // 🔴 ELIMINADA LA LÍNEA DEL TOTAL DE GESTORES
-                                
-                                return labels;
-                            },
-                            font: { size: 11, weight: 'normal' },
-                            padding: 10,
-                            usePointStyle: false,
-                            boxWidth: 16,
-                            boxHeight: 16
-                        },
-                        onClick: function(e, legendItem, legend) {
-                            if (legendItem.datasetIndex !== undefined && legendItem.datasetIndex !== null) {
-                                const ci = legend.chart;
-                                const meta = ci.getDatasetMeta(legendItem.datasetIndex);
-                                meta.hidden = meta.hidden === null ? !ci.data.datasets[legendItem.datasetIndex].hidden : null;
-                                ci.update();
-                            }
-                        }
-                    },
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'top',
-                        offset: 8,
-                        formatter: function (value, context) {
-                            if (value === 0) return '';
-                            
+                {
+                    label: '📈 Q2 (Bueno)',
+                    data: dataQ2,
+                    backgroundColor: '#019DF4',
+                    borderColor: '#019DF4',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8
+                },
+                {
+                    label: '⚠️ Q3 (Regular)',
+                    data: dataQ3,
+                    backgroundColor: '#f39c12',
+                    borderColor: '#f39c12',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8
+                },
+                {
+                    label: '🔴 Q4 (Riesgo)',
+                    data: dataQ4,
+                    backgroundColor: '#d93025',
+                    borderColor: '#d93025',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: {
+                    top: 25,
+                    bottom: 10
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const label = context.dataset.label || '';
+                            const promedio = context.raw;
                             const idx = context.dataIndex;
                             let cantidadGestores = 0;
                             
@@ -7546,73 +7844,147 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     break;
                             }
                             
-                            return `${value}% (${cantidadGestores})`;
-                        },
-                        backgroundColor: function (context) {
-                            const colores = {
-                                '🏆 Q1 (Excelente)': '#1a7f37',
-                                '📈 Q2 (Bueno)': '#019DF4',
-                                '⚠️ Q3 (Regular)': '#f39c12',
-                                '🔴 Q4 (Riesgo)': '#d93025'
-                            };
-                            return colores[context.dataset.label] || '#666';
-                        },
-                        borderRadius: 12,
-                        padding: { left: 8, right: 8, top: 3, bottom: 3 },
-                        color: 'white',
-                        font: { 
-                            weight: 'bold', 
-                            size: 10,
-                            family: 'system-ui, monospace'
-                        },
-                        clip: false
+                            return `${label}: ${promedio}% (${cantidadGestores} gestor(es))`;
+                        }
                     }
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        title: {
-                            display: true,
-                            text: 'Nota Promedio del Cuartil (%)',
-                            color: 'var(--muted)',
-                            font: { weight: 'bold', size: 11 }
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        generateLabels: function(chart) {
+                            const datasets = chart.data.datasets;
+                            const labels = [];
+                            
+                            const infoPorCuartil = [
+                                { label: '🏆 Q1 (Excelente)', cantidad: promedioMensualQ1, nota: promedioNotaQ1, color: '#1a7f37' },
+                                { label: '📈 Q2 (Bueno)', cantidad: promedioMensualQ2, nota: promedioNotaQ2, color: '#019DF4' },
+                                { label: '⚠️ Q3 (Regular)', cantidad: promedioMensualQ3, nota: promedioNotaQ3, color: '#f39c12' },
+                                { label: '🔴 Q4 (Riesgo)', cantidad: promedioMensualQ4, nota: promedioNotaQ4, color: '#d93025' }
+                            ];
+                            
+                            for (let i = 0; i < datasets.length; i++) {
+                                const dataset = datasets[i];
+                                const info = infoPorCuartil[i];
+                                
+                                labels.push({
+                                    text: `${info.label} — ${info.cantidad} gestores/${periodoEfectivo === 'mes' ? 'mes' : 'período'} (${info.nota}% promedio)`,
+                                    fillStyle: dataset.backgroundColor,
+                                    strokeStyle: dataset.borderColor,
+                                    lineWidth: dataset.borderWidth,
+                                    hidden: chart.getDatasetMeta(i).hidden,
+                                    index: i,
+                                    datasetIndex: i
+                                });
+                            }
+                            
+                            return labels;
                         },
-                        grid: { 
-                            display: false
-                        },
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            },
-                            stepSize: 20,
-                            color: '#555'
-                        }
+                        font: { size: 11, weight: 'normal' },
+                        padding: 10,
+                        usePointStyle: false,
+                        boxWidth: 16,
+                        boxHeight: 16
                     },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Mes',
-                            color: 'var(--muted)',
-                            font: { weight: 'bold', size: 11 }
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45,
-                            autoSkip: true,
-                            maxTicksLimit: 12,
-                            color: '#555'
-                        },
-                        grid: { 
-                            display: false
+                    onClick: function(e, legendItem, legend) {
+                        if (legendItem.datasetIndex !== undefined && legendItem.datasetIndex !== null) {
+                            const ci = legend.chart;
+                            const meta = ci.getDatasetMeta(legendItem.datasetIndex);
+                            meta.hidden = meta.hidden === null ? !ci.data.datasets[legendItem.datasetIndex].hidden : null;
+                            ci.update();
                         }
                     }
+                },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    offset: 8,
+                    formatter: function (value, context) {
+                        if (value === 0) return '';
+                        
+                        const idx = context.dataIndex;
+                        let cantidadGestores = 0;
+                        
+                        switch(context.dataset.label) {
+                            case '🏆 Q1 (Excelente)':
+                                cantidadGestores = cantidadesQ1[idx];
+                                break;
+                            case '📈 Q2 (Bueno)':
+                                cantidadGestores = cantidadesQ2[idx];
+                                break;
+                            case '⚠️ Q3 (Regular)':
+                                cantidadGestores = cantidadesQ3[idx];
+                                break;
+                            case '🔴 Q4 (Riesgo)':
+                                cantidadGestores = cantidadesQ4[idx];
+                                break;
+                        }
+                        
+                        return `${value}% (${cantidadGestores})`;
+                    },
+                    backgroundColor: function (context) {
+                        const colores = {
+                            '🏆 Q1 (Excelente)': '#1a7f37',
+                            '📈 Q2 (Bueno)': '#019DF4',
+                            '⚠️ Q3 (Regular)': '#f39c12',
+                            '🔴 Q4 (Riesgo)': '#d93025'
+                        };
+                        return colores[context.dataset.label] || '#666';
+                    },
+                    borderRadius: 12,
+                    padding: { left: 8, right: 8, top: 3, bottom: 3 },
+                    color: 'white',
+                    font: { 
+                        weight: 'bold', 
+                        size: 10,
+                        family: 'system-ui, monospace'
+                    },
+                    clip: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Nota Promedio del Cuartil (%)',
+                        color: 'var(--muted)',
+                        font: { weight: 'bold', size: 11 }
+                    },
+                    grid: { display: false },
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        },
+                        stepSize: 20,
+                        color: '#555'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: periodoEfectivo === 'mes' ? 'Mes' : 
+                              (periodoEfectivo === 'trimestre' ? 'Trimestre' : 
+                              (periodoEfectivo === 'anio' ? 'Año' : 
+                              (periodoEfectivo === 'dia' ? 'Día' : 'Período'))),
+                        color: 'var(--muted)',
+                        font: { weight: 'bold', size: 11 }
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 12,
+                        color: '#555'
+                    },
+                    grid: { display: false }
                 }
             }
-        });
+        }
+    });
 
-        console.log(`✅ Gráfico Comparativa de Desempeño por Cuartiles (evolutivo por meses) actualizado`);
-    }
+    console.log(`✅ Gráfico Comparativa de Desempeño por Cuartiles actualizado (período: ${periodoEfectivo})`);
+}
     // ===== FIN FUNCIÓN: generarGraficoComparativaAgrupado ===================
     
     // ===== 16. INICIO FUNCIÓN: mostrarMensajeSinDatosEnCanvasComparativa ====
@@ -7639,340 +8011,370 @@ async function actualizarTablaEvolutivaIndicadores() {
     // ===== FIN FUNCIÓN: mostrarMensajeSinDatosEnCanvasComparativa ===========
     
     // ===== 17. INICIO FUNCIÓN: renderizarEvolutivoConDatosFiltrados =========
-    async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null) {
-        console.log('📊 renderizarEvolutivoConDatosFiltrados - FUNCIÓN UNIFICADA');
+    async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, periodoParam = null) {
+    console.log('📊 renderizarEvolutivoConDatosFiltrados - FUNCIÓN UNIFICADA');
+    console.log(`   periodoParam recibido: ${periodoParam}`);
 
-        const canvas = document.getElementById('chartEvolutivoFrentes');
-        if (!canvas) {
-            console.error('❌ Canvas chartEvolutivoFrentes no encontrado');
-            return;
+    const canvas = document.getElementById('chartEvolutivoFrentes');
+    if (!canvas) {
+        console.error('❌ Canvas chartEvolutivoFrentes no encontrado');
+        return;
+    }
+
+    // 🔴 OBTENER EVALUACIONES
+    let evaluacionesFiltradas;
+    if (evaluacionesParam !== null) {
+        evaluacionesFiltradas = evaluacionesParam;
+        console.log(`📊 Usando evaluaciones pasadas como parámetro: ${evaluacionesFiltradas.length}`);
+    } else {
+        evaluacionesFiltradas = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
+        console.log(`📊 Usando evaluaciones de window: ${evaluacionesFiltradas.length}`);
+    }
+
+    // Destruir gráfico existente
+    if (window.chartEvolutivo && typeof window.chartEvolutivo.destroy === 'function') {
+        try {
+            window.chartEvolutivo.destroy();
+            console.log('✅ Gráfico chartEvolutivo destruido');
+        } catch (e) {
+            console.warn('Error destruyendo gráfico:', e);
         }
+        window.chartEvolutivo = null;
+    }
 
-        // 🔴 OBTENER EVALUACIONES: si se pasó parámetro, usarlo; si no, usar las filtradas globales
-        let evaluacionesFiltradas;
-        if (evaluacionesParam !== null) {
-            evaluacionesFiltradas = evaluacionesParam;
-            console.log(`📊 Usando evaluaciones pasadas como parámetro: ${evaluacionesFiltradas.length}`);
-        } else {
-            // Priorizar evaluaciones filtradas globales, luego todas las globales
-            evaluacionesFiltradas = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
-            console.log(`📊 Usando evaluaciones de window: ${evaluacionesFiltradas.length}`);
-        }
-
-        // Destruir gráfico existente de forma segura
-        if (window.chartEvolutivo && typeof window.chartEvolutivo.destroy === 'function') {
-            try {
-                window.chartEvolutivo.destroy();
-                console.log('✅ Gráfico chartEvolutivo destruido');
-            } catch (e) {
-                console.warn('Error destruyendo gráfico:', e);
-            }
-            window.chartEvolutivo = null;
-        }
-
-        // Verificar si hay evaluaciones
-        if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
-            console.warn('⚠️ No hay evaluaciones para mostrar en el gráfico evolutivo');
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                canvas.width = canvas.clientWidth;
-                canvas.height = canvas.clientHeight;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.font = '14px sans-serif';
-                ctx.fillStyle = '#6c757d';
-                ctx.textAlign = 'center';
-                ctx.fillText('📊 No hay evaluaciones para mostrar', canvas.width / 2, canvas.height / 2);
-            }
-            return;
-        }
-
-        // Obtener el período actual (día, semana, mes, trimestre, año)
-        let periodo = filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
-        // Forzar meses por defecto para este evolutivo (específico de notas por motivos)
-        if (!periodo || periodo === 'dia') periodo = 'mes';
-        console.log(`📊 Agrupando ${evaluacionesFiltradas.length} evaluaciones por período: ${periodo}`);
-
-        // Agrupar evaluaciones por el período seleccionado
-        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
-
-        if (datosAgrupados.length === 0) {
-            console.warn('⚠️ No hay datos agrupados para el período seleccionado');
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                canvas.width = canvas.clientWidth;
-                canvas.height = canvas.clientHeight;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.font = '14px sans-serif';
-                ctx.fillStyle = '#6c757d';
-                ctx.textAlign = 'center';
-                ctx.fillText('📊 No hay datos para el período seleccionado', canvas.width / 2, canvas.height / 2);
-            }
-            return;
-        }
-
-        // Extraer etiquetas para el eje X
-        const labels = datosAgrupados.map(item => item.label);
-
-        // 🔴 UNIFORME: Usar matrices dinámicas en lugar de hardcodes
-        const matrizDominante = obtenerMatrizDominante(datosAgrupados.flatMap(d => d.evaluaciones || []));
-        const pesos = matrizDominante ? matrizDominante.pesos : { ENC: 30, ECUF: 30, ECN: 40 };
-        
-        // Calcular porcentajes de cada frente (ENC, ECUF, ECN) usando pesos dinámicos
-        const dataCliente = datosAgrupados.map(item => Math.round((parseFloat(item.promedioENC) / pesos.ENC) * 100));
-        const dataNegocio = datosAgrupados.map(item => Math.round((parseFloat(item.promedioECUF) / pesos.ECUF) * 100));
-        const dataProceso = datosAgrupados.map(item => Math.round((parseFloat(item.promedioECN) / pesos.ECN) * 100));
-
-        // Calcular escala dinámica del eje Y para mejor visualización
-        const todosValores = [...dataCliente, ...dataNegocio, ...dataProceso];
-        const minValor = Math.min(...todosValores);
-        const maxValor = Math.max(...todosValores);
-        let yMin = Math.max(0, minValor - 5);
-        let yMax = Math.min(100, maxValor + 5);
-
-        // Ajustar escala si el rango es muy pequeño
-        if (yMax - yMin < 15) {
-            const centro = (yMin + yMax) / 2;
-            yMin = Math.max(0, centro - 10);
-            yMax = Math.min(100, centro + 10);
-        }
-
-        // Determinar el step size según el rango
-        let stepSize = 5;
-        const rango = yMax - yMin;
-        if (rango <= 10) stepSize = 2;
-        else if (rango <= 20) stepSize = 5;
-        else if (rango <= 40) stepSize = 10;
-        else stepSize = 20;
-
-        // Líneas de meta (85% y 90%)
-        const lineaMeta85 = new Array(datosAgrupados.length).fill(85);
-        const lineaMeta90 = new Array(datosAgrupados.length).fill(90);
-
-        // Determinar título del eje X según el período
-        let xTitle = 'Período';
-        if (periodo === 'dia') xTitle = 'Fecha (Día/Mes)';
-        else if (periodo === 'semana') xTitle = 'Semana';
-        else if (periodo === 'mes') xTitle = 'Mes';
-        else if (periodo === 'trimestre') xTitle = 'Trimestre';
-        else if (periodo === 'anio') xTitle = 'Año';
-
-        // Obtener el contexto del canvas
+    // Verificar si hay evaluaciones
+    if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
+        console.warn('⚠️ No hay evaluaciones para mostrar en el gráfico evolutivo');
         const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        if (ctx) {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '14px sans-serif';
+            ctx.fillStyle = '#6c757d';
+            ctx.textAlign = 'center';
+            ctx.fillText('📊 No hay evaluaciones para mostrar', canvas.width / 2, canvas.height / 2);
+        }
+        return;
+    }
 
-        // Limpiar el canvas antes de dibujar
-        canvas.width = canvas.clientWidth;
-        canvas.height = canvas.clientHeight;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 🔴 OBTENER EL PERÍODO CORRECTO - CON MAPEO DE 'rango'
+    let periodo = periodoParam || filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
+    console.log(`   Período inicial: ${periodo}`);
+    
+    // 🔴 MAPEAR 'rango' A SU SUBTIPO
+    if (periodo === 'rango') {
+        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        console.log(`   Rango detectado, tipo: ${tipoRango}`);
+        if (tipoRango === 'mes') periodo = 'mes';
+        else if (tipoRango === 'trimestre') periodo = 'trimestre';
+        else if (tipoRango === 'anio') periodo = 'anio';
+        else if (tipoRango === 'dia') periodo = 'dia';
+        else periodo = 'mes';
+        console.log(`   Rango mapeado a: ${periodo}`);
+    }
+    
+    // 🔴 MAPEAR 'multiples' A SU SUBTIPO
+    if (periodo === 'multiples') {
+        const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+        console.log(`   Múltiples detectado, tipo: ${tipoMultiples}`);
+        if (tipoMultiples === 'mes') periodo = 'mes';
+        else if (tipoMultiples === 'trimestre') periodo = 'trimestre';
+        else if (tipoMultiples === 'anio') periodo = 'anio';
+        else if (tipoMultiples === 'dia') periodo = 'dia';
+        else periodo = 'mes';
+        console.log(`   Múltiples mapeado a: ${periodo}`);
+    }
+    
+    // Si es 'todos', usar 'mes'
+    if (periodo === 'todos') {
+        periodo = 'mes';
+        console.log('   "todos" → "mes"');
+    }
+    
+    console.log(`   Período FINAL para agrupar: ${periodo}`);
 
-        // Crear el nuevo gráfico
-        window.chartEvolutivo = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: '🎯 ENC - Cliente (30%)',
-                        data: dataCliente,
-                        borderColor: '#019DF4',
-                        backgroundColor: 'rgba(1, 157, 244, 0.08)',
-                        borderWidth: 3,
-                        tension: 0.2,
-                        fill: true,
-                        pointBackgroundColor: '#019DF4',
-                        pointBorderColor: '#fff',
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        pointBorderWidth: 2,
-                    },
-                    {
-                        label: '⚠️ ECUF - Negocio (30%)',
-                        data: dataNegocio,
-                        borderColor: '#7b1fa2',
-                        backgroundColor: 'rgba(123, 31, 162, 0.08)',
-                        borderWidth: 3,
-                        tension: 0.2,
-                        fill: true,
-                        pointBackgroundColor: '#7b1fa2',
-                        pointBorderColor: '#fff',
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        pointBorderWidth: 2,
-                    },
-                    {
-                        label: '💰 ECN - Proceso (40%)',
-                        data: dataProceso,
-                        borderColor: '#fd7e14',
-                        backgroundColor: 'rgba(253, 126, 20, 0.08)',
-                        borderWidth: 3,
-                        tension: 0.2,
-                        fill: true,
-                        pointBackgroundColor: '#fd7e14',
-                        pointBorderColor: '#fff',
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        pointBorderWidth: 2,
-                    },
-                    {
-                        label: '📊 Meta 85% (Aprobación)',
-                        data: lineaMeta85,
-                        borderColor: '#f39c12',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        borderDash: [8, 6],
-                        tension: 0,
-                        fill: false,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                    },
-                    {
-                        label: '🏆 Meta 90% (Excelencia)',
-                        data: lineaMeta90,
-                        borderColor: '#28a745',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        borderDash: [8, 6],
-                        tension: 0,
-                        fill: false,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                    }
-                ]
+    // Agrupar evaluaciones por el período seleccionado
+    const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
+
+    if (datosAgrupados.length === 0) {
+        console.warn('⚠️ No hay datos agrupados para el período seleccionado');
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '14px sans-serif';
+            ctx.fillStyle = '#6c757d';
+            ctx.textAlign = 'center';
+            ctx.fillText('📊 No hay datos para el período seleccionado', canvas.width / 2, canvas.height / 2);
+        }
+        return;
+    }
+
+    // Extraer etiquetas para el eje X
+    const labels = datosAgrupados.map(item => item.label);
+    console.log(`   Labels generadas: ${labels.join(', ')}`);
+
+    // Usar matrices dinámicas
+    const matrizDominante = obtenerMatrizDominante(datosAgrupados.flatMap(d => d.evaluaciones || []));
+    const pesos = matrizDominante ? matrizDominante.pesos : { ENC: 30, ECUF: 30, ECN: 40 };
+    
+    // Calcular porcentajes de cada frente (ENC, ECUF, ECN) usando pesos dinámicos
+    const dataCliente = datosAgrupados.map(item => Math.round((parseFloat(item.promedioENC) / pesos.ENC) * 100));
+    const dataNegocio = datosAgrupados.map(item => Math.round((parseFloat(item.promedioECUF) / pesos.ECUF) * 100));
+    const dataProceso = datosAgrupados.map(item => Math.round((parseFloat(item.promedioECN) / pesos.ECN) * 100));
+
+    // Calcular escala dinámica del eje Y
+    const todosValores = [...dataCliente, ...dataNegocio, ...dataProceso];
+    const minValor = Math.min(...todosValores);
+    const maxValor = Math.max(...todosValores);
+    let yMin = Math.max(0, minValor - 5);
+    let yMax = Math.min(100, maxValor + 5);
+
+    // Ajustar escala si el rango es muy pequeño
+    if (yMax - yMin < 15) {
+        const centro = (yMin + yMax) / 2;
+        yMin = Math.max(0, centro - 10);
+        yMax = Math.min(100, centro + 10);
+    }
+
+    // Determinar el step size según el rango
+    let stepSize = 5;
+    const rango = yMax - yMin;
+    if (rango <= 10) stepSize = 2;
+    else if (rango <= 20) stepSize = 5;
+    else if (rango <= 40) stepSize = 10;
+    else stepSize = 20;
+
+    // Líneas de meta (85% y 90%)
+    const lineaMeta85 = new Array(datosAgrupados.length).fill(85);
+    const lineaMeta90 = new Array(datosAgrupados.length).fill(90);
+
+    // Determinar título del eje X según el período
+    let xTitle = 'Período';
+    if (periodo === 'dia') xTitle = 'Fecha (Día/Mes)';
+    else if (periodo === 'semana') xTitle = 'Semana';
+    else if (periodo === 'mes') xTitle = 'Mes';
+    else if (periodo === 'trimestre') xTitle = 'Trimestre';
+    else if (periodo === 'anio') xTitle = 'Año';
+
+    // Obtener el contexto del canvas
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Limpiar el canvas antes de dibujar
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Crear el nuevo gráfico
+    window.chartEvolutivo = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '🎯 ENC - Cliente',
+                    data: dataCliente,
+                    borderColor: '#019DF4',
+                    backgroundColor: 'rgba(1, 157, 244, 0.08)',
+                    borderWidth: 3,
+                    tension: 0.2,
+                    fill: true,
+                    pointBackgroundColor: '#019DF4',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBorderWidth: 2,
+                },
+                {
+                    label: '⚠️ ECUF - Negocio',
+                    data: dataNegocio,
+                    borderColor: '#7b1fa2',
+                    backgroundColor: 'rgba(123, 31, 162, 0.08)',
+                    borderWidth: 3,
+                    tension: 0.2,
+                    fill: true,
+                    pointBackgroundColor: '#7b1fa2',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBorderWidth: 2,
+                },
+                {
+                    label: '💰 ECN - Proceso',
+                    data: dataProceso,
+                    borderColor: '#fd7e14',
+                    backgroundColor: 'rgba(253, 126, 20, 0.08)',
+                    borderWidth: 3,
+                    tension: 0.2,
+                    fill: true,
+                    pointBackgroundColor: '#fd7e14',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBorderWidth: 2,
+                },
+                {
+                    label: '📊 Meta 85% (Aprobación)',
+                    data: lineaMeta85,
+                    borderColor: '#f39c12',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [8, 6],
+                    tension: 0,
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                },
+                {
+                    label: '🏆 Meta 90% (Excelencia)',
+                    data: lineaMeta90,
+                    borderColor: '#28a745',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [8, 6],
+                    tension: 0,
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                layout: {
-                    padding: {
-                        top: 30,
-                        bottom: 10,
-                        left: 10,
-                        right: 10
-                    }
-                },
-                scales: {
-                    y: {
-                        min: yMin,
-                        max: yMax,
-                        title: {
-                            display: true,
-                            text: 'Porcentaje de Cumplimiento (%)',
-                            color: '#6c757d',
-                            font: {
-                                weight: 'bold',
-                                size: 12
-                            }
-                        },
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            callback: (value) => Math.round(value) + '%',
-                            stepSize: stepSize,
-                            color: '#555'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: xTitle,
-                            color: '#6c757d',
-                            font: {
-                                weight: 'bold',
-                                size: 12
-                            }
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45,
-                            autoSkip: true,
-                            maxTicksLimit: 12,
-                            color: '#555'
-                        },
-                        grid: {
-                            display: false
-                        }
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                let label = context.dataset.label || '';
-                                let value = context.raw;
-                                let rangoTexto = '';
-                                if (value >= 90) {
-                                    rangoTexto = '✅ Excelente/Bueno';
-                                } else if (value >= 85) {
-                                    rangoTexto = '⚠️ Regular - Requiere atención';
-                                } else {
-                                    rangoTexto = '🔴 Crítico - PDA Requerido';
-                                }
-                                return `${label}: ${Math.round(value)}% (${rangoTexto})`;
-                            }
-                        },
-                        backgroundColor: 'rgba(0,0,0,0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#e9ecef',
-                        padding: 10,
-                        cornerRadius: 8
-                    },
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            usePointStyle: true,
-                            boxWidth: 12,
-                            font: {
-                                size: 11,
-                                weight: '500'
-                            }
-                        }
-                    },
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'top',
-                        offset: -8,
-                        formatter: function (value, context) {
-                            if (value === null || value === undefined) return '';
-                            // Solo mostrar etiquetas para los datasets de datos principales (no para las líneas de meta)
-                            if (context.datasetIndex === 0 || context.datasetIndex === 1 || context.datasetIndex === 2) {
-                                if (value === 0) return '';
-                                return Math.round(value) + '%';
-                            }
-                            return '';
-                        },
-                        backgroundColor: function (context) {
-                            const colores = ['#019DF4', '#7b1fa2', '#fd7e14'];
-                            if (context.datasetIndex === 0 || context.datasetIndex === 1 || context.datasetIndex === 2) {
-                                return colores[context.datasetIndex % 3];
-                            }
-                            return 'transparent';
-                        },
-                        borderRadius: 6,
-                        padding: {
-                            left: 6,
-                            right: 6,
-                            top: 3,
-                            bottom: 3
-                        },
-                        color: 'white',
+            layout: {
+                padding: {
+                    top: 30,
+                    bottom: 10,
+                    left: 10,
+                    right: 10
+                }
+            },
+            scales: {
+                y: {
+                    min: yMin,
+                    max: yMax,
+                    title: {
+                        display: true,
+                        text: 'Porcentaje de Cumplimiento (%)',
+                        color: '#6c757d',
                         font: {
                             weight: 'bold',
-                            size: 9
-                        },
-                        borderWidth: 0
+                            size: 12
+                        }
+                    },
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        callback: (value) => Math.round(value) + '%',
+                        stepSize: stepSize,
+                        color: '#555'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: xTitle,
+                        color: '#6c757d',
+                        font: {
+                            weight: 'bold',
+                            size: 12
+                        }
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 12,
+                        color: '#555'
+                    },
+                    grid: {
+                        display: false
                     }
                 }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            let value = context.raw;
+                            let rangoTexto = '';
+                            if (value >= 90) {
+                                rangoTexto = '✅ Excelente/Bueno';
+                            } else if (value >= 85) {
+                                rangoTexto = '⚠️ Regular - Requiere atención';
+                            } else {
+                                rangoTexto = '🔴 Crítico - PDA Requerido';
+                            }
+                            return `${label}: ${Math.round(value)}% (${rangoTexto})`;
+                        }
+                    },
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#e9ecef',
+                    padding: 10,
+                    cornerRadius: 8
+                },
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        boxWidth: 12,
+                        font: {
+                            size: 11,
+                            weight: '500'
+                        }
+                    }
+                },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    offset: -8,
+                    formatter: function (value, context) {
+                        if (value === null || value === undefined) return '';
+                        if (context.datasetIndex === 0 || context.datasetIndex === 1 || context.datasetIndex === 2) {
+                            if (value === 0) return '';
+                            return Math.round(value) + '%';
+                        }
+                        return '';
+                    },
+                    backgroundColor: function (context) {
+                        const colores = ['#019DF4', '#7b1fa2', '#fd7e14'];
+                        if (context.datasetIndex === 0 || context.datasetIndex === 1 || context.datasetIndex === 2) {
+                            return colores[context.datasetIndex % 3];
+                        }
+                        return 'transparent';
+                    },
+                    borderRadius: 6,
+                    padding: {
+                        left: 6,
+                        right: 6,
+                        top: 3,
+                        bottom: 3
+                    },
+                    color: 'white',
+                    font: {
+                        weight: 'bold',
+                        size: 9
+                    },
+                    borderWidth: 0
+                }
             }
-        });
+        }
+    });
 
-        console.log(`✅ Gráfico Evolutivo unificado actualizado - ${datosAgrupados.length} períodos, ${evaluacionesFiltradas.length} evaluaciones`);
-    }
+    console.log(`✅ Gráfico Evolutivo unificado actualizado - ${datosAgrupados.length} períodos, ${evaluacionesFiltradas.length} evaluaciones`);
+    console.log(`   Período usado: ${periodo}`);
+}
     // ===== FIN FUNCIÓN: renderizarEvolutivoConDatosFiltrados ================
     
     // ===== 18. INICIO FUNCIÓN: procesarDatosEvolutivosConEvaluaciones =======
@@ -8126,7 +8528,7 @@ async function actualizarTablaEvolutivaIndicadores() {
             if (btnGeneral) btnGeneral.classList.remove('active');
         }
 
-        // 🔴 CORRECCIÓN CRÍTICA: Obtener evaluaciones filtradas actuales
+        // Obtener evaluaciones filtradas actuales
         let evaluacionesParaGrafico = null;
         
         // Prioridad 1: Evaluaciones filtradas por líder (si existen)
@@ -8162,27 +8564,17 @@ async function actualizarTablaEvolutivaIndicadores() {
             return;
         }
 
-        // 🔴 CLAVE 1: Obtener el período ACTUAL del selector
-        let periodo = 'mes'; // Valor por defecto
+        // 🔴 OBTENER EL PERÍODO SELECCIONADO SIN MODIFICACIONES
+        let periodo = filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
+        console.log(`📊 Período para vista atributos: ${periodo}`);
         
-        // Intentar obtener del selector de período
-        const periodoSelect = document.getElementById('filtroPeriodoReportes');
-        if (periodoSelect && periodoSelect.value) {
-            periodo = periodoSelect.value;
-            console.log(`📊 Período obtenido del selector: ${periodo}`);
-        } 
-        // Si no, usar filtroPeriodoActual global
-        else if (typeof filtroPeriodoActual !== 'undefined' && filtroPeriodoActual) {
-            periodo = filtroPeriodoActual;
-            console.log(`📊 Período obtenido de variable global: ${periodo}`);
-        }
-        
-        // 🔴 CLAVE 2: Forzar a 'mes' si el período es 'dia' (para estos gráficos es mejor)
-        if (periodo === 'dia') {
-            console.log('📊 Período "dia" detectado, cambiando a "mes" para mejor visualización');
+        // 🔴 SOLO SI ES 'todos', usar 'mes'
+        if (periodo === 'todos') {
             periodo = 'mes';
+            console.log('📊 "todos" seleccionado, usando "mes" para atributos');
         }
         
+        // 🔴 NO FORZAR 'mes' SI EL USUARIO SELECCIONÓ 'dia'
         console.log(`📊 Usando período: ${periodo} para el gráfico de atributos/submotivos`);
         
         // Recalcular datos agrupados con el período correcto
@@ -8201,13 +8593,12 @@ async function actualizarTablaEvolutivaIndicadores() {
         console.log(`📊 Generando gráfico para vista: ${vistaAtributosActual} con período ${periodo}`);
         
         if (vistaAtributosActual === 'general') {
-            // 🔴 Pasar explícitamente el período
             generarEvolutivoAtributosAgrupado(evaluacionesParaGrafico, datosAgrupados, periodo);
         } else {
-            // 🔴 Pasar explícitamente el período
             generarEvolutivoSubmotivosAgrupado(evaluacionesParaGrafico, datosAgrupados, periodo);
         }
-    }// ===== FIN FUNCIÓN: cambiarVistaAtributos ===============================
+    }
+    // ===== FIN FUNCIÓN: cambiarVistaAtributos ===============================
 
     // ===== 20. INICIO FUNCIÓN: mostrarDetalleFechaMejorado ==================
     function mostrarDetalleFechaMejorado(fecha, frenteFiltro = null) {
@@ -8481,9 +8872,11 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
     // ===== FIN FUNCIÓN: cerrarDrillDown =====================================
     
-    // ===== 23. INICIO FUNCIÓN: generarTablaJerarquicaFallas =================
+    // ======================================================
+    // FUNCIÓN: generarTablaJerarquicaFallas (CORREGIDA)
+    // ======================================================
     async function generarTablaJerarquicaFallas(evaluaciones) {
-        console.log('📊 generarTablaJerarquicaFallas - VERSIÓN EVOLUTIVA CON SCROLL');
+        console.log('📊 generarTablaJerarquicaFallas - INICIO');
         
         const container = document.getElementById('contenedorFallasJerarquicas');
         if (!container) {
@@ -8491,37 +8884,83 @@ async function actualizarTablaEvolutivaIndicadores() {
             return;
         }
         
+        // 🔴 VALIDACIÓN
         if (!evaluaciones || evaluaciones.length === 0) {
+            console.log('⚠️ No hay evaluaciones para mostrar fallas jerárquicas');
             container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos de fallas para mostrar</div>';
             return;
         }
         
+        console.log(`📊 ${evaluaciones.length} evaluaciones recibidas`);
+        
         // Calcular datos evolutivos por mes
         const datosEvolutivos = await calcularDatosEvolutivosJerarquia(evaluaciones);
         
-        if (!datosEvolutivos || datosEvolutivos.meses.length === 0) {
+        // 🔴 VALIDACIÓN DE RESULTADO
+        if (!datosEvolutivos) {
+            console.log('⚠️ datosEvolutivos es null o undefined');
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No se pudieron calcular los datos evolutivos</div>';
+            return;
+        }
+        
+        const { meses, totalMeses } = datosEvolutivos;
+        
+        console.log(`📊 datosEvolutivos: ${totalMeses} meses, meses array: ${meses?.length || 0}`);
+        
+        if (!meses || meses.length === 0) {
+            console.log('⚠️ No hay meses con datos para mostrar jerarquía');
             container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos suficientes para mostrar evolución</div>';
             return;
         }
         
-        // Renderizar la nueva vista evolutiva
-        renderizarJerarquiaEvolutiva(container, datosEvolutivos);
+        // 🔴 VERIFICAR QUE CADA MES TENGA LABEL
+        const mesesConLabel = meses.filter(m => m && m.label);
+        if (mesesConLabel.length === 0) {
+            console.log('⚠️ Ningún mes tiene la propiedad label');
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos de meses válidos</div>';
+            return;
+        }
+        
+        console.log(`✅ ${mesesConLabel.length} meses con label: ${mesesConLabel.map(m => m.label).join(', ')}`);
+        
+        // Renderizar la vista evolutiva
+        renderizarJerarquiaEvolutiva(container, {
+            meses: mesesConLabel,
+            totalMeses: mesesConLabel.length
+        });
     }
     // ===== FIN FUNCIÓN: generarTablaJerarquicaFallas ========================
     
     // ======================================================
-    // NUEVA FUNCIÓN: Calcular datos evolutivos por mes
+    // NUEVA FUNCIÓN: Calcular datos evolutivos jerarquía (CORREGIDA)
     // ======================================================
     async function calcularDatosEvolutivosJerarquia(evaluaciones) {
-        console.log('📊 Calculando datos evolutivos para análisis jerárquico...');
+        console.log('📊 calcularDatosEvolutivosJerarquia - INICIO');
         
-        // 1. Agrupar evaluaciones por mes
+        // 🔴 VALIDACIÓN
+        if (!evaluaciones || evaluaciones.length === 0) {
+            console.log('⚠️ No hay evaluaciones para calcular jerarquía');
+            return { meses: [], totalMeses: 0 };
+        }
+        
+        const rango = obtenerRangoFechasActivo();
+        console.log(`   📅 Rango activo: ${rango.tieneFiltro ? 'SÍ' : 'NO'}`);
+        if (rango.tieneFiltro) {
+            console.log(`   Desde: ${rango.fechaInicio.toLocaleDateString()} Hasta: ${rango.fechaFin.toLocaleDateString()}`);
+        }
+        
+        // 1. Agrupar evaluaciones por mes (CON FILTRO)
         const evaluacionesPorMes = {};
         const mesesOrdenados = [];
         
         for (const evalItem of evaluaciones) {
             const fecha = obtenerFechaEvaluacion(evalItem);
             if (!fecha) continue;
+            
+            // Filtrar por rango de fechas
+            if (rango && rango.tieneFiltro) {
+                if (fecha < rango.fechaInicio || fecha > rango.fechaFin) continue;
+            }
             
             const anio = fecha.getFullYear();
             const mes = fecha.getMonth() + 1;
@@ -8545,6 +8984,13 @@ async function actualizarTablaEvolutivaIndicadores() {
         // Ordenar meses cronológicamente
         mesesOrdenados.sort();
         
+        console.log(`📊 ${mesesOrdenados.length} meses encontrados después del filtro`);
+        
+        if (mesesOrdenados.length === 0) {
+            console.log('⚠️ No hay meses en el rango seleccionado');
+            return { meses: [], totalMeses: 0 };
+        }
+        
         // 2. Para cada mes, calcular estadísticas de fallas
         const datosPorMes = {};
         
@@ -8558,7 +9004,7 @@ async function actualizarTablaEvolutivaIndicadores() {
             const fallasPorSubmotivo = {};
             let totalFallasMes = 0;
             
-            // 🔴 NUEVO: Guardar TODAS las ocurrencias por agente (NO solo únicos)
+            // Guardar TODAS las ocurrencias por agente
             const ocurrenciasPorAgente = {};
             
             for (const evalItem of evaluacionesMes) {
@@ -8573,12 +9019,15 @@ async function actualizarTablaEvolutivaIndicadores() {
                             // Por BLOQUE (Motivo)
                             const bloque = det.bloque || 'Sin bloque';
                             if (!fallasPorBloque[bloque]) {
-                                fallasPorBloque[bloque] = { fallas: 0, gestores: new Set(), ocurrenciasPorAgente: {} };
+                                fallasPorBloque[bloque] = { 
+                                    fallas: 0, 
+                                    gestores: new Set(), 
+                                    ocurrenciasPorAgente: {} 
+                                };
                             }
                             fallasPorBloque[bloque].fallas++;
                             fallasPorBloque[bloque].gestores.add(agente);
                             
-                            // 🔴 NUEVO: Guardar ocurrencia por agente para este bloque
                             if (!fallasPorBloque[bloque].ocurrenciasPorAgente[agente]) {
                                 fallasPorBloque[bloque].ocurrenciasPorAgente[agente] = 0;
                             }
@@ -8636,7 +9085,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                 gestores: Array.from(data.gestores),
                 cantidadGestores: data.gestores.size,
                 porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0,
-                ocurrenciasPorAgente: data.ocurrenciasPorAgente  // 🔴 NUEVO
+                ocurrenciasPorAgente: data.ocurrenciasPorAgente
             })).sort((a, b) => b.fallas - a.fallas).slice(0, 3);
             
             const atributosArray = Object.values(fallasPorAtributo).map(data => ({
@@ -8646,7 +9095,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                 gestores: Array.from(data.gestores),
                 cantidadGestores: data.gestores.size,
                 porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0,
-                ocurrenciasPorAgente: data.ocurrenciasPorAgente  // 🔴 NUEVO
+                ocurrenciasPorAgente: data.ocurrenciasPorAgente
             })).sort((a, b) => b.fallas - a.fallas).slice(0, 10);
             
             const submotivosArray = Object.values(fallasPorSubmotivo).map(data => ({
@@ -8657,7 +9106,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                 gestores: Array.from(data.gestores),
                 cantidadGestores: data.gestores.size,
                 porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0,
-                ocurrenciasPorAgente: data.ocurrenciasPorAgente  // 🔴 NUEVO
+                ocurrenciasPorAgente: data.ocurrenciasPorAgente
             })).sort((a, b) => b.fallas - a.fallas).slice(0, 10);
             
             datosPorMes[mesClave] = {
@@ -8673,6 +9122,16 @@ async function actualizarTablaEvolutivaIndicadores() {
         // Convertir a array ordenado
         const mesesArray = mesesOrdenados.map(clave => datosPorMes[clave]);
         
+        // 🔴 DIAGNÓSTICO: Verificar que cada mes tenga label
+        for (const m of mesesArray) {
+            if (!m.label) {
+                console.warn(`⚠️ Mes sin label:`, m);
+            }
+        }
+        
+        console.log(`✅ ${mesesArray.length} meses analizados (filtrados por período)`);
+        console.log(`   Meses: ${mesesArray.map(m => m.label).join(', ')}`);
+        
         return {
             meses: mesesArray,
             totalMeses: mesesArray.length
@@ -8680,16 +9139,59 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
 
     // ======================================================
-    // NUEVA FUNCIÓN: Renderizar vista evolutiva con scroll
+    // NUEVA FUNCIÓN: Renderizar vista evolutiva con scroll (VERSIÓN FINAL)
     // ======================================================
     function renderizarJerarquiaEvolutiva(container, datosEvolutivos) {
-        const { meses, totalMeses } = datosEvolutivos;
+        console.log('📊 renderizarJerarquiaEvolutiva - INICIO');
+        
+        // 🔴 VALIDACIÓN ROBUSTA
+        if (!container) {
+            console.error('❌ Container no encontrado');
+            return;
+        }
+        
+        if (!datosEvolutivos) {
+            console.warn('⚠️ datosEvolutivos es null o undefined');
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos para mostrar</div>';
+            return;
+        }
+        
+        // 🔴 EXTRAER MESES CON VALIDACIÓN
+        let meses = datosEvolutivos.meses || [];
+        
+        if (!Array.isArray(meses)) {
+            console.warn('⚠️ meses no es un array:', meses);
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 Error: formato de datos inválido</div>';
+            return;
+        }
+        
+        // 🔴 FILTRAR MESES QUE TENGAN LA PROPIEDAD 'label'
+        const mesesValidos = meses.filter(m => m && m.label);
+        
+        console.log(`📊 Meses totales: ${meses.length}, Meses válidos: ${mesesValidos.length}`);
+        
+        if (mesesValidos.length === 0) {
+            console.warn('⚠️ No hay meses válidos con label');
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--muted);">
+                    📊 No hay datos de meses válidos en el período seleccionado
+                    <div style="font-size: 12px; margin-top: 10px; color: #999;">
+                        Período seleccionado: ${filtroPeriodoActual || 'todos'}
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        console.log(`📊 ${mesesValidos.length} meses válidos: ${mesesValidos.map(m => m.label).join(', ')}`);
+        
+        // ... (resto del código de renderizado igual, usando mesesValidos)
         
         // Determinar el ancho de la tabla basado en cantidad de meses
-        const anchoPorMes = 100; // px por mes
-        const anchoMinimo = Math.max(800, meses.length * anchoPorMes);
+        const anchoPorMes = 100;
+        const anchoMinimo = Math.max(800, mesesValidos.length * anchoPorMes);
         
-        // Estado de expansión (por sección)
+        // Estado de expansión
         if (typeof window.jerarquiaExpandido === 'undefined') {
             window.jerarquiaExpandido = {
                 motivos: false,
@@ -8697,6 +9199,11 @@ async function actualizarTablaEvolutivaIndicadores() {
                 submotivos: false
             };
         }
+        
+        // ... (el resto del HTML igual, usando mesesValidos en lugar de meses)
+        
+        // 🔴 EL RESTO DEL CÓDIGO ES IGUAL, SOLO CAMBIA QUE USA mesesValidos
+        // En lugar de repetir todo el HTML, aquí va la versión completa pero usando mesesValidos
         
         let html = `
             <div class="analisis-jerarquico-evolutivo">
@@ -8788,7 +9295,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                     <div class="jerarquia-header-evolutivo" onclick="toggleSeccionJerarquia('motivos')">
                         <span class="jerarquia-icono">📁</span>
                         <span class="jerarquia-titulo">MOTIVOS (Top 3)</span>
-                        <span class="jerarquia-badge">${meses.length} meses</span>
+                        <span class="jerarquia-badge">${mesesValidos.length} meses</span>
                         <span class="jerarquia-expand">▼</span>
                         <button class="boton-exportar" onclick="event.stopPropagation(); exportarJerarquiaCSV('motivos', datosJerarquiaEvolutivos)" style="background: var(--accent);">📥 Exportar CSV</button>
                     </div>
@@ -8798,13 +9305,13 @@ async function actualizarTablaEvolutivaIndicadores() {
                                 <thead>
                                     <tr>
                                         <th>Motivo</th>
-                                        ${meses.map(m => `<th>${m.label}</th>`).join('')}
+                                        ${mesesValidos.map(m => `<th>${m.label}</th>`).join('')}
                                         <th>📊 Tendencia</th>
-                                        <th>📊 Promedio</th>  <!-- ← NUEVA COLUMNA -->
+                                        <th>📊 Promedio</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tablaMotivosEvolutiva">
-                                    ${generarFilasJerarquiaEvolutiva(meses, 'bloques')}
+                                    ${generarFilasJerarquiaEvolutiva(mesesValidos, 'bloques')}
                                 </tbody>
                             </table>
                         </div>
@@ -8817,7 +9324,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                     <div class="jerarquia-header-evolutivo" onclick="toggleSeccionJerarquia('atributos')">
                         <span class="jerarquia-icono">🏷️</span>
                         <span class="jerarquia-titulo">ATRIBUTOS (Top 10)</span>
-                        <span class="jerarquia-badge">${meses.length} meses</span>
+                        <span class="jerarquia-badge">${mesesValidos.length} meses</span>
                         <span class="jerarquia-expand">▼</span>
                         <button class="boton-exportar" onclick="event.stopPropagation(); exportarJerarquiaCSV('atributos', datosJerarquiaEvolutivos)" style="background: var(--accent);">📥 Exportar CSV</button>
                     </div>
@@ -8828,13 +9335,13 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     <tr>
                                         <th>Motivo</th>
                                         <th>Atributo</th>
-                                        ${meses.map(m => `<th>${m.label}</th>`).join('')}
+                                        ${mesesValidos.map(m => `<th>${m.label}</th>`).join('')}
                                         <th>📊 Tendencia</th>
-                                        <th>📊 Promedio</th>  <!-- ← NUEVA COLUMNA -->
+                                        <th>📊 Promedio</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tablaAtributosEvolutiva">
-                                    ${generarFilasJerarquiaEvolutiva(meses, 'atributos')}
+                                    ${generarFilasJerarquiaEvolutiva(mesesValidos, 'atributos')}
                                 </tbody>
                             </table>
                         </div>
@@ -8847,7 +9354,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                     <div class="jerarquia-header-evolutivo" onclick="toggleSeccionJerarquia('submotivos')">
                         <span class="jerarquia-icono">🔬</span>
                         <span class="jerarquia-titulo">SUBMOTIVOS (Top 10)</span>
-                        <span class="jerarquia-badge">${meses.length} meses</span>
+                        <span class="jerarquia-badge">${mesesValidos.length} meses</span>
                         <span class="jerarquia-expand">▼</span>
                         <button class="boton-exportar" onclick="event.stopPropagation(); exportarJerarquiaCSV('submotivos', datosJerarquiaEvolutivos)" style="background: var(--accent);">📥 Exportar CSV</button>
                     </div>
@@ -8859,13 +9366,13 @@ async function actualizarTablaEvolutivaIndicadores() {
                                         <th>Motivo</th>
                                         <th>Atributo</th>
                                         <th>Submotivo</th>
-                                        ${meses.map(m => `<th>${m.label}</th>`).join('')}
+                                        ${mesesValidos.map(m => `<th>${m.label}</th>`).join('')}
                                         <th>📊 Tendencia</th>
-                                        <th>📊 Promedio</th>  <!-- ← NUEVA COLUMNA -->
+                                        <th>📊 Promedio</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tablaSubmotivosEvolutiva">
-                                    ${generarFilasJerarquiaEvolutiva(meses, 'submotivos')}
+                                    ${generarFilasJerarquiaEvolutiva(mesesValidos, 'submotivos')}
                                 </tbody>
                             </table>
                         </div>
@@ -8878,264 +9385,283 @@ async function actualizarTablaEvolutivaIndicadores() {
         container.innerHTML = html;
         
         // Guardar datos globalmente para exportación
-        window.datosJerarquiaEvolutivos = datosEvolutivos;
+        window.datosJerarquiaEvolutivos = {
+            meses: mesesValidos,
+            totalMeses: mesesValidos.length
+        };
+        
+        console.log(`✅ renderizarJerarquiaEvolutiva completada - ${mesesValidos.length} meses`);
     }
 
     // ======================================================
-    // NUEVA FUNCIÓN: Generar filas de la tabla evolutiva
+    // NUEVA FUNCIÓN: Generar filas de la tabla evolutiva (CORREGIDA)
     // ======================================================
     function generarFilasJerarquiaEvolutiva(meses, tipo) {
-    // ======================================================
-    // 1. FUNCIÓN AUXILIAR: Calcular variación mensual
-    // ======================================================
-    function calcularVariacionMensual(valorActual, valorAnterior) {
-        if (valorAnterior === 0 || valorAnterior === null || valorAnterior === undefined) {
-            return { icono: '🆕', texto: 'Nuevo', color: '#019DF4' };
-        }
-        const cambio = ((valorActual - valorAnterior) / valorAnterior) * 100;
-        if (cambio > 0.1) {
-            return { icono: '▲', texto: `+${cambio.toFixed(1)}%`, color: '#28a745' };
-        } else if (cambio < -0.1) {
-            return { icono: '▼', texto: `${cambio.toFixed(1)}%`, color: '#d93025' };
-        } else {
-            return { icono: '➡️', texto: 'Estable', color: '#6c757d' };
-        }
-    }
-
-    // ======================================================
-    // 2. FUNCIÓN AUXILIAR: Calcular tendencia total
-    // ======================================================
-    function calcularTendenciaTotal(valores) {
-        const validos = valores.filter(v => v !== null && v.fallas > 0);
-        if (validos.length < 2) {
-            return { icono: '🆕', texto: 'Sin datos', color: '#6c757d' };
-        }
-        const primerValor = validos[0].fallas;
-        const ultimoValor = validos[validos.length - 1].fallas;
-        if (primerValor === 0) {
-            return { icono: '🆕', texto: 'Nuevo', color: '#019DF4' };
-        }
-        const cambio = ((ultimoValor - primerValor) / primerValor) * 100;
-        if (cambio > 2) {
-            return { icono: '📈', texto: `+${cambio.toFixed(1)}%`, color: '#28a745' };
-        } else if (cambio < -2) {
-            return { icono: '📉', texto: `${cambio.toFixed(1)}%`, color: '#d93025' };
-        } else {
-            return { icono: '➡️', texto: 'Estable', color: '#6c757d' };
-        }
-    }
-
-    // ======================================================
-    // 3. RECOLECTAR ITEMS ÚNICOS (código existente)
-    // ======================================================
-    const itemsMap = new Map();
-    
-    for (const mes of meses) {
-        let items = [];
-        if (tipo === 'bloques') items = mes.bloques || [];
-        else if (tipo === 'atributos') items = mes.atributos || [];
-        else items = mes.submotivos || [];
+        console.log(`📊 generarFilasJerarquiaEvolutiva - tipo: ${tipo}, meses: ${meses?.length || 0}`);
         
-        for (const item of items) {
-            let key = '';
-            let displayName = '';
-            
-            if (tipo === 'bloques') {
-                key = item.nombre;
-                displayName = `📁 ${item.nombre}`;
-            } else if (tipo === 'atributos') {
-                key = `${item.bloque}|${item.atributo}`;
-                displayName = `🏷️ ${item.atributo}`;
+        // 🔴 VALIDACIÓN
+        if (!meses || !Array.isArray(meses) || meses.length === 0) {
+            console.warn('⚠️ meses inválido o vacío');
+            return `<tr><td colspan="10" style="text-align: center; padding: 20px; color: var(--muted);">No hay datos para mostrar</td></tr>`;
+        }
+        
+        // 🔴 FILTRAR MESES CON LABEL VÁLIDO
+        const mesesValidos = meses.filter(m => m && m.label);
+        
+        if (mesesValidos.length === 0) {
+            console.warn('⚠️ No hay meses con label válido');
+            return `<tr><td colspan="10" style="text-align: center; padding: 20px; color: var(--muted);">No hay datos para mostrar</td></tr>`;
+        }
+        
+        // ======================================================
+        // 1. FUNCIÓN AUXILIAR: Calcular variación mensual
+        // ======================================================
+        function calcularVariacionMensual(valorActual, valorAnterior) {
+            if (valorAnterior === 0 || valorAnterior === null || valorAnterior === undefined) {
+                return { icono: '🆕', texto: 'Nuevo', color: '#019DF4' };
+            }
+            const cambio = ((valorActual - valorAnterior) / valorAnterior) * 100;
+            if (cambio > 0.1) {
+                return { icono: '▲', texto: `+${cambio.toFixed(1)}%`, color: '#28a745' };
+            } else if (cambio < -0.1) {
+                return { icono: '▼', texto: `${cambio.toFixed(1)}%`, color: '#d93025' };
             } else {
-                key = `${item.bloque}|${item.atributo}|${item.submotivo}`;
-                displayName = `🔬 ${item.submotivo}`;
-            }
-            
-            if (!itemsMap.has(key)) {
-                itemsMap.set(key, {
-                    key: key,
-                    bloque: item.bloque,
-                    atributo: item.atributo,
-                    submotivo: item.submotivo,
-                    nombre: displayName,
-                    valores: new Array(meses.length).fill(null),
-                    gestoresPorMes: new Array(meses.length).fill(null)
-                });
-            }
-            
-            const itemData = itemsMap.get(key);
-            const idx = meses.findIndex(m => m.clave === mes.clave);
-            if (idx !== -1) {
-                itemData.valores[idx] = {
-                    fallas: item.fallas,
-                    porcentaje: item.porcentaje.toFixed(1)
-                };
-                itemData.gestoresPorMes[idx] = item.gestores || [];
+                return { icono: '➡️', texto: 'Estable', color: '#6c757d' };
             }
         }
-    }
-    
-    // ======================================================
-    // 4. ORDENAR POR TOTAL DE FALLAS
-    // ======================================================
-    const itemsArray = Array.from(itemsMap.values());
-    for (const item of itemsArray) {
-        item.totalFallas = item.valores.reduce((sum, v) => sum + (v?.fallas || 0), 0);
-    }
-    itemsArray.sort((a, b) => b.totalFallas - a.totalFallas);
-    
-    let topLimit = 3;
-    if (tipo === 'atributos') topLimit = 10;
-    if (tipo === 'submotivos') topLimit = 10;
-    
-    const topItems = itemsArray.slice(0, topLimit);
-    
-    // ════════════════════════════════════════════════════════
-    // 🔴 CAMBIO IMPORTANTE: INICIAR HTML VACÍO (SIN ENCABEZADO)
-    // ════════════════════════════════════════════════════════
-    let html = '';  // ← ESTO ES LO QUE CAMBIA
-    
-    // ======================================================
-    // 6. GENERAR FILAS DE DATOS
-    // ======================================================
-    for (const item of topItems) {
-        html += `<tr onclick="verAgentesJerarquia('${tipo}', '${item.key.replace(/'/g, "\\'")}', window.datosJerarquiaEvolutivos)" style="cursor: pointer;">`;
-        
-        // Columnas según el tipo
-        if (tipo === 'bloques') {
-            html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
-        } else if (tipo === 'atributos') {
-            html += `<td style="padding: 6px 8px;">📁 ${item.bloque || '-'}</td>`;
-            html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
-        } else {
-            html += `<td style="padding: 6px 8px;">📁 ${item.bloque || '-'}</td>`;
-            html += `<td style="padding: 6px 8px;">🏷️ ${item.atributo || '-'}</td>`;
-            html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
+
+        // ======================================================
+        // 2. FUNCIÓN AUXILIAR: Calcular tendencia total
+        // ======================================================
+        function calcularTendenciaTotal(valores) {
+            const validos = valores.filter(v => v !== null && v.fallas > 0);
+            if (validos.length < 2) {
+                return { icono: '🆕', texto: 'Sin datos', color: '#6c757d' };
+            }
+            const primerValor = validos[0].fallas;
+            const ultimoValor = validos[validos.length - 1].fallas;
+            if (primerValor === 0) {
+                return { icono: '🆕', texto: 'Nuevo', color: '#019DF4' };
+            }
+            const cambio = ((ultimoValor - primerValor) / primerValor) * 100;
+            if (cambio > 2) {
+                return { icono: '📈', texto: `+${cambio.toFixed(1)}%`, color: '#28a745' };
+            } else if (cambio < -2) {
+                return { icono: '📉', texto: `${cambio.toFixed(1)}%`, color: '#d93025' };
+            } else {
+                return { icono: '➡️', texto: 'Estable', color: '#6c757d' };
+            }
         }
+
+        // ======================================================
+        // 3. RECOLECTAR ITEMS ÚNICOS
+        // ======================================================
+        const itemsMap = new Map();
         
-        // ======================================================
-        // 7. VALORES POR MES CON VARIACIÓN
-        // ======================================================
-        for (let i = 0; i < meses.length; i++) {
-            const valor = item.valores[i];
-            let celdaHtml = '';
+        for (const mes of mesesValidos) {
+            let items = [];
+            if (tipo === 'bloques') items = mes.bloques || [];
+            else if (tipo === 'atributos') items = mes.atributos || [];
+            else items = mes.submotivos || [];
             
-            if (valor && valor.fallas > 0) {
-                let variacionHtml = '';
-                if (i > 0) {
-                    const valorAnterior = item.valores[i - 1];
-                    if (valorAnterior && valorAnterior.fallas > 0) {
-                        const variacion = calcularVariacionMensual(valor.fallas, valorAnterior.fallas);
-                        variacionHtml = `<span style="color: ${variacion.color}; font-size: 10px; display: block; margin-top: 2px;">
-                            ${variacion.icono} ${variacion.texto}
-                        </span>`;
-                    } else if (valorAnterior && valorAnterior.fallas === 0 && valor.fallas > 0) {
-                        variacionHtml = `<span style="color: #019DF4; font-size: 10px; display: block; margin-top: 2px;">🆕 Nuevo</span>`;
-                    }
+            for (const item of items) {
+                let key = '';
+                let displayName = '';
+                
+                if (tipo === 'bloques') {
+                    key = item.nombre;
+                    displayName = `📁 ${item.nombre}`;
+                } else if (tipo === 'atributos') {
+                    key = `${item.bloque}|${item.atributo}`;
+                    displayName = `🏷️ ${item.atributo}`;
+                } else {
+                    key = `${item.bloque}|${item.atributo}|${item.submotivo}`;
+                    displayName = `🔬 ${item.submotivo}`;
                 }
                 
-                celdaHtml = `
-                    <div><strong>${valor.porcentaje}%</strong> <span style="font-size: 11px; color: var(--muted);">(${valor.fallas})</span></div>
-                    ${variacionHtml}
-                `;
-            } else {
-                celdaHtml = `<span style="color: var(--muted);">-</span>`;
-            }
-            
-            html += `<td style="padding: 6px 4px; text-align: center; vertical-align: middle;">${celdaHtml}</td>`;
-        }
-        
-        // ======================================================
-        // 8. COLUMNA DE TENDENCIA TOTAL
-        // ======================================================
-        const tendencia = calcularTendenciaTotal(item.valores);
-        html += `<td style="text-align: center; color: ${tendencia.color}; font-weight: bold; padding: 6px 4px;">
-            ${tendencia.icono} ${tendencia.texto}
-        </td>`;
-        
-        // ======================================================
-        // 9. COLUMNA DE PROMEDIO
-        // ======================================================
-        const valoresValidos = item.valores.filter(v => v !== null && v.fallas > 0);
-        let promedioErrores = 0;
-        let promedioPorcentaje = 0;
-        if (valoresValidos.length > 0) {
-            const sumFallas = valoresValidos.reduce((sum, v) => sum + v.fallas, 0);
-            const sumPorcentaje = valoresValidos.reduce((sum, v) => sum + parseFloat(v.porcentaje), 0);
-            promedioErrores = sumFallas / valoresValidos.length;
-            promedioPorcentaje = sumPorcentaje / valoresValidos.length;
-        }
-        
-        html += `<td style="text-align: center; padding: 6px 4px; background: #f8fafc; font-weight: bold; color: ${promedioErrores > 5 ? '#d93025' : (promedioErrores > 2 ? '#f39c12' : '#28a745')};">
-            <div>${promedioPorcentaje > 0 ? promedioPorcentaje.toFixed(1) : 0}%</div>
-            <span style="font-size: 10px; color: var(--muted);">(${promedioErrores > 0 ? promedioErrores.toFixed(1) : 0})</span>
-        </td>`;
-        
-        html += `</tr>`;
-    }
-    
-    // ======================================================
-    // 10. FILA TOTAL AL FINAL
-    // ======================================================
-    if (topItems.length > 0) {
-        const totalFallasPorMes = new Array(meses.length).fill(0);
-        let totalFallasGlobal = 0;
-        let mesesConDatos = 0;
-        
-        for (const item of topItems) {
-            for (let i = 0; i < meses.length; i++) {
-                const val = item.valores[i];
-                if (val) {
-                    totalFallasPorMes[i] += val.fallas;
-                    totalFallasGlobal += val.fallas;
+                if (!itemsMap.has(key)) {
+                    itemsMap.set(key, {
+                        key: key,
+                        bloque: item.bloque,
+                        atributo: item.atributo,
+                        submotivo: item.submotivo,
+                        nombre: displayName,
+                        valores: new Array(mesesValidos.length).fill(null),
+                        gestoresPorMes: new Array(mesesValidos.length).fill(null)
+                    });
+                }
+                
+                const itemData = itemsMap.get(key);
+                const idx = mesesValidos.findIndex(m => m.clave === mes.clave);
+                if (idx !== -1) {
+                    itemData.valores[idx] = {
+                        fallas: item.fallas,
+                        porcentaje: item.porcentaje.toFixed(1)
+                    };
+                    itemData.gestoresPorMes[idx] = item.gestores || [];
                 }
             }
         }
         
-        for (const total of totalFallasPorMes) {
-            if (total > 0) mesesConDatos++;
+        // ======================================================
+        // 4. ORDENAR POR TOTAL DE FALLAS
+        // ======================================================
+        const itemsArray = Array.from(itemsMap.values());
+        for (const item of itemsArray) {
+            item.totalFallas = item.valores.reduce((sum, v) => sum + (v?.fallas || 0), 0);
+        }
+        itemsArray.sort((a, b) => b.totalFallas - a.totalFallas);
+        
+        let topLimit = 3;
+        if (tipo === 'atributos') topLimit = 10;
+        if (tipo === 'submotivos') topLimit = 10;
+        
+        const topItems = itemsArray.slice(0, topLimit);
+        
+        // ======================================================
+        // 5. GENERAR HTML
+        // ======================================================
+        let html = '';
+        
+        if (topItems.length === 0) {
+            const columnasFijas = tipo === 'bloques' ? 1 : (tipo === 'atributos' ? 2 : 3);
+            const colspan = columnasFijas + mesesValidos.length + 2;
+            html += `<tr><td colspan="${colspan}" style="text-align: center; padding: 20px; color: var(--muted);">No hay datos en este período</td></tr>`;
+            return html;
         }
         
-        const promedioGlobalErrores = mesesConDatos > 0 ? (totalFallasGlobal / mesesConDatos) : 0;
-        
-        let colspan = 1;
-        if (tipo === 'bloques') colspan = 1;
-        else if (tipo === 'atributos') colspan = 2;
-        else if (tipo === 'submotivos') colspan = 3;
-        
-        html += `<tr style="background: #f0f7ff; font-weight: bold; border-top: 2px solid var(--accent);">
-            <td colspan="${colspan}" style="text-align: right; padding: 8px;">
-                <strong>📊 TOTAL</strong>
+        // ======================================================
+        // 6. GENERAR FILAS DE DATOS
+        // ======================================================
+        for (const item of topItems) {
+            html += `<tr onclick="verAgentesJerarquia('${tipo}', '${item.key.replace(/'/g, "\\'")}', window.datosJerarquiaEvolutivos)" style="cursor: pointer;">`;
+            
+            // Columnas según el tipo
+            if (tipo === 'bloques') {
+                html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
+            } else if (tipo === 'atributos') {
+                html += `<td style="padding: 6px 8px;">📁 ${item.bloque || '-'}</td>`;
+                html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
+            } else {
+                html += `<td style="padding: 6px 8px;">📁 ${item.bloque || '-'}</td>`;
+                html += `<td style="padding: 6px 8px;">🏷️ ${item.atributo || '-'}</td>`;
+                html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
+            }
+            
+            // ======================================================
+            // 7. VALORES POR MES CON VARIACIÓN
+            // ======================================================
+            for (let i = 0; i < mesesValidos.length; i++) {
+                const valor = item.valores[i];
+                let celdaHtml = '';
+                
+                if (valor && valor.fallas > 0) {
+                    let variacionHtml = '';
+                    if (i > 0) {
+                        const valorAnterior = item.valores[i - 1];
+                        if (valorAnterior && valorAnterior.fallas > 0) {
+                            const variacion = calcularVariacionMensual(valor.fallas, valorAnterior.fallas);
+                            variacionHtml = `<span style="color: ${variacion.color}; font-size: 10px; display: block; margin-top: 2px;">
+                                ${variacion.icono} ${variacion.texto}
+                            </span>`;
+                        } else if (valorAnterior && valorAnterior.fallas === 0 && valor.fallas > 0) {
+                            variacionHtml = `<span style="color: #019DF4; font-size: 10px; display: block; margin-top: 2px;">🆕 Nuevo</span>`;
+                        }
+                    }
+                    
+                    celdaHtml = `
+                        <div><strong>${valor.porcentaje}%</strong> <span style="font-size: 11px; color: var(--muted);">(${valor.fallas})</span></div>
+                        ${variacionHtml}
+                    `;
+                } else {
+                    celdaHtml = `<span style="color: var(--muted);">-</span>`;
+                }
+                
+                html += `<td style="padding: 6px 4px; text-align: center; vertical-align: middle;">${celdaHtml}</td>`;
+            }
+            
+            // ======================================================
+            // 8. COLUMNA DE TENDENCIA TOTAL
+            // ======================================================
+            const tendencia = calcularTendenciaTotal(item.valores);
+            html += `<td style="text-align: center; color: ${tendencia.color}; font-weight: bold; padding: 6px 4px;">
+                ${tendencia.icono} ${tendencia.texto}
             </td>`;
-        
-        for (let i = 0; i < meses.length; i++) {
-            const totalFallas = totalFallasPorMes[i] || 0;
-            html += `<td style="text-align: center; padding: 8px;">
-                <strong>100%</strong>
-                <span style="font-size: 11px; color: var(--muted);">(${totalFallas})</span>
+            
+            // ======================================================
+            // 9. COLUMNA DE PROMEDIO
+            // ======================================================
+            const valoresValidos = item.valores.filter(v => v !== null && v.fallas > 0);
+            let promedioErrores = 0;
+            let promedioPorcentaje = 0;
+            if (valoresValidos.length > 0) {
+                const sumFallas = valoresValidos.reduce((sum, v) => sum + v.fallas, 0);
+                const sumPorcentaje = valoresValidos.reduce((sum, v) => sum + parseFloat(v.porcentaje), 0);
+                promedioErrores = sumFallas / valoresValidos.length;
+                promedioPorcentaje = sumPorcentaje / valoresValidos.length;
+            }
+            
+            html += `<td style="text-align: center; padding: 6px 4px; background: #f8fafc; font-weight: bold; color: ${promedioErrores > 5 ? '#d93025' : (promedioErrores > 2 ? '#f39c12' : '#28a745')};">
+                <div>${promedioPorcentaje > 0 ? promedioPorcentaje.toFixed(1) : 0}%</div>
+                <span style="font-size: 10px; color: var(--muted);">(${promedioErrores > 0 ? promedioErrores.toFixed(1) : 0})</span>
             </td>`;
+            
+            html += `</tr>`;
         }
         
-        html += `<td style="text-align: center; color: var(--muted);">-</td>`;
-        html += `<td style="text-align: center; padding: 8px; background: #f8fafc; font-weight: bold; color: ${promedioGlobalErrores > 10 ? '#d93025' : (promedioGlobalErrores > 5 ? '#f39c12' : '#28a745')};">
-            <div>${mesesConDatos > 0 ? '100%' : '0%'}</div>
-            <span style="font-size: 11px; color: var(--muted);">(${promedioGlobalErrores.toFixed(1)})</span>
-        </td>`;
+        // ======================================================
+        // 10. FILA TOTAL AL FINAL
+        // ======================================================
+        if (topItems.length > 0) {
+            const totalFallasPorMes = new Array(mesesValidos.length).fill(0);
+            let totalFallasGlobal = 0;
+            let mesesConDatos = 0;
+            
+            for (const item of topItems) {
+                for (let i = 0; i < mesesValidos.length; i++) {
+                    const val = item.valores[i];
+                    if (val) {
+                        totalFallasPorMes[i] += val.fallas;
+                        totalFallasGlobal += val.fallas;
+                    }
+                }
+            }
+            
+            for (const total of totalFallasPorMes) {
+                if (total > 0) mesesConDatos++;
+            }
+            
+            const promedioGlobalErrores = mesesConDatos > 0 ? (totalFallasGlobal / mesesConDatos) : 0;
+            
+            let colspan = 1;
+            if (tipo === 'bloques') colspan = 1;
+            else if (tipo === 'atributos') colspan = 2;
+            else if (tipo === 'submotivos') colspan = 3;
+            
+            html += `<tr style="background: #f0f7ff; font-weight: bold; border-top: 2px solid var(--accent);">
+                <td colspan="${colspan}" style="text-align: right; padding: 8px;">
+                    <strong>📊 TOTAL</strong>
+                </td>`;
+            
+            for (let i = 0; i < mesesValidos.length; i++) {
+                const totalFallas = totalFallasPorMes[i] || 0;
+                html += `<td style="text-align: center; padding: 8px;">
+                    <strong>100%</strong>
+                    <span style="font-size: 11px; color: var(--muted);">(${totalFallas})</span>
+                </td>`;
+            }
+            
+            html += `<td style="text-align: center; color: var(--muted);">-</td>`;
+            html += `<td style="text-align: center; padding: 8px; background: #f8fafc; font-weight: bold; color: ${promedioGlobalErrores > 10 ? '#d93025' : (promedioGlobalErrores > 5 ? '#f39c12' : '#28a745')};">
+                <div>${mesesConDatos > 0 ? '100%' : '0%'}</div>
+                <span style="font-size: 11px; color: var(--muted);">(${promedioGlobalErrores.toFixed(1)})</span>
+            </td>`;
+            
+            html += `</tr>`;
+        }
         
-        html += `</tr>`;
+        return html;
     }
-    
-    // ======================================================
-    // 11. MENSAJE SI NO HAY DATOS
-    // ======================================================
-    if (topItems.length === 0) {
-        const columnasFijas = tipo === 'bloques' ? 1 : (tipo === 'atributos' ? 2 : 3);
-        const colspan = columnasFijas + meses.length + 2;
-        html += `<tr><td colspan="${colspan}" style="text-align: center; padding: 20px; color: var(--muted);">No hay datos en este período</td></tr>`;
-    }
-    
-    return html;
-}
 
     // ======================================================
     // NUEVA FUNCIÓN: Toggle expandir/contraer sección
@@ -10124,104 +10650,160 @@ async function actualizarTablaEvolutivaIndicadores() {
     // ===== 31. INICIO FUNCIÓN: aplicarFiltroReportes ========================
     
     async function aplicarFiltroReportes() {
-        console.log('🔄 Aplicando filtro de reportes...');
+    console.log('🔄 Aplicando filtro de reportes...');
+    console.log(`📊 Período seleccionado: ${filtroPeriodoActual}`);
+    
+    const loadingDiv = document.createElement('div');
+    loadingDiv.textContent = '⏳ Aplicando filtro...';
+    loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 15px 25px; border-radius: 30px; z-index: 10000; font-size: 14px;';
+    document.body.appendChild(loadingDiv);
+    
+    try {
+        const evaluaciones = await obtenerEvaluacionesConCache(false);
         
-        const loadingDiv = document.createElement('div');
-        loadingDiv.textContent = '⏳ Aplicando filtro...';
-        loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 15px 25px; border-radius: 30px; z-index: 10000; font-size: 14px;';
-        document.body.appendChild(loadingDiv);
-        
-        try {
-            const evaluaciones = await obtenerEvaluacionesConCache(false);
-            
-            if (evaluaciones.length === 0) {
-                console.warn('⚠️ No hay evaluaciones para filtrar');
-                mostrarMensajeSinDatosEnGraficos();
-                loadingDiv.remove();
-                return;
-            }
-            
-            const evaluacionesFiltradas = obtenerEvaluacionesFiltradasPorPeriodo(evaluaciones);
-            
-            console.log(`📊 Evaluaciones filtradas: ${evaluacionesFiltradas.length} de ${evaluaciones.length}`);
-            
-            // Guardar en variable global
-            window.evaluacionesFiltradasGlobal = evaluacionesFiltradas;
-            
-            // Actualizar resumen agrupado con los datos filtrados
-            if (typeof cambiarAgrupacion === 'function') {
-                await cambiarAgrupacion();
-            }
-
-            actualizarInfoFiltro();
-            
-            if (evaluacionesFiltradas.length === 0) {
-                mostrarMensajeSinDatosEnGraficos();
-                loadingDiv.remove();
-                return;
-            }
-            
-            // 1. Actualizar KPIs
-            await actualizarKPIsConFiltro(evaluacionesFiltradas);
-            
-            // 2. Actualizar ranking
-            const ranking = await construirRankingAgentes(evaluacionesFiltradas);
-            rankingCompletoGlobal = ranking;
-            await actualizarTablaRanking(ranking);
-            
-            
-            // 4. Actualizar tabla jerárquica de fallas
-            generarTablaJerarquicaFallas(evaluacionesFiltradas);
-            
-            // 5. Obtener datos agrupados
-            const periodo = filtroPeriodoActual;
-            const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
-            datosAgrupadosActualesGlobal = datosAgrupados;
-            
-            // 6. Actualizar cards
-            actualizarCardsPromedioMotivosAgrupados(datosAgrupados);
-            actualizarCardPorcentajeQuiebresAgrupados(datosAgrupados);
-            
-            // 7. Actualizar gráficos (llamadas síncronas, sin setTimeout anidado)
-            generarEvolutivoAudiosAgrupado(datosAgrupados, periodo);
-            generarDistribucionRangosAgrupado(evaluacionesFiltradas);
-            
-            if (vistaAtributosActual === 'general') {
-                generarEvolutivoAtributosAgrupado(evaluacionesFiltradas, datosAgrupados, periodo);
-            } else {
-                generarEvolutivoSubmotivosAgrupado(evaluacionesFiltradas, datosAgrupados, periodo);
-            }
-            
-            generarEvolutivoQuiebresAgrupado(datosAgrupados);
-            generarGraficoComparativaAgrupado(evaluacionesFiltradas);
-            generarGraficoGestionLlamadas(evaluacionesFiltradas);
-            renderizarEvolutivoConDatosFiltrados(evaluacionesFiltradas);
-            generarEvolutivoCuartiles(evaluacionesFiltradas, datosAgrupados, periodo);
-            
-            if (window.chartResultados) window.chartResultados.destroy();
-            if (window.chartTendencias) window.chartTendencias.destroy();
-            generarGraficosReportes(evaluacionesFiltradas);
-            
-            // ======================================================
-            // 8. 🔴 FORZAR ACTUALIZACIÓN DEL RESUMEN POR LÍDER
-            // ======================================================
-            await cambiarAgrupacion();
-            
-            console.log('✅ Filtro aplicado correctamente');
-            
-            const mensajeTemporal = document.createElement('div');
-            mensajeTemporal.textContent = `📊 Mostrando ${evaluacionesFiltradas.length} evaluaciones`;
-            mensajeTemporal.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--ok); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1000; animation: fadeOut 2s ease forwards;';
-            document.body.appendChild(mensajeTemporal);
-            setTimeout(() => mensajeTemporal.remove(), 2000);
-            
-        } catch (error) {
-            console.error('Error aplicando filtro:', error);
-            alert('❌ Error al aplicar el filtro: ' + error.message);
-        } finally {
+        if (evaluaciones.length === 0) {
+            console.warn('⚠️ No hay evaluaciones para filtrar');
+            mostrarMensajeSinDatosEnGraficos();
             loadingDiv.remove();
+            return;
         }
+        
+        const evaluacionesFiltradas = obtenerEvaluacionesFiltradasPorPeriodo(evaluaciones);
+        
+        console.log(`📊 Evaluaciones filtradas: ${evaluacionesFiltradas.length} de ${evaluaciones.length}`);
+        
+        // Guardar en variable global
+        window.evaluacionesFiltradasGlobal = evaluacionesFiltradas;
+        
+        // Actualizar resumen agrupado con los datos filtrados
+        if (typeof cambiarAgrupacion === 'function') {
+            await cambiarAgrupacion();
+        }
+
+        actualizarInfoFiltro();
+        
+        if (evaluacionesFiltradas.length === 0) {
+            mostrarMensajeSinDatosEnGraficos();
+            loadingDiv.remove();
+            return;
+        }
+        
+        // 1. Actualizar KPIs
+        await actualizarKPIsConFiltro(evaluacionesFiltradas);
+        
+        // 2. Actualizar ranking
+        const ranking = await construirRankingAgentes(evaluacionesFiltradas);
+        rankingCompletoGlobal = ranking;
+        await actualizarTablaRanking(ranking);
+        
+        // 3. Actualizar tabla jerárquica de fallas
+        generarTablaJerarquicaFallas(evaluacionesFiltradas);
+        
+        // 4. Obtener el período seleccionado sin modificaciones
+        let periodo = filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
+        console.log(`📊 Período para agrupar: ${periodo}`);
+
+        // 🔴 IMPORTANTE: Definir periodoGraficos correctamente
+        let periodoGraficos = periodo;
+
+        // 🔴 SI ES 'rango', VERIFICAR QUÉ TIPO DE RANGO ESTÁ SELECCIONADO
+        if (periodo === 'rango') {
+            const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+            if (tipoRango === 'mes') periodoGraficos = 'mes';
+            else if (tipoRango === 'trimestre') periodoGraficos = 'trimestre';
+            else if (tipoRango === 'anio') periodoGraficos = 'anio';
+            else if (tipoRango === 'dia') periodoGraficos = 'dia';
+            else periodoGraficos = 'mes';
+            console.log(`📊 Rango mapeado a período: ${periodoGraficos}`);
+        }
+
+        // 🔴 SI ES 'multiples', VERIFICAR QUÉ TIPO DE MÚLTIPLES ESTÁ SELECCIONADO
+        if (periodo === 'multiples') {
+            const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+            if (tipoMultiples === 'mes') periodoGraficos = 'mes';
+            else if (tipoMultiples === 'trimestre') periodoGraficos = 'trimestre';
+            else if (tipoMultiples === 'anio') periodoGraficos = 'anio';
+            else if (tipoMultiples === 'dia') periodoGraficos = 'dia';
+            else periodoGraficos = 'mes';
+            console.log(`📊 Múltiples mapeado a período: ${periodoGraficos}`);
+        }
+
+        // Si es 'todos', usar 'mes' (porque 'todos' no es un período de agrupación)
+        if (periodo === 'todos') {
+            periodoGraficos = 'mes';
+            console.log('📊 "todos" seleccionado, usando "mes" para agrupar los gráficos');
+        }
+        
+        console.log(`📊 periodoGraficos FINAL: ${periodoGraficos}`);
+
+        // 5. Obtener datos agrupados con el período correcto
+        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodoGraficos);
+        datosAgrupadosActualesGlobal = datosAgrupados;
+        
+        // 6. Actualizar cards
+        actualizarCardsPromedioMotivosAgrupados(datosAgrupados);
+        actualizarCardPorcentajeQuiebresAgrupados(datosAgrupados);
+        
+        // ======================================================
+        // 7. DESTRUIR GRÁFICOS EXISTENTES
+        // ======================================================
+        destruirTodosLosGraficosCompleto();
+
+        // ======================================================
+        // 8. ACTUALIZAR GRÁFICOS - UNA SOLA VEZ CADA UNO
+        // ======================================================
+        generarEvolutivoAudiosAgrupado(datosAgrupados, periodoGraficos);
+        generarDistribucionRangosAgrupado(evaluacionesFiltradas, periodoGraficos);
+        generarEvolutivoQuiebresAgrupado(datosAgrupados);
+        generarGraficoComparativaAgrupado(evaluacionesFiltradas, periodoGraficos);
+        generarGraficoGestionLlamadas(evaluacionesFiltradas, periodoGraficos);
+        renderizarEvolutivoConDatosFiltrados(evaluacionesFiltradas, periodoGraficos);
+        generarEvolutivoCuartiles(evaluacionesFiltradas, datosAgrupados, periodoGraficos);
+
+        // ======================================================
+        // 9. ATRIBUTOS - SEGÚN VISTA
+        // ======================================================
+        if (vistaAtributosActual === 'general') {
+            generarEvolutivoAtributosAgrupado(evaluacionesFiltradas, datosAgrupados, periodoGraficos);
+        } else {
+            generarEvolutivoSubmotivosAgrupado(evaluacionesFiltradas, datosAgrupados, periodoGraficos);
+        }
+        
+        // ======================================================
+        // 10. GRÁFICOS DE REPORTES (no dependen del período)
+        // ======================================================
+        if (window.chartResultados) window.chartResultados.destroy();
+        if (window.chartTendencias) window.chartTendencias.destroy();
+        generarGraficosReportes(evaluacionesFiltradas);
+        
+        // ======================================================
+        // 11. Actualizar tabla evolutiva de indicadores
+        // ======================================================
+        console.log('📊 Actualizando tabla evolutiva con datos filtrados...');
+        if (typeof actualizarTablaEvolutivaIndicadores === 'function') {
+            await actualizarTablaEvolutivaIndicadores();
+        }
+        
+        // ======================================================
+        // 12. Forzar actualización del resumen por líder
+        // ======================================================
+        await cambiarAgrupacion();
+        
+        console.log('✅ Filtro aplicado correctamente');
+        
+        const mensajeTemporal = document.createElement('div');
+        mensajeTemporal.textContent = `📊 Mostrando ${evaluacionesFiltradas.length} evaluaciones`;
+        mensajeTemporal.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--ok); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1000; animation: fadeOut 2s ease forwards;';
+        document.body.appendChild(mensajeTemporal);
+        setTimeout(() => mensajeTemporal.remove(), 2000);
+        
+    } catch (error) {
+        console.error('Error aplicando filtro:', error);
+        alert('❌ Error al aplicar el filtro: ' + error.message);
+    } finally {
+        loadingDiv.remove();
     }
+}
 
 
     // ===== FIN FUNCIÓN: aplicarFiltroReportes ===============================
@@ -10231,9 +10813,15 @@ async function actualizarTablaEvolutivaIndicadores() {
     console.log('🧹 Limpiando filtros de reportes...');
 
     // ======================================================
-    // 1. RESETEAR TODAS LAS VARIABLES DE FILTRO
+    // 1. RESETEAR EL SELECTOR A "TODOS"
     // ======================================================
-    filtroPeriodoActual = 'dia';
+    const periodoSelect = document.getElementById('filtroPeriodoReportes');
+    if (periodoSelect) periodoSelect.value = 'todos';
+    
+    // ======================================================
+    // 2. RESETEAR TODAS LAS VARIABLES DE FILTRO
+    // ======================================================
+    filtroPeriodoActual = 'todos';
     filtroCantidadActual = 'all';
     filtroFechaInicioActual = null;
     filtroFechaFinActual = null;
@@ -10251,23 +10839,21 @@ async function actualizarTablaEvolutivaIndicadores() {
     filtroRangoFin = null;
     filtroMultiples = [];
 
-    const periodoSelect = document.getElementById('filtroPeriodoReportes');
-    if (periodoSelect) periodoSelect.value = 'mes';
+    // ======================================================
+    // 3. RENDERIZAR CONTROLES Y ACTUALIZAR INFO
+    // ======================================================
     renderizarControlesPeriodo();
+    actualizarInfoFiltro();
 
     // ======================================================
-    // 2. RESETEAR FILTRO POR LÍDER
+    // 4. RESETEAR FILTRO POR LÍDER
     // ======================================================
     liderSeleccionadoActual = 'todos';
     const selectLider = document.getElementById('selectFiltrarLider');
     if (selectLider) selectLider.value = 'todos';
-    document.querySelectorAll('.fila-lider').forEach(row => {
-        row.style.background = '';
-        row.style.fontWeight = 'normal';
-    });
 
     // ======================================================
-    // 3. RESETEAR FILTRO POR CUARTIL
+    // 5. RESETEAR FILTRO POR CUARTIL
     // ======================================================
     if (typeof cuartilActivoGlobal !== 'undefined') {
         cuartilActivoGlobal = 'todos';
@@ -10275,15 +10861,7 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
 
     // ======================================================
-    // 4. ACTUALIZAR INFORMACIÓN VISUAL
-    // ======================================================
-    const infoSpan = document.getElementById('infoRangoSeleccionado');
-    if (infoSpan) {
-        infoSpan.innerHTML = '📅 Mostrando TODOS los datos (sin filtros)';
-    }
-
-    // ======================================================
-    // 5. RECARGAR DATOS COMPLETOS
+    // 6. RECARGAR DATOS COMPLETOS
     // ======================================================
     if (!window.evaluacionesGlobales || window.evaluacionesGlobales.length === 0) {
         await cargarEvaluacionesDesdePostgreSQL();
@@ -10298,26 +10876,21 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
 
     // ======================================================
-    // 6. ACTUALIZAR DATOS FILTRADOS
+    // 7. ACTUALIZAR DATOS FILTRADOS CON TODOS LOS DATOS
     // ======================================================
     window.evaluacionesFiltradasGlobal = evaluacionesCompletas;
 
     // ======================================================
-    // 7. 🔴 ACTUALIZAR KPIs CON DATOS COMPLETOS
+    // 8. ACTUALIZAR KPIs CON DATOS COMPLETOS
     // ======================================================
     console.log('🔄 Actualizando KPIs con datos completos...');
     await actualizarKPIsConFiltro(evaluacionesCompletas);
 
     // ======================================================
-    // 8. 🔴 🔴 🔴 CLAVE: RECALCULAR TARJETAS DE PROMEDIOS 🔴 🔴 🔴
+    // 9. RECALCULAR TARJETAS DE PROMEDIOS
     // ======================================================
     console.log('🔄 Recalculando tarjetas de promedios...');
     actualizarCardsPromedioMotivos(evaluacionesCompletas);
-    
-    // ======================================================
-    // 9. 🔴 RECALCULAR TARJETA DE QUIEBRES
-    // ======================================================
-    console.log('🔄 Recalculando tarjeta de quiebres...');
     actualizarCardPorcentajeQuiebres(evaluacionesCompletas);
 
     // ======================================================
@@ -10346,10 +10919,22 @@ async function actualizarTablaEvolutivaIndicadores() {
     rankingCompletoGlobal = rankingCompleto;
     actualizarTablaRanking(rankingCompleto);
 
+    // ======================================================
+    // 12. ACTUALIZAR TABLA EVOLUTIVA Y JERARQUÍA
+    // ======================================================
+    console.log('📊 Actualizando tabla evolutiva con TODOS los datos...');
+    if (typeof actualizarTablaEvolutivaIndicadores === 'function') {
+        await actualizarTablaEvolutivaIndicadores();
+    }
+
+    console.log('📊 Actualizando análisis jerárquico con TODOS los datos...');
+    if (typeof generarTablaJerarquicaFallas === 'function') {
+        await generarTablaJerarquicaFallas(evaluacionesCompletas);
+    }
+
     window.evaluacionesFiltradasPorLider = null;
     
     console.log('✅ Filtros limpiados, mostrando todos los datos');
-    console.log(`   kpiPromedioENC: ${document.getElementById('kpiPromedioENC')?.textContent}`);
 }
     // ===== FIN FUNCIÓN: limpiarFiltrosReportes ==============================
     
@@ -10629,55 +11214,16 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
 
     // ===== 33. INICIO FUNCIÓN: filtrarEvaluacionesPorRangoFechas ============
     function filtrarEvaluacionesPorRangoFechas(evaluaciones, fechaInicio, fechaFin) {
-        if (!fechaInicio || !fechaFin) return evaluaciones;
-
-        // 🔴 Convertir a string YYYYMMDD para comparación exacta
-        const inicioComparable = fechaInicio.replace(/-/g, ''); // "2026-04-10" → "20260410"
-        const finComparable = fechaFin.replace(/-/g, '');       // "2026-04-10" → "20260410"
-
-        console.log(`📅 Filtro fechas: ${inicioComparable} - ${finComparable}`);
-
+        const inicio = new Date(fechaInicio + 'T00:00:00');
+        const fin = new Date(fechaFin + 'T23:59:59');
+        
         return evaluaciones.filter(eval => {
-            // Obtener fecha de la evaluación en formato YYYYMMDD
-            let fechaStr = eval.fechaOriginal || eval.fecha || '';
-            if (!fechaStr || fechaStr === 'Sin fecha') return false;
-
-            let fechaEvalComparable = null;
-
-            // Caso 1: "23/03/2026 14:49" o "23/03/2026"
-            if (fechaStr.includes('/')) {
-                const partesFecha = fechaStr.split(' ')[0].split('/');
-                if (partesFecha.length === 3) {
-                    // partesFecha = [dia, mes, anio] → "20260323"
-                    fechaEvalComparable = `${partesFecha[2]}${partesFecha[1]}${partesFecha[0]}`;
-                }
-            }
-
-            // Caso 2: "2026-03-23T14:49:00" (ISO)
-            if (!fechaEvalComparable && fechaStr.includes('T')) {
-                const [fechaParte] = fechaStr.split('T');
-                fechaEvalComparable = fechaParte.replace(/-/g, '');
-            }
-
-            // Caso 3: "2026-03-23 14:49:00"
-            if (!fechaEvalComparable && fechaStr.includes('-') && fechaStr.includes(':')) {
-                const [fechaParte] = fechaStr.split(' ');
-                fechaEvalComparable = fechaParte.replace(/-/g, '');
-            }
-
-            if (!fechaEvalComparable) {
-                console.warn('⚠️ Fecha no parseable:', fechaStr);
-                return false;
-            }
-
-            // Comparar como números (ej: 20260410 >= 20260410 && <= 20260410)
-            const fechaNum = parseInt(fechaEvalComparable, 10);
-            const inicioNum = parseInt(inicioComparable, 10);
-            const finNum = parseInt(finComparable, 10);
-
-            return fechaNum >= inicioNum && fechaNum <= finNum;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha >= inicio && fecha <= fin;
         });
     }
+
     // ===== FIN FUNCIÓN: filtrarEvaluacionesPorRangoFechas ===================
     
     // ===== 34. INICIO FUNCIÓN: filtrarEvaluacionesPorCantidadPeriodos =======
@@ -10715,6 +11261,14 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     // ===== 35. INICIO FUNCIÓN: agruparEvaluacionesPorPeriodo ================
     function agruparEvaluacionesPorPeriodo(evaluaciones, periodo) {
         if (evaluaciones.length === 0) return [];
+
+        // 🔴 SOLO SI ES 'todos', usar 'mes' (porque 'todos' no es un período de agrupación)
+        if (periodo === 'todos') {
+            periodo = 'mes';
+            console.log('📊 "todos" en agruparEvaluacionesPorPeriodo, usando "mes"');
+        }
+
+        console.log(`📊 agruparEvaluacionesPorPeriodo: ${evaluaciones.length} evaluaciones, período: ${periodo}`);
 
         const agrupado = {};
 
@@ -10811,6 +11365,7 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
             };
         });
 
+        console.log(`✅ Datos agrupados: ${resultados.length} períodos`);
         return resultados;
     }
     // ===== FIN FUNCIÓN: agruparEvaluacionesPorPeriodo =======================
@@ -11470,13 +12025,144 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     // ======================================================
     // ACTUALIZAR BADGE DEL PERÍODO SELECCIONADO
     // ======================================================
+    async function renderizarControlesPeriodo() {
+        const container = document.getElementById('periodoControlesContainer');
+        if (!container) return;
+        
+        const periodo = document.getElementById('filtroPeriodoReportes').value;
+        filtroPeriodoActual = periodo;
+        
+        // 🔴 ACTUALIZAR BADGE DEL PERÍODO
+        actualizarBadgePeriodo();
+        
+        let html = '';
+        
+        // ========== MODO "TODOS LOS DATOS" ==========
+        if (periodo === 'todos') {
+            html = `
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 500;">📊 Mostrando TODOS los datos históricos</span>
+                    <span style="font-size: 11px; color: var(--muted);">(sin filtros aplicados)</span>
+                </div>
+            `;
+        }
+        // ========== MODOS ESTÁNDAR ==========
+        else if (periodo === 'dia') {
+            html = `
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 500;">Desde:</span>
+                    <input type="date" id="filtroFechaInicioReportes" value="${filtroDiaDesde || ''}" 
+                        style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none;">
+                    <span style="color: #94a3b8;">→</span>
+                    <input type="date" id="filtroFechaFinReportes" value="${filtroDiaHasta || ''}" 
+                        style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none;">
+                </div>
+            `;
+        } else if (periodo === 'mes') {
+            const meses = await obtenerMesesDisponiblesDinamicos();
+            if (meses.length === 0) {
+                html = `<div style="color: #94a3b8; font-size: 12px;">⏳ Cargando meses disponibles...</div>`;
+            } else {
+                html = `
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                        <span style="font-size: 12px; color: #64748b; font-weight: 500;">Mes:</span>
+                        <select id="filtroMesSelect" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none; cursor: pointer; min-width: 140px;">
+                            <option value="">Seleccionar mes</option>
+                            ${meses.map(m => `<option value="${m.valor}">${m.label}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            }
+        } else if (periodo === 'trimestre') {
+            const trimestres = await obtenerTrimestresDisponiblesDinamicos();
+            if (trimestres.length === 0) {
+                html = `<div style="color: #94a3b8; font-size: 12px;">⏳ Cargando trimestres disponibles...</div>`;
+            } else {
+                html = `
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                        <span style="font-size: 12px; color: #64748b; font-weight: 500;">Trimestre:</span>
+                        <select id="filtroTrimSelect" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none; cursor: pointer; min-width: 140px;">
+                            <option value="">Seleccionar trimestre</option>
+                            ${trimestres.map(t => `<option value="${t.valor}">${t.label}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            }
+        } else if (periodo === 'anio') {
+            const anios = await obtenerAniosDisponiblesDinamicos();
+            if (anios.length === 0) {
+                html = `<div style="color: #94a3b8; font-size: 12px;">⏳ Cargando años disponibles...</div>`;
+            } else {
+                html = `
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                        <span style="font-size: 12px; color: #64748b; font-weight: 500;">Año:</span>
+                        <select id="filtroAnioSelect" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none; cursor: pointer; min-width: 120px;">
+                            <option value="">Seleccionar año</option>
+                            ${anios.map(a => `<option value="${a.valor}">${a.label}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            }
+        }
+        // ========== MODO RANGO ==========
+        else if (periodo === 'rango') {
+            html = `
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 500;">Tipo:</span>
+                    <select id="filtroRangoTipo" onchange="renderizarControlesRango()" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none; cursor: pointer; min-width: 120px;">
+                        <option value="">Seleccionar</option>
+                        <option value="mes">📅 Mes</option>
+                        <option value="trimestre">📊 Trimestre</option>
+                        <option value="anio">📅 Año</option>
+                        <option value="dia">📆 Día</option>
+                    </select>
+                    <div id="filtroRangoControlesContainer" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"></div>
+                </div>
+            `;
+        }
+        // ========== MODO MÚLTIPLES ==========
+        else if (periodo === 'multiples') {
+            html = `
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 500;">Tipo:</span>
+                    <select id="filtroMultiplesTipo" onchange="renderizarControlesMultiples()" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none; cursor: pointer; min-width: 120px;">
+                        <option value="">Seleccionar</option>
+                        <option value="mes">📅 Mes</option>
+                        <option value="trimestre">📊 Trimestre</option>
+                        <option value="anio">📅 Año</option>
+                        <option value="dia">📆 Día</option>
+                    </select>
+                    <div id="filtroMultiplesControlesContainer" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"></div>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+        
+        // Agregar event listeners
+        if (periodo !== 'todos') {
+            const inputs = container.querySelectorAll('input, select');
+            inputs.forEach(input => input.addEventListener('change', () => actualizarInfoFiltro()));
+        } else {
+            // Si es 'todos', actualizar la info inmediatamente
+            actualizarInfoFiltro();
+        }
+    }
+
+    // ======================================================
+    // ACTUALIZAR BADGE DEL PERÍODO SELECCIONADO
+    // ======================================================
     function actualizarBadgePeriodo() {
-        const periodo = document.getElementById('filtroPeriodoReportes')?.value || 'dia';
+        const periodo = document.getElementById('filtroPeriodoReportes')?.value || 'todos';
         const badge = document.getElementById('periodoActivoBadge');
         
-        if (!badge) return;
+        if (!badge) {
+            console.warn('⚠️ badge periodoActivoBadge no encontrado');
+            return;
+        }
         
         const nombres = {
+            'todos': 'TODOS LOS DATOS',
             'dia': 'DÍA',
             'mes': 'MES',
             'trimestre': 'TRIMESTRE',
@@ -11486,6 +12172,7 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         };
         
         const colores = {
+            'todos': '#6c757d',
             'dia': '#019DF4',
             'mes': '#28a745',
             'trimestre': '#7b1fa2',
@@ -11778,275 +12465,291 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         const mesesCortos = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
         
-        // 🔴 ACTUALIZAR VARIABLES GLOBALES con los valores actuales de los selects
-        switch (periodo) {
-            case 'dia':
-                filtroDiaDesde = document.getElementById('filtroFechaInicioReportes')?.value || null;
-                filtroDiaHasta = document.getElementById('filtroFechaFinReportes')?.value || null;
-                break;
-            case 'mes':
-                // Nuevos selectores más simples
-                break;
-            case 'trimestre':
-                // Nuevos selectores más simples
-                break;
-            case 'anio':
-                // Nuevos selectores más simples
-                break;
-            case 'rango':
-                // Valores se cargan dinámicamente según tipoRango
-                break;
-            case 'multiples':
-                // Valores se cargan dinámicamente en filtroMultiples
-                break;
-        }
-        
         let textoInfo = '';
         
-        switch (periodo) {
-            case 'dia':
-                if (filtroDiaDesde && filtroDiaHasta) {
-                    textoInfo = `📅 Mostrando datos del ${formatDateToDisplay(filtroDiaDesde)} al ${formatDateToDisplay(filtroDiaHasta)} | Período: Día`;
-                } else {
-                    textoInfo = `📅 Mostrando TODOS los datos (sin filtro de fechas) | Período: Día`;
-                }
-                break;
-                
-            case 'mes':
-                const mesVal = document.getElementById('filtroMesSelect')?.value;
-                if (mesVal) {
-                    const [anioM, mesM] = mesVal.split('-');
-                    const mesesNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-                    textoInfo = `📅 Mostrando ${mesesNames[parseInt(mesM) - 1]} ${anioM} | Período: Mes`;
-                } else {
-                    textoInfo = `📅 Seleccione un mes para filtrar | Período: Mes`;
-                }
-                break;
-                
-            case 'trimestre':
-                const trimVal = document.getElementById('filtroTrimSelect')?.value;
-                if (trimVal) {
-                    const [anioT, qT] = trimVal.split('-Q');
-                    textoInfo = `📊 Mostrando Q${qT} ${anioT} | Período: Trimestre`;
-                } else {
-                    textoInfo = `📊 Seleccione un trimestre para filtrar | Período: Trimestre`;
-                }
-                break;
-                
-            case 'anio':
-                const anioVal = document.getElementById('filtroAnioSelect')?.value;
-                if (anioVal) {
-                    textoInfo = `📅 Mostrando año ${anioVal} | Período: Año`;
-                } else {
-                    textoInfo = `📅 Seleccione un año para filtrar | Período: Año`;
-                }
-                break;
-                
-            case 'rango':
-                const tipoRango = document.getElementById('filtroRangoTipo')?.value;
-                if (tipoRango === 'dia') {
-                    const diaI = document.getElementById('filtroRangoDiaInicio')?.value;
-                    const diaF = document.getElementById('filtroRangoDiaFin')?.value;
-                    if (diaI && diaF) {
-                        textoInfo = `📅 Rango: ${formatDateToDisplay(diaI)} → ${formatDateToDisplay(diaF)} | Período: Rango de días`;
-                    } else {
-                        textoInfo = `📅 Seleccione rango de fechas | Período: Rango de días`;
-                    }
-                } else if (tipoRango === 'mes') {
-                    const mesInd = document.getElementById('filtroRangoMesInicio')?.value;
-                    const mesFin = document.getElementById('filtroRangoMesFin')?.value;
-                    if (mesInd && mesFin) {
-                        const [aI, mI] = mesInd.split('-');
-                        const [aF, mF] = mesFin.split('-');
-                        const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-                        textoInfo = `📅 Rango: ${meses[parseInt(mI) - 1]} ${aI} → ${meses[parseInt(mF) - 1]} ${aF} | Período: Rango de meses`;
-                    } else {
-                        textoInfo = `📅 Seleccione rango de meses | Período: Rango de meses`;
-                    }
-                } else if (tipoRango === 'trimestre') {
-                    const trimInd = document.getElementById('filtroRangoTrimInicio')?.value;
-                    const trimFin = document.getElementById('filtroRangoTrimFin')?.value;
-                    if (trimInd && trimFin) {
-                        const [aI, qI] = trimInd.split('-Q');
-                        const [aF, qF] = trimFin.split('-Q');
-                        textoInfo = `📊 Rango: Q${qI} ${aI} → Q${qF} ${aF} | Período: Rango de trimestres`;
-                    } else {
-                        textoInfo = `📊 Seleccione rango de trimestres | Período: Rango de trimestres`;
-                    }
-                } else if (tipoRango === 'anio') {
-                    const anioInd = document.getElementById('filtroRangoAnioInicio')?.value;
-                    const anioFin = document.getElementById('filtroRangoAnioFin')?.value;
-                    if (anioInd && anioFin) {
-                        textoInfo = `📅 Rango: ${anioInd} → ${anioFin} | Período: Rango de años`;
-                    } else {
-                        textoInfo = `📅 Seleccione rango de años | Período: Rango de años`;
-                    }
-                } else {
-                    textoInfo = `📊 Seleccione tipo y rango | Período: Rango de períodos`;
-                }
-                break;
-                
-            case 'multiples':
-                const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
-                if (filtroMultiples.length === 0) {
-                    textoInfo = `📌 Seleccione elementos | Período: Múltiples ${tipoMultiples || 'períodos'}`;
-                } else {
-                    if (tipoMultiples === 'dia') {
-                        const diasFormato = filtroMultiples.map(d => formatDateToDisplay(d)).slice(0, 3).join(', ');
-                        const mas = filtroMultiples.length > 3 ? `... +${filtroMultiples.length - 3}` : '';
-                        textoInfo = `📆 Mostrando ${filtroMultiples.length} día(s): ${diasFormato}${mas} | Período: Múltiples días`;
-                    } else if (tipoMultiples === 'mes') {
-                        const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-                        const mesesFormato = filtroMultiples.map(m => {
-                            const [a, me] = m.split('-');
-                            return `${meses[parseInt(me) - 1]} ${a}`;
-                        }).slice(0, 3).join(', ');
-                        const mas = filtroMultiples.length > 3 ? `... +${filtroMultiples.length - 3}` : '';
-                        textoInfo = `📅 Mostrando ${filtroMultiples.length} mes(es): ${mesesFormato}${mas} | Período: Múltiples meses`;
-                    } else if (tipoMultiples === 'trimestre') {
-                        const trimFormato = filtroMultiples.map(t => {
-                            const [a, q] = t.split('-Q');
-                            return `Q${q} ${a}`;
-                        }).slice(0, 3).join(', ');
-                        const mas = filtroMultiples.length > 3 ? `... +${filtroMultiples.length - 3}` : '';
-                        textoInfo = `📊 Mostrando ${filtroMultiples.length} trimestre(s): ${trimFormato}${mas} | Período: Múltiples trimestres`;
-                    } else if (tipoMultiples === 'anio') {
-                        const aniosFormato = filtroMultiples.slice(0, 3).join(', ');
-                        const mas = filtroMultiples.length > 3 ? `... +${filtroMultiples.length - 3}` : '';
-                        textoInfo = `📅 Mostrando ${filtroMultiples.length} año(s): ${aniosFormato}${mas} | Período: Múltiples años`;
-                    } else {
-                        textoInfo = `📌 Mostrando ${filtroMultiples.length} elemento(s) | Período: Múltiples períodos`;
-                    }
-                }
-                break;
-                
-            default:
-                textoInfo = `💡 Seleccione un período para visualizar los datos agrupados`;
+        // ========== MODO "TODOS LOS DATOS" ==========
+        if (periodo === 'todos') {
+            textoInfo = `📊 Mostrando TODOS los datos históricos (sin filtros)`;
+        }
+        // ========== RESTO DE PERÍODOS ==========
+        else if (periodo === 'dia') {
+            filtroDiaDesde = document.getElementById('filtroFechaInicioReportes')?.value || null;
+            filtroDiaHasta = document.getElementById('filtroFechaFinReportes')?.value || null;
+            
+            if (filtroDiaDesde && filtroDiaHasta) {
+                textoInfo = `📅 Mostrando datos del ${formatDateToDisplay(filtroDiaDesde)} al ${formatDateToDisplay(filtroDiaHasta)} | Período: Día`;
+            } else {
+                textoInfo = `📅 Seleccione un rango de fechas | Período: Día`;
+            }
+        } else if (periodo === 'mes') {
+            const mesVal = document.getElementById('filtroMesSelect')?.value;
+            if (mesVal) {
+                const [anioM, mesM] = mesVal.split('-');
+                textoInfo = `📅 Mostrando ${meses[parseInt(mesM) - 1]} ${anioM} | Período: Mes`;
+            } else {
+                textoInfo = `📅 Seleccione un mes para filtrar | Período: Mes`;
+            }
+        } else if (periodo === 'trimestre') {
+            const trimVal = document.getElementById('filtroTrimSelect')?.value;
+            if (trimVal) {
+                const [anioT, qT] = trimVal.split('-Q');
+                textoInfo = `📊 Mostrando Q${qT} ${anioT} | Período: Trimestre`;
+            } else {
+                textoInfo = `📊 Seleccione un trimestre para filtrar | Período: Trimestre`;
+            }
+        } else if (periodo === 'anio') {
+            const anioVal = document.getElementById('filtroAnioSelect')?.value;
+            if (anioVal) {
+                textoInfo = `📅 Mostrando año ${anioVal} | Período: Año`;
+            } else {
+                textoInfo = `📅 Seleccione un año para filtrar | Período: Año`;
+            }
+        } else if (periodo === 'rango') {
+            // ... (código existente para rango)
+            textoInfo = textoInfo || `📊 Seleccione tipo y rango | Período: Rango de períodos`;
+        } else if (periodo === 'multiples') {
+            // ... (código existente para multiples)
+            textoInfo = textoInfo || `📌 Seleccione elementos | Período: Múltiples períodos`;
+        } else {
+            textoInfo = `💡 Seleccione un período para visualizar los datos agrupados`;
         }
         
         infoSpan.innerHTML = textoInfo;
     }
 
-    // Obtener evaluaciones filtradas según el período seleccionado
-    function obtenerEvaluacionesFiltradasPorPeriodo(evaluaciones) {
-        const periodo = filtroPeriodoActual;
-        
-        // ========== MODOS ESTÁNDAR ==========
-        if (periodo === 'dia') {
-            const fechaInicio = document.getElementById('filtroFechaInicioReportes')?.value;
-            const fechaFin = document.getElementById('filtroFechaFinReportes')?.value;
-            if (fechaInicio && fechaFin) {
-                return filtrarEvaluacionesPorRangoFechas(evaluaciones, fechaInicio, fechaFin);
-            }
-            return evaluaciones;
-        }
-        else if (periodo === 'mes') {
-            const mesSelect = document.getElementById('filtroMesSelect')?.value;
-            if (mesSelect) {
-                const [anio, mes] = mesSelect.split('-');
-                return filtrarEvaluacionesPorMesEspecifico(evaluaciones, parseInt(anio), parseInt(mes));
-            }
-            return evaluaciones;
-        }
-        else if (periodo === 'trimestre') {
-            const trimSelect = document.getElementById('filtroTrimSelect')?.value;
-            if (trimSelect) {
-                const [anio, qTrim] = trimSelect.split('-Q');
-                return filtrarEvaluacionesPorTrimestre(evaluaciones, parseInt(anio), parseInt(qTrim));
-            }
-            return evaluaciones;
-        }
-        else if (periodo === 'anio') {
-            const anioSelect = document.getElementById('filtroAnioSelect')?.value;
-            if (anioSelect) {
-                return filtrarEvaluacionesPorAnio(evaluaciones, parseInt(anioSelect));
-            }
-            return evaluaciones;
-        }
-        // ========== MODO RANGO ==========
-        else if (periodo === 'rango') {
-            const tipoRango = document.getElementById('filtroRangoTipo')?.value;
-            
-            if (tipoRango === 'dia') {
-                const fechaInicio = document.getElementById('filtroRangoDiaInicio')?.value;
-                const fechaFin = document.getElementById('filtroRangoDiaFin')?.value;
-                if (fechaInicio && fechaFin) {
-                    return filtrarEvaluacionesPorRangoFechas(evaluaciones, fechaInicio, fechaFin);
-                }
-            }
-            else if (tipoRango === 'mes') {
-                const mesInicio = document.getElementById('filtroRangoMesInicio')?.value;
-                const mesFin = document.getElementById('filtroRangoMesFin')?.value;
-                if (mesInicio && mesFin) {
-                    const [anioI, mesI] = mesInicio.split('-');
-                    const [anioF, mesF] = mesFin.split('-');
-                    return filtrarEvaluacionesPorRangoMeses(evaluaciones, parseInt(anioI), parseInt(mesI), parseInt(anioF), parseInt(mesF));
-                }
-            }
-            else if (tipoRango === 'trimestre') {
-                const trimInicio = document.getElementById('filtroRangoTrimInicio')?.value;
-                const trimFin = document.getElementById('filtroRangoTrimFin')?.value;
-                if (trimInicio && trimFin) {
-                    const [anioI, qI] = trimInicio.split('-Q');
-                    const [anioF, qF] = trimFin.split('-Q');
-                    return filtrarEvaluacionesPorRangoTrimestres(evaluaciones, parseInt(anioI), parseInt(qI), parseInt(anioF), parseInt(qF));
-                }
-            }
-            else if (tipoRango === 'anio') {
-                const anioInicio = document.getElementById('filtroRangoAnioInicio')?.value;
-                const anioFin = document.getElementById('filtroRangoAnioFin')?.value;
-                if (anioInicio && anioFin) {
-                    return filtrarEvaluacionesPorRangoAnios(evaluaciones, parseInt(anioInicio), parseInt(anioFin));
-                }
-            }
-            
-            return evaluaciones;
-        }
-        // ========== MODO MÚLTIPLES ==========
-        else if (periodo === 'multiples') {
-            const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
-            
-            if (filtroMultiples.length === 0) return evaluaciones;
-            
-            if (tipoMultiples === 'dia') {
-                return filtrarEvaluacionesPorMultiplesDias(evaluaciones, filtroMultiples);
-            }
-            else if (tipoMultiples === 'mes') {
-                return filtrarEvaluacionesPorMultiplesMeses(evaluaciones, filtroMultiples);
-            }
-            else if (tipoMultiples === 'trimestre') {
-                return filtrarEvaluacionesPorMultiplesTrimestres(evaluaciones, filtroMultiples);
-            }
-            else if (tipoMultiples === 'anio') {
-                return filtrarEvaluacionesPorMultiplesAnios(evaluaciones, filtroMultiples);
-            }
-            
-            return evaluaciones;
-        }
-        
+    // ======================================================
+// FUNCIÓN: obtenerEvaluacionesFiltradasPorPeriodo (COMPLETA)
+// ======================================================
+function obtenerEvaluacionesFiltradasPorPeriodo(evaluaciones) {
+    console.log('📅 obtenerEvaluacionesFiltradasPorPeriodo - INICIO');
+    console.log(`   Período actual: ${filtroPeriodoActual}`);
+    console.log(`   Evaluaciones disponibles: ${evaluaciones?.length || 0}`);
+    
+    // 🔴 VALIDACIÓN INICIAL
+    if (!evaluaciones || evaluaciones.length === 0) {
+        console.log('⚠️ No hay evaluaciones para filtrar');
+        return [];
+    }
+    
+    const periodo = filtroPeriodoActual;
+    
+    // ======================================================
+    // MODO 1: "TODOS LOS DATOS" - Sin ningún filtro
+    // ======================================================
+    if (periodo === 'todos') {
+        console.log('📊 Mostrando TODOS los datos históricos (sin filtros)');
         return evaluaciones;
     }
+    
+    // ======================================================
+    // MODO 2: PERÍODO "DÍA" - Rango de fechas específico
+    // ======================================================
+    if (periodo === 'dia') {
+        const fechaInicio = document.getElementById('filtroFechaInicioReportes')?.value;
+        const fechaFin = document.getElementById('filtroFechaFinReportes')?.value;
+        
+        if (fechaInicio && fechaFin) {
+            console.log(`📅 Filtrando por rango de fechas: ${fechaInicio} → ${fechaFin}`);
+            const filtradas = filtrarEvaluacionesPorRangoFechas(evaluaciones, fechaInicio, fechaFin);
+            console.log(`   ✅ ${filtradas.length} evaluaciones en el rango`);
+            return filtradas;
+        }
+        
+        console.log('⚠️ No hay fechas seleccionadas para el período "dia", devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 3: PERÍODO "MES" - Mes específico
+    // ======================================================
+    if (periodo === 'mes') {
+        const mesSelect = document.getElementById('filtroMesSelect');
+        const mesVal = mesSelect?.value;
+        
+        if (mesVal) {
+            const [anio, mes] = mesVal.split('-');
+            console.log(`📅 Filtrando por mes: ${mes}/${anio}`);
+            const filtradas = filtrarEvaluacionesPorMesEspecifico(evaluaciones, parseInt(anio), parseInt(mes));
+            console.log(`   ✅ ${filtradas.length} evaluaciones en el mes`);
+            return filtradas;
+        }
+        
+        console.log('⚠️ No hay mes seleccionado para el período "mes", devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 4: PERÍODO "SEMANA" - Semana específica
+    // ======================================================
+    if (periodo === 'semana') {
+        const anioSelect = document.getElementById('filtroSemanaAnio');
+        const semanaSelect = document.getElementById('filtroSemanaNumero');
+        
+        const anio = anioSelect?.value;
+        const semana = semanaSelect?.value;
+        
+        if (anio && semana) {
+            console.log(`📅 Filtrando por semana: Semana ${semana} de ${anio}`);
+            const filtradas = filtrarEvaluacionesPorSemana(evaluaciones, parseInt(anio), parseInt(semana));
+            console.log(`   ✅ ${filtradas.length} evaluaciones en la semana`);
+            return filtradas;
+        }
+        
+        console.log('⚠️ No hay semana seleccionada, devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 5: PERÍODO "TRIMESTRE" - Trimestre específico
+    // ======================================================
+    if (periodo === 'trimestre') {
+        const trimSelect = document.getElementById('filtroTrimSelect');
+        const trimVal = trimSelect?.value;
+        
+        if (trimVal) {
+            const [anio, q] = trimVal.split('-Q');
+            console.log(`📅 Filtrando por trimestre: Q${q} de ${anio}`);
+            const filtradas = filtrarEvaluacionesPorTrimestre(evaluaciones, parseInt(anio), parseInt(q));
+            console.log(`   ✅ ${filtradas.length} evaluaciones en el trimestre`);
+            return filtradas;
+        }
+        
+        console.log('⚠️ No hay trimestre seleccionado, devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 6: PERÍODO "AÑO" - Año específico
+    // ======================================================
+    if (periodo === 'anio') {
+        const anioSelect = document.getElementById('filtroAnioSelect');
+        const anioVal = anioSelect?.value;
+        
+        if (anioVal) {
+            console.log(`📅 Filtrando por año: ${anioVal}`);
+            const filtradas = filtrarEvaluacionesPorAnio(evaluaciones, parseInt(anioVal));
+            console.log(`   ✅ ${filtradas.length} evaluaciones en el año`);
+            return filtradas;
+        }
+        
+        console.log('⚠️ No hay año seleccionado, devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 7: PERÍODO "RANGO" - Rango de períodos (meses, trimestres, años, días)
+    // ======================================================
+    if (periodo === 'rango') {
+        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        console.log(`📊 Filtrando por RANGO de tipo: ${tipoRango || 'no seleccionado'}`);
+        
+        if (tipoRango === 'dia') {
+            const inicio = document.getElementById('filtroRangoDiaInicio')?.value;
+            const fin = document.getElementById('filtroRangoDiaFin')?.value;
+            if (inicio && fin) {
+                console.log(`   📅 Días: ${inicio} → ${fin}`);
+                const filtradas = filtrarEvaluacionesPorRangoFechas(evaluaciones, inicio, fin);
+                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de días`);
+                return filtradas;
+            }
+        } else if (tipoRango === 'mes') {
+            const inicio = document.getElementById('filtroRangoMesInicio')?.value;
+            const fin = document.getElementById('filtroRangoMesFin')?.value;
+            if (inicio && fin) {
+                const [anioI, mesI] = inicio.split('-');
+                const [anioF, mesF] = fin.split('-');
+                console.log(`   📅 Meses: ${mesI}/${anioI} → ${mesF}/${anioF}`);
+                const filtradas = filtrarEvaluacionesPorRangoMeses(evaluaciones, parseInt(anioI), parseInt(mesI), parseInt(anioF), parseInt(mesF));
+                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de meses`);
+                return filtradas;
+            }
+        } else if (tipoRango === 'trimestre') {
+            const inicio = document.getElementById('filtroRangoTrimInicio')?.value;
+            const fin = document.getElementById('filtroRangoTrimFin')?.value;
+            if (inicio && fin) {
+                const [anioI, qI] = inicio.split('-Q');
+                const [anioF, qF] = fin.split('-Q');
+                console.log(`   📅 Trimestres: Q${qI} ${anioI} → Q${qF} ${anioF}`);
+                const filtradas = filtrarEvaluacionesPorRangoTrimestres(evaluaciones, parseInt(anioI), parseInt(qI), parseInt(anioF), parseInt(qF));
+                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de trimestres`);
+                return filtradas;
+            }
+        } else if (tipoRango === 'anio') {
+            const inicio = document.getElementById('filtroRangoAnioInicio')?.value;
+            const fin = document.getElementById('filtroRangoAnioFin')?.value;
+            if (inicio && fin) {
+                console.log(`   📅 Años: ${inicio} → ${fin}`);
+                const filtradas = filtrarEvaluacionesPorRangoAnios(evaluaciones, parseInt(inicio), parseInt(fin));
+                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de años`);
+                return filtradas;
+            }
+        }
+        
+        console.log('⚠️ No hay rango seleccionado o tipo no válido, devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 8: PERÍODO "MÚLTIPLES" - Múltiples períodos seleccionados
+    // ======================================================
+    if (periodo === 'multiples') {
+        const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+        console.log(`📊 Filtrando por MÚLTIPLES de tipo: ${tipoMultiples || 'no seleccionado'}`);
+        
+        if (filtroMultiples && filtroMultiples.length > 0) {
+            console.log(`   📋 Elementos seleccionados: ${filtroMultiples.length}`);
+            
+            if (tipoMultiples === 'dia') {
+                const filtradas = filtrarEvaluacionesPorMultiplesDias(evaluaciones, filtroMultiples);
+                console.log(`   ✅ ${filtradas.length} evaluaciones en los días seleccionados`);
+                return filtradas;
+            } else if (tipoMultiples === 'mes') {
+                const filtradas = filtrarEvaluacionesPorMultiplesMeses(evaluaciones, filtroMultiples);
+                console.log(`   ✅ ${filtradas.length} evaluaciones en los meses seleccionados`);
+                return filtradas;
+            } else if (tipoMultiples === 'trimestre') {
+                const filtradas = filtrarEvaluacionesPorMultiplesTrimestres(evaluaciones, filtroMultiples);
+                console.log(`   ✅ ${filtradas.length} evaluaciones en los trimestres seleccionados`);
+                return filtradas;
+            } else if (tipoMultiples === 'anio') {
+                const filtradas = filtrarEvaluacionesPorMultiplesAnios(evaluaciones, filtroMultiples);
+                console.log(`   ✅ ${filtradas.length} evaluaciones en los años seleccionados`);
+                return filtradas;
+            }
+        }
+        
+        console.log('⚠️ No hay elementos múltiples seleccionados, devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // CASO POR DEFECTO: Si ningún filtro coincide, devolver TODAS
+    // ======================================================
+    console.log(`⚠️ Período "${periodo}" no reconocido, devolviendo TODAS las evaluaciones`);
+    return evaluaciones;
+}
 
     // Filtrar por semana específica
     function filtrarEvaluacionesPorSemana(evaluaciones, anio, semana) {
-        // Obtener fechas de inicio y fin de la semana
         const fechaInicio = obtenerFechaInicioSemana(anio, semana);
         const fechaFin = new Date(fechaInicio);
         fechaFin.setDate(fechaFin.getDate() + 6);
+        fechaFin.setHours(23, 59, 59, 999);
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval >= fechaInicio && fechaEval <= fechaFin;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha >= fechaInicio && fecha <= fechaFin;
         });
     }
+
 
     // Filtrar por mes específico
     function filtrarEvaluacionesPorMesEspecifico(evaluaciones, anio, mes) {
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval.getFullYear() === anio && (fechaEval.getMonth() + 1) === mes;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha.getFullYear() === anio && (fecha.getMonth() + 1) === mes;
         });
     }
 
@@ -12056,19 +12759,19 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         const mesFin = trimestre * 3;
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            const mes = fechaEval.getMonth() + 1;
-            return fechaEval.getFullYear() === anio && mes >= mesInicio && mes <= mesFin;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            const mes = fecha.getMonth() + 1;
+            return fecha.getFullYear() === anio && mes >= mesInicio && mes <= mesFin;
         });
     }
 
     // Filtrar por año específico
     function filtrarEvaluacionesPorAnio(evaluaciones, anio) {
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval.getFullYear() === anio;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha.getFullYear() === anio;
         });
     }
 
@@ -12077,27 +12780,29 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     // Filtrar por rango de meses (desde mesDesde hasta mesHasta)
     function filtrarEvaluacionesPorRangoMeses(evaluaciones, desdeAnio, desdeMes, hastaAnio, hastaMes) {
         const fechaDesde = new Date(desdeAnio, desdeMes - 1, 1);
-        const fechaHasta = new Date(hastaAnio, hastaMes, 0); // Último día del mes
+        const fechaHasta = new Date(hastaAnio, hastaMes, 0);
+        fechaHasta.setHours(23, 59, 59, 999);
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval >= fechaDesde && fechaEval <= fechaHasta;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha >= fechaDesde && fecha <= fechaHasta;
         });
     }
     
     // Filtrar por rango de trimestres (desde trimDesde hasta trimHasta)
     function filtrarEvaluacionesPorRangoTrimestres(evaluaciones, desdeAnio, desdeTrim, hastaAnio, hastaTrim) {
         const mesDesde = (desdeTrim - 1) * 3 + 1;
-        const mesFin = hastaTrim * 3;
+        const mesHasta = hastaTrim * 3;
         
         const fechaDesde = new Date(desdeAnio, mesDesde - 1, 1);
-        const fechaHasta = new Date(hastaAnio, mesFin, 0); // Último día del mes final
+        const fechaHasta = new Date(hastaAnio, mesHasta, 0);
+        fechaHasta.setHours(23, 59, 59, 999);
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval >= fechaDesde && fechaEval <= fechaHasta;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha >= fechaDesde && fecha <= fechaHasta;
         });
     }
     
@@ -12105,11 +12810,12 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     function filtrarEvaluacionesPorRangoAnios(evaluaciones, desdeAnio, hastaAnio) {
         const fechaDesde = new Date(desdeAnio, 0, 1);
         const fechaHasta = new Date(hastaAnio, 11, 31);
+        fechaHasta.setHours(23, 59, 59, 999);
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval >= fechaDesde && fechaEval <= fechaHasta;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha >= fechaDesde && fecha <= fechaHasta;
         });
     }
     
@@ -12119,17 +12825,16 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     function filtrarEvaluacionesPorMultiplesDias(evaluaciones, diasSeleccionados) {
         if (!diasSeleccionados || diasSeleccionados.length === 0) return evaluaciones;
         
-        // Convertir strings de fechas a objetos Date
         const diasObjetos = diasSeleccionados.map(dia => new Date(dia + 'T00:00:00'));
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
             
             return diasObjetos.some(dia => {
-                return fechaEval.getFullYear() === dia.getFullYear() &&
-                       fechaEval.getMonth() === dia.getMonth() &&
-                       fechaEval.getDate() === dia.getDate();
+                return fecha.getFullYear() === dia.getFullYear() &&
+                    fecha.getMonth() === dia.getMonth() &&
+                    fecha.getDate() === dia.getDate();
             });
         });
     }
@@ -12139,14 +12844,14 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         if (!mesesSeleccionados || mesesSeleccionados.length === 0) return evaluaciones;
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
             
-            const anioDel = fechaEval.getFullYear();
-            const mesDel = String(fechaEval.getMonth() + 1).padStart(2, '0');
-            const mesEvalStr = `${anioDel}-${mesDel}`;
+            const anio = fecha.getFullYear();
+            const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+            const clave = `${anio}-${mes}`;
             
-            return mesesSeleccionados.includes(mesEvalStr);
+            return mesesSeleccionados.includes(clave);
         });
     }
     
@@ -12155,14 +12860,14 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         if (!trimestresSeleccionados || trimestresSeleccionados.length === 0) return evaluaciones;
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
             
-            const anio = fechaEval.getFullYear();
-            const trimestre = Math.floor(fechaEval.getMonth() / 3) + 1;
-            const trimEvalStr = `${anio}-Q${trimestre}`;
+            const anio = fecha.getFullYear();
+            const trimestre = Math.floor(fecha.getMonth() / 3) + 1;
+            const clave = `${anio}-Q${trimestre}`;
             
-            return trimestresSeleccionados.includes(trimEvalStr);
+            return trimestresSeleccionados.includes(clave);
         });
     }
     
@@ -12173,10 +12878,9 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         const aniosNum = aniosSeleccionados.map(a => parseInt(a));
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            
-            return aniosNum.includes(fechaEval.getFullYear());
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return aniosNum.includes(fecha.getFullYear());
         });
     }
 
@@ -20912,47 +21616,126 @@ function generarDocumentoHTML(data) {
     }
     // ===== FIN FUNCIÓN: generarDetalleErroresAuditorHTML ===================
 
-    // ===== 28. INICIO FUNCIÓN: calcularProductividadAuditor ================
-    async function calcularProductividadAuditor(evaluaciones) {
-        if (!evaluaciones || evaluaciones.length === 0) {
-            return { porAuditor: 0, capacidadTotal: 0 };
+    // ======================================================
+// FUNCIÓN: calcularProductividadAuditor (CON TOKEN RENOVADO)
+// ======================================================
+async function calcularProductividadAuditor(evaluaciones) {
+    console.log('📊 calcularProductividadAuditor - INICIO');
+    console.log(`   Evaluaciones recibidas: ${evaluaciones?.length || 0}`);
+    
+    if (!evaluaciones || evaluaciones.length === 0) {
+        console.log('⚠️ No hay evaluaciones, retornando 0');
+        return { porAuditor: 0, capacidadTotal: 0 };
+    }
+
+    try {
+        // 🔴 OBTENER TOKEN ACTUAL
+        const token = localStorage.getItem('meca_token');
+        
+        if (!token) {
+            console.warn('⚠️ No hay token disponible, usando fallback local');
+            return calcularProductividadLocal(evaluaciones);
         }
 
+        // 🔴 OBTENER AUDITORES ACTIVOS DESDE LA BD CON EL TOKEN
+        let auditoresActivos = [];
+        let errorAutenticacion = false;
+        
         try {
-            // 🔴 CAMBIO: Usar API en lugar de PostgreSQL directo
-            const auditores = await API.getAuditoresActivos();
-            
-            const numeroAuditores = auditores?.length || 2;
-
-            // Obtener días únicos trabajados
-            let fechasUnicas = [];
-            evaluaciones.forEach(e => {
-                let fechaStr = e.fechaOriginal || e.fecha || '';
-                if (fechaStr) {
-                    let fechaSolo = fechaStr.split(' ')[0];
-                    if (fechaSolo && !fechasUnicas.includes(fechaSolo)) {
-                        fechasUnicas.push(fechaSolo);
-                    }
+            console.log('📡 Solicitando auditores activos a la BD...');
+            const response = await fetch('/api/usuarios/auditores-activos', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
                 }
             });
+            
+            if (!response.ok) {
+                if (response.status === 401) {
+                    console.warn('⚠️ Token expirado o inválido. Intentando renovar...');
+                    errorAutenticacion = true;
+                    
+                    // Intentar renovar sesión
+                    const renovado = await renovarSesion();
+                    if (renovado) {
+                        // Reintentar con el nuevo token
+                        const nuevoToken = localStorage.getItem('meca_token');
+                        const retryResponse = await fetch('/api/usuarios/auditores-activos', {
+                            headers: {
+                                'Authorization': `Bearer ${nuevoToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        if (retryResponse.ok) {
+                            auditoresActivos = await retryResponse.json();
+                            console.log(`   ✅ ${auditoresActivos.length} auditores activos (después de renovar)`);
+                        }
+                    }
+                } else {
+                    console.warn(`⚠️ Error ${response.status} al obtener auditores`);
+                }
+            } else {
+                auditoresActivos = await response.json();
+                console.log(`   ✅ ${auditoresActivos.length} auditores activos desde BD`);
+            }
+        } catch (fetchError) {
+            console.warn('⚠️ Error de red al obtener auditores:', fetchError.message);
+        }
 
-            const diasTrabajados = fechasUnicas.length;
-            if (diasTrabajados === 0) return { porAuditor: 0, capacidadTotal: 0 };
+        // 🔴 FALLBACK: Si no se obtuvieron auditores de la BD, contar de evaluaciones
+        if (auditoresActivos.length === 0) {
+            console.log('📊 Usando fallback: auditores desde evaluaciones');
+            const auditoresSet = new Set();
+            evaluaciones.forEach(e => {
+                if (e.evaluador) auditoresSet.add(e.evaluador);
+            });
+            auditoresActivos = Array.from(auditoresSet);
+            console.log(`   👥 ${auditoresActivos.length} auditores únicos desde evaluaciones`);
+        }
 
-            const totalEvaluaciones = evaluaciones.length;
-            const productividadReal = totalEvaluaciones / (numeroAuditores * diasTrabajados);
-            const capacidadReal = totalEvaluaciones / diasTrabajados;
+        const numeroAuditores = Math.max(auditoresActivos.length, 1);
+        console.log(`   👥 Auditores considerados: ${numeroAuditores}`);
 
-            return {
-                porAuditor: Math.round(productividadReal),
-                capacidadTotal: Math.round(capacidadReal)
-            };
+        // Obtener días únicos trabajados
+        const fechasUnicas = new Set();
+        evaluaciones.forEach(e => {
+            let fechaStr = e.fechaOriginal || e.fecha || '';
+            if (fechaStr) {
+                let fechaSolo = fechaStr.split(' ')[0];
+                if (fechaSolo) {
+                    fechasUnicas.add(fechaSolo);
+                }
+            }
+        });
 
-        } catch (error) {
-            console.error('Error calculando productividad:', error);
+        const diasTrabajados = fechasUnicas.size;
+        console.log(`   📅 Días trabajados: ${diasTrabajados}`);
+        
+        if (diasTrabajados === 0) {
+            console.log('⚠️ No hay días trabajados, retornando 0');
             return { porAuditor: 0, capacidadTotal: 0 };
         }
+
+        const totalEvaluaciones = evaluaciones.length;
+        console.log(`   📊 Total evaluaciones: ${totalEvaluaciones}`);
+        
+        const productividadReal = totalEvaluaciones / (numeroAuditores * diasTrabajados);
+        const capacidadReal = totalEvaluaciones / diasTrabajados;
+
+        const resultado = {
+            porAuditor: Math.round(productividadReal * 10) / 10,
+            capacidadTotal: Math.round(capacidadReal * 10) / 10
+        };
+        
+        console.log(`   ✅ Resultado: porAuditor=${resultado.porAuditor}, capacidadTotal=${resultado.capacidadTotal}`);
+        return resultado;
+
+    } catch (error) {
+        console.error('❌ Error calculando productividad:', error);
+        // Fallback final
+        return calcularProductividadLocal(evaluaciones);
     }
+}
     // ===== FIN FUNCIÓN: calcularProductividadAuditor =======================
 
 // =============================CIERRE BLOQUE 6==========================================    
@@ -33768,57 +34551,87 @@ async function showTab(tabName, event) {
     
     // ===== 19. INICIO FUNCIÓN: destruirGraficoPorCanvas ====================
     function destruirGraficoPorCanvas(canvasId) {
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return false;
-
-        // Buscar la instancia del gráfico por su ID
-        const chartKey = `chart-${canvasId}`;
-
-        // Método 1: Buscar en window por nombre común
-        const posiblesNombres = [
-            canvasId,
-            chartKey,
-            `chart_${canvasId}`,
-            canvasId.replace('chart', '').toLowerCase()
-        ];
-
-        for (const nombre of posiblesNombres) {
-            if (window[nombre] && typeof window[nombre].destroy === 'function') {
-                try {
-                    window[nombre].destroy();
-                    window[nombre] = null;
-                    console.log(`✅ Gráfico "${nombre}" destruido`);
-                    return true;
-                } catch (e) {
-                    console.warn(`Error destruyendo ${nombre}:`, e.message);
-                }
-            }
-        }
-
-        // Método 2: Buscar en Chart.instances (si existe)
-        if (Chart && Chart.instances) {
-            for (const [id, instance] of Object.entries(Chart.instances)) {
-                if (instance.canvas && instance.canvas.id === canvasId) {
-                    try {
-                        instance.destroy();
-                        console.log(`✅ Gráfico con canvas "${canvasId}" destruido vía Chart.instances`);
-                        return true;
-                    } catch (e) { }
-                }
-            }
-        }
-
-        // Método 3: Limpiar el canvas manualmente
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            canvas.width = canvas.clientWidth;
-            canvas.height = canvas.clientHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            console.log(`🧹 Canvas "${canvasId}" limpiado manualmente`);
-        }
-
+    console.log(`🧹 destruirGraficoPorCanvas - Intentando destruir: ${canvasId}`);
+    
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        console.log(`   Canvas ${canvasId} no encontrado en el DOM`);
         return false;
     }
+
+    // 🔴 MÉTODO 1: Buscar en Chart.instances (la más confiable)
+    if (Chart && Chart.instances) {
+        let instanciaEncontrada = null;
+        for (const [id, instance] of Object.entries(Chart.instances)) {
+            if (instance.canvas && instance.canvas.id === canvasId) {
+                instanciaEncontrada = instance;
+                break;
+            }
+        }
+        if (instanciaEncontrada) {
+            try {
+                instanciaEncontrada.destroy();
+                console.log(`✅ Gráfico con canvas "${canvasId}" destruido vía Chart.instances`);
+                return true;
+            } catch (e) {
+                console.warn(`   Error destruyendo instancia:`, e);
+            }
+        }
+    }
+
+    // 🔴 MÉTODO 2: Buscar en window por nombres comunes
+    const posiblesNombres = [
+        canvasId,
+        `chart${canvasId.charAt(0).toUpperCase() + canvasId.slice(1)}`,
+        `chart_${canvasId}`,
+        canvasId.replace('chart', '').toLowerCase(),
+        // Nombres específicos para este caso
+        'chartEvolutivoCuartiles',
+        'chartComparativa',
+        'chartGestionLlamadas',
+        'chartDistribucionRangos',
+        'chartEvolutivoAudios',
+        'chartEvolutivoAtributos',
+        'chartEvolutivoQuiebres',
+        'chartEvolutivo',
+        'chartEvolutivoFrentes',
+        'chartResultados',
+        'chartTendencias',
+        'chartAuditoriasPorAuditor',
+        'chartEvolutivoAuditorias',
+        'chartTablasSize'
+    ];
+
+    for (const nombre of posiblesNombres) {
+        if (window[nombre] && typeof window[nombre].destroy === 'function') {
+            try {
+                window[nombre].destroy();
+                window[nombre] = null;
+                console.log(`✅ Gráfico "${nombre}" destruido desde window`);
+                return true;
+            } catch (e) {
+                console.warn(`   Error destruyendo ${nombre}:`, e.message);
+            }
+        }
+    }
+
+    // 🔴 MÉTODO 3: Limpiar el canvas manualmente
+    try {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            canvas.width = canvas.clientWidth || 1;
+            canvas.height = canvas.clientHeight || 1;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            console.log(`🧹 Canvas "${canvasId}" limpiado manualmente`);
+            return true;
+        }
+    } catch (e) {
+        console.warn(`   Error limpiando canvas:`, e);
+    }
+
+    console.log(`⚠️ No se pudo destruir el gráfico del canvas "${canvasId}"`);
+    return false;
+}
     // ===== FIN FUNCIÓN: destruirGraficoPorCanvas ===========================
 
     // ===== 20. INICIO FUNCIÓN: destruirTodosLosGraficosCompleto ============

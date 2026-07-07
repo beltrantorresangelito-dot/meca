@@ -215,15 +215,16 @@
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="font-size: 12px; color: #64748b;">Agrupar por:</span>
                             <select id="filtroPeriodoReportes" style="padding: 6px 12px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; background: white; cursor: pointer; outline: none; font-weight: 500;">
-                                        <option value="dia">📆 Día</option>
-                                        <option value="mes">📅 Mes</option>
-                                        <option value="trimestre">📊 Trimestre</option>
-                                        <option value="anio">📅 Año</option>
-                                        <optgroup label="──────────">
-                                            <option value="rango">📊 Rango</option>
-                                            <option value="multiples">📌 Múltiples</option>
-                                        </optgroup>
-                                    </select>
+                                <option value="todos" selected>📊 Todos los datos</option>  <!-- ✅ NUEVA OPCIÓN -->
+                                <option value="dia">📆 Día</option>
+                                <option value="mes">📅 Mes</option>
+                                <option value="trimestre">📊 Trimestre</option>
+                                <option value="anio">📅 Año</option>
+                                <optgroup label="──────────">
+                                    <option value="rango">📊 Rango</option>
+                                    <option value="multiples">📌 Múltiples</option>
+                                </optgroup>
+                            </select>
                         </div>
 
                     </div>
@@ -3007,93 +3008,109 @@
         </div>
 
         <!-- ====================================================== -->
-        <!-- PESTAÑA: REPORTES AUTOMÁTICOS                          -->
-        <!-- ====================================================== -->
-        <div id="tab-reportespda" class="tab-content tab-pane">
+<!-- PESTAÑA: REPORTES AUTOMÁTICOS                          -->
+<!-- ====================================================== -->
+<div id="tab-reportespda" class="tab-content tab-pane">
 
-            <!-- Estado del Scheduler -->
-            <div class="card" style="margin-bottom: 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0;">⚙️ Estado del Sistema de Reportes</h3>
-                    <div id="schedulerStatusReportes">
-                        <span class="badge" id="schedulerBadge" style="background: #f39c12;">⏳ Verificando...</span>
-                    </div>
-                </div>
-                <div style="margin-top: 10px; font-size: 13px; color: var(--muted);">
-                    <span id="schedulerInfo">Cargando estado...</span>
-                </div>
+    <!-- Estado del Scheduler -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;">⚙️ Estado del Sistema de Reportes</h3>
+            <div id="schedulerStatusReportes">
+                <span class="badge" id="schedulerBadge" style="background: #f39c12;">⏳ Verificando...</span>
             </div>
-
-            <!-- Acciones Rápidas -->
-            <div class="card" style="margin-bottom: 20px;">
-                <h3>⚡ Acciones Rápidas</h3>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <!-- 🔴 CAMBIADO: ejecutarReporteManual → generarReporteManual -->
-                    <button onclick="generarReporteManual('todos')" style="background: var(--accent); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer;">
-                        📊 Generar Todos los Reportes
-                    </button>
-                    <button onclick="generarReporteManual('pda')" style="background: var(--warning); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer;">
-                        📋 Generar Reporte PDA
-                    </button>
-                    <button onclick="generarReporteManual('mensual')" style="background: var(--info); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer;">
-                        📅 Generar Informe Mensual
-                    </button>
-                    <button onclick="abrirCarpetaReportes()" style="background: var(--success); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer;">
-                        📁 Abrir Carpeta de Reportes
-                    </button>
-                </div>
-                <div id="reporteEjecucionStatus" style="margin-top: 10px; display: none;">
-                    <div style="background: #e3f2fd; padding: 10px; border-radius: 8px;">
-                        <span id="reporteEjecucionMensaje">⏳ Ejecutando reporte...</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tareas Programadas -->
-            <div class="card" style="margin-bottom: 20px;">
-                <h3>📋 Tareas Programadas</h3>
-                <div class="table-container" style="max-height: 300px; overflow-y: auto;">
-                    <table style="width: 100%; font-size: 13px;">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nombre</th>
-                                <th>Tipo</th>
-                                <th>Frecuencia</th>
-                                <th>Hora</th>
-                                <th>Última Ejecución</th>
-                                <th>Estado</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tablaTareasReportes">
-                            <tr><td colspan="7" style="text-align: center; padding: 20px;">Cargando...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Últimos Reportes Generados -->
-            <div class="card">
-                <h3>📄 Últimos Reportes Generados</h3>
-                <div class="table-container" style="max-height: 300px; overflow-y: auto;">
-                    <table style="width: 100%; font-size: 13px;">
-                        <thead>
-                            <tr>
-                                <th>Archivo</th>
-                                <th>Fecha</th>
-                                <th>Tamaño</th>
-                                <th>Estado</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tablaUltimosReportes">
-                            <tr><td colspan="5" style="text-align: center; padding: 20px;">Cargando...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
         </div>
+        <div style="margin-top: 10px; font-size: 13px; color: var(--muted);">
+            <span id="schedulerInfo">Cargando estado...</span>
+        </div>
+    </div>
+
+    <!-- Acciones Rápidas -->
+    <div class="card" style="margin-bottom: 20px;">
+        <h3>⚡ Acciones Rápidas</h3>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <!-- ✅ BOTÓN 1: Generar Todos los Reportes -->
+            <button onclick="generarReporteManual('todos')" 
+                    style="background: var(--accent); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                <span>📊</span> Generar Todos
+            </button>
+            
+            <!-- ✅ BOTÓN 2: Generar Reporte PDA -->
+            <button onclick="generarReporteManual('pda')" 
+                    style="background: var(--warning); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                <span>📋</span> Generar PDA
+            </button>
+            
+            <!-- ✅ BOTÓN 3: Generar Informe Mensual -->
+            <button onclick="generarReporteManual('mensual')" 
+                    style="background: #7b1fa2; padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                <span>📅</span> Generar Mensual
+            </button>
+            
+            <!-- ✅ BOTÓN 4: Abrir Carpeta -->
+            <button onclick="abrirCarpetaReportes()" 
+                    style="background: var(--success); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                <span>📁</span> Abrir Carpeta
+            </button>
+            
+            <!-- ✅ BOTÓN 5: Refrescar -->
+            <button onclick="cargarEstadoReportes()" 
+                    style="background: var(--info); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+                <span>🔄</span> Refrescar
+            </button>
+        </div>
+        <div id="reporteEjecucionStatus" style="margin-top: 10px; display: none;">
+            <div style="background: #e3f2fd; padding: 10px; border-radius: 8px;">
+                <span id="reporteEjecucionMensaje">⏳ Ejecutando reporte...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tareas Programadas -->
+    <div class="card" style="margin-bottom: 20px;">
+        <h3>📋 Tareas Programadas</h3>
+        <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+            <table style="width: 100%; font-size: 13px;">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Tipo</th>
+                        <th>Frecuencia</th>
+                        <th>Hora</th>
+                        <th>Última Ejecución</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaTareasReportes">
+                    <tr><td colspan="7" style="text-align: center; padding: 20px;">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Últimos Reportes Generados -->
+    <div class="card">
+        <h3>📄 Últimos Reportes Generados</h3>
+        <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+            <table style="width: 100%; font-size: 13px;">
+                <thead>
+                    <tr>
+                        <th>Archivo</th>
+                        <th>Fecha</th>
+                        <th>Tamaño</th>
+                        <th>Carpeta</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaUltimosReportes">
+                    <tr><td colspan="5" style="text-align: center; padding: 20px;">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
 
         <!-- ====================================================== -->
         <!-- FOOTER - CARGADO DINÁMICAMENTE                         -->
