@@ -2154,3 +2154,45 @@ td {
         transform: translateX(0);
     }
 }
+
+/* =============================================
+   ESTILOS PARA BOTONES DE REPORTES
+   ============================================= */
+
+/* Forzar visibilidad de texto en botones */
+.card button {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.card button span {
+    display: inline-block !important;
+}
+
+/* Estilos específicos para cada botón */
+.btn-reportes-todos {
+    background: var(--accent);
+}
+.btn-reportes-pda {
+    background: var(--warning);
+}
+.btn-reportes-mensual {
+    background: #7b1fa2;
+}
+.btn-reportes-carpeta {
+    background: var(--success);
+}
+.btn-reportes-refrescar {
+    background: var(--info);
+}
+
+/* Hover effects */
+.card button:hover {
+    opacity: 0.85;
+    transform: translateY(-1px);
+    transition: all 0.2s;
+}

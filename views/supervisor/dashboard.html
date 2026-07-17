@@ -760,7 +760,7 @@
                                     <option value="con_pda">✅ Solo con PDA</option>
                                 </select>
                         </div>
-                        <button onclick="cargarAgentesQ4PorMes()" style="background: var(--accent); padding: 8px 16px;">🔄 Actualizar</button>
+                       
                     </div>
                     <div id="agentesQ4PorMesContainer">
                         <div style="text-align: center; padding: 40px;">Seleccione un mes para ver los agentes en Q4</div>
@@ -769,40 +769,7 @@
 
 
 
-                <!-- ====================================================== -->
-                <!-- NUEVA SECCIÓN: Q3 CON HISTORIAL Q4 -->
-                <!-- ====================================================== -->
-                <div class="card" style="margin-top: 25px;">
-                    <h3 style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                        <span style="display: flex; align-items: center; gap: 10px;">
-                            <span>🟡</span> Gestor(es) en Alerta (Q3 con historial Q4)
-                        </span>
-                        <button onclick="exportarTodosQ3()" style="background: var(--ok); padding: 6px 12px; font-size: 12px;">
-                            📥 Exportar todos los Q3
-                        </button>
-                    </h3>
-                    <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
-                        <div>
-                            <label style="font-weight: bold;">📅 Seleccionar Mes:</label>
-                            <select id="selectorMesQ3" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);">
-                                    <option value="">Cargando meses...</option>
-                                </select>
-                        </div>
-                        <div>
-                            <label style="font-weight: bold;">📊 Mostrar:</label>
-                            <select id="selectorFiltroQ3" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);">
-                                    <option value="con_historial" selected>🟡 Solo Q3 con historial Q4</option>
-                                    <option value="todos">📊 Todos los Q3</option>
-                                </select>
-                        </div>
-                        <button onclick="cargarAgentesQ3PorMes()" style="background: var(--accent); padding: 8px 16px;">🔄 Actualizar</button>
-                    </div>
-                    <div id="agentesQ3PorMesContainer">
-                        <div style="text-align: center; padding: 40px; color: var(--muted);">
-                            Seleccione un mes para ver los agentes en Q3
-                        </div>
-                    </div>
-                </div>
+                
 
             </div>
             <!-- ====================================================== -->
@@ -811,7 +778,7 @@
             <div id="tab-gestionPersonas" class="tab-content tab-pane">
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;">
-                        <h3 style="margin: 0;">📊 Gestión de Personas</h3>
+                        <h3 style="margin: 0;">📊 Performance</h3>
                         <div>
                             <button onclick="exportarGestionPersonasGP()" style="background: var(--ok); padding: 8px 16px;">
                                 📥 Exportar CSV
@@ -998,6 +965,14 @@
                         <div style="text-align: center; padding: 40px; color: var(--muted);">
                             No hay PDA en seguimiento
                         </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN: PDA EN CAPACITACIÓN -->
+                <div class="card" style="margin-top: 20px;">
+                    <h3>📚 En Capacitación <span id="totalCapacitacion" class="badge" style="background: #fd7e14; margin-left: 10px;">0</span></h3>
+                    <div id="listaCapacitacion">
+                        <div style="text-align: center; padding: 40px; color: var(--muted);">📚 No hay PDA en proceso de capacitación</div>
                     </div>
                 </div>
 
@@ -2713,9 +2688,7 @@
                     <!-- ===== COLUMNA 2: PROGRAMAR TAREA ===== -->
                     <div class="card" style="padding: 20px;">
                         <h4>📋 Programar Tarea</h4>
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <input type="text" id="tareaNombre" placeholder="Nombre de la tarea" style="padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                            
+                        <div style="display: flex; flex-direction: column; gap: 10px;">    
                             <!-- ===== ORIGEN DE AUDIOS ===== -->
                             <div>
                                 <label style="font-size: 12px; font-weight: 600;">📁 Origen de los audios</label>
@@ -2794,7 +2767,7 @@
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                                 <div>
                                     <label style="font-size: 12px; font-weight: 600;">🔄 Frecuencia</label>
-                                    <select id="tareaFrecuencia" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                    <select id="tareaFrecuencia" onchange="toggleCamposFrecuencia()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
                                         <option value="diaria">Diaria</option>
                                         <option value="semanal">Semanal</option>
                                         <option value="mensual">Mensual</option>
@@ -3007,110 +2980,133 @@
             <span id="progressMinimizadoIcon">📊</span>
         </div>
 
-        <!-- ====================================================== -->
-<!-- PESTAÑA: REPORTES AUTOMÁTICOS                          -->
-<!-- ====================================================== -->
-<div id="tab-reportespda" class="tab-content tab-pane">
+    <!-- ====================================================== -->
+    <!-- PESTAÑA: REPORTES AUTOMÁTICOS                          -->
+    <!-- ====================================================== -->
+    <div id="tab-reportespda" class="tab-content tab-pane">
 
-    <!-- Estado del Scheduler -->
-    <div class="card" style="margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0;">⚙️ Estado del Sistema de Reportes</h3>
-            <div id="schedulerStatusReportes">
-                <span class="badge" id="schedulerBadge" style="background: #f39c12;">⏳ Verificando...</span>
+        <!-- Estado del Scheduler -->
+        <div class="card" style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0;">⚙️ Estado del Sistema de Reportes</h3>
+                <div id="schedulerStatusReportes">
+                    <span class="badge" id="schedulerBadge" style="background: #f39c12;">⏳ Verificando...</span>
+                </div>
+            </div>
+            <div style="margin-top: 10px; font-size: 13px; color: var(--muted);">
+                <span id="schedulerInfo">Cargando estado...</span>
             </div>
         </div>
-        <div style="margin-top: 10px; font-size: 13px; color: var(--muted);">
-            <span id="schedulerInfo">Cargando estado...</span>
-        </div>
-    </div>
 
-    <!-- Acciones Rápidas -->
-    <div class="card" style="margin-bottom: 20px;">
-        <h3>⚡ Acciones Rápidas</h3>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <!-- ✅ BOTÓN 1: Generar Todos los Reportes -->
-            <button onclick="generarReporteManual('todos')" 
-                    style="background: var(--accent); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
-                <span>📊</span> Generar Todos
-            </button>
-            
-            <!-- ✅ BOTÓN 2: Generar Reporte PDA -->
-            <button onclick="generarReporteManual('pda')" 
-                    style="background: var(--warning); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
-                <span>📋</span> Generar PDA
-            </button>
-            
-            <!-- ✅ BOTÓN 3: Generar Informe Mensual -->
-            <button onclick="generarReporteManual('mensual')" 
-                    style="background: #7b1fa2; padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
-                <span>📅</span> Generar Mensual
-            </button>
-            
-            <!-- ✅ BOTÓN 4: Abrir Carpeta -->
-            <button onclick="abrirCarpetaReportes()" 
-                    style="background: var(--success); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
-                <span>📁</span> Abrir Carpeta
-            </button>
-            
-            <!-- ✅ BOTÓN 5: Refrescar -->
-            <button onclick="cargarEstadoReportes()" 
-                    style="background: var(--info); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
-                <span>🔄</span> Refrescar
-            </button>
-        </div>
-        <div id="reporteEjecucionStatus" style="margin-top: 10px; display: none;">
-            <div style="background: #e3f2fd; padding: 10px; border-radius: 8px;">
-                <span id="reporteEjecucionMensaje">⏳ Ejecutando reporte...</span>
+        <!-- ============================================= -->
+        <!-- ACCIONES RÁPIDAS - CONTENEDOR INDEPENDIENTE   -->
+        <!-- ============================================= -->
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>⚡ Acciones Rápidas</h3>
+            <div id="accionesRapidasContainer" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                
+                <button onclick="generarReporteManual('todos')" 
+                        class="btn-reportes" 
+                        style="background: #019DF4; padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
+                    <span style="font-size: 16px;">📊</span> Generar Todos
+                </button>
+                
+                <button onclick="generarReporteManual('pda')" 
+                        class="btn-reportes"
+                        style="background: #f39c12; padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
+                    <span style="font-size: 16px;">📋</span> Generar PDA
+                </button>
+                
+                <button onclick="generarReporteManual('mensual')" 
+                        class="btn-reportes"
+                        style="background: #7b1fa2; padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
+                    <span style="font-size: 16px;">📅</span> Generar Mensual
+                </button>
+                
+                <button onclick="abrirCarpetaReportes()" 
+                        class="btn-reportes"
+                        style="background: #28a745; padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
+                    <span style="font-size: 16px;">📁</span> Abrir Carpeta
+                </button>
+                
+                <button onclick="cargarEstadoReportes()" 
+                        class="btn-reportes"
+                        style="background: #17a2b8; padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
+                    <span style="font-size: 16px;">🔄</span> Refrescar
+                </button>
+
+            </div>
+            <div id="reporteEjecucionStatus" style="margin-top: 10px; display: none;">
+                <div style="background: #e3f2fd; padding: 10px; border-radius: 8px;">
+                    <span id="reporteEjecucionMensaje">⏳ Ejecutando reporte...</span>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Tareas Programadas -->
-    <div class="card" style="margin-bottom: 20px;">
-        <h3>📋 Tareas Programadas</h3>
-        <div class="table-container" style="max-height: 300px; overflow-y: auto;">
-            <table style="width: 100%; font-size: 13px;">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nombre</th>
-                        <th>Tipo</th>
-                        <th>Frecuencia</th>
-                        <th>Hora</th>
-                        <th>Última Ejecución</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody id="tablaTareasReportes">
-                    <tr><td colspan="7" style="text-align: center; padding: 20px;">Cargando...</td></tr>
-                </tbody>
-            </table>
-        </div>
+        <!-- Administración -->
+<div class="card" style="margin-bottom: 20px;">
+    <h3>⚙️ Administración de Reportes</h3>
+    <div id="adminReportesContainer" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+        
+        <button onclick="abrirModalNuevaTarea()" 
+                style="background: var(--accent); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
+            <span style="font-size: 16px;">➕</span> Nueva Tarea
+        </button>
+        
+        <button onclick="cargarTareasReportes()" 
+                style="background: #17a2b8; padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
+            <span style="font-size: 16px;">🔄</span> Refrescar Tareas
+        </button>
+        
     </div>
-
-    <!-- Últimos Reportes Generados -->
-    <div class="card">
-        <h3>📄 Últimos Reportes Generados</h3>
-        <div class="table-container" style="max-height: 300px; overflow-y: auto;">
-            <table style="width: 100%; font-size: 13px;">
-                <thead>
-                    <tr>
-                        <th>Archivo</th>
-                        <th>Fecha</th>
-                        <th>Tamaño</th>
-                        <th>Carpeta</th>
-                        <th>Acción</th>
-                    </tr>
-                </thead>
-                <tbody id="tablaUltimosReportes">
-                    <tr><td colspan="5" style="text-align: center; padding: 20px;">Cargando...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
 </div>
+
+        <!-- Tareas Programadas -->
+        <div class="card" style="margin-bottom: 20px;">
+            <h3>📋 Tareas Programadas</h3>
+            <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+                <table style="width: 100%; font-size: 13px;">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Tipo</th>
+                            <th>Frecuencia</th>
+                            <th>Hora</th>
+                            <th>Última Ejecución</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaTareasReportes">
+                        <tr><td colspan="7" style="text-align: center; padding: 20px;">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Últimos Reportes Generados -->
+        <div class="card">
+            <h3>📄 Últimos Reportes Generados</h3>
+            <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+                <table style="width: 100%; font-size: 13px;">
+                    <thead>
+                        <tr>
+                            <th>Archivo</th>
+                            <th>Fecha</th>
+                            <th>Tamaño</th>
+                            <th>Carpeta</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaUltimosReportes">
+                        <tr><td colspan="5" style="text-align: center; padding: 20px;">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
 
         <!-- ====================================================== -->
         <!-- FOOTER - CARGADO DINÁMICAMENTE                         -->
@@ -3208,8 +3204,6 @@
         </div>
     </div>
 
-    
-
     <!-- ====================================================== -->
     <!-- MODAL: CAMBIO DE CONTRASEÑA (PRIMER LOGIN)             -->
     <!-- ====================================================== -->
@@ -3304,6 +3298,189 @@
                     <button onclick="cambiarPasswordVoluntario()" style="background: var(--ok);">💾 Actualizar contraseña</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ============================================= -->
+<!-- MODAL: NUEVA/EDITAR TAREA - CORREGIDO         -->
+<!-- ============================================= -->
+<div id="modalTareaReporte" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10050; justify-content: center; align-items: center; padding: 20px;">
+    <div style="background: white; border-radius: 16px; width: 100%; max-width: 550px; max-height: 90vh; overflow-y: auto; padding: 25px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        
+        <!-- HEADER -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 id="modalTareaTitulo" style="margin: 0; color: #019DF4; font-size: 18px;">➕ Nueva Tarea Programada</h3>
+            <button onclick="cerrarModalTarea()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6c757d; padding: 0 8px;">✖</button>
+        </div>
+        
+            <input type="hidden" id="tareaId">
+            
+            <!-- ============================================= -->
+            <!-- CAMPO: NOMBRE DE LA TAREA                     -->
+            <!-- ============================================= -->
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 5px; font-size: 13px;">📌 Nombre de la tarea *</label>
+                <input type="text" id="tareaNombre" placeholder="Ej: Reporte PDA Diario" 
+                       style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; box-sizing: border-box;">
+                <small style="color: #6c757d; font-size: 11px;">Identificador único de la tarea</small>
+            </div>
+            
+            <!-- ============================================= -->
+            <!-- FILA: TIPO DE REPORTE + FRECUENCIA            -->
+            <!-- ============================================= -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 5px; font-size: 13px;">📊 Tipo de Reporte *</label>
+                    <select id="tareaTipoReporte" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; box-sizing: border-box;">
+                        <option value="pda">📋 PDA Individual</option>
+                        <option value="mensual">📅 Mensual Individual</option>
+                        <option value="capacitacion">📚 Lista Capacitación</option>
+                        <option value="reiterativos">🔄 Lista Reiterativos</option>
+                        <option value="todos">📊 Todos los reportes</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 5px; font-size: 13px;">🔄 Frecuencia *</label>
+                    <select id="tareaFrecuenciaReporte" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; box-sizing: border-box;" onchange="toggleCamposFrecuencia()">
+                        <option value="diaria">📅 Diaria</option>
+                        <option value="semanal">📅 Semanal</option>
+                        <option value="mensual">📅 Mensual</option>
+                        <option value="intervalo">⏱️ Intervalo (minutos)</option>
+                        <option value="manual">✋ Manual</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- ============================================= -->
+            <!-- CAMPO: HORA (visible por defecto)             -->
+            <!-- ============================================= -->
+            <div id="campoHora" style="display: block; margin-bottom: 15px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 5px; font-size: 13px;">🕐 Hora de ejecución</label>
+                <input type="time" id="tareaHoraReporte" value="06:00" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+            </div>
+            
+            <!-- ============================================= -->
+            <!-- CAMPO: DÍA DE LA SEMANA (oculto por defecto)  -->
+            <!-- ============================================= -->
+            <div id="campoDiaSemana" style="display: none; margin-bottom: 15px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 5px; font-size: 13px;">📅 Día de la semana</label>
+                <select id="tareaDiaSemana" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; box-sizing: border-box;">
+                    <option value="1">Lunes</option>
+                    <option value="2">Martes</option>
+                    <option value="3">Miércoles</option>
+                    <option value="4">Jueves</option>
+                    <option value="5">Viernes</option>
+                    <option value="6">Sábado</option>
+                    <option value="7">Domingo</option>
+                </select>
+            </div>
+            
+            <!-- ============================================= -->
+            <!-- CAMPO: DÍA DEL MES (oculto por defecto)       -->
+            <!-- ============================================= -->
+            <div id="campoDiaMes" style="display: none; margin-bottom: 15px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 5px; font-size: 13px;">📅 Día del mes</label>
+                <input type="number" id="tareaDiaMes" value="1" min="1" max="31" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; box-sizing: border-box;">
+                <small style="color: #6c757d; font-size: 11px;">Día del mes (1-31)</small>
+            </div>
+            
+            <!-- ============================================= -->
+            <!-- CAMPO: INTERVALO (oculto por defecto)         -->
+            <!-- ============================================= -->
+            <div id="campoIntervalo" style="display: none; margin-bottom: 15px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 5px; font-size: 13px;">⏱️ Intervalo (minutos)</label>
+                <input type="number" id="tareaIntervalo" value="30" min="5" step="5" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; box-sizing: border-box;">
+                <small style="color: #6c757d; font-size: 11px;">Mínimo 5 minutos</small>
+            </div>
+            
+            <!-- ============================================= -->
+            <!-- FILA: FORMATO + ESTADO                        -->
+            <!-- ============================================= -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 5px; font-size: 13px;">📄 Formato</label>
+                    <select id="tareaFormato" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; box-sizing: border-box;">
+                        <option value="html">📄 HTML</option>
+                        <option value="csv">📊 CSV</option>
+                        <option value="xlsx">📈 Excel</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-weight: 600; display: block; margin-bottom: 5px; font-size: 13px;">📌 Estado</label>
+                    <select id="tareaEstado" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; box-sizing: border-box;">
+                        <option value="activo">✅ Activo</option>
+                        <option value="inactivo">⏸️ Inactivo</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- ============================================= -->
+            <!-- CAMPO: CARPETA DE DESTINO                     -->
+            <!-- ============================================= -->
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 5px; font-size: 13px;">📁 Carpeta de destino</label>
+                <input type="text" id="tareaDestinoCarpeta" value="C:\MECA_ML\reportes_generados" 
+                       style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; box-sizing: border-box;">
+                <small style="color: #6c757d; font-size: 11px;">Ruta donde se guardarán los reportes</small>
+            </div>
+            
+            <!-- ============================================= -->
+            <!-- BOTONES                                        -->
+            <!-- ============================================= -->
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 15px;">
+                <button type="button" onclick="cerrarModalTarea()" 
+                        style="padding: 10px 24px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 14px; font-weight: 500;">
+                    ❌ Cancelar
+                </button>
+                <button type="submit" id="btnGuardarTarea" 
+                        style="padding: 10px 24px; background: #28a745; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 14px; font-weight: 500;">
+                    💾 Crear Tarea
+                </button>
+            </div>
+            
+        </form>
+        
+    </div>
+</div>
+
+    <!-- ============================================= -->
+    <!-- MODAL: CONFIGURAR CARPETA                     -->
+    <!-- ============================================= -->
+    <div id="modalConfigurarCarpeta" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10051; justify-content: center; align-items: center; padding: 20px;">
+        <div style="background: white; border-radius: 16px; width: 100%; max-width: 500px; padding: 25px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: var(--accent);">📁 Configurar Carpeta de Reportes</h3>
+                <button onclick="cerrarModalCarpeta()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #6c757d;">✖</button>
+            </div>
+            
+            <div style="margin-bottom: 15px; background: #f8f9fa; padding: 12px; border-radius: 8px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 5px;">📌 Carpeta actual</label>
+                <input type="text" id="carpetaActual" readonly style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; background: #e9ecef; cursor: not-allowed;">
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 600; display: block; margin-bottom: 5px;">📂 Nueva carpeta</label>
+                <input type="text" id="carpetaNueva" placeholder="Ej: D:\Reportes\MECA" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+            </div>
+            
+            <div id="subcarpetasInfo" style="margin-bottom: 15px; background: #e3f2fd; padding: 12px; border-radius: 8px; font-size: 13px; color: #333;">
+                📁 <strong>Subcarpetas:</strong><br>
+                • PDA: Cargando...<br>
+                • Mensual: Cargando...<br>
+                • Capacitación: Cargando...<br>
+                • Reiterativos: Cargando...
+            </div>
+            
+            <div style="background: #fff3e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 12px; color: #6c757d;">
+                ⚠️ <strong>Nota:</strong> Los reportes existentes NO se moverán automáticamente. Solo los nuevos reportes se guardarán en la nueva carpeta.
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid #ddd; padding-top: 15px;">
+                <button onclick="cerrarModalCarpeta()" style="padding: 10px 24px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white;">Cancelar</button>
+                <button onclick="guardarCarpetaReportes()" style="padding: 10px 24px; background: var(--warning); border: none; border-radius: 8px; cursor: pointer; color: white;">💾 Actualizar Carpeta</button>
+            </div>
+            
         </div>
     </div>
 </body>

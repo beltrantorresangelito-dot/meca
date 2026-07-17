@@ -3221,6 +3221,103 @@ const API = (function() {
         return response.json();
     }
 
+    // =============================================
+    // CRUD - TAREAS PROGRAMADAS DE REPORTES
+    // =============================================
+
+    /**
+     * Lista todas las tareas de reportes
+     */
+    async function listarTareasReportes() {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('http://localhost:5000/api/reportes/tareas', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al listar tareas');
+        }
+        return response.json();
+    }
+
+    /**
+     * Crea una nueva tarea de reporte
+     */
+    async function crearTareaReporte(data) {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('http://localhost:5000/api/reportes/tareas', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al crear tarea');
+        }
+        return response.json();
+    }
+
+    /**
+     * Actualiza una tarea de reporte
+     */
+    async function actualizarTareaReporte(id, data) {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`http://localhost:5000/api/reportes/tareas/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al actualizar tarea');
+        }
+        return response.json();
+    }
+
+    /**
+     * Elimina una tarea de reporte
+     */
+    async function eliminarTareaReporte(id) {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`http://localhost:5000/api/reportes/tareas/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al eliminar tarea');
+        }
+        return response.json();
+    }
+
+    /**
+     * Obtiene o actualiza la carpeta de reportes
+     */
+    async function configurarCarpetaReportes(carpeta_base = null) {
+        const token = localStorage.getItem('meca_token');
+        const options = {
+            headers: { 'Authorization': `Bearer ${token}` }
+        };
+        
+        if (carpeta_base) {
+            options.method = 'POST';
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify({ carpeta_base });
+        }
+        
+        const response = await fetch('http://localhost:5000/api/reportes/config/carpeta', options);
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al configurar carpeta');
+        }
+        return response.json();
+    }
         
     // ======================================================
     // API PÚBLICA - Exportación de todos los métodos
@@ -3439,6 +3536,14 @@ const API = (function() {
         descargarReporte,
         verificarSchedulerReportes,
 
+        // =============================================
+        // CRUD - TAREAS PROGRAMADAS DE REPORTES
+        // =============================================
+        listarTareasReportes,
+        crearTareaReporte,
+        actualizarTareaReporte,
+        eliminarTareaReporte,
+        configurarCarpetaReportes,
 
         // Utilidad: cambiar modo de un módulo (para pruebas)
         setModo: (modulo, modo) => {

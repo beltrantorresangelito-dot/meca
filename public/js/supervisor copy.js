@@ -15,8 +15,10 @@
     let chartEvolutivoCuartiles = null;
     let auditoresExcluidosGlobal = [];      
     let todosLosAuditoresGlobal = [];       
+    let rankingOriginalCompleto = [];
+    let lotesHistorialGlobal = [];
     let liderSeleccionadoActual = 'todos';  
-    let filtroPeriodoActual = 'mes';
+    let filtroPeriodoActual = 'todos';
     let filtroDiaDesde = null;
     let filtroDiaHasta = null;
     let filtroSemanaAnio = null;
@@ -123,6 +125,297 @@ const matrizCacheStore = {};
         // Ignorar errores de localStorage
     }
 })();
+
+// ======================================================
+// FUNCIÓN: obtenerRangoFechasActivo (CORREGIDA - MES FINAL)
+// ======================================================
+function obtenerRangoFechasActivo() {
+    const periodoSelect = document.getElementById('filtroPeriodoReportes');
+    const periodo = periodoSelect?.value || filtroPeriodoActual || 'mes';
+    
+    // 🔴 FUNCIÓN AUXILIAR: Validar fecha
+    function esFechaValida(fecha) {
+        return fecha && !isNaN(fecha.getTime());
+    }
+    
+    // 🔴 FUNCIÓN AUXILIAR: Obtener último día del mes
+    function ultimoDiaDelMes(anio, mes) {
+        // mes es 1-12, pasamos mes+1 para obtener el último día del mes correcto
+        return new Date(anio, mes, 0).getDate();
+    }
+    
+    // Caso 1: Período "dia" - usar fechas de inicio/fin
+    if (periodo === 'dia') {
+        const inicioInput = document.getElementById('filtroFechaInicioReportes');
+        const finInput = document.getElementById('filtroFechaFinReportes');
+        const fechaInicioStr = inicioInput?.value;
+        const fechaFinStr = finInput?.value;
+        
+        if (fechaInicioStr && fechaFinStr) {
+            const fechaInicio = new Date(fechaInicioStr + 'T00:00:00');
+            const fechaFin = new Date(fechaFinStr + 'T23:59:59');
+            if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                return { 
+                    fechaInicio: fechaInicio, 
+                    fechaFin: fechaFin,
+                    periodo: 'dia',
+                    tieneFiltro: true
+                };
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Caso 2: Período "mes" - usar el mes seleccionado
+    if (periodo === 'mes') {
+        const mesSelect = document.getElementById('filtroMesSelect');
+        const mesVal = mesSelect?.value;
+        if (mesVal) {
+            const [anioStr, mesStr] = mesVal.split('-');
+            const anio = parseInt(anioStr);
+            const mes = parseInt(mesStr);
+            if (!isNaN(anio) && !isNaN(mes) && mes >= 1 && mes <= 12) {
+                // 🔴 CORREGIDO: fechaInicio = primer día del mes
+                const fechaInicio = new Date(anio, mes - 1, 1);
+                
+                // 🔴 CORREGIDO: fechaFin = último día del MISMO mes
+                // Para obtener el último día de julio (mes=7), usamos new Date(anio, 8, 0)
+                // porque el mes 8 es agosto y el día 0 da el último día de julio
+                const fechaFin = new Date(anio, mes, 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    console.log(`📅 Rango MES: ${fechaInicio.toLocaleDateString()} → ${fechaFin.toLocaleDateString()}`);
+                    return { 
+                        fechaInicio: fechaInicio, 
+                        fechaFin: fechaFin,
+                        periodo: 'mes',
+                        tieneFiltro: true
+                    };
+                }
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Caso 3: Período "trimestre" - usar el trimestre seleccionado
+    if (periodo === 'trimestre') {
+        const trimSelect = document.getElementById('filtroTrimSelect');
+        const trimVal = trimSelect?.value;
+        if (trimVal) {
+            const [anioStr, qStr] = trimVal.split('-Q');
+            const anio = parseInt(anioStr);
+            const trimestre = parseInt(qStr);
+            if (!isNaN(anio) && !isNaN(trimestre) && trimestre >= 1 && trimestre <= 4) {
+                const mesInicio = (trimestre - 1) * 3 + 1;
+                const mesFin = trimestre * 3; // Último mes del trimestre
+                
+                // 🔴 CORREGIDO: fechaInicio = primer día del trimestre
+                const fechaInicio = new Date(anio, mesInicio - 1, 1);
+                
+                // 🔴 CORREGIDO: fechaFin = último día del ÚLTIMO mes del trimestre
+                // Ej: Trimestre 2 (Abr-Jun) → mesFin=6 → new Date(anio, 7, 0) = último día de junio
+                const fechaFin = new Date(anio, mesFin, 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    console.log(`📅 Rango TRIMESTRE: ${fechaInicio.toLocaleDateString()} → ${fechaFin.toLocaleDateString()}`);
+                    return { 
+                        fechaInicio: fechaInicio, 
+                        fechaFin: fechaFin,
+                        periodo: 'trimestre',
+                        tieneFiltro: true
+                    };
+                }
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Caso 4: Período "anio" - usar el año seleccionado
+    if (periodo === 'anio') {
+        const anioSelect = document.getElementById('filtroAnioSelect');
+        const anioVal = anioSelect?.value;
+        if (anioVal) {
+            const anio = parseInt(anioVal);
+            if (!isNaN(anio)) {
+                const fechaInicio = new Date(anio, 0, 1);
+                const fechaFin = new Date(anio, 11, 31);
+                fechaFin.setHours(23, 59, 59, 999);
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    return { 
+                        fechaInicio: fechaInicio, 
+                        fechaFin: fechaFin,
+                        periodo: 'anio',
+                        tieneFiltro: true
+                    };
+                }
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Caso 5: Período "rango" - usar los rangos seleccionados
+    if (periodo === 'rango') {
+        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        
+        if (tipoRango === 'dia') {
+            const inicio = document.getElementById('filtroRangoDiaInicio')?.value;
+            const fin = document.getElementById('filtroRangoDiaFin')?.value;
+            if (inicio && fin) {
+                const fechaInicio = new Date(inicio + 'T00:00:00');
+                const fechaFin = new Date(fin + 'T23:59:59');
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    return { fechaInicio, fechaFin, periodo: 'rango', tieneFiltro: true };
+                }
+            }
+        } else if (tipoRango === 'mes') {
+            const inicio = document.getElementById('filtroRangoMesInicio')?.value;
+            const fin = document.getElementById('filtroRangoMesFin')?.value;
+            if (inicio && fin) {
+                const [anioI, mesI] = inicio.split('-');
+                const [anioF, mesF] = fin.split('-');
+                
+                // 🔴 CORREGIDO: fechaInicio = primer día del mes inicio
+                const fechaInicio = new Date(parseInt(anioI), parseInt(mesI) - 1, 1);
+                
+                // 🔴 CORREGIDO: fechaFin = último día del mes fin
+                const fechaFin = new Date(parseInt(anioF), parseInt(mesF), 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    console.log(`📅 Rango MES: ${fechaInicio.toLocaleDateString()} → ${fechaFin.toLocaleDateString()}`);
+                    return { fechaInicio, fechaFin, periodo: 'rango', tieneFiltro: true };
+                }
+            }
+        } else if (tipoRango === 'trimestre') {
+            const inicio = document.getElementById('filtroRangoTrimInicio')?.value;
+            const fin = document.getElementById('filtroRangoTrimFin')?.value;
+            if (inicio && fin) {
+                const [anioI, qI] = inicio.split('-Q');
+                const [anioF, qF] = fin.split('-Q');
+                const mesInicioI = (parseInt(qI) - 1) * 3 + 1;
+                const mesFinF = parseInt(qF) * 3;
+                
+                // 🔴 CORREGIDO: fechaInicio = primer día del trimestre inicio
+                const fechaInicio = new Date(parseInt(anioI), mesInicioI - 1, 1);
+                
+                // 🔴 CORREGIDO: fechaFin = último día del trimestre fin
+                const fechaFin = new Date(parseInt(anioF), mesFinF, 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    console.log(`📅 Rango TRIMESTRE: ${fechaInicio.toLocaleDateString()} → ${fechaFin.toLocaleDateString()}`);
+                    return { fechaInicio, fechaFin, periodo: 'rango', tieneFiltro: true };
+                }
+            }
+        } else if (tipoRango === 'anio') {
+            const inicio = document.getElementById('filtroRangoAnioInicio')?.value;
+            const fin = document.getElementById('filtroRangoAnioFin')?.value;
+            if (inicio && fin) {
+                const fechaInicio = new Date(parseInt(inicio), 0, 1);
+                const fechaFin = new Date(parseInt(fin), 11, 31);
+                fechaFin.setHours(23, 59, 59, 999);
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    return { fechaInicio, fechaFin, periodo: 'rango', tieneFiltro: true };
+                }
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Caso 6: Período "multiples" - usar los múltiples períodos seleccionados
+    if (periodo === 'multiples') {
+        if (filtroMultiples && filtroMultiples.length > 0) {
+            const fechas = filtroMultiples
+                .map(f => {
+                    const [anio, mes] = f.split('-');
+                    return new Date(parseInt(anio), parseInt(mes) - 1, 1);
+                })
+                .filter(d => esFechaValida(d))
+                .sort((a, b) => a - b);
+            
+            if (fechas.length > 0) {
+                const fechaInicio = fechas[0];
+                const ultimoMes = fechas[fechas.length - 1];
+                // 🔴 CORREGIDO: fechaFin = último día del último mes seleccionado
+                const fechaFin = new Date(ultimoMes.getFullYear(), ultimoMes.getMonth() + 1, 0);
+                fechaFin.setHours(23, 59, 59, 999);
+                
+                if (esFechaValida(fechaInicio) && esFechaValida(fechaFin)) {
+                    console.log(`📅 Rango MULTIPLES: ${fechaInicio.toLocaleDateString()} → ${fechaFin.toLocaleDateString()}`);
+                    return { fechaInicio, fechaFin, periodo: 'multiples', tieneFiltro: true };
+                }
+            }
+        }
+        return { tieneFiltro: false };
+    }
+    
+    // Sin filtro activo
+    return { tieneFiltro: false };
+}
+
+// ======================================================
+// FUNCIÓN: Normalizar fecha para comparación
+// Convierte cualquier formato a YYYYMMDD para comparar
+// ======================================================
+function normalizarFechaParaComparacion(fechaStr) {
+    if (!fechaStr) return null;
+    
+    try {
+        // Si es un objeto Date, convertirlo a YYYYMMDD
+        if (fechaStr instanceof Date) {
+            const anio = fechaStr.getFullYear();
+            const mes = String(fechaStr.getMonth() + 1).padStart(2, '0');
+            const dia = String(fechaStr.getDate()).padStart(2, '0');
+            return `${anio}${mes}${dia}`;
+        }
+        
+        // Si es string, intentar parsear
+        if (typeof fechaStr === 'string') {
+            let dia, mes, anio;
+            
+            // Formato DD/MM/YYYY
+            if (fechaStr.includes('/')) {
+                const partes = fechaStr.split('/');
+                if (partes.length === 3) {
+                    dia = partes[0].padStart(2, '0');
+                    mes = partes[1].padStart(2, '0');
+                    anio = partes[2];
+                    return `${anio}${mes}${dia}`;
+                }
+            }
+            
+            // Formato YYYY-MM-DD (ISO)
+            if (fechaStr.includes('-')) {
+                const partes = fechaStr.split('T')[0].split('-');
+                if (partes.length === 3) {
+                    anio = partes[0];
+                    mes = partes[1];
+                    dia = partes[2];
+                    return `${anio}${mes}${dia}`;
+                }
+            }
+            
+            // Formato DD-MM-YYYY
+            if (fechaStr.includes('-') && fechaStr.length === 10) {
+                const partes = fechaStr.split('-');
+                if (partes.length === 3) {
+                    dia = partes[0].padStart(2, '0');
+                    mes = partes[1].padStart(2, '0');
+                    anio = partes[2];
+                    return `${anio}${mes}${dia}`;
+                }
+            }
+        }
+        
+        return null;
+    } catch(e) {
+        console.warn('Error normalizando fecha:', fechaStr, e);
+        return null;
+    }
+}
+
 
 // ======================================================
 // FUNCIÓN: obtenerVersionMatrizPorFecha
@@ -3593,45 +3886,164 @@ if (document.readyState === 'loading') {
     }
     // ===== FIN FUNCIÓN: invalidarCacheEvaluaciones ==========================
     
+
+    
     // ===== 4. INICIO FUNCIÓN: cargarDatosPDA ===============================
     async function cargarDatosPDA() {
-        console.log('📋 Cargando PDA...');
-        
-        try {
-            const pendientes = await API.getPDAPendientes();
-            const seguimiento = await API.getPDASeguimiento();
-            const historial = await API.getPDAHistorial();
-            
-            // Combinar todos los datos
-            let todos = [...pendientes, ...seguimiento, ...historial];
-            
-            // 🔴 CORREGIDO: Calcular acciones completadas y total para cada PDA
-            window.datosPDA = todos.map(pda => {
-                // La API puede devolver 'pda_acciones' o 'acciones'
-                const acciones = pda.pda_acciones || pda.acciones || [];
-                const completadas = acciones.filter(a => a.completado === true || a.completado === 1).length;
-                const total = acciones.length;
-                
-                console.log(`PDA ${pda.id}: ${completadas}/${total} acciones`);
-                
-                return {
-                    ...pda,
-                    acciones: acciones,
-                    accionesCompletadas: completadas,
-                    totalAcciones: total
-                };
-            });
-            
-            actualizarListasPDA();
-            
-        } catch (error) {
-            console.error('Error cargando PDA:', error);
+    console.log('📋 Cargando PDA...');
+    
+    try {
+        // ======================================================
+        // 🔴 CONSULTA DIRECTA - TODOS LOS PDA SIN FILTRO DE ESTADO
+        // ======================================================
+        const db = getDB();
+        if (!db) {
+            console.error('❌ Base de datos no disponible');
             window.datosPDA = [];
             actualizarListasPDA();
+            return;
         }
+        
+        const { data: todos, error } = await db
+            .from('pda_cabecera')
+            .select('*')
+            .order('id', { ascending: false });
+        
+        if (error) {
+            console.error('❌ Error consultando PDA:', error);
+            window.datosPDA = [];
+            actualizarListasPDA();
+            return;
+        }
+        
+        console.log(`📊 Total PDA cargados (consulta directa): ${todos?.length || 0}`);
+        
+        // 🔴 DIAGNÓSTICO: Verificar estados cargados
+        const estados = {};
+        (todos || []).forEach(p => {
+            const estado = p.estado || 'sin_estado';
+            estados[estado] = (estados[estado] || 0) + 1;
+        });
+        console.log('📊 Distribución por estado:', estados);
+        
+        // ======================================================
+        // 🔴 OBTENER TODOS LOS REPORTES
+        // ======================================================
+        const token = localStorage.getItem('meca_token');
+        let todosLosReportes = [];
+        try {
+            const reportesResponse = await fetch('http://localhost:5000/api/reportes/listar', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const reportesData = await reportesResponse.json();
+            todosLosReportes = reportesData.archivos || [];
+            console.log(`📊 ${todosLosReportes.length} reportes disponibles`);
+        } catch(e) {
+            console.warn('⚠️ No se pudieron cargar reportes:', e.message);
+        }
+        
+        // ======================================================
+        // 🔴 CREAR MAPA DE REPORTES
+        // ======================================================
+        const reportesMap = {};
+        for (const reporte of todosLosReportes) {
+            const nombre = reporte.nombre;
+            if (nombre.includes('PDA_CICLO')) {
+                const partes = nombre.split('_PDA_CICLO');
+                if (partes.length === 2) {
+                    const agenteBD = partes[0].replace(/_/g, ' ');
+                    const cicloParte = partes[1].split('_')[0];
+                    const key = `${agenteBD}|${cicloParte}`;
+                    reportesMap[key] = {
+                        nombre_archivo: nombre,
+                        ruta_completa: reporte.ruta || `C:\\MECA_ML\\reportes_generados\\pda_individual\\${nombre}`
+                    };
+                }
+            }
+        }
+        
+        console.log(`📊 Mapa de reportes: ${Object.keys(reportesMap).length} entradas`);
+        
+        // ======================================================
+        // 🔴 ASIGNAR REPORTES A CADA PDA
+        // ======================================================
+        for (const pda of (todos || [])) {
+            const key = `${pda.agente}|${pda.ciclo_basal_numero}`;
+            if (reportesMap[key]) {
+                pda.ruta_archivo = reportesMap[key].nombre_archivo;
+                pda.nombre_archivo = reportesMap[key].nombre_archivo;
+            } else {
+                pda.ruta_archivo = null;
+                pda.nombre_archivo = 'No disponible';
+            }
+        }
+        
+        // ======================================================
+        // 🔴 ASIGNAR ACCIONES Y ESTADÍSTICAS
+        // ======================================================
+        window.datosPDA = (todos || []).map(pda => ({
+            ...pda,
+            acciones: pda.pda_acciones || pda.acciones || [],
+            accionesCompletadas: (pda.pda_acciones || pda.acciones || []).filter(a => a.completado === true || a.completado === 1).length,
+            totalAcciones: (pda.pda_acciones || pda.acciones || []).length
+        }));
+        
+        console.log(`✅ window.datosPDA actualizado: ${window.datosPDA.length} PDA`);
+        
+        // ======================================================
+        // 🔴 VERIFICAR ESPECÍFICAMENTE enviado_capacitacion
+        // ======================================================
+        const enCap = window.datosPDA.filter(p => p.estado === 'enviado_capacitacion' || p.estado === 'en_capacitacion');
+        console.log(`📚 PDA en capacitación: ${enCap.length}`);
+        if (enCap.length > 0) {
+            enCap.forEach(p => {
+                console.log(`   ID: ${p.id} | Agente: ${p.agente} | Estado: ${p.estado}`);
+            });
+        }
+        
+        // ======================================================
+        // 🔴 ACTUALIZAR LISTAS EN LA UI
+        // ======================================================
+        actualizarListasPDA();
+        
+    } catch (error) {
+        console.error('❌ Error cargando PDA:', error);
+        window.datosPDA = [];
+        actualizarListasPDA();
     }
+}
     // ===== FIN FUNCIÓN: cargarDatosPDA ======================================        
 
+    function verReportePDA(rutaArchivo) {
+        if (!rutaArchivo) {
+            alert('⚠️ No hay reporte disponible para este PDA');
+            return;
+        }
+        
+        // 🔴 EXTRAER SOLO EL NOMBRE DEL ARCHIVO
+        let nombreArchivo = rutaArchivo;
+        
+        // Si es una ruta con \, extraer después de la última \
+        if (nombreArchivo.includes('\\')) {
+            nombreArchivo = nombreArchivo.split('\\').pop();
+        }
+        // Si es una ruta con /, extraer después de la última /
+        if (nombreArchivo.includes('/')) {
+            nombreArchivo = nombreArchivo.split('/').pop();
+        }
+        
+        // Limpiar
+        nombreArchivo = nombreArchivo.trim();
+        
+        console.log('📄 Abriendo reporte:', nombreArchivo);
+        
+        // 🔴 USAR EL PUERTO 5000 (NO 8080)
+        const url = `http://localhost:5000/api/reportes/descargar/${encodeURIComponent(nombreArchivo)}`;
+        console.log('🔗 URL:', url);
+        
+        window.open(url, '_blank');
+    }
+    
     // ===== SISTEMA DE CACHÉ PARA EVALUACIONES ===============================
     let cacheEvaluaciones = {
         data: null,
@@ -4511,12 +4923,10 @@ let indicadoresEvolutivosExpandido = {
 
 
 // ======================================================
-// FUNCIÓN PRINCIPAL: Generar tabla evolutiva
+// FUNCIÓN PRINCIPAL: Generar tabla evolutiva (CORREGIDA)
 // ======================================================
 async function generarTablaEvolutivaIndicadores(evaluacionesFiltradas) {
-    console.log('📊 Generando tabla evolutiva de indicadores...');
-    
-
+    console.log('📊 generarTablaEvolutivaIndicadores - INICIO');
     
     const container = document.getElementById('tablaEvolutivaContainer');
     if (!container) {
@@ -4524,20 +4934,36 @@ async function generarTablaEvolutivaIndicadores(evaluacionesFiltradas) {
         return;
     }
     
+    // 🔴 VALIDACIÓN ROBUSTA
     if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos para mostrar</div>';
+        console.log('⚠️ No hay evaluaciones filtradas');
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos en el período seleccionado</div>';
         return;
     }
     
-    // 1. Obtener meses disponibles
+    console.log(`📊 Evaluaciones filtradas: ${evaluacionesFiltradas.length}`);
+    
+    // 1. Obtener meses disponibles (YA FILTRADOS)
     const mesesData = await obtenerMesesConDatos(evaluacionesFiltradas);
-    if (mesesData.length === 0) {
-        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📅 No hay suficientes meses con datos</div>';
+    
+    // 🔴 VALIDACIÓN: Si no hay meses, mostrar mensaje
+    if (!mesesData || mesesData.length === 0) {
+        console.log('⚠️ No hay meses con datos en el período seleccionado');
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📅 No hay meses con datos en el período seleccionado</div>';
         return;
     }
+    
+    console.log(`📅 ${mesesData.length} meses encontrados:`, mesesData.map(m => m.label).join(', '));
     
     // 2. Calcular indicadores por mes
     const indicadoresPorMes = await calcularIndicadoresPorMes(evaluacionesFiltradas, mesesData);
+    
+    // 🔴 VALIDACIÓN: Verificar que indicadoresPorMes no esté vacío
+    if (!indicadoresPorMes || Object.keys(indicadoresPorMes).length === 0) {
+        console.log('⚠️ No se pudieron calcular indicadores');
+        container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos suficientes para calcular indicadores</div>';
+        return;
+    }
     
     // 3. Generar HTML
     const html = generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes);
@@ -4550,14 +4976,31 @@ async function generarTablaEvolutivaIndicadores(evaluacionesFiltradas) {
 }
 
 // ======================================================
-// Obtener meses disponibles con datos
+// Obtener meses disponibles con datos (VERSIÓN CORREGIDA)
 // ======================================================
 async function obtenerMesesConDatos(evaluaciones) {
+    // 🔴 VALIDACIÓN: Si no hay evaluaciones, retornar array vacío
+    if (!evaluaciones || evaluaciones.length === 0) {
+        console.log('⚠️ No hay evaluaciones para obtener meses');
+        return [];
+    }
+    
+    const rango = obtenerRangoFechasActivo();
+    console.log(`📅 Rango activo: ${rango.tieneFiltro ? 'SÍ' : 'NO'}`);
+    if (rango.tieneFiltro) {
+        console.log(`   Desde: ${rango.fechaInicio.toLocaleDateString()} Hasta: ${rango.fechaFin.toLocaleDateString()}`);
+    }
+    
     const mesesSet = new Set();
     
     for (const evalItem of evaluaciones) {
         const fecha = obtenerFechaEvaluacion(evalItem);
         if (!fecha) continue;
+        
+        // Filtrar por rango de fechas
+        if (rango && rango.tieneFiltro) {
+            if (fecha < rango.fechaInicio || fecha > rango.fechaFin) continue;
+        }
         
         const anio = fecha.getFullYear();
         const mes = fecha.getMonth() + 1;
@@ -4565,28 +5008,59 @@ async function obtenerMesesConDatos(evaluaciones) {
         mesesSet.add(clave);
     }
     
-    const meses = Array.from(mesesSet).sort();
+    // 🔴 CONVERTIR A ARRAY Y ORDENAR
+    const mesesArray = Array.from(mesesSet).sort();
+    
+    if (mesesArray.length === 0) {
+        console.log('⚠️ No se encontraron meses en el rango seleccionado');
+        return [];
+    }
+    
     const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     
-    return meses.map(clave => {
+    // 🔴 RETORNAR CON LA ESTRUCTURA COMPLETA
+    const resultado = mesesArray.map(clave => {
         const [anio, mes] = clave.split('-');
+        const mesNum = parseInt(mes);
         return {
             clave: clave,
-            label: `${mesesNombres[parseInt(mes) - 1]} ${anio}`,
+            label: `${mesesNombres[mesNum - 1]} ${anio}`,
             anio: parseInt(anio),
-            mes: parseInt(mes),
-            orden: parseInt(anio) * 12 + parseInt(mes)
+            mes: mesNum,
+            orden: parseInt(anio) * 12 + mesNum
         };
     }).sort((a, b) => a.orden - b.orden);
+    
+    console.log(`✅ ${resultado.length} meses encontrados:`, resultado.map(m => m.label).join(', '));
+    return resultado;
 }
 
 // ======================================================
-// Calcular todos los indicadores por mes
+// Calcular todos los indicadores por mes (CORREGIDA)
 // ======================================================
 async function calcularIndicadoresPorMes(evaluaciones, mesesData) {
+    console.log('📊 calcularIndicadoresPorMes - INICIO');
+    
+    // 🔴 VALIDACIÓN INICIAL
+    if (!evaluaciones || evaluaciones.length === 0) {
+        console.log('⚠️ No hay evaluaciones para calcular indicadores');
+        return {};
+    }
+    
+    if (!mesesData || mesesData.length === 0) {
+        console.log('⚠️ No hay meses para calcular indicadores');
+        return {};
+    }
+    
     const resultados = {};
     
     for (const mes of mesesData) {
+        // 🔴 VALIDAR QUE 'mes' TENGA LA ESTRUCTURA CORRECTA
+        if (!mes || !mes.clave) {
+            console.warn('⚠️ Mes inválido, saltando:', mes);
+            continue;
+        }
+        
         // Filtrar evaluaciones del mes
         const evaluacionesMes = evaluaciones.filter(evalItem => {
             const fecha = obtenerFechaEvaluacion(evalItem);
@@ -4599,84 +5073,79 @@ async function calcularIndicadoresPorMes(evaluaciones, mesesData) {
             continue;
         }
         
+        // ========== CALCULAR INDICADORES ==========
         const totalEval = evaluacionesMes.length;
-        const promedioRawENC = (evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalENC), 0) / totalEval).toFixed(1);
-        const promedioRawECUF = (evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalECUF), 0) / totalEval).toFixed(1);
-        const promedioRawECN = (evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalECN), 0) / totalEval).toFixed(1);
-        const porcentajes = calcularPromediosMotivosPorcentaje(evaluacionesMes);
-        const pctPromedioMotivoENC = Math.round(Number(porcentajes.promedioENC));
-        const pctPromedioMotivoECUF = Math.round(Number(porcentajes.promedioECUF));
-        const pctPromedioMotivoECN = Math.round(Number(porcentajes.promedioECN));
-        const matrizDominante = obtenerMatrizDominante(evaluacionesMes);
-        const encDetalleText = matrizDominante ? `${promedioRawENC}/${matrizDominante.pesos.ENC} pts` : `${promedioRawENC} pts`;
-        const ecufDetalleText = matrizDominante ? `${promedioRawECUF}/${matrizDominante.pesos.ECUF} pts` : `${promedioRawECUF} pts`;
-        const ecnDetalleText = matrizDominante ? `${promedioRawECN}/${matrizDominante.pesos.ECN} pts` : `${promedioRawECN} pts`;
-        const sumaNotas = evaluacionesMes.reduce((sum, evalItem) => {
-            const fecha = obtenerFechaEvaluacion(evalItem);
-            const matriz = getMatrizByFecha(fecha);
-            const notaPorcentaje = calcularNotaPorcentaje(evalItem, matriz.pesos);
-            return sum + (isNaN(notaPorcentaje) ? 0 : notaPorcentaje);
-        }, 0);
+        
+        // Promedio General
+        const sumaNotas = evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.notaFinal || e.nota_final), 0);
         const promedioGeneral = totalEval > 0 ? (sumaNotas / totalEval).toFixed(1) : '0.0';
         
-        // ========== % LLAMADAS CON NOTA < 85% ==========
+        // Promedios RAW por motivo
+        const sumENC = evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalENC || e.total_enc), 0);
+        const sumECUF = evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalECUF || e.total_ecuf), 0);
+        const sumECN = evaluacionesMes.reduce((sum, e) => sum + numeroSeguro(e.totalECN || e.total_ecn), 0);
+        
+        const promedioRawENC = totalEval > 0 ? (sumENC / totalEval).toFixed(1) : '0.0';
+        const promedioRawECUF = totalEval > 0 ? (sumECUF / totalEval).toFixed(1) : '0.0';
+        const promedioRawECN = totalEval > 0 ? (sumECN / totalEval).toFixed(1) : '0.0';
+        
+        // % Llamadas con nota < 85%
         let quiebres = 0;
         for (const evalItem of evaluacionesMes) {
-            const fecha = obtenerFechaEvaluacion(evalItem);
-            const matriz = getMatrizByFecha(fecha);
-            const notaPorcentaje = calcularNotaPorcentaje(evalItem, matriz.pesos);
-            if (notaPorcentaje < 85) quiebres++;
+            const nota = numeroSeguro(evalItem.notaFinal || evalItem.nota_final);
+            if (nota < 85) quiebres++;
         }
-        const pctQuiebres = totalEval > 0 ? ((quiebres / totalEval) * 100).toFixed(1) : 0;
+        const pctQuiebres = totalEval > 0 ? ((quiebres / totalEval) * 100).toFixed(1) : '0.0';
         
-        // ========== MOTIVOS DE IMPACTO (según matriz de cada evaluación) ==========
+        // Motivos de impacto (según matriz de cada evaluación)
         let conENC = 0, conECUF = 0, conECN = 0;
         for (const evalItem of evaluacionesMes) {
             const fecha = obtenerFechaEvaluacion(evalItem);
             const matriz = getMatrizByFecha(fecha);
             const pesos = matriz.pesos;
             
-            if ((evalItem.totalENC || 0) < pesos.ENC) conENC++;
-            if ((evalItem.totalECUF || 0) < pesos.ECUF) conECUF++;
-            if ((evalItem.totalECN || 0) < pesos.ECN) conECN++;
+            if (numeroSeguro(evalItem.totalENC || evalItem.total_enc) < pesos.ENC) conENC++;
+            if (numeroSeguro(evalItem.totalECUF || evalItem.total_ecuf) < pesos.ECUF) conECUF++;
+            if (numeroSeguro(evalItem.totalECN || evalItem.total_ecn) < pesos.ECN) conECN++;
         }
         
-        const pctENC = totalEval > 0 ? ((conENC / totalEval) * 100).toFixed(1) : 0;
-        const pctECUF = totalEval > 0 ? ((conECUF / totalEval) * 100).toFixed(1) : 0;
-        const pctECN = totalEval > 0 ? ((conECN / totalEval) * 100).toFixed(1) : 0;
+        const pctENC = totalEval > 0 ? ((conENC / totalEval) * 100).toFixed(1) : '0.0';
+        const pctECUF = totalEval > 0 ? ((conECUF / totalEval) * 100).toFixed(1) : '0.0';
+        const pctECN = totalEval > 0 ? ((conECN / totalEval) * 100).toFixed(1) : '0.0';
         
-        // ========== PROMEDIO POR MOTIVO (convertido a porcentaje según matriz) ==========
+        // Promedio porcentual por motivo (según matriz)
         let sumaPctENC = 0, sumaPctECUF = 0, sumaPctECN = 0;
         for (const evalItem of evaluacionesMes) {
             const fecha = obtenerFechaEvaluacion(evalItem);
             const matriz = getMatrizByFecha(fecha);
             const pesos = matriz.pesos;
             
-            const pctENC = Math.min(((evalItem.totalENC || 0) / pesos.ENC) * 100, 100);
-            const pctECUF = Math.min(((evalItem.totalECUF || 0) / pesos.ECUF) * 100, 100);
-            const pctECN = Math.min(((evalItem.totalECN || 0) / pesos.ECN) * 100, 100);
+            const pctENC = Math.min((numeroSeguro(evalItem.totalENC || evalItem.total_enc) / pesos.ENC) * 100, 100);
+            const pctECUF = Math.min((numeroSeguro(evalItem.totalECUF || evalItem.total_ecuf) / pesos.ECUF) * 100, 100);
+            const pctECN = Math.min((numeroSeguro(evalItem.totalECN || evalItem.total_ecn) / pesos.ECN) * 100, 100);
             
             sumaPctENC += pctENC;
             sumaPctECUF += pctECUF;
             sumaPctECN += pctECN;
         }
         
-        const promedioENC = (sumaPctENC / totalEval).toFixed(1);
-        const promedioECUF = (sumaPctECUF / totalEval).toFixed(1);
-        const promedioECN = (sumaPctECN / totalEval).toFixed(1);
+        const promedioENC = totalEval > 0 ? (sumaPctENC / totalEval).toFixed(1) : '0.0';
+        const promedioECUF = totalEval > 0 ? (sumaPctECUF / totalEval).toFixed(1) : '0.0';
+        const promedioECN = totalEval > 0 ? (sumaPctECN / totalEval).toFixed(1) : '0.0';
         
-        // ========== TOTAL GESTORES ÚNICOS ==========
+        // Total gestores únicos
         const gestoresSet = new Set();
         evaluacionesMes.forEach(e => { if (e.agente) gestoresSet.add(e.agente); });
         const totalGestores = gestoresSet.size;
         
-        // ========== RANKING Y CUARTILES ==========
+        // Ranking y cuartiles
         const ranking = await construirRankingAgentes(evaluacionesMes);
         const q1 = ranking.filter(a => a.cuartil === 'Q1').length;
         const q2 = ranking.filter(a => a.cuartil === 'Q2').length;
         const q3 = ranking.filter(a => a.cuartil === 'Q3').length;
         const q4 = ranking.filter(a => a.cuartil === 'Q4').length;
         
+        // 🔴 ASIGNAR TODAS LAS VARIABLES CORRECTAMENTE
         resultados[mes.clave] = {
             totalEval: totalEval,
             totalGestores: totalGestores,
@@ -4695,22 +5164,39 @@ async function calcularIndicadoresPorMes(evaluaciones, mesesData) {
         };
     }
     
+    console.log(`✅ Indicadores calculados para ${Object.keys(resultados).length} meses`);
     return resultados;
 }
 
 // ======================================================
-// Generar HTML de la tabla evolutiva
-// ======================================================
-// ======================================================
-// GENERAR HTML DE LA TABLA EVOLUTIVA (COMPLETO)
+// GENERAR HTML DE LA TABLA EVOLUTIVA (COMPLETA CON VALIDACIONES)
 // ======================================================
 function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
-    // Filtrar meses con datos
-    const mesesValidos = mesesData.filter(m => indicadoresPorMes[m.clave] !== null);
+    console.log('📊 generarHTMLTablaEvolutiva - INICIO');
     
-    if (mesesValidos.length === 0) {
+    // 🔴 VALIDACIÓN ROBUSTA
+    if (!mesesData || !Array.isArray(mesesData) || mesesData.length === 0) {
+        console.log('⚠️ mesesData inválido o vacío');
         return '<div style="text-align: center; padding: 40px;">📊 No hay datos suficientes</div>';
     }
+    
+    if (!indicadoresPorMes || typeof indicadoresPorMes !== 'object') {
+        console.log('⚠️ indicadoresPorMes inválido');
+        return '<div style="text-align: center; padding: 40px;">📊 No hay datos de indicadores</div>';
+    }
+    
+    // Filtrar meses con datos
+    const mesesValidos = mesesData.filter(m => {
+        if (!m || !m.clave) return false;
+        return indicadoresPorMes[m.clave] !== null && indicadoresPorMes[m.clave] !== undefined;
+    });
+    
+    if (mesesValidos.length === 0) {
+        console.log('⚠️ No hay meses válidos con datos');
+        return '<div style="text-align: center; padding: 40px;">📊 No hay datos suficientes</div>';
+    }
+    
+    console.log(`📊 ${mesesValidos.length} meses válidos para la tabla`);
     
     // 🔵 FECHA DE CAMBIO DE MATRIZ: 1 de junio 2026
     const FECHA_CAMBIO = new Date(2026, 5, 1);
@@ -4776,7 +5262,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                 gap: 5px;
                 font-size: 12px;
             ">
-                🔵 Mar - May: <strong>ENC 30 | ECUF 30 | ECN 70</strong>
+                🔵 Mar - May: <strong>ENC 30 | ECUF 30 | ECN 40</strong>
                 <span style="font-size: 10px; color: #6c757d; font-weight: 400;">(ANTERIOR)</span>
             </span>
             <span style="
@@ -4892,59 +5378,11 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                                 ${generarFilaConTendenciaGlobal('promedioGeneral', mesesValidos, indicadoresPorMes, true, 1)}
                                 <td style="padding: 8px; text-align: center; ${tendencias.promedioGeneral.color}">${tendencias.promedioGeneral.icono} ${tendencias.promedioGeneral.texto}</td>
                             </tr>
-                            <!--
-                            <tr>                                
-                                <td style="padding: 8px;"><strong>⚠️ % Llamadas con NOTA &lt; 85%</strong></td>
-                                ${generarFilaConTendenciaGlobal('pctQuiebres', mesesValidos, indicadoresPorMes, true, 1)}
-                                <td style="padding: 8px; text-align: center; ${tendencias.pctQuiebres.color}">${tendencias.pctQuiebres.icono} ${tendencias.pctQuiebres.texto}</td>
-                            </tr>
-                            -->
                         </tbody>
                     </table>
                 </div>
             </div>
             
-            <!-- ====================================================== -->
-            <!-- SECCIÓN MOTIVOS DE IMPACTO -->
-            <!-- ====================================================== -->
-            <!--
-            <div class="indicador-seccion" data-seccion="motivos" style="margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
-                <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 18px;">🎯</span>
-                        <strong>MOTIVOS DE IMPACTO</strong>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <span style="font-size: 11px;">ENC:${ultimosValores.pctENC || 0}% | ECUF:${ultimosValores.pctECUF || 0}% | ECN:${ultimosValores.pctECN || 0}%</span>
-                        <span class="indicador-expand" style="font-size: 12px;">▼</span>
-                    </div>
-                </div>
-                <div class="indicador-contenido" style="display: none; padding: 15px; overflow-x: auto;">
-                    <table style="width: 100%; min-width: 600px; font-size: 12px; border-collapse: collapse;">
-                        <thead>
-                            <tr><th style="text-align: left; padding: 8px;">Indicador</th>${headers}<th style="padding: 8px; text-align: center;">Tendencia</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr style="border-bottom: 1px solid #e0e0e0;">
-                                <td style="padding: 8px;"><strong>🎯 % Llamadas con ENC &lt; 30</strong></td>
-                                ${generarFilaConTendenciaGlobal('pctENC', mesesValidos, indicadoresPorMes, true, 1)}
-                                <td style="padding: 8px; text-align: center; ${tendencias.pctENC.color}">${tendencias.pctENC.icono} ${tendencias.pctENC.texto}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #e0e0e0;">
-                                <td style="padding: 8px;"><strong>⚠️ % Llamadas con ECUF &lt; 30</strong></td>
-                                ${generarFilaConTendenciaGlobal('pctECUF', mesesValidos, indicadoresPorMes, true, 1)}
-                                <td style="padding: 8px; text-align: center; ${tendencias.pctECUF.color}">${tendencias.pctECUF.icono} ${tendencias.pctECUF.texto}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px;"><strong>💰 % Llamadas con ECN &lt; 40</strong></td>
-                                ${generarFilaConTendenciaGlobal('pctECN', mesesValidos, indicadoresPorMes, true, 1)}
-                                <td style="padding: 8px; text-align: center; ${tendencias.pctECN.color}">${tendencias.pctECN.icono} ${tendencias.pctECN.texto}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            -->
             <!-- ====================================================== -->
             <!-- SECCIÓN NOTA PROMEDIO POR MOTIVO -->
             <!-- ====================================================== -->
@@ -4952,7 +5390,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                 <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 18px;">📊</span>
-                        <strong>NOTA PROMEDIO POR MOTIVO</strong>
+                        <strong>NOTA PROMEDIO POR FRENTE DE IMPACTO</strong>
                     </div>
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <span style="font-size: 11px;">ENC:${ultimosValores.promedioENC || 0}% | ECUF:${ultimosValores.promedioECUF || 0}% | ECN:${ultimosValores.promedioECN || 0}%</span>
@@ -4986,13 +5424,13 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
             </div>
             
             <!-- ====================================================== -->
-            <!-- SECCIÓN DISTRIBUCIÓN POR CUARTILES -->
+            <!-- SECCIÓN DISTRIBUCIÓN POR CATEGORIA -->
             <!-- ====================================================== -->
             <div class="indicador-seccion" data-seccion="cuartiles" style="margin-bottom: 10px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
                 <div class="indicador-header" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; cursor: pointer;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 18px;">🏆</span>
-                        <strong>DISTRIBUCIÓN POR CATEGORIA</strong>
+                        <strong>DISTRIBUCIÓN POR RENDIMIENTO</strong>
                     </div>
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <span style="font-size: 11px;">Q4:${ultimosValores.q4 || 0} gestores (${tendencias.q4.texto})</span>
@@ -5290,6 +5728,7 @@ function exportarIndicadoresCSV() {
 // Actualizar tabla evolutiva desde reportes
 // ======================================================
 async function actualizarTablaEvolutivaIndicadores() {
+    // 🔴 USAR LAS EVALUACIONES FILTRADAS, NO LAS GLOBALES
     const evaluacionesFiltradas = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
     if (evaluacionesFiltradas.length === 0) return;
     
@@ -5531,152 +5970,157 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
     // ===== FIN FUNCIÓN: generarGraficosReportes =============================
     
-        // ===== 7. INICIO FUNCIÓN: generarGraficoGestionLlamadas (VERSIÓN HORIZONTAL Y FORZADA) =====
+    // ===== 7. INICIO FUNCIÓN: generarGraficoGestionLlamadas (VERSIÓN CON PERÍODO) =====
     let chartGestionLlamadas = null;
-    function generarGraficoGestionLlamadas(evaluacionesFiltradas) {
-        console.log('📞 generarGraficoGestionLlamadas (Horizontal forzado) - Iniciando...');
 
-        const canvas = document.getElementById('chartGestionLlamadas');
-        if (!canvas) {
-            console.error('❌ Canvas chartGestionLlamadas no encontrado');
-            return;
+function generarGraficoGestionLlamadas(evaluacionesFiltradas, periodo) {
+    console.log('📞 generarGraficoGestionLlamadas - INICIANDO...');
+    console.log(`   Período recibido: ${periodo}`);
+
+    const canvas = document.getElementById('chartGestionLlamadas');
+    if (!canvas) {
+        console.error('❌ Canvas chartGestionLlamadas no encontrado');
+        return;
+    }
+
+    // 🔴 DESTRUIR GRÁFICO EXISTENTE
+    if (chartGestionLlamadas) {
+        try {
+            chartGestionLlamadas.destroy();
+            chartGestionLlamadas = null;
+            console.log('✅ Gráfico chartGestionLlamadas destruido');
+        } catch (e) {
+            console.warn('Error destruyendo gráfico:', e);
         }
+    }
 
-        // 1. Destruir gráfico existente
-        if (chartGestionLlamadas) {
-            try {
-                chartGestionLlamadas.destroy();
-                chartGestionLlamadas = null;
-            } catch (e) {
-                console.warn('Error destruyendo gráfico:', e);
-            }
-        }
+    // 2. Validar datos
+    if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
+        console.warn('⚠️ No hay evaluaciones filtradas para el gráfico');
+        mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
+        return;
+    }
 
-        // 2. Validar datos
-        if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
-            console.warn('⚠️ No hay evaluaciones filtradas para el gráfico');
-            mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
-            return;
-        }
+    // 🔴 DETERMINAR PERÍODO EFECTIVO - MANEJA TODOS LOS CASOS
+    let periodoEfectivo = periodo || 'mes';
+    console.log(`   Período inicial: ${periodoEfectivo}`);
+    
+    if (periodoEfectivo === 'todos') {
+        periodoEfectivo = 'mes';
+        console.log('   "todos" → "mes"');
+    }
+    
+    if (periodoEfectivo === 'rango') {
+        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        if (tipoRango === 'mes') periodoEfectivo = 'mes';
+        else if (tipoRango === 'trimestre') periodoEfectivo = 'trimestre';
+        else if (tipoRango === 'anio') periodoEfectivo = 'anio';
+        else if (tipoRango === 'dia') periodoEfectivo = 'dia';
+        else periodoEfectivo = 'mes';
+        console.log(`   Rango mapeado a: ${periodoEfectivo}`);
+    }
+    
+    if (periodoEfectivo === 'multiples') {
+        const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+        if (tipoMultiples === 'mes') periodoEfectivo = 'mes';
+        else if (tipoMultiples === 'trimestre') periodoEfectivo = 'trimestre';
+        else if (tipoMultiples === 'anio') periodoEfectivo = 'anio';
+        else if (tipoMultiples === 'dia') periodoEfectivo = 'dia';
+        else periodoEfectivo = 'mes';
+        console.log(`   Múltiples mapeado a: ${periodoEfectivo}`);
+    }
+    
+    console.log(`   Período EFECTIVO final: ${periodoEfectivo}`);
 
-        // 3. Agrupar los datos por mes
-        const periodo = 'mes';
-        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
+    // 3. Agrupar los datos por el período efectivo
+    const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodoEfectivo);
 
-        if (datosAgrupados.length === 0) {
-            mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
-            return;
-        }
+    if (datosAgrupados.length === 0) {
+        mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
+        return;
+    }
 
-        // 4. Preparar los datos
-        const labels = datosAgrupados.map(item => item.label);
-        
-        // Arrays para almacenar cantidades reales
-        const cantidadesCompletas = [];
-        const cantidadesIncompletas = [];
-        
-        // Arrays para porcentajes (lo que se grafica)
-        const dataCompletas = datosAgrupados.map(item => {
-            const totalPeriodo = item.evaluaciones.length;
-            if (totalPeriodo === 0) return 0;
-            const completas = item.evaluaciones.filter(e => (e.notaFinal || 0) >= 85).length;
-            cantidadesCompletas.push(completas);
-            cantidadesIncompletas.push(totalPeriodo - completas);
-            return Math.round((completas / totalPeriodo) * 100);
-        });
+    // 4. Preparar los datos
+    const labels = datosAgrupados.map(item => item.label);
+    
+    const cantidadesCompletas = [];
+    const cantidadesIncompletas = [];
+    
+    const dataCompletas = datosAgrupados.map(item => {
+        const totalPeriodo = item.evaluaciones.length;
+        if (totalPeriodo === 0) return 0;
+        const completas = item.evaluaciones.filter(e => (e.notaFinal || 0) >= 85).length;
+        cantidadesCompletas.push(completas);
+        cantidadesIncompletas.push(totalPeriodo - completas);
+        return Math.round((completas / totalPeriodo) * 100);
+    });
 
-        const dataIncompletas = datosAgrupados.map((item, idx) => {
-            const totalPeriodo = item.evaluaciones.length;
-            if (totalPeriodo === 0) return 0;
-            const incompletas = cantidadesIncompletas[idx];
-            return Math.round((incompletas / totalPeriodo) * 100);
-        });
+    const dataIncompletas = datosAgrupados.map((item, idx) => {
+        const totalPeriodo = item.evaluaciones.length;
+        if (totalPeriodo === 0) return 0;
+        const incompletas = cantidadesIncompletas[idx];
+        return Math.round((incompletas / totalPeriodo) * 100);
+    });
 
-        // 5. Configurar el gráfico
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+    // 5. Configurar el gráfico
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-        canvas.width = canvas.clientWidth;
-        canvas.height = canvas.clientHeight;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        chartGestionLlamadas = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: '✅ Gestionadas (≥85%)',
-                        data: dataCompletas,
-                        backgroundColor: 'rgba(26, 127, 55, 0.85)',
-                        borderColor: '#1a7f37',
-                        borderWidth: 2,
-                        borderRadius: 8,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8,
-                        stack: 'gestion'
-                    },
-                    {
-                        label: '❌ No gestionadas (<85%)',
-                        data: dataIncompletas,
-                        backgroundColor: 'rgba(217, 48, 37, 0.85)',
-                        borderColor: '#d93025',
-                        borderWidth: 2,
-                        borderRadius: 8,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8,
-                        stack: 'gestion'
-                    }
-                ]
+    chartGestionLlamadas = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '✅ Gestionadas (≥85%)',
+                    data: dataCompletas,
+                    backgroundColor: 'rgba(26, 127, 55, 0.85)',
+                    borderColor: '#1a7f37',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8,
+                    stack: 'gestion'
+                },
+                {
+                    label: '❌ No gestionadas (<85%)',
+                    data: dataIncompletas,
+                    backgroundColor: 'rgba(217, 48, 37, 0.85)',
+                    borderColor: '#d93025',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8,
+                    stack: 'gestion'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                layout: {
-                    padding: {
-                        top: 25,  // Espacio extra arriba para que no se corten las etiquetas
-                        bottom: 10
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                let label = context.dataset.label || '';
-                                let porcentaje = context.raw;
-                                const idx = context.dataIndex;
-                                let cantidadReal = 0;
-                                let totalPeriodo = datosAgrupados[idx].evaluaciones.length;
-                                
-                                if (context.dataset.label.includes('Gestionadas')) {
-                                    cantidadReal = cantidadesCompletas[idx];
-                                } else {
-                                    cantidadReal = cantidadesIncompletas[idx];
-                                }
-                                
-                                return `${label}: ${porcentaje}% (${cantidadReal} de ${totalPeriodo} llamadas)`;
-                            }
-                        }
-                    },
-                    legend: {
-                        position: 'bottom',
-                        labels: { font: { size: 11, weight: 'bold' }, usePointStyle: true }
-                    },
-                    datalabels: {
-                        // 🔴 ANCLAJE: 'end' para ponerlo al final de la barra (horizontal)
-                        anchor: 'end',
-                        align: 'end',
-                        offset: 8,  // Separación de la barra
-                        
-                        formatter: function (value, context) {
-                            if (value === 0) return '';
-                            
+            layout: {
+                padding: {
+                    top: 25,
+                    bottom: 10
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            let porcentaje = context.raw;
                             const idx = context.dataIndex;
                             let cantidadReal = 0;
+                            let totalPeriodo = datosAgrupados[idx].evaluaciones.length;
                             
                             if (context.dataset.label.includes('Gestionadas')) {
                                 cantidadReal = cantidadesCompletas[idx];
@@ -5684,87 +6128,110 @@ async function actualizarTablaEvolutivaIndicadores() {
                                 cantidadReal = cantidadesIncompletas[idx];
                             }
                             
-                            // 🔴 FORMATO HORIZONTAL: "75% (15)"
-                            return `${value}% (${cantidadReal})`;
-                        },
-                        backgroundColor: function (context) {
-                            // Fondo con opacidad para mejor legibilidad
-                            return context.dataset.label.includes('Gestionadas') ? '#1a7f37' : '#d93025';
-                        },
-                        borderRadius: 12,
-                        padding: { left: 8, right: 8, top: 3, bottom: 3 },
-                        color: 'white',
-                        font: { 
-                            weight: 'bold', 
-                            size: 10,
-                            family: 'system-ui, monospace'
-                        },
-                        // 🔴 FORZAR VISUALIZACIÓN SIEMPRE (incluso en barras pequeñas)
-                        // Esto se logra con 'clip: false' y ajustando el offset
-                        clip: false
+                            return `${label}: ${porcentaje}% (${cantidadReal} de ${totalPeriodo} llamadas)`;
+                        }
                     }
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        title: {
-                            display: true,
-                            text: 'Porcentaje de Llamadas (%)',
-                            color: 'var(--muted)',
-                            font: { weight: 'bold', size: 11 }
-                        },
-                        grid: { display: false },
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            },
-                            stepSize: 20,
-                            color: '#555'
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { size: 11, weight: 'bold' }, usePointStyle: true }
+                },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'end',
+                    offset: 8,
+                    formatter: function (value, context) {
+                        if (value === 0) return '';
+                        
+                        const idx = context.dataIndex;
+                        let cantidadReal = 0;
+                        
+                        if (context.dataset.label.includes('Gestionadas')) {
+                            cantidadReal = cantidadesCompletas[idx];
+                        } else {
+                            cantidadReal = cantidadesIncompletas[idx];
                         }
+                        
+                        return `${value}% (${cantidadReal})`;
                     },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Mes',
-                            color: 'var(--muted)',
-                            font: { weight: 'bold', size: 11 }
+                    backgroundColor: function (context) {
+                        return context.dataset.label.includes('Gestionadas') ? '#1a7f37' : '#d93025';
+                    },
+                    borderRadius: 12,
+                    padding: { left: 8, right: 8, top: 3, bottom: 3 },
+                    color: 'white',
+                    font: { 
+                        weight: 'bold', 
+                        size: 10,
+                        family: 'system-ui, monospace'
+                    },
+                    clip: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Porcentaje de Llamadas (%)',
+                        color: 'var(--muted)',
+                        font: { weight: 'bold', size: 11 }
+                    },
+                    grid: { display: false },
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
                         },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45,
-                            autoSkip: true,
-                            maxTicksLimit: 12,
-                            color: '#555'
-                        },
-                        grid: { display: false }
+                        stepSize: 20,
+                        color: '#555'
                     }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: periodoEfectivo === 'mes' ? 'Mes' : 
+                              (periodoEfectivo === 'trimestre' ? 'Trimestre' : 
+                              (periodoEfectivo === 'anio' ? 'Año' : 
+                              (periodoEfectivo === 'dia' ? 'Día' : 'Período'))),
+                        color: 'var(--muted)',
+                        font: { weight: 'bold', size: 11 }
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 12,
+                        color: '#555'
+                    },
+                    grid: { display: false }
                 }
             }
-        });
-
-        // 6. Actualizar el texto de información
-        let sumaCompletasPct = 0, sumaIncompletasPct = 0;
-        let totalCompletasAbs = 0, totalIncompletasAbs = 0;
-        
-        for (let i = 0; i < datosAgrupados.length; i++) {
-            sumaCompletasPct += dataCompletas[i];
-            sumaIncompletasPct += dataIncompletas[i];
-            totalCompletasAbs += cantidadesCompletas[i];
-            totalIncompletasAbs += cantidadesIncompletas[i];
         }
-        
-        const promedioCompletas = (sumaCompletasPct / datosAgrupados.length).toFixed(1);
-        const promedioIncompletas = (sumaIncompletasPct / datosAgrupados.length).toFixed(1);
-        const totalGeneral = totalCompletasAbs + totalIncompletasAbs;
-        
-        const infoDiv = document.getElementById('gestionLlamadasInfo');
-        if (infoDiv) {
-            infoDiv.innerHTML = `📊 Total: ${totalGeneral} llamadas | ✅ Completas: ${totalCompletasAbs} (${promedioCompletas}% promedio) | ❌ Incompletas: ${totalIncompletasAbs} (${promedioIncompletas}% promedio)`;
-        }
+    });
 
-        console.log('✅ Gráfico Gestión de Llamadas (horizontal forzado) actualizado');
+    // 6. Actualizar el texto de información
+    let sumaCompletasPct = 0, sumaIncompletasPct = 0;
+    let totalCompletasAbs = 0, totalIncompletasAbs = 0;
+    
+    for (let i = 0; i < datosAgrupados.length; i++) {
+        sumaCompletasPct += dataCompletas[i];
+        sumaIncompletasPct += dataIncompletas[i];
+        totalCompletasAbs += cantidadesCompletas[i];
+        totalIncompletasAbs += cantidadesIncompletas[i];
     }
+    
+    const promedioCompletas = (sumaCompletasPct / datosAgrupados.length).toFixed(1);
+    const promedioIncompletas = (sumaIncompletasPct / datosAgrupados.length).toFixed(1);
+    const totalGeneral = totalCompletasAbs + totalIncompletasAbs;
+    
+    const infoDiv = document.getElementById('gestionLlamadasInfo');
+    if (infoDiv) {
+        infoDiv.innerHTML = `📊 Total: ${totalGeneral} llamadas | ✅ Completas: ${totalCompletasAbs} (${promedioCompletas}% promedio) | ❌ Incompletas: ${totalIncompletasAbs} (${promedioIncompletas}% promedio)`;
+    }
+
+    console.log(`✅ Gráfico Gestión de Llamadas actualizado (período: ${periodoEfectivo})`);
+}
     // ===== FIN FUNCIÓN: generarGraficoGestionLlamadas =======================
     
     // ===== 8. INICIO FUNCIÓN: generarEvolutivoAudiosAgrupado ===============
@@ -5801,6 +6268,10 @@ async function actualizarTablaEvolutivaIndicadores() {
             }
             return;
         }
+
+        // 🔴 USAR EL PERÍODO RECIBIDO (YA VIENE DE aplicarFiltroReportes)
+        const periodoEfectivo = periodo || 'mes';
+        console.log(`📊 Generando gráfico de audios con período: ${periodoEfectivo}`);
 
         const labels = datosAgrupados.map(item => item.label);
         const dataCantidad = datosAgrupados.map(item => item.count);
@@ -5897,7 +6368,13 @@ async function actualizarTablaEvolutivaIndicadores() {
                         ticks: { callback: (v) => Math.round(v) + '%', stepSize: 20, color: '#d93025' }
                     },
                     x: {
-                        title: { display: true, text: periodo === 'dia' ? 'Fecha (Día)' : (periodo === 'semana' ? 'Semana' : (periodo === 'mes' ? 'Mes' : (periodo === 'trimestre' ? 'Trimestre' : 'Año'))) },
+                        title: { 
+                            display: true, 
+                            text: periodoEfectivo === 'dia' ? 'Fecha (Día)' : 
+                                (periodoEfectivo === 'semana' ? 'Semana' : 
+                                (periodoEfectivo === 'mes' ? 'Mes' : 
+                                (periodoEfectivo === 'trimestre' ? 'Trimestre' : 'Año'))) 
+                        },
                         ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 12 },
                         grid: { display: false }
                     }
@@ -5908,9 +6385,10 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
     // ===== FIN FUNCIÓN: generarEvolutivoAudiosAgrupado ======================
 
-        // ===== 9. INICIO FUNCIÓN: generarDistribucionRangosAgrupado (CON LEYENDA INTERACTIVA MEJORADA) =====
-    function generarDistribucionRangosAgrupado(evaluacionesFiltradas) {
-        console.log('🔵 generarDistribucionRangosAgrupado - CON LEYENDA INTERACTIVA MEJORADA');
+    // ===== 9. INICIO FUNCIÓN: generarDistribucionRangosAgrupado (VERSIÓN CON PERÍODO) =====
+    function generarDistribucionRangosAgrupado(evaluacionesFiltradas, periodo) {
+        console.log('🔵 generarDistribucionRangosAgrupado - INICIANDO...');
+        console.log(`   Período recibido: ${periodo}`);
 
         const canvasId = 'chartDistribucionRangos';
         const canvas = document.getElementById(canvasId);
@@ -5919,15 +6397,15 @@ async function actualizarTablaEvolutivaIndicadores() {
             return;
         }
 
-        // 1. Destruir gráfico existente
+        // 🔴 DESTRUIR GRÁFICO EXISTENTE
         if (window.chartDistribucionRangos && typeof window.chartDistribucionRangos.destroy === 'function') {
             try {
                 window.chartDistribucionRangos.destroy();
+                window.chartDistribucionRangos = null;
                 console.log('✅ Gráfico chartDistribucionRangos destruido');
             } catch (e) {
                 console.warn('Error destruyendo gráfico:', e);
             }
-            window.chartDistribucionRangos = null;
         }
 
         // 2. Validar datos
@@ -5937,9 +6415,42 @@ async function actualizarTablaEvolutivaIndicadores() {
             return;
         }
 
-        // 3. Agrupar los datos por mes
-        const periodo = 'mes';
-        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
+        // 🔴 DETERMINAR PERÍODO EFECTIVO - MANEJA TODOS LOS CASOS
+        let periodoEfectivo = periodo || 'mes';
+        console.log(`   Período inicial: ${periodoEfectivo}`);
+        
+        // Si es 'todos', usar 'mes'
+        if (periodoEfectivo === 'todos') {
+            periodoEfectivo = 'mes';
+            console.log('   "todos" → "mes"');
+        }
+        
+        // Si es 'rango', obtener el subtipo
+        if (periodoEfectivo === 'rango') {
+            const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+            if (tipoRango === 'mes') periodoEfectivo = 'mes';
+            else if (tipoRango === 'trimestre') periodoEfectivo = 'trimestre';
+            else if (tipoRango === 'anio') periodoEfectivo = 'anio';
+            else if (tipoRango === 'dia') periodoEfectivo = 'dia';
+            else periodoEfectivo = 'mes';
+            console.log(`   Rango mapeado a: ${periodoEfectivo}`);
+        }
+        
+        // Si es 'multiples', obtener el subtipo
+        if (periodoEfectivo === 'multiples') {
+            const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+            if (tipoMultiples === 'mes') periodoEfectivo = 'mes';
+            else if (tipoMultiples === 'trimestre') periodoEfectivo = 'trimestre';
+            else if (tipoMultiples === 'anio') periodoEfectivo = 'anio';
+            else if (tipoMultiples === 'dia') periodoEfectivo = 'dia';
+            else periodoEfectivo = 'mes';
+            console.log(`   Múltiples mapeado a: ${periodoEfectivo}`);
+        }
+        
+        console.log(`   Período EFECTIVO final: ${periodoEfectivo}`);
+
+        // 3. Agrupar los datos por el período efectivo
+        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodoEfectivo);
 
         if (datosAgrupados.length === 0) {
             mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
@@ -5954,7 +6465,6 @@ async function actualizarTablaEvolutivaIndicadores() {
         const cantidadesRegular = [];
         const cantidadesCritico = [];
         
-        // Totales acumulados para la leyenda
         let totalExcelente = 0, totalBien = 0, totalRegular = 0, totalCritico = 0;
         let sumaExcelentePct = 0, sumaBienPct = 0, sumaRegularPct = 0, sumaCriticoPct = 0;
         
@@ -6008,7 +6518,7 @@ async function actualizarTablaEvolutivaIndicadores() {
         const promedioRegular = (sumaRegularPct / datosAgrupados.length).toFixed(1);
         const promedioCritico = (sumaCriticoPct / datosAgrupados.length).toFixed(1);
 
-        // 5. Configurar el gráfico con leyenda personalizada
+        // 5. Configurar el gráfico
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
@@ -6105,16 +6615,13 @@ async function actualizarTablaEvolutivaIndicadores() {
                             }
                         }
                     },
-                    // 🔴 CLAVE: Personalizar la leyenda para mostrar cantidad + porcentaje
                     legend: {
                         position: 'bottom',
                         labels: {
-                            // Esta función personaliza el texto de cada elemento de la leyenda
                             generateLabels: function(chart) {
                                 const datasets = chart.data.datasets;
                                 const labels = [];
                                 
-                                // Datos acumulados para mostrar en la leyenda
                                 const totals = {
                                     '🏆 Excelente (97-100%)': { cantidad: totalExcelente, pct: promedioExcelente },
                                     '📈 Bueno (90-96%)': { cantidad: totalBien, pct: promedioBien },
@@ -6137,7 +6644,6 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     });
                                 }
                                 
-                                // Agregar item de total general al final
                                 labels.push({
                                     text: `📊 TOTAL: ${totalGeneral} llamadas`,
                                     fillStyle: 'transparent',
@@ -6160,7 +6666,6 @@ async function actualizarTablaEvolutivaIndicadores() {
                             boxHeight: 16
                         },
                         onClick: function(e, legendItem, legend) {
-                            // 🔴 Mantener la funcionalidad de mostrar/ocultar datasets
                             if (legendItem.datasetIndex !== undefined && legendItem.datasetIndex !== null) {
                                 const ci = legend.chart;
                                 const meta = ci.getDatasetMeta(legendItem.datasetIndex);
@@ -6240,7 +6745,10 @@ async function actualizarTablaEvolutivaIndicadores() {
                     x: {
                         title: {
                             display: true,
-                            text: 'Mes',
+                            text: periodoEfectivo === 'mes' ? 'Mes' : 
+                                (periodoEfectivo === 'trimestre' ? 'Trimestre' : 
+                                (periodoEfectivo === 'anio' ? 'Año' : 
+                                (periodoEfectivo === 'dia' ? 'Día' : 'Período'))),
                             color: 'var(--muted)',
                             font: { weight: 'bold', size: 11 }
                         },
@@ -6259,17 +6767,20 @@ async function actualizarTablaEvolutivaIndicadores() {
             }
         });
 
-        console.log('✅ Gráfico Distribución de Rangos (con leyenda interactiva mejorada) actualizado');
+        console.log(`✅ Gráfico Distribución de Rangos actualizado (período: ${periodoEfectivo})`);
         console.log(`📊 Totales - Excelente: ${totalExcelente} (${promedioExcelente}%), Bueno: ${totalBien} (${promedioBien}%), Regular: ${totalRegular} (${promedioRegular}%), Crítico: ${totalCritico} (${promedioCritico}%)`);
-    }// ===== FIN FUNCIÓN: generarDistribucionRangosAgrupado ===================
+    }
+// ===== FIN FUNCIÓN: generarDistribucionRangosAgrupado ===================
     
-        // ===== 10. INICIO FUNCIÓN: generarEvolutivoAtributosAgrupado (SIN LÍNEAS DE FONDO) =====
+    // ===== 10. INICIO FUNCIÓN: generarEvolutivoAtributosAgrupado (SIN LÍNEAS DE FONDO) =====
     function generarEvolutivoAtributosAgrupado(evaluacionesParam, datosAgrupados, periodo) {
         console.log('📊 generarEvolutivoAtributosAgrupado - INICIANDO...');
-        console.log(`📊 Período recibido: ${periodo}`);
         
         const canvas = document.getElementById('chartEvolutivoAtributos');
-        if (!canvas) return;
+        if (!canvas) {
+            console.error('❌ Canvas chartEvolutivoAtributos no encontrado');
+            return;
+        }
 
         let evaluaciones = evaluacionesParam;
         if (!evaluaciones || evaluaciones.length === 0) {
@@ -6281,17 +6792,27 @@ async function actualizarTablaEvolutivaIndicadores() {
             return;
         }
         
+        // 🔴 USAR EL PERÍODO RECIBIDO O EL SELECCIONADO
+        let periodoEfectivo = periodo || filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
+        console.log(`📊 Período para atributos: ${periodoEfectivo}`);
+        
+        // 🔴 SOLO SI ES 'todos', usar 'mes'
+        if (periodoEfectivo === 'todos') {
+            periodoEfectivo = 'mes';
+            console.log('📊 "todos" seleccionado, usando "mes" para atributos');
+        }
+        
+        // 🔴 NO FORZAR 'mes' SI EL USUARIO SELECCIONÓ 'dia'
+        console.log(`📊 Usando período: ${periodoEfectivo}`);
+        
         if (!datosAgrupados || datosAgrupados.length === 0) {
-            const periodoCalculado = (periodo === 'dia' || !periodo) ? 'mes' : periodo;
-            datosAgrupados = agruparEvaluacionesPorPeriodo(evaluaciones, periodoCalculado);
+            datosAgrupados = agruparEvaluacionesPorPeriodo(evaluaciones, periodoEfectivo);
         }
         
         if (datosAgrupados.length === 0) {
             mostrarMensajeSinDatosEnCanvas(canvas, '📊 No hay datos en el período seleccionado');
             return;
         }
-
-        const periodoEfectivo = (periodo === 'dia' || !periodo) ? 'mes' : periodo;
 
         const fallasPorAtributo = {};
         evaluaciones.forEach(evalItem => {
@@ -6420,7 +6941,6 @@ async function actualizarTablaEvolutivaIndicadores() {
                             color: 'var(--muted)',
                             font: { weight: 'bold', size: 11 }
                         },
-                        // 🔴 ELIMINAR LÍNEAS DE FONDO DEL EJE Y
                         grid: { 
                             display: false,
                             drawBorder: true
@@ -6443,7 +6963,6 @@ async function actualizarTablaEvolutivaIndicadores() {
                             autoSkip: true,
                             color: '#555'
                         },
-                        // 🔴 ELIMINAR LÍNEAS DE FONDO DEL EJE X
                         grid: { 
                             display: false
                         } 
@@ -6820,8 +7339,15 @@ async function actualizarTablaEvolutivaIndicadores() {
 
         // 3. Determinar el período a usar
         let periodoEfectivo = periodo || filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
-        if (periodoEfectivo === 'dia') periodoEfectivo = 'mes';
+        console.log(`📊 Período para cuartiles: ${periodoEfectivo}`);
         
+        // 🔴 SOLO SI ES 'todos', usar 'mes'
+        if (periodoEfectivo === 'todos') {
+            periodoEfectivo = 'mes';
+            console.log('📊 "todos" seleccionado, usando "mes" para cuartiles');
+        }
+        
+        // 🔴 NO FORZAR 'mes' SI EL USUARIO SELECCIONÓ 'dia'
         console.log(`📊 Usando período: ${periodoEfectivo}`);
 
         // 4. Agrupar evaluaciones por período (si no se pasaron datosAgrupados)
@@ -6901,25 +7427,21 @@ async function actualizarTablaEvolutivaIndicadores() {
         const labels = periodosOrdenados.map(item => item.label);
 
         // 5. Preparar datos para los 4 cuartiles (Q1, Q2, Q3, Q4)
-        // Arrays para almacenar cantidades reales
         const cantidadesQ1 = [];
         const cantidadesQ2 = [];
         const cantidadesQ3 = [];
         const cantidadesQ4 = [];
         
-        // Arrays para porcentajes (lo que se grafica)
         const dataQ1 = [];
         const dataQ2 = [];
         const dataQ3 = [];
         const dataQ4 = [];
         
-        // Totales acumulados para la leyenda
         let totalQ1 = 0, totalQ2 = 0, totalQ3 = 0, totalQ4 = 0;
         let sumaQ1Pct = 0, sumaQ2Pct = 0, sumaQ3Pct = 0, sumaQ4Pct = 0;
 
         for (const periodoData of periodosOrdenados) {
             if (periodoData.evaluaciones.length > 0) {
-                // Construir ranking para este período específico
                 const rankingPeriodo = await construirRankingAgentes(periodoData.evaluaciones);
                 
                 const q1 = rankingPeriodo.filter(a => a.cuartil === 'Q1').length;
@@ -7017,7 +7539,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                         stack: 'cuartiles'
                     },
                     {
-                        label: '🔴 Q4 (Crítico)',
+                        label: '🔴 Q4 (Riesgo)',
                         data: dataQ4,
                         backgroundColor: '#d93025',
                         borderColor: '#d93025',
@@ -7156,7 +7678,6 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     break;
                             }
                             
-                            // Mostrar formato: "75% (15)"
                             return `${value}% (${cantidadReal})`;
                         },
                         backgroundColor: function (context) {
@@ -7250,284 +7771,243 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
     // ===== FIN FUNCIÓN: mostrarMensajeSinDatosEnCanvasCuartiles =============
     
-    // ===== 15. INICIO FUNCIÓN: generarGraficoComparativaAgrupado (VERSIÓN SIN TOTAL EN LEYENDA) =====
-    async function generarGraficoComparativaAgrupado(evaluacionesFiltradas) {
-        console.log('📊 generarGraficoComparativaAgrupado - VERSIÓN EVOLUTIVA POR MESES');
+    // ===== 15. INICIO FUNCIÓN: generarGraficoComparativaAgrupado (VERSIÓN CON PERÍODO) =====
+    async function generarGraficoComparativaAgrupado(evaluacionesFiltradas, periodo) {
+    console.log('📊 generarGraficoComparativaAgrupado - INICIANDO...');
+    console.log(`   Período recibido: ${periodo}`);
 
-        const canvas = document.getElementById('chartComparativa');
-        if (!canvas) {
-            console.error('❌ Canvas chartComparativa no encontrado');
-            return;
-        }
+    const canvas = document.getElementById('chartComparativa');
+    if (!canvas) {
+        console.error('❌ Canvas chartComparativa no encontrado');
+        return;
+    }
 
-        // 1. Destruir gráfico existente
-        if (window.chartComparativa) {
-            try {
-                if (typeof window.chartComparativa.destroy === 'function') {
-                    window.chartComparativa.destroy();
-                }
-            } catch (e) { }
-            window.chartComparativa = null;
-        }
-
-        // 2. Validar datos
-        if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
-            console.warn('⚠️ No hay evaluaciones filtradas');
-            mostrarMensajeSinDatosEnCanvasComparativa(canvas, '📊 No hay datos en el período seleccionado');
-            return;
-        }
-
-        // 3. Agrupar por mes
-        const periodo = 'mes';
-        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
-
-        if (datosAgrupados.length === 0) {
-            mostrarMensajeSinDatosEnCanvasComparativa(canvas, '📊 No hay datos en el período seleccionado');
-            return;
-        }
-
-        // 4. Para cada período, calcular el desempeño por cuartil (promedio de nota)
-        const labels = datosAgrupados.map(item => item.label);
-        
-        // Arrays para almacenar los datos por período
-        const dataQ1 = [];
-        const dataQ2 = [];
-        const dataQ3 = [];
-        const dataQ4 = [];
-        
-        // Arrays para almacenar cantidades de gestores por cuartil
-        const cantidadesQ1 = [];
-        const cantidadesQ2 = [];
-        const cantidadesQ3 = [];
-        const cantidadesQ4 = [];
-        
-        // Promedios mensuales para la leyenda
-        let sumaQ1Mensual = 0, sumaQ2Mensual = 0, sumaQ3Mensual = 0, sumaQ4Mensual = 0;
-        let sumaPromedioQ1 = 0, sumaPromedioQ2 = 0, sumaPromedioQ3 = 0, sumaPromedioQ4 = 0;
-
-        for (const periodoData of datosAgrupados) {
-            if (periodoData.evaluaciones.length > 0) {
-                // Construir ranking para este período específico
-                const rankingPeriodo = await construirRankingAgentes(periodoData.evaluaciones);
-                
-                // Calcular promedios por cuartil
-                const q1Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q1');
-                const q2Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q2');
-                const q3Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q3');
-                const q4Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q4');
-                
-                const promedioQ1 = q1Agentes.length > 0 
-                    ? Math.round(q1Agentes.reduce((sum, a) => sum + a.promedio, 0) / q1Agentes.length * 10) / 10
-                    : 0;
-                const promedioQ2 = q2Agentes.length > 0 
-                    ? Math.round(q2Agentes.reduce((sum, a) => sum + a.promedio, 0) / q2Agentes.length * 10) / 10
-                    : 0;
-                const promedioQ3 = q3Agentes.length > 0 
-                    ? Math.round(q3Agentes.reduce((sum, a) => sum + a.promedio, 0) / q3Agentes.length * 10) / 10
-                    : 0;
-                const promedioQ4 = q4Agentes.length > 0 
-                    ? Math.round(q4Agentes.reduce((sum, a) => sum + a.promedio, 0) / q4Agentes.length * 10) / 10
-                    : 0;
-                
-                dataQ1.push(promedioQ1);
-                dataQ2.push(promedioQ2);
-                dataQ3.push(promedioQ3);
-                dataQ4.push(promedioQ4);
-                
-                const cantidadQ1 = q1Agentes.length;
-                const cantidadQ2 = q2Agentes.length;
-                const cantidadQ3 = q3Agentes.length;
-                const cantidadQ4 = q4Agentes.length;
-                
-                cantidadesQ1.push(cantidadQ1);
-                cantidadesQ2.push(cantidadQ2);
-                cantidadesQ3.push(cantidadQ3);
-                cantidadesQ4.push(cantidadQ4);
-                
-                // Acumular para promedios mensuales
-                sumaQ1Mensual += cantidadQ1;
-                sumaQ2Mensual += cantidadQ2;
-                sumaQ3Mensual += cantidadQ3;
-                sumaQ4Mensual += cantidadQ4;
-                sumaPromedioQ1 += promedioQ1;
-                sumaPromedioQ2 += promedioQ2;
-                sumaPromedioQ3 += promedioQ3;
-                sumaPromedioQ4 += promedioQ4;
-            } else {
-                dataQ1.push(0);
-                dataQ2.push(0);
-                dataQ3.push(0);
-                dataQ4.push(0);
-                cantidadesQ1.push(0);
-                cantidadesQ2.push(0);
-                cantidadesQ3.push(0);
-                cantidadesQ4.push(0);
+    // 🔴 DESTRUIR GRÁFICO EXISTENTE - MÁS ROBUSTO
+    if (window.chartComparativa) {
+        try {
+            if (typeof window.chartComparativa.destroy === 'function') {
+                window.chartComparativa.destroy();
+                window.chartComparativa = null;
+                console.log('✅ Gráfico chartComparativa destruido');
+            }
+        } catch (e) {
+            console.warn('Error destruyendo gráfico:', e);
+            // Forzar limpieza del canvas
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         }
-
-        const totalMeses = datosAgrupados.length;
-        
-        // Promedio mensual de gestores por cuartil
-        const promedioMensualQ1 = totalMeses > 0 ? Math.round(sumaQ1Mensual / totalMeses) : 0;
-        const promedioMensualQ2 = totalMeses > 0 ? Math.round(sumaQ2Mensual / totalMeses) : 0;
-        const promedioMensualQ3 = totalMeses > 0 ? Math.round(sumaQ3Mensual / totalMeses) : 0;
-        const promedioMensualQ4 = totalMeses > 0 ? Math.round(sumaQ4Mensual / totalMeses) : 0;
-        
-        // Promedio de notas por cuartil en todo el período
-        const promedioNotaQ1 = totalMeses > 0 ? (sumaPromedioQ1 / totalMeses).toFixed(1) : 0;
-        const promedioNotaQ2 = totalMeses > 0 ? (sumaPromedioQ2 / totalMeses).toFixed(1) : 0;
-        const promedioNotaQ3 = totalMeses > 0 ? (sumaPromedioQ3 / totalMeses).toFixed(1) : 0;
-        const promedioNotaQ4 = totalMeses > 0 ? (sumaPromedioQ4 / totalMeses).toFixed(1) : 0;
-
-        // 5. Configurar el gráfico
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
+    }
+    
+    // 🔴 FORZAR LIMPIEZA DEL CANVAS POR SI QUEDA ALGO
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
         canvas.width = canvas.clientWidth;
         canvas.height = canvas.clientHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
 
-        window.chartComparativa = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: '🏆 Q1 (Excelente)',
-                        data: dataQ1,
-                        backgroundColor: '#1a7f37',
-                        borderColor: '#1a7f37',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    },
-                    {
-                        label: '📈 Q2 (Bueno)',
-                        data: dataQ2,
-                        backgroundColor: '#019DF4',
-                        borderColor: '#019DF4',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    },
-                    {
-                        label: '⚠️ Q3 (Regular)',
-                        data: dataQ3,
-                        backgroundColor: '#f39c12',
-                        borderColor: '#f39c12',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    },
-                    {
-                        label: '🔴 Q4 (Crítico)',
-                        data: dataQ4,
-                        backgroundColor: '#d93025',
-                        borderColor: '#d93025',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: {
-                    padding: {
-                        top: 25,
-                        bottom: 10
-                    }
+    // 2. Validar datos
+    if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
+        console.warn('⚠️ No hay evaluaciones filtradas');
+        mostrarMensajeSinDatosEnCanvasComparativa(canvas, '📊 No hay datos en el período seleccionado');
+        return;
+    }
+
+    // 🔴 DETERMINAR PERÍODO EFECTIVO - MANEJA TODOS LOS CASOS
+    let periodoEfectivo = periodo || 'mes';
+    console.log(`   Período inicial: ${periodoEfectivo}`);
+    
+    if (periodoEfectivo === 'todos') {
+        periodoEfectivo = 'mes';
+        console.log('   "todos" → "mes"');
+    }
+    
+    if (periodoEfectivo === 'rango') {
+        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        if (tipoRango === 'mes') periodoEfectivo = 'mes';
+        else if (tipoRango === 'trimestre') periodoEfectivo = 'trimestre';
+        else if (tipoRango === 'anio') periodoEfectivo = 'anio';
+        else if (tipoRango === 'dia') periodoEfectivo = 'dia';
+        else periodoEfectivo = 'mes';
+        console.log(`   Rango mapeado a: ${periodoEfectivo}`);
+    }
+    
+    if (periodoEfectivo === 'multiples') {
+        const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+        if (tipoMultiples === 'mes') periodoEfectivo = 'mes';
+        else if (tipoMultiples === 'trimestre') periodoEfectivo = 'trimestre';
+        else if (tipoMultiples === 'anio') periodoEfectivo = 'anio';
+        else if (tipoMultiples === 'dia') periodoEfectivo = 'dia';
+        else periodoEfectivo = 'mes';
+        console.log(`   Múltiples mapeado a: ${periodoEfectivo}`);
+    }
+    
+    console.log(`   Período EFECTIVO final: ${periodoEfectivo}`);
+
+    // 3. Agrupar por el período efectivo
+    const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodoEfectivo);
+
+    if (datosAgrupados.length === 0) {
+        mostrarMensajeSinDatosEnCanvasComparativa(canvas, '📊 No hay datos en el período seleccionado');
+        return;
+    }
+
+    // 4. Para cada período, calcular el desempeño por cuartil
+    const labels = datosAgrupados.map(item => item.label);
+    
+    const dataQ1 = [];
+    const dataQ2 = [];
+    const dataQ3 = [];
+    const dataQ4 = [];
+    
+    const cantidadesQ1 = [];
+    const cantidadesQ2 = [];
+    const cantidadesQ3 = [];
+    const cantidadesQ4 = [];
+    
+    let sumaQ1Mensual = 0, sumaQ2Mensual = 0, sumaQ3Mensual = 0, sumaQ4Mensual = 0;
+    let sumaPromedioQ1 = 0, sumaPromedioQ2 = 0, sumaPromedioQ3 = 0, sumaPromedioQ4 = 0;
+
+    for (const periodoData of datosAgrupados) {
+        if (periodoData.evaluaciones.length > 0) {
+            const rankingPeriodo = await construirRankingAgentes(periodoData.evaluaciones);
+            
+            const q1Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q1');
+            const q2Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q2');
+            const q3Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q3');
+            const q4Agentes = rankingPeriodo.filter(a => a.cuartil === 'Q4');
+            
+            const promedioQ1 = q1Agentes.length > 0 
+                ? Math.round(q1Agentes.reduce((sum, a) => sum + a.promedio, 0) / q1Agentes.length * 10) / 10
+                : 0;
+            const promedioQ2 = q2Agentes.length > 0 
+                ? Math.round(q2Agentes.reduce((sum, a) => sum + a.promedio, 0) / q2Agentes.length * 10) / 10
+                : 0;
+            const promedioQ3 = q3Agentes.length > 0 
+                ? Math.round(q3Agentes.reduce((sum, a) => sum + a.promedio, 0) / q3Agentes.length * 10) / 10
+                : 0;
+            const promedioQ4 = q4Agentes.length > 0 
+                ? Math.round(q4Agentes.reduce((sum, a) => sum + a.promedio, 0) / q4Agentes.length * 10) / 10
+                : 0;
+            
+            dataQ1.push(promedioQ1);
+            dataQ2.push(promedioQ2);
+            dataQ3.push(promedioQ3);
+            dataQ4.push(promedioQ4);
+            
+            const cantidadQ1 = q1Agentes.length;
+            const cantidadQ2 = q2Agentes.length;
+            const cantidadQ3 = q3Agentes.length;
+            const cantidadQ4 = q4Agentes.length;
+            
+            cantidadesQ1.push(cantidadQ1);
+            cantidadesQ2.push(cantidadQ2);
+            cantidadesQ3.push(cantidadQ3);
+            cantidadesQ4.push(cantidadQ4);
+            
+            sumaQ1Mensual += cantidadQ1;
+            sumaQ2Mensual += cantidadQ2;
+            sumaQ3Mensual += cantidadQ3;
+            sumaQ4Mensual += cantidadQ4;
+            sumaPromedioQ1 += promedioQ1;
+            sumaPromedioQ2 += promedioQ2;
+            sumaPromedioQ3 += promedioQ3;
+            sumaPromedioQ4 += promedioQ4;
+        } else {
+            dataQ1.push(0);
+            dataQ2.push(0);
+            dataQ3.push(0);
+            dataQ4.push(0);
+            cantidadesQ1.push(0);
+            cantidadesQ2.push(0);
+            cantidadesQ3.push(0);
+            cantidadesQ4.push(0);
+        }
+    }
+
+    const totalPeriodos = datosAgrupados.length;
+    
+    const promedioMensualQ1 = totalPeriodos > 0 ? Math.round(sumaQ1Mensual / totalPeriodos) : 0;
+    const promedioMensualQ2 = totalPeriodos > 0 ? Math.round(sumaQ2Mensual / totalPeriodos) : 0;
+    const promedioMensualQ3 = totalPeriodos > 0 ? Math.round(sumaQ3Mensual / totalPeriodos) : 0;
+    const promedioMensualQ4 = totalPeriodos > 0 ? Math.round(sumaQ4Mensual / totalPeriodos) : 0;
+    
+    const promedioNotaQ1 = totalPeriodos > 0 ? (sumaPromedioQ1 / totalPeriodos).toFixed(1) : 0;
+    const promedioNotaQ2 = totalPeriodos > 0 ? (sumaPromedioQ2 / totalPeriodos).toFixed(1) : 0;
+    const promedioNotaQ3 = totalPeriodos > 0 ? (sumaPromedioQ3 / totalPeriodos).toFixed(1) : 0;
+    const promedioNotaQ4 = totalPeriodos > 0 ? (sumaPromedioQ4 / totalPeriodos).toFixed(1) : 0;
+
+    // 5. Configurar el gráfico
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    window.chartComparativa = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '🏆 Q1 (Excelente)',
+                    data: dataQ1,
+                    backgroundColor: '#1a7f37',
+                    borderColor: '#1a7f37',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8
                 },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                const label = context.dataset.label || '';
-                                const promedio = context.raw;
-                                const idx = context.dataIndex;
-                                let cantidadGestores = 0;
-                                
-                                switch(context.dataset.label) {
-                                    case '🏆 Q1 (Excelente)':
-                                        cantidadGestores = cantidadesQ1[idx];
-                                        break;
-                                    case '📈 Q2 (Bueno)':
-                                        cantidadGestores = cantidadesQ2[idx];
-                                        break;
-                                    case '⚠️ Q3 (Regular)':
-                                        cantidadGestores = cantidadesQ3[idx];
-                                        break;
-                                    case '🔴 Q4 (Riesgo)':
-                                        cantidadGestores = cantidadesQ4[idx];
-                                        break;
-                                }
-                                
-                                return `${label}: ${promedio}% (${cantidadGestores} gestor(es))`;
-                            }
-                        }
-                    },
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            // 🔴 LEYENDA CORREGIDA - SIN TOTAL DE GESTORES
-                            generateLabels: function(chart) {
-                                const datasets = chart.data.datasets;
-                                const labels = [];
-                                
-                                // Datos: promedio mensual de gestores por cuartil
-                                const infoPorCuartil = [
-                                    { label: '🏆 Q1 (Excelente)', cantidad: promedioMensualQ1, nota: promedioNotaQ1, color: '#1a7f37' },
-                                    { label: '📈 Q2 (Bueno)', cantidad: promedioMensualQ2, nota: promedioNotaQ2, color: '#019DF4' },
-                                    { label: '⚠️ Q3 (Regular)', cantidad: promedioMensualQ3, nota: promedioNotaQ3, color: '#f39c12' },
-                                    { label: '🔴 Q4 (Riesgo)', cantidad: promedioMensualQ4, nota: promedioNotaQ4, color: '#d93025' }
-                                ];
-                                
-                                for (let i = 0; i < datasets.length; i++) {
-                                    const dataset = datasets[i];
-                                    const info = infoPorCuartil[i];
-                                    
-                                    labels.push({
-                                        text: `${info.label} — ${info.cantidad} gestores/mes (${info.nota}% promedio)`,
-                                        fillStyle: dataset.backgroundColor,
-                                        strokeStyle: dataset.borderColor,
-                                        lineWidth: dataset.borderWidth,
-                                        hidden: chart.getDatasetMeta(i).hidden,
-                                        index: i,
-                                        datasetIndex: i
-                                    });
-                                }
-                                
-                                // 🔴 ELIMINADA LA LÍNEA DEL TOTAL DE GESTORES
-                                
-                                return labels;
-                            },
-                            font: { size: 11, weight: 'normal' },
-                            padding: 10,
-                            usePointStyle: false,
-                            boxWidth: 16,
-                            boxHeight: 16
-                        },
-                        onClick: function(e, legendItem, legend) {
-                            if (legendItem.datasetIndex !== undefined && legendItem.datasetIndex !== null) {
-                                const ci = legend.chart;
-                                const meta = ci.getDatasetMeta(legendItem.datasetIndex);
-                                meta.hidden = meta.hidden === null ? !ci.data.datasets[legendItem.datasetIndex].hidden : null;
-                                ci.update();
-                            }
-                        }
-                    },
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'top',
-                        offset: 8,
-                        formatter: function (value, context) {
-                            if (value === 0) return '';
-                            
+                {
+                    label: '📈 Q2 (Bueno)',
+                    data: dataQ2,
+                    backgroundColor: '#019DF4',
+                    borderColor: '#019DF4',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8
+                },
+                {
+                    label: '⚠️ Q3 (Regular)',
+                    data: dataQ3,
+                    backgroundColor: '#f39c12',
+                    borderColor: '#f39c12',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8
+                },
+                {
+                    label: '🔴 Q4 (Riesgo)',
+                    data: dataQ4,
+                    backgroundColor: '#d93025',
+                    borderColor: '#d93025',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: {
+                    top: 25,
+                    bottom: 10
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            const label = context.dataset.label || '';
+                            const promedio = context.raw;
                             const idx = context.dataIndex;
                             let cantidadGestores = 0;
                             
@@ -7546,73 +8026,147 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     break;
                             }
                             
-                            return `${value}% (${cantidadGestores})`;
-                        },
-                        backgroundColor: function (context) {
-                            const colores = {
-                                '🏆 Q1 (Excelente)': '#1a7f37',
-                                '📈 Q2 (Bueno)': '#019DF4',
-                                '⚠️ Q3 (Regular)': '#f39c12',
-                                '🔴 Q4 (Riesgo)': '#d93025'
-                            };
-                            return colores[context.dataset.label] || '#666';
-                        },
-                        borderRadius: 12,
-                        padding: { left: 8, right: 8, top: 3, bottom: 3 },
-                        color: 'white',
-                        font: { 
-                            weight: 'bold', 
-                            size: 10,
-                            family: 'system-ui, monospace'
-                        },
-                        clip: false
+                            return `${label}: ${promedio}% (${cantidadGestores} gestor(es))`;
+                        }
                     }
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        title: {
-                            display: true,
-                            text: 'Nota Promedio del Cuartil (%)',
-                            color: 'var(--muted)',
-                            font: { weight: 'bold', size: 11 }
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        generateLabels: function(chart) {
+                            const datasets = chart.data.datasets;
+                            const labels = [];
+                            
+                            const infoPorCuartil = [
+                                { label: '🏆 Q1 (Excelente)', cantidad: promedioMensualQ1, nota: promedioNotaQ1, color: '#1a7f37' },
+                                { label: '📈 Q2 (Bueno)', cantidad: promedioMensualQ2, nota: promedioNotaQ2, color: '#019DF4' },
+                                { label: '⚠️ Q3 (Regular)', cantidad: promedioMensualQ3, nota: promedioNotaQ3, color: '#f39c12' },
+                                { label: '🔴 Q4 (Riesgo)', cantidad: promedioMensualQ4, nota: promedioNotaQ4, color: '#d93025' }
+                            ];
+                            
+                            for (let i = 0; i < datasets.length; i++) {
+                                const dataset = datasets[i];
+                                const info = infoPorCuartil[i];
+                                
+                                labels.push({
+                                    text: `${info.label} — ${info.cantidad} gestores/${periodoEfectivo === 'mes' ? 'mes' : 'período'} (${info.nota}% promedio)`,
+                                    fillStyle: dataset.backgroundColor,
+                                    strokeStyle: dataset.borderColor,
+                                    lineWidth: dataset.borderWidth,
+                                    hidden: chart.getDatasetMeta(i).hidden,
+                                    index: i,
+                                    datasetIndex: i
+                                });
+                            }
+                            
+                            return labels;
                         },
-                        grid: { 
-                            display: false
-                        },
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            },
-                            stepSize: 20,
-                            color: '#555'
-                        }
+                        font: { size: 11, weight: 'normal' },
+                        padding: 10,
+                        usePointStyle: false,
+                        boxWidth: 16,
+                        boxHeight: 16
                     },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Mes',
-                            color: 'var(--muted)',
-                            font: { weight: 'bold', size: 11 }
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45,
-                            autoSkip: true,
-                            maxTicksLimit: 12,
-                            color: '#555'
-                        },
-                        grid: { 
-                            display: false
+                    onClick: function(e, legendItem, legend) {
+                        if (legendItem.datasetIndex !== undefined && legendItem.datasetIndex !== null) {
+                            const ci = legend.chart;
+                            const meta = ci.getDatasetMeta(legendItem.datasetIndex);
+                            meta.hidden = meta.hidden === null ? !ci.data.datasets[legendItem.datasetIndex].hidden : null;
+                            ci.update();
                         }
                     }
+                },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    offset: 8,
+                    formatter: function (value, context) {
+                        if (value === 0) return '';
+                        
+                        const idx = context.dataIndex;
+                        let cantidadGestores = 0;
+                        
+                        switch(context.dataset.label) {
+                            case '🏆 Q1 (Excelente)':
+                                cantidadGestores = cantidadesQ1[idx];
+                                break;
+                            case '📈 Q2 (Bueno)':
+                                cantidadGestores = cantidadesQ2[idx];
+                                break;
+                            case '⚠️ Q3 (Regular)':
+                                cantidadGestores = cantidadesQ3[idx];
+                                break;
+                            case '🔴 Q4 (Riesgo)':
+                                cantidadGestores = cantidadesQ4[idx];
+                                break;
+                        }
+                        
+                        return `${value}% (${cantidadGestores})`;
+                    },
+                    backgroundColor: function (context) {
+                        const colores = {
+                            '🏆 Q1 (Excelente)': '#1a7f37',
+                            '📈 Q2 (Bueno)': '#019DF4',
+                            '⚠️ Q3 (Regular)': '#f39c12',
+                            '🔴 Q4 (Riesgo)': '#d93025'
+                        };
+                        return colores[context.dataset.label] || '#666';
+                    },
+                    borderRadius: 12,
+                    padding: { left: 8, right: 8, top: 3, bottom: 3 },
+                    color: 'white',
+                    font: { 
+                        weight: 'bold', 
+                        size: 10,
+                        family: 'system-ui, monospace'
+                    },
+                    clip: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: 'Nota Promedio del Cuartil (%)',
+                        color: 'var(--muted)',
+                        font: { weight: 'bold', size: 11 }
+                    },
+                    grid: { display: false },
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        },
+                        stepSize: 20,
+                        color: '#555'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: periodoEfectivo === 'mes' ? 'Mes' : 
+                              (periodoEfectivo === 'trimestre' ? 'Trimestre' : 
+                              (periodoEfectivo === 'anio' ? 'Año' : 
+                              (periodoEfectivo === 'dia' ? 'Día' : 'Período'))),
+                        color: 'var(--muted)',
+                        font: { weight: 'bold', size: 11 }
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 12,
+                        color: '#555'
+                    },
+                    grid: { display: false }
                 }
             }
-        });
+        }
+    });
 
-        console.log(`✅ Gráfico Comparativa de Desempeño por Cuartiles (evolutivo por meses) actualizado`);
-    }
+    console.log(`✅ Gráfico Comparativa de Desempeño por Cuartiles actualizado (período: ${periodoEfectivo})`);
+}
     // ===== FIN FUNCIÓN: generarGraficoComparativaAgrupado ===================
     
     // ===== 16. INICIO FUNCIÓN: mostrarMensajeSinDatosEnCanvasComparativa ====
@@ -7639,340 +8193,370 @@ async function actualizarTablaEvolutivaIndicadores() {
     // ===== FIN FUNCIÓN: mostrarMensajeSinDatosEnCanvasComparativa ===========
     
     // ===== 17. INICIO FUNCIÓN: renderizarEvolutivoConDatosFiltrados =========
-    async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null) {
-        console.log('📊 renderizarEvolutivoConDatosFiltrados - FUNCIÓN UNIFICADA');
+    async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, periodoParam = null) {
+    console.log('📊 renderizarEvolutivoConDatosFiltrados - FUNCIÓN UNIFICADA');
+    console.log(`   periodoParam recibido: ${periodoParam}`);
 
-        const canvas = document.getElementById('chartEvolutivoFrentes');
-        if (!canvas) {
-            console.error('❌ Canvas chartEvolutivoFrentes no encontrado');
-            return;
+    const canvas = document.getElementById('chartEvolutivoFrentes');
+    if (!canvas) {
+        console.error('❌ Canvas chartEvolutivoFrentes no encontrado');
+        return;
+    }
+
+    // 🔴 OBTENER EVALUACIONES
+    let evaluacionesFiltradas;
+    if (evaluacionesParam !== null) {
+        evaluacionesFiltradas = evaluacionesParam;
+        console.log(`📊 Usando evaluaciones pasadas como parámetro: ${evaluacionesFiltradas.length}`);
+    } else {
+        evaluacionesFiltradas = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
+        console.log(`📊 Usando evaluaciones de window: ${evaluacionesFiltradas.length}`);
+    }
+
+    // Destruir gráfico existente
+    if (window.chartEvolutivo && typeof window.chartEvolutivo.destroy === 'function') {
+        try {
+            window.chartEvolutivo.destroy();
+            console.log('✅ Gráfico chartEvolutivo destruido');
+        } catch (e) {
+            console.warn('Error destruyendo gráfico:', e);
         }
+        window.chartEvolutivo = null;
+    }
 
-        // 🔴 OBTENER EVALUACIONES: si se pasó parámetro, usarlo; si no, usar las filtradas globales
-        let evaluacionesFiltradas;
-        if (evaluacionesParam !== null) {
-            evaluacionesFiltradas = evaluacionesParam;
-            console.log(`📊 Usando evaluaciones pasadas como parámetro: ${evaluacionesFiltradas.length}`);
-        } else {
-            // Priorizar evaluaciones filtradas globales, luego todas las globales
-            evaluacionesFiltradas = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
-            console.log(`📊 Usando evaluaciones de window: ${evaluacionesFiltradas.length}`);
-        }
-
-        // Destruir gráfico existente de forma segura
-        if (window.chartEvolutivo && typeof window.chartEvolutivo.destroy === 'function') {
-            try {
-                window.chartEvolutivo.destroy();
-                console.log('✅ Gráfico chartEvolutivo destruido');
-            } catch (e) {
-                console.warn('Error destruyendo gráfico:', e);
-            }
-            window.chartEvolutivo = null;
-        }
-
-        // Verificar si hay evaluaciones
-        if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
-            console.warn('⚠️ No hay evaluaciones para mostrar en el gráfico evolutivo');
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                canvas.width = canvas.clientWidth;
-                canvas.height = canvas.clientHeight;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.font = '14px sans-serif';
-                ctx.fillStyle = '#6c757d';
-                ctx.textAlign = 'center';
-                ctx.fillText('📊 No hay evaluaciones para mostrar', canvas.width / 2, canvas.height / 2);
-            }
-            return;
-        }
-
-        // Obtener el período actual (día, semana, mes, trimestre, año)
-        let periodo = filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
-        // Forzar meses por defecto para este evolutivo (específico de notas por motivos)
-        if (!periodo || periodo === 'dia') periodo = 'mes';
-        console.log(`📊 Agrupando ${evaluacionesFiltradas.length} evaluaciones por período: ${periodo}`);
-
-        // Agrupar evaluaciones por el período seleccionado
-        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
-
-        if (datosAgrupados.length === 0) {
-            console.warn('⚠️ No hay datos agrupados para el período seleccionado');
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                canvas.width = canvas.clientWidth;
-                canvas.height = canvas.clientHeight;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.font = '14px sans-serif';
-                ctx.fillStyle = '#6c757d';
-                ctx.textAlign = 'center';
-                ctx.fillText('📊 No hay datos para el período seleccionado', canvas.width / 2, canvas.height / 2);
-            }
-            return;
-        }
-
-        // Extraer etiquetas para el eje X
-        const labels = datosAgrupados.map(item => item.label);
-
-        // 🔴 UNIFORME: Usar matrices dinámicas en lugar de hardcodes
-        const matrizDominante = obtenerMatrizDominante(datosAgrupados.flatMap(d => d.evaluaciones || []));
-        const pesos = matrizDominante ? matrizDominante.pesos : { ENC: 30, ECUF: 30, ECN: 40 };
-        
-        // Calcular porcentajes de cada frente (ENC, ECUF, ECN) usando pesos dinámicos
-        const dataCliente = datosAgrupados.map(item => Math.round((parseFloat(item.promedioENC) / pesos.ENC) * 100));
-        const dataNegocio = datosAgrupados.map(item => Math.round((parseFloat(item.promedioECUF) / pesos.ECUF) * 100));
-        const dataProceso = datosAgrupados.map(item => Math.round((parseFloat(item.promedioECN) / pesos.ECN) * 100));
-
-        // Calcular escala dinámica del eje Y para mejor visualización
-        const todosValores = [...dataCliente, ...dataNegocio, ...dataProceso];
-        const minValor = Math.min(...todosValores);
-        const maxValor = Math.max(...todosValores);
-        let yMin = Math.max(0, minValor - 5);
-        let yMax = Math.min(100, maxValor + 5);
-
-        // Ajustar escala si el rango es muy pequeño
-        if (yMax - yMin < 15) {
-            const centro = (yMin + yMax) / 2;
-            yMin = Math.max(0, centro - 10);
-            yMax = Math.min(100, centro + 10);
-        }
-
-        // Determinar el step size según el rango
-        let stepSize = 5;
-        const rango = yMax - yMin;
-        if (rango <= 10) stepSize = 2;
-        else if (rango <= 20) stepSize = 5;
-        else if (rango <= 40) stepSize = 10;
-        else stepSize = 20;
-
-        // Líneas de meta (85% y 90%)
-        const lineaMeta85 = new Array(datosAgrupados.length).fill(85);
-        const lineaMeta90 = new Array(datosAgrupados.length).fill(90);
-
-        // Determinar título del eje X según el período
-        let xTitle = 'Período';
-        if (periodo === 'dia') xTitle = 'Fecha (Día/Mes)';
-        else if (periodo === 'semana') xTitle = 'Semana';
-        else if (periodo === 'mes') xTitle = 'Mes';
-        else if (periodo === 'trimestre') xTitle = 'Trimestre';
-        else if (periodo === 'anio') xTitle = 'Año';
-
-        // Obtener el contexto del canvas
+    // Verificar si hay evaluaciones
+    if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
+        console.warn('⚠️ No hay evaluaciones para mostrar en el gráfico evolutivo');
         const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        if (ctx) {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '14px sans-serif';
+            ctx.fillStyle = '#6c757d';
+            ctx.textAlign = 'center';
+            ctx.fillText('📊 No hay evaluaciones para mostrar', canvas.width / 2, canvas.height / 2);
+        }
+        return;
+    }
 
-        // Limpiar el canvas antes de dibujar
-        canvas.width = canvas.clientWidth;
-        canvas.height = canvas.clientHeight;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 🔴 OBTENER EL PERÍODO CORRECTO - CON MAPEO DE 'rango'
+    let periodo = periodoParam || filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
+    console.log(`   Período inicial: ${periodo}`);
+    
+    // 🔴 MAPEAR 'rango' A SU SUBTIPO
+    if (periodo === 'rango') {
+        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        console.log(`   Rango detectado, tipo: ${tipoRango}`);
+        if (tipoRango === 'mes') periodo = 'mes';
+        else if (tipoRango === 'trimestre') periodo = 'trimestre';
+        else if (tipoRango === 'anio') periodo = 'anio';
+        else if (tipoRango === 'dia') periodo = 'dia';
+        else periodo = 'mes';
+        console.log(`   Rango mapeado a: ${periodo}`);
+    }
+    
+    // 🔴 MAPEAR 'multiples' A SU SUBTIPO
+    if (periodo === 'multiples') {
+        const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+        console.log(`   Múltiples detectado, tipo: ${tipoMultiples}`);
+        if (tipoMultiples === 'mes') periodo = 'mes';
+        else if (tipoMultiples === 'trimestre') periodo = 'trimestre';
+        else if (tipoMultiples === 'anio') periodo = 'anio';
+        else if (tipoMultiples === 'dia') periodo = 'dia';
+        else periodo = 'mes';
+        console.log(`   Múltiples mapeado a: ${periodo}`);
+    }
+    
+    // Si es 'todos', usar 'mes'
+    if (periodo === 'todos') {
+        periodo = 'mes';
+        console.log('   "todos" → "mes"');
+    }
+    
+    console.log(`   Período FINAL para agrupar: ${periodo}`);
 
-        // Crear el nuevo gráfico
-        window.chartEvolutivo = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: '🎯 ENC - Cliente (30%)',
-                        data: dataCliente,
-                        borderColor: '#019DF4',
-                        backgroundColor: 'rgba(1, 157, 244, 0.08)',
-                        borderWidth: 3,
-                        tension: 0.2,
-                        fill: true,
-                        pointBackgroundColor: '#019DF4',
-                        pointBorderColor: '#fff',
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        pointBorderWidth: 2,
-                    },
-                    {
-                        label: '⚠️ ECUF - Negocio (30%)',
-                        data: dataNegocio,
-                        borderColor: '#7b1fa2',
-                        backgroundColor: 'rgba(123, 31, 162, 0.08)',
-                        borderWidth: 3,
-                        tension: 0.2,
-                        fill: true,
-                        pointBackgroundColor: '#7b1fa2',
-                        pointBorderColor: '#fff',
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        pointBorderWidth: 2,
-                    },
-                    {
-                        label: '💰 ECN - Proceso (40%)',
-                        data: dataProceso,
-                        borderColor: '#fd7e14',
-                        backgroundColor: 'rgba(253, 126, 20, 0.08)',
-                        borderWidth: 3,
-                        tension: 0.2,
-                        fill: true,
-                        pointBackgroundColor: '#fd7e14',
-                        pointBorderColor: '#fff',
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        pointBorderWidth: 2,
-                    },
-                    {
-                        label: '📊 Meta 85% (Aprobación)',
-                        data: lineaMeta85,
-                        borderColor: '#f39c12',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        borderDash: [8, 6],
-                        tension: 0,
-                        fill: false,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                    },
-                    {
-                        label: '🏆 Meta 90% (Excelencia)',
-                        data: lineaMeta90,
-                        borderColor: '#28a745',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        borderDash: [8, 6],
-                        tension: 0,
-                        fill: false,
-                        pointRadius: 0,
-                        pointHoverRadius: 0,
-                    }
-                ]
+    // Agrupar evaluaciones por el período seleccionado
+    const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
+
+    if (datosAgrupados.length === 0) {
+        console.warn('⚠️ No hay datos agrupados para el período seleccionado');
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '14px sans-serif';
+            ctx.fillStyle = '#6c757d';
+            ctx.textAlign = 'center';
+            ctx.fillText('📊 No hay datos para el período seleccionado', canvas.width / 2, canvas.height / 2);
+        }
+        return;
+    }
+
+    // Extraer etiquetas para el eje X
+    const labels = datosAgrupados.map(item => item.label);
+    console.log(`   Labels generadas: ${labels.join(', ')}`);
+
+    // Usar matrices dinámicas
+    const matrizDominante = obtenerMatrizDominante(datosAgrupados.flatMap(d => d.evaluaciones || []));
+    const pesos = matrizDominante ? matrizDominante.pesos : { ENC: 30, ECUF: 30, ECN: 40 };
+    
+    // Calcular porcentajes de cada frente (ENC, ECUF, ECN) usando pesos dinámicos
+    const dataCliente = datosAgrupados.map(item => Math.round((parseFloat(item.promedioENC) / pesos.ENC) * 100));
+    const dataNegocio = datosAgrupados.map(item => Math.round((parseFloat(item.promedioECUF) / pesos.ECUF) * 100));
+    const dataProceso = datosAgrupados.map(item => Math.round((parseFloat(item.promedioECN) / pesos.ECN) * 100));
+
+    // Calcular escala dinámica del eje Y
+    const todosValores = [...dataCliente, ...dataNegocio, ...dataProceso];
+    const minValor = Math.min(...todosValores);
+    const maxValor = Math.max(...todosValores);
+    let yMin = Math.max(0, minValor - 5);
+    let yMax = Math.min(100, maxValor + 5);
+
+    // Ajustar escala si el rango es muy pequeño
+    if (yMax - yMin < 15) {
+        const centro = (yMin + yMax) / 2;
+        yMin = Math.max(0, centro - 10);
+        yMax = Math.min(100, centro + 10);
+    }
+
+    // Determinar el step size según el rango
+    let stepSize = 5;
+    const rango = yMax - yMin;
+    if (rango <= 10) stepSize = 2;
+    else if (rango <= 20) stepSize = 5;
+    else if (rango <= 40) stepSize = 10;
+    else stepSize = 20;
+
+    // Líneas de meta (85% y 90%)
+    const lineaMeta85 = new Array(datosAgrupados.length).fill(85);
+    const lineaMeta90 = new Array(datosAgrupados.length).fill(90);
+
+    // Determinar título del eje X según el período
+    let xTitle = 'Período';
+    if (periodo === 'dia') xTitle = 'Fecha (Día/Mes)';
+    else if (periodo === 'semana') xTitle = 'Semana';
+    else if (periodo === 'mes') xTitle = 'Mes';
+    else if (periodo === 'trimestre') xTitle = 'Trimestre';
+    else if (periodo === 'anio') xTitle = 'Año';
+
+    // Obtener el contexto del canvas
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Limpiar el canvas antes de dibujar
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Crear el nuevo gráfico
+    window.chartEvolutivo = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '🎯 ENC - Cliente',
+                    data: dataCliente,
+                    borderColor: '#019DF4',
+                    backgroundColor: 'rgba(1, 157, 244, 0.08)',
+                    borderWidth: 3,
+                    tension: 0.2,
+                    fill: true,
+                    pointBackgroundColor: '#019DF4',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBorderWidth: 2,
+                },
+                {
+                    label: '⚠️ ECUF - Negocio',
+                    data: dataNegocio,
+                    borderColor: '#7b1fa2',
+                    backgroundColor: 'rgba(123, 31, 162, 0.08)',
+                    borderWidth: 3,
+                    tension: 0.2,
+                    fill: true,
+                    pointBackgroundColor: '#7b1fa2',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBorderWidth: 2,
+                },
+                {
+                    label: '💰 ECN - Proceso',
+                    data: dataProceso,
+                    borderColor: '#fd7e14',
+                    backgroundColor: 'rgba(253, 126, 20, 0.08)',
+                    borderWidth: 3,
+                    tension: 0.2,
+                    fill: true,
+                    pointBackgroundColor: '#fd7e14',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBorderWidth: 2,
+                },
+                {
+                    label: '📊 Meta 85% (Aprobación)',
+                    data: lineaMeta85,
+                    borderColor: '#f39c12',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [8, 6],
+                    tension: 0,
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                },
+                {
+                    label: '🏆 Meta 90% (Excelencia)',
+                    data: lineaMeta90,
+                    borderColor: '#28a745',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [8, 6],
+                    tension: 0,
+                    fill: false,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                layout: {
-                    padding: {
-                        top: 30,
-                        bottom: 10,
-                        left: 10,
-                        right: 10
-                    }
-                },
-                scales: {
-                    y: {
-                        min: yMin,
-                        max: yMax,
-                        title: {
-                            display: true,
-                            text: 'Porcentaje de Cumplimiento (%)',
-                            color: '#6c757d',
-                            font: {
-                                weight: 'bold',
-                                size: 12
-                            }
-                        },
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            callback: (value) => Math.round(value) + '%',
-                            stepSize: stepSize,
-                            color: '#555'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: xTitle,
-                            color: '#6c757d',
-                            font: {
-                                weight: 'bold',
-                                size: 12
-                            }
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45,
-                            autoSkip: true,
-                            maxTicksLimit: 12,
-                            color: '#555'
-                        },
-                        grid: {
-                            display: false
-                        }
-                    }
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                let label = context.dataset.label || '';
-                                let value = context.raw;
-                                let rangoTexto = '';
-                                if (value >= 90) {
-                                    rangoTexto = '✅ Excelente/Bueno';
-                                } else if (value >= 85) {
-                                    rangoTexto = '⚠️ Regular - Requiere atención';
-                                } else {
-                                    rangoTexto = '🔴 Crítico - PDA Requerido';
-                                }
-                                return `${label}: ${Math.round(value)}% (${rangoTexto})`;
-                            }
-                        },
-                        backgroundColor: 'rgba(0,0,0,0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#e9ecef',
-                        padding: 10,
-                        cornerRadius: 8
-                    },
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            usePointStyle: true,
-                            boxWidth: 12,
-                            font: {
-                                size: 11,
-                                weight: '500'
-                            }
-                        }
-                    },
-                    datalabels: {
-                        anchor: 'end',
-                        align: 'top',
-                        offset: -8,
-                        formatter: function (value, context) {
-                            if (value === null || value === undefined) return '';
-                            // Solo mostrar etiquetas para los datasets de datos principales (no para las líneas de meta)
-                            if (context.datasetIndex === 0 || context.datasetIndex === 1 || context.datasetIndex === 2) {
-                                if (value === 0) return '';
-                                return Math.round(value) + '%';
-                            }
-                            return '';
-                        },
-                        backgroundColor: function (context) {
-                            const colores = ['#019DF4', '#7b1fa2', '#fd7e14'];
-                            if (context.datasetIndex === 0 || context.datasetIndex === 1 || context.datasetIndex === 2) {
-                                return colores[context.datasetIndex % 3];
-                            }
-                            return 'transparent';
-                        },
-                        borderRadius: 6,
-                        padding: {
-                            left: 6,
-                            right: 6,
-                            top: 3,
-                            bottom: 3
-                        },
-                        color: 'white',
+            layout: {
+                padding: {
+                    top: 30,
+                    bottom: 10,
+                    left: 10,
+                    right: 10
+                }
+            },
+            scales: {
+                y: {
+                    min: yMin,
+                    max: yMax,
+                    title: {
+                        display: true,
+                        text: 'Porcentaje de Cumplimiento (%)',
+                        color: '#6c757d',
                         font: {
                             weight: 'bold',
-                            size: 9
-                        },
-                        borderWidth: 0
+                            size: 12
+                        }
+                    },
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        callback: (value) => Math.round(value) + '%',
+                        stepSize: stepSize,
+                        color: '#555'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: xTitle,
+                        color: '#6c757d',
+                        font: {
+                            weight: 'bold',
+                            size: 12
+                        }
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 12,
+                        color: '#555'
+                    },
+                    grid: {
+                        display: false
                     }
                 }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            let value = context.raw;
+                            let rangoTexto = '';
+                            if (value >= 90) {
+                                rangoTexto = '✅ Excelente/Bueno';
+                            } else if (value >= 85) {
+                                rangoTexto = '⚠️ Regular - Requiere atención';
+                            } else {
+                                rangoTexto = '🔴 Crítico - PDA Requerido';
+                            }
+                            return `${label}: ${Math.round(value)}% (${rangoTexto})`;
+                        }
+                    },
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#e9ecef',
+                    padding: 10,
+                    cornerRadius: 8
+                },
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        boxWidth: 12,
+                        font: {
+                            size: 11,
+                            weight: '500'
+                        }
+                    }
+                },
+                datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    offset: -8,
+                    formatter: function (value, context) {
+                        if (value === null || value === undefined) return '';
+                        if (context.datasetIndex === 0 || context.datasetIndex === 1 || context.datasetIndex === 2) {
+                            if (value === 0) return '';
+                            return Math.round(value) + '%';
+                        }
+                        return '';
+                    },
+                    backgroundColor: function (context) {
+                        const colores = ['#019DF4', '#7b1fa2', '#fd7e14'];
+                        if (context.datasetIndex === 0 || context.datasetIndex === 1 || context.datasetIndex === 2) {
+                            return colores[context.datasetIndex % 3];
+                        }
+                        return 'transparent';
+                    },
+                    borderRadius: 6,
+                    padding: {
+                        left: 6,
+                        right: 6,
+                        top: 3,
+                        bottom: 3
+                    },
+                    color: 'white',
+                    font: {
+                        weight: 'bold',
+                        size: 9
+                    },
+                    borderWidth: 0
+                }
             }
-        });
+        }
+    });
 
-        console.log(`✅ Gráfico Evolutivo unificado actualizado - ${datosAgrupados.length} períodos, ${evaluacionesFiltradas.length} evaluaciones`);
-    }
+    console.log(`✅ Gráfico Evolutivo unificado actualizado - ${datosAgrupados.length} períodos, ${evaluacionesFiltradas.length} evaluaciones`);
+    console.log(`   Período usado: ${periodo}`);
+}
     // ===== FIN FUNCIÓN: renderizarEvolutivoConDatosFiltrados ================
     
     // ===== 18. INICIO FUNCIÓN: procesarDatosEvolutivosConEvaluaciones =======
@@ -8126,7 +8710,7 @@ async function actualizarTablaEvolutivaIndicadores() {
             if (btnGeneral) btnGeneral.classList.remove('active');
         }
 
-        // 🔴 CORRECCIÓN CRÍTICA: Obtener evaluaciones filtradas actuales
+        // Obtener evaluaciones filtradas actuales
         let evaluacionesParaGrafico = null;
         
         // Prioridad 1: Evaluaciones filtradas por líder (si existen)
@@ -8162,27 +8746,17 @@ async function actualizarTablaEvolutivaIndicadores() {
             return;
         }
 
-        // 🔴 CLAVE 1: Obtener el período ACTUAL del selector
-        let periodo = 'mes'; // Valor por defecto
+        // 🔴 OBTENER EL PERÍODO SELECCIONADO SIN MODIFICACIONES
+        let periodo = filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
+        console.log(`📊 Período para vista atributos: ${periodo}`);
         
-        // Intentar obtener del selector de período
-        const periodoSelect = document.getElementById('filtroPeriodoReportes');
-        if (periodoSelect && periodoSelect.value) {
-            periodo = periodoSelect.value;
-            console.log(`📊 Período obtenido del selector: ${periodo}`);
-        } 
-        // Si no, usar filtroPeriodoActual global
-        else if (typeof filtroPeriodoActual !== 'undefined' && filtroPeriodoActual) {
-            periodo = filtroPeriodoActual;
-            console.log(`📊 Período obtenido de variable global: ${periodo}`);
-        }
-        
-        // 🔴 CLAVE 2: Forzar a 'mes' si el período es 'dia' (para estos gráficos es mejor)
-        if (periodo === 'dia') {
-            console.log('📊 Período "dia" detectado, cambiando a "mes" para mejor visualización');
+        // 🔴 SOLO SI ES 'todos', usar 'mes'
+        if (periodo === 'todos') {
             periodo = 'mes';
+            console.log('📊 "todos" seleccionado, usando "mes" para atributos');
         }
         
+        // 🔴 NO FORZAR 'mes' SI EL USUARIO SELECCIONÓ 'dia'
         console.log(`📊 Usando período: ${periodo} para el gráfico de atributos/submotivos`);
         
         // Recalcular datos agrupados con el período correcto
@@ -8201,13 +8775,12 @@ async function actualizarTablaEvolutivaIndicadores() {
         console.log(`📊 Generando gráfico para vista: ${vistaAtributosActual} con período ${periodo}`);
         
         if (vistaAtributosActual === 'general') {
-            // 🔴 Pasar explícitamente el período
             generarEvolutivoAtributosAgrupado(evaluacionesParaGrafico, datosAgrupados, periodo);
         } else {
-            // 🔴 Pasar explícitamente el período
             generarEvolutivoSubmotivosAgrupado(evaluacionesParaGrafico, datosAgrupados, periodo);
         }
-    }// ===== FIN FUNCIÓN: cambiarVistaAtributos ===============================
+    }
+    // ===== FIN FUNCIÓN: cambiarVistaAtributos ===============================
 
     // ===== 20. INICIO FUNCIÓN: mostrarDetalleFechaMejorado ==================
     function mostrarDetalleFechaMejorado(fecha, frenteFiltro = null) {
@@ -8481,9 +9054,11 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
     // ===== FIN FUNCIÓN: cerrarDrillDown =====================================
     
-    // ===== 23. INICIO FUNCIÓN: generarTablaJerarquicaFallas =================
+    // ======================================================
+    // FUNCIÓN: generarTablaJerarquicaFallas (CORREGIDA)
+    // ======================================================
     async function generarTablaJerarquicaFallas(evaluaciones) {
-        console.log('📊 generarTablaJerarquicaFallas - VERSIÓN EVOLUTIVA CON SCROLL');
+        console.log('📊 generarTablaJerarquicaFallas - INICIO');
         
         const container = document.getElementById('contenedorFallasJerarquicas');
         if (!container) {
@@ -8491,37 +9066,83 @@ async function actualizarTablaEvolutivaIndicadores() {
             return;
         }
         
+        // 🔴 VALIDACIÓN
         if (!evaluaciones || evaluaciones.length === 0) {
+            console.log('⚠️ No hay evaluaciones para mostrar fallas jerárquicas');
             container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos de fallas para mostrar</div>';
             return;
         }
         
+        console.log(`📊 ${evaluaciones.length} evaluaciones recibidas`);
+        
         // Calcular datos evolutivos por mes
         const datosEvolutivos = await calcularDatosEvolutivosJerarquia(evaluaciones);
         
-        if (!datosEvolutivos || datosEvolutivos.meses.length === 0) {
+        // 🔴 VALIDACIÓN DE RESULTADO
+        if (!datosEvolutivos) {
+            console.log('⚠️ datosEvolutivos es null o undefined');
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No se pudieron calcular los datos evolutivos</div>';
+            return;
+        }
+        
+        const { meses, totalMeses } = datosEvolutivos;
+        
+        console.log(`📊 datosEvolutivos: ${totalMeses} meses, meses array: ${meses?.length || 0}`);
+        
+        if (!meses || meses.length === 0) {
+            console.log('⚠️ No hay meses con datos para mostrar jerarquía');
             container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos suficientes para mostrar evolución</div>';
             return;
         }
         
-        // Renderizar la nueva vista evolutiva
-        renderizarJerarquiaEvolutiva(container, datosEvolutivos);
+        // 🔴 VERIFICAR QUE CADA MES TENGA LABEL
+        const mesesConLabel = meses.filter(m => m && m.label);
+        if (mesesConLabel.length === 0) {
+            console.log('⚠️ Ningún mes tiene la propiedad label');
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos de meses válidos</div>';
+            return;
+        }
+        
+        console.log(`✅ ${mesesConLabel.length} meses con label: ${mesesConLabel.map(m => m.label).join(', ')}`);
+        
+        // Renderizar la vista evolutiva
+        renderizarJerarquiaEvolutiva(container, {
+            meses: mesesConLabel,
+            totalMeses: mesesConLabel.length
+        });
     }
     // ===== FIN FUNCIÓN: generarTablaJerarquicaFallas ========================
     
     // ======================================================
-    // NUEVA FUNCIÓN: Calcular datos evolutivos por mes
+    // NUEVA FUNCIÓN: Calcular datos evolutivos jerarquía (CORREGIDA)
     // ======================================================
     async function calcularDatosEvolutivosJerarquia(evaluaciones) {
-        console.log('📊 Calculando datos evolutivos para análisis jerárquico...');
+        console.log('📊 calcularDatosEvolutivosJerarquia - INICIO');
         
-        // 1. Agrupar evaluaciones por mes
+        // 🔴 VALIDACIÓN
+        if (!evaluaciones || evaluaciones.length === 0) {
+            console.log('⚠️ No hay evaluaciones para calcular jerarquía');
+            return { meses: [], totalMeses: 0 };
+        }
+        
+        const rango = obtenerRangoFechasActivo();
+        console.log(`   📅 Rango activo: ${rango.tieneFiltro ? 'SÍ' : 'NO'}`);
+        if (rango.tieneFiltro) {
+            console.log(`   Desde: ${rango.fechaInicio.toLocaleDateString()} Hasta: ${rango.fechaFin.toLocaleDateString()}`);
+        }
+        
+        // 1. Agrupar evaluaciones por mes (CON FILTRO)
         const evaluacionesPorMes = {};
         const mesesOrdenados = [];
         
         for (const evalItem of evaluaciones) {
             const fecha = obtenerFechaEvaluacion(evalItem);
             if (!fecha) continue;
+            
+            // Filtrar por rango de fechas
+            if (rango && rango.tieneFiltro) {
+                if (fecha < rango.fechaInicio || fecha > rango.fechaFin) continue;
+            }
             
             const anio = fecha.getFullYear();
             const mes = fecha.getMonth() + 1;
@@ -8545,6 +9166,13 @@ async function actualizarTablaEvolutivaIndicadores() {
         // Ordenar meses cronológicamente
         mesesOrdenados.sort();
         
+        console.log(`📊 ${mesesOrdenados.length} meses encontrados después del filtro`);
+        
+        if (mesesOrdenados.length === 0) {
+            console.log('⚠️ No hay meses en el rango seleccionado');
+            return { meses: [], totalMeses: 0 };
+        }
+        
         // 2. Para cada mes, calcular estadísticas de fallas
         const datosPorMes = {};
         
@@ -8558,7 +9186,7 @@ async function actualizarTablaEvolutivaIndicadores() {
             const fallasPorSubmotivo = {};
             let totalFallasMes = 0;
             
-            // 🔴 NUEVO: Guardar TODAS las ocurrencias por agente (NO solo únicos)
+            // Guardar TODAS las ocurrencias por agente
             const ocurrenciasPorAgente = {};
             
             for (const evalItem of evaluacionesMes) {
@@ -8573,12 +9201,15 @@ async function actualizarTablaEvolutivaIndicadores() {
                             // Por BLOQUE (Motivo)
                             const bloque = det.bloque || 'Sin bloque';
                             if (!fallasPorBloque[bloque]) {
-                                fallasPorBloque[bloque] = { fallas: 0, gestores: new Set(), ocurrenciasPorAgente: {} };
+                                fallasPorBloque[bloque] = { 
+                                    fallas: 0, 
+                                    gestores: new Set(), 
+                                    ocurrenciasPorAgente: {} 
+                                };
                             }
                             fallasPorBloque[bloque].fallas++;
                             fallasPorBloque[bloque].gestores.add(agente);
                             
-                            // 🔴 NUEVO: Guardar ocurrencia por agente para este bloque
                             if (!fallasPorBloque[bloque].ocurrenciasPorAgente[agente]) {
                                 fallasPorBloque[bloque].ocurrenciasPorAgente[agente] = 0;
                             }
@@ -8636,7 +9267,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                 gestores: Array.from(data.gestores),
                 cantidadGestores: data.gestores.size,
                 porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0,
-                ocurrenciasPorAgente: data.ocurrenciasPorAgente  // 🔴 NUEVO
+                ocurrenciasPorAgente: data.ocurrenciasPorAgente
             })).sort((a, b) => b.fallas - a.fallas).slice(0, 3);
             
             const atributosArray = Object.values(fallasPorAtributo).map(data => ({
@@ -8646,7 +9277,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                 gestores: Array.from(data.gestores),
                 cantidadGestores: data.gestores.size,
                 porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0,
-                ocurrenciasPorAgente: data.ocurrenciasPorAgente  // 🔴 NUEVO
+                ocurrenciasPorAgente: data.ocurrenciasPorAgente
             })).sort((a, b) => b.fallas - a.fallas).slice(0, 10);
             
             const submotivosArray = Object.values(fallasPorSubmotivo).map(data => ({
@@ -8657,7 +9288,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                 gestores: Array.from(data.gestores),
                 cantidadGestores: data.gestores.size,
                 porcentaje: totalFallasMes > 0 ? (data.fallas / totalFallasMes) * 100 : 0,
-                ocurrenciasPorAgente: data.ocurrenciasPorAgente  // 🔴 NUEVO
+                ocurrenciasPorAgente: data.ocurrenciasPorAgente
             })).sort((a, b) => b.fallas - a.fallas).slice(0, 10);
             
             datosPorMes[mesClave] = {
@@ -8673,6 +9304,16 @@ async function actualizarTablaEvolutivaIndicadores() {
         // Convertir a array ordenado
         const mesesArray = mesesOrdenados.map(clave => datosPorMes[clave]);
         
+        // 🔴 DIAGNÓSTICO: Verificar que cada mes tenga label
+        for (const m of mesesArray) {
+            if (!m.label) {
+                console.warn(`⚠️ Mes sin label:`, m);
+            }
+        }
+        
+        console.log(`✅ ${mesesArray.length} meses analizados (filtrados por período)`);
+        console.log(`   Meses: ${mesesArray.map(m => m.label).join(', ')}`);
+        
         return {
             meses: mesesArray,
             totalMeses: mesesArray.length
@@ -8680,16 +9321,59 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
 
     // ======================================================
-    // NUEVA FUNCIÓN: Renderizar vista evolutiva con scroll
+    // NUEVA FUNCIÓN: Renderizar vista evolutiva con scroll (VERSIÓN FINAL)
     // ======================================================
     function renderizarJerarquiaEvolutiva(container, datosEvolutivos) {
-        const { meses, totalMeses } = datosEvolutivos;
+        console.log('📊 renderizarJerarquiaEvolutiva - INICIO');
+        
+        // 🔴 VALIDACIÓN ROBUSTA
+        if (!container) {
+            console.error('❌ Container no encontrado');
+            return;
+        }
+        
+        if (!datosEvolutivos) {
+            console.warn('⚠️ datosEvolutivos es null o undefined');
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos para mostrar</div>';
+            return;
+        }
+        
+        // 🔴 EXTRAER MESES CON VALIDACIÓN
+        let meses = datosEvolutivos.meses || [];
+        
+        if (!Array.isArray(meses)) {
+            console.warn('⚠️ meses no es un array:', meses);
+            container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 Error: formato de datos inválido</div>';
+            return;
+        }
+        
+        // 🔴 FILTRAR MESES QUE TENGAN LA PROPIEDAD 'label'
+        const mesesValidos = meses.filter(m => m && m.label);
+        
+        console.log(`📊 Meses totales: ${meses.length}, Meses válidos: ${mesesValidos.length}`);
+        
+        if (mesesValidos.length === 0) {
+            console.warn('⚠️ No hay meses válidos con label');
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--muted);">
+                    📊 No hay datos de meses válidos en el período seleccionado
+                    <div style="font-size: 12px; margin-top: 10px; color: #999;">
+                        Período seleccionado: ${filtroPeriodoActual || 'todos'}
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        console.log(`📊 ${mesesValidos.length} meses válidos: ${mesesValidos.map(m => m.label).join(', ')}`);
+        
+        // ... (resto del código de renderizado igual, usando mesesValidos)
         
         // Determinar el ancho de la tabla basado en cantidad de meses
-        const anchoPorMes = 100; // px por mes
-        const anchoMinimo = Math.max(800, meses.length * anchoPorMes);
+        const anchoPorMes = 100;
+        const anchoMinimo = Math.max(800, mesesValidos.length * anchoPorMes);
         
-        // Estado de expansión (por sección)
+        // Estado de expansión
         if (typeof window.jerarquiaExpandido === 'undefined') {
             window.jerarquiaExpandido = {
                 motivos: false,
@@ -8697,6 +9381,11 @@ async function actualizarTablaEvolutivaIndicadores() {
                 submotivos: false
             };
         }
+        
+        // ... (el resto del HTML igual, usando mesesValidos en lugar de meses)
+        
+        // 🔴 EL RESTO DEL CÓDIGO ES IGUAL, SOLO CAMBIA QUE USA mesesValidos
+        // En lugar de repetir todo el HTML, aquí va la versión completa pero usando mesesValidos
         
         let html = `
             <div class="analisis-jerarquico-evolutivo">
@@ -8788,7 +9477,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                     <div class="jerarquia-header-evolutivo" onclick="toggleSeccionJerarquia('motivos')">
                         <span class="jerarquia-icono">📁</span>
                         <span class="jerarquia-titulo">MOTIVOS (Top 3)</span>
-                        <span class="jerarquia-badge">${meses.length} meses</span>
+                        <span class="jerarquia-badge">${mesesValidos.length} meses</span>
                         <span class="jerarquia-expand">▼</span>
                         <button class="boton-exportar" onclick="event.stopPropagation(); exportarJerarquiaCSV('motivos', datosJerarquiaEvolutivos)" style="background: var(--accent);">📥 Exportar CSV</button>
                     </div>
@@ -8798,13 +9487,13 @@ async function actualizarTablaEvolutivaIndicadores() {
                                 <thead>
                                     <tr>
                                         <th>Motivo</th>
-                                        ${meses.map(m => `<th>${m.label}</th>`).join('')}
+                                        ${mesesValidos.map(m => `<th>${m.label}</th>`).join('')}
                                         <th>📊 Tendencia</th>
-                                        <th>📊 Promedio</th>  <!-- ← NUEVA COLUMNA -->
+                                        <th>📊 Promedio</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tablaMotivosEvolutiva">
-                                    ${generarFilasJerarquiaEvolutiva(meses, 'bloques')}
+                                    ${generarFilasJerarquiaEvolutiva(mesesValidos, 'bloques')}
                                 </tbody>
                             </table>
                         </div>
@@ -8817,7 +9506,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                     <div class="jerarquia-header-evolutivo" onclick="toggleSeccionJerarquia('atributos')">
                         <span class="jerarquia-icono">🏷️</span>
                         <span class="jerarquia-titulo">ATRIBUTOS (Top 10)</span>
-                        <span class="jerarquia-badge">${meses.length} meses</span>
+                        <span class="jerarquia-badge">${mesesValidos.length} meses</span>
                         <span class="jerarquia-expand">▼</span>
                         <button class="boton-exportar" onclick="event.stopPropagation(); exportarJerarquiaCSV('atributos', datosJerarquiaEvolutivos)" style="background: var(--accent);">📥 Exportar CSV</button>
                     </div>
@@ -8828,13 +9517,13 @@ async function actualizarTablaEvolutivaIndicadores() {
                                     <tr>
                                         <th>Motivo</th>
                                         <th>Atributo</th>
-                                        ${meses.map(m => `<th>${m.label}</th>`).join('')}
+                                        ${mesesValidos.map(m => `<th>${m.label}</th>`).join('')}
                                         <th>📊 Tendencia</th>
-                                        <th>📊 Promedio</th>  <!-- ← NUEVA COLUMNA -->
+                                        <th>📊 Promedio</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tablaAtributosEvolutiva">
-                                    ${generarFilasJerarquiaEvolutiva(meses, 'atributos')}
+                                    ${generarFilasJerarquiaEvolutiva(mesesValidos, 'atributos')}
                                 </tbody>
                             </table>
                         </div>
@@ -8847,7 +9536,7 @@ async function actualizarTablaEvolutivaIndicadores() {
                     <div class="jerarquia-header-evolutivo" onclick="toggleSeccionJerarquia('submotivos')">
                         <span class="jerarquia-icono">🔬</span>
                         <span class="jerarquia-titulo">SUBMOTIVOS (Top 10)</span>
-                        <span class="jerarquia-badge">${meses.length} meses</span>
+                        <span class="jerarquia-badge">${mesesValidos.length} meses</span>
                         <span class="jerarquia-expand">▼</span>
                         <button class="boton-exportar" onclick="event.stopPropagation(); exportarJerarquiaCSV('submotivos', datosJerarquiaEvolutivos)" style="background: var(--accent);">📥 Exportar CSV</button>
                     </div>
@@ -8859,13 +9548,13 @@ async function actualizarTablaEvolutivaIndicadores() {
                                         <th>Motivo</th>
                                         <th>Atributo</th>
                                         <th>Submotivo</th>
-                                        ${meses.map(m => `<th>${m.label}</th>`).join('')}
+                                        ${mesesValidos.map(m => `<th>${m.label}</th>`).join('')}
                                         <th>📊 Tendencia</th>
-                                        <th>📊 Promedio</th>  <!-- ← NUEVA COLUMNA -->
+                                        <th>📊 Promedio</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tablaSubmotivosEvolutiva">
-                                    ${generarFilasJerarquiaEvolutiva(meses, 'submotivos')}
+                                    ${generarFilasJerarquiaEvolutiva(mesesValidos, 'submotivos')}
                                 </tbody>
                             </table>
                         </div>
@@ -8878,264 +9567,283 @@ async function actualizarTablaEvolutivaIndicadores() {
         container.innerHTML = html;
         
         // Guardar datos globalmente para exportación
-        window.datosJerarquiaEvolutivos = datosEvolutivos;
+        window.datosJerarquiaEvolutivos = {
+            meses: mesesValidos,
+            totalMeses: mesesValidos.length
+        };
+        
+        console.log(`✅ renderizarJerarquiaEvolutiva completada - ${mesesValidos.length} meses`);
     }
 
     // ======================================================
-    // NUEVA FUNCIÓN: Generar filas de la tabla evolutiva
+    // NUEVA FUNCIÓN: Generar filas de la tabla evolutiva (CORREGIDA)
     // ======================================================
     function generarFilasJerarquiaEvolutiva(meses, tipo) {
-    // ======================================================
-    // 1. FUNCIÓN AUXILIAR: Calcular variación mensual
-    // ======================================================
-    function calcularVariacionMensual(valorActual, valorAnterior) {
-        if (valorAnterior === 0 || valorAnterior === null || valorAnterior === undefined) {
-            return { icono: '🆕', texto: 'Nuevo', color: '#019DF4' };
-        }
-        const cambio = ((valorActual - valorAnterior) / valorAnterior) * 100;
-        if (cambio > 0.1) {
-            return { icono: '▲', texto: `+${cambio.toFixed(1)}%`, color: '#28a745' };
-        } else if (cambio < -0.1) {
-            return { icono: '▼', texto: `${cambio.toFixed(1)}%`, color: '#d93025' };
-        } else {
-            return { icono: '➡️', texto: 'Estable', color: '#6c757d' };
-        }
-    }
-
-    // ======================================================
-    // 2. FUNCIÓN AUXILIAR: Calcular tendencia total
-    // ======================================================
-    function calcularTendenciaTotal(valores) {
-        const validos = valores.filter(v => v !== null && v.fallas > 0);
-        if (validos.length < 2) {
-            return { icono: '🆕', texto: 'Sin datos', color: '#6c757d' };
-        }
-        const primerValor = validos[0].fallas;
-        const ultimoValor = validos[validos.length - 1].fallas;
-        if (primerValor === 0) {
-            return { icono: '🆕', texto: 'Nuevo', color: '#019DF4' };
-        }
-        const cambio = ((ultimoValor - primerValor) / primerValor) * 100;
-        if (cambio > 2) {
-            return { icono: '📈', texto: `+${cambio.toFixed(1)}%`, color: '#28a745' };
-        } else if (cambio < -2) {
-            return { icono: '📉', texto: `${cambio.toFixed(1)}%`, color: '#d93025' };
-        } else {
-            return { icono: '➡️', texto: 'Estable', color: '#6c757d' };
-        }
-    }
-
-    // ======================================================
-    // 3. RECOLECTAR ITEMS ÚNICOS (código existente)
-    // ======================================================
-    const itemsMap = new Map();
-    
-    for (const mes of meses) {
-        let items = [];
-        if (tipo === 'bloques') items = mes.bloques || [];
-        else if (tipo === 'atributos') items = mes.atributos || [];
-        else items = mes.submotivos || [];
+        console.log(`📊 generarFilasJerarquiaEvolutiva - tipo: ${tipo}, meses: ${meses?.length || 0}`);
         
-        for (const item of items) {
-            let key = '';
-            let displayName = '';
-            
-            if (tipo === 'bloques') {
-                key = item.nombre;
-                displayName = `📁 ${item.nombre}`;
-            } else if (tipo === 'atributos') {
-                key = `${item.bloque}|${item.atributo}`;
-                displayName = `🏷️ ${item.atributo}`;
+        // 🔴 VALIDACIÓN
+        if (!meses || !Array.isArray(meses) || meses.length === 0) {
+            console.warn('⚠️ meses inválido o vacío');
+            return `<tr><td colspan="10" style="text-align: center; padding: 20px; color: var(--muted);">No hay datos para mostrar</td></tr>`;
+        }
+        
+        // 🔴 FILTRAR MESES CON LABEL VÁLIDO
+        const mesesValidos = meses.filter(m => m && m.label);
+        
+        if (mesesValidos.length === 0) {
+            console.warn('⚠️ No hay meses con label válido');
+            return `<tr><td colspan="10" style="text-align: center; padding: 20px; color: var(--muted);">No hay datos para mostrar</td></tr>`;
+        }
+        
+        // ======================================================
+        // 1. FUNCIÓN AUXILIAR: Calcular variación mensual
+        // ======================================================
+        function calcularVariacionMensual(valorActual, valorAnterior) {
+            if (valorAnterior === 0 || valorAnterior === null || valorAnterior === undefined) {
+                return { icono: '🆕', texto: 'Nuevo', color: '#019DF4' };
+            }
+            const cambio = ((valorActual - valorAnterior) / valorAnterior) * 100;
+            if (cambio > 0.1) {
+                return { icono: '▲', texto: `+${cambio.toFixed(1)}%`, color: '#28a745' };
+            } else if (cambio < -0.1) {
+                return { icono: '▼', texto: `${cambio.toFixed(1)}%`, color: '#d93025' };
             } else {
-                key = `${item.bloque}|${item.atributo}|${item.submotivo}`;
-                displayName = `🔬 ${item.submotivo}`;
-            }
-            
-            if (!itemsMap.has(key)) {
-                itemsMap.set(key, {
-                    key: key,
-                    bloque: item.bloque,
-                    atributo: item.atributo,
-                    submotivo: item.submotivo,
-                    nombre: displayName,
-                    valores: new Array(meses.length).fill(null),
-                    gestoresPorMes: new Array(meses.length).fill(null)
-                });
-            }
-            
-            const itemData = itemsMap.get(key);
-            const idx = meses.findIndex(m => m.clave === mes.clave);
-            if (idx !== -1) {
-                itemData.valores[idx] = {
-                    fallas: item.fallas,
-                    porcentaje: item.porcentaje.toFixed(1)
-                };
-                itemData.gestoresPorMes[idx] = item.gestores || [];
+                return { icono: '➡️', texto: 'Estable', color: '#6c757d' };
             }
         }
-    }
-    
-    // ======================================================
-    // 4. ORDENAR POR TOTAL DE FALLAS
-    // ======================================================
-    const itemsArray = Array.from(itemsMap.values());
-    for (const item of itemsArray) {
-        item.totalFallas = item.valores.reduce((sum, v) => sum + (v?.fallas || 0), 0);
-    }
-    itemsArray.sort((a, b) => b.totalFallas - a.totalFallas);
-    
-    let topLimit = 3;
-    if (tipo === 'atributos') topLimit = 10;
-    if (tipo === 'submotivos') topLimit = 10;
-    
-    const topItems = itemsArray.slice(0, topLimit);
-    
-    // ════════════════════════════════════════════════════════
-    // 🔴 CAMBIO IMPORTANTE: INICIAR HTML VACÍO (SIN ENCABEZADO)
-    // ════════════════════════════════════════════════════════
-    let html = '';  // ← ESTO ES LO QUE CAMBIA
-    
-    // ======================================================
-    // 6. GENERAR FILAS DE DATOS
-    // ======================================================
-    for (const item of topItems) {
-        html += `<tr onclick="verAgentesJerarquia('${tipo}', '${item.key.replace(/'/g, "\\'")}', window.datosJerarquiaEvolutivos)" style="cursor: pointer;">`;
-        
-        // Columnas según el tipo
-        if (tipo === 'bloques') {
-            html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
-        } else if (tipo === 'atributos') {
-            html += `<td style="padding: 6px 8px;">📁 ${item.bloque || '-'}</td>`;
-            html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
-        } else {
-            html += `<td style="padding: 6px 8px;">📁 ${item.bloque || '-'}</td>`;
-            html += `<td style="padding: 6px 8px;">🏷️ ${item.atributo || '-'}</td>`;
-            html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
+
+        // ======================================================
+        // 2. FUNCIÓN AUXILIAR: Calcular tendencia total
+        // ======================================================
+        function calcularTendenciaTotal(valores) {
+            const validos = valores.filter(v => v !== null && v.fallas > 0);
+            if (validos.length < 2) {
+                return { icono: '🆕', texto: 'Sin datos', color: '#6c757d' };
+            }
+            const primerValor = validos[0].fallas;
+            const ultimoValor = validos[validos.length - 1].fallas;
+            if (primerValor === 0) {
+                return { icono: '🆕', texto: 'Nuevo', color: '#019DF4' };
+            }
+            const cambio = ((ultimoValor - primerValor) / primerValor) * 100;
+            if (cambio > 2) {
+                return { icono: '📈', texto: `+${cambio.toFixed(1)}%`, color: '#28a745' };
+            } else if (cambio < -2) {
+                return { icono: '📉', texto: `${cambio.toFixed(1)}%`, color: '#d93025' };
+            } else {
+                return { icono: '➡️', texto: 'Estable', color: '#6c757d' };
+            }
         }
+
+        // ======================================================
+        // 3. RECOLECTAR ITEMS ÚNICOS
+        // ======================================================
+        const itemsMap = new Map();
         
-        // ======================================================
-        // 7. VALORES POR MES CON VARIACIÓN
-        // ======================================================
-        for (let i = 0; i < meses.length; i++) {
-            const valor = item.valores[i];
-            let celdaHtml = '';
+        for (const mes of mesesValidos) {
+            let items = [];
+            if (tipo === 'bloques') items = mes.bloques || [];
+            else if (tipo === 'atributos') items = mes.atributos || [];
+            else items = mes.submotivos || [];
             
-            if (valor && valor.fallas > 0) {
-                let variacionHtml = '';
-                if (i > 0) {
-                    const valorAnterior = item.valores[i - 1];
-                    if (valorAnterior && valorAnterior.fallas > 0) {
-                        const variacion = calcularVariacionMensual(valor.fallas, valorAnterior.fallas);
-                        variacionHtml = `<span style="color: ${variacion.color}; font-size: 10px; display: block; margin-top: 2px;">
-                            ${variacion.icono} ${variacion.texto}
-                        </span>`;
-                    } else if (valorAnterior && valorAnterior.fallas === 0 && valor.fallas > 0) {
-                        variacionHtml = `<span style="color: #019DF4; font-size: 10px; display: block; margin-top: 2px;">🆕 Nuevo</span>`;
-                    }
+            for (const item of items) {
+                let key = '';
+                let displayName = '';
+                
+                if (tipo === 'bloques') {
+                    key = item.nombre;
+                    displayName = `📁 ${item.nombre}`;
+                } else if (tipo === 'atributos') {
+                    key = `${item.bloque}|${item.atributo}`;
+                    displayName = `🏷️ ${item.atributo}`;
+                } else {
+                    key = `${item.bloque}|${item.atributo}|${item.submotivo}`;
+                    displayName = `🔬 ${item.submotivo}`;
                 }
                 
-                celdaHtml = `
-                    <div><strong>${valor.porcentaje}%</strong> <span style="font-size: 11px; color: var(--muted);">(${valor.fallas})</span></div>
-                    ${variacionHtml}
-                `;
-            } else {
-                celdaHtml = `<span style="color: var(--muted);">-</span>`;
-            }
-            
-            html += `<td style="padding: 6px 4px; text-align: center; vertical-align: middle;">${celdaHtml}</td>`;
-        }
-        
-        // ======================================================
-        // 8. COLUMNA DE TENDENCIA TOTAL
-        // ======================================================
-        const tendencia = calcularTendenciaTotal(item.valores);
-        html += `<td style="text-align: center; color: ${tendencia.color}; font-weight: bold; padding: 6px 4px;">
-            ${tendencia.icono} ${tendencia.texto}
-        </td>`;
-        
-        // ======================================================
-        // 9. COLUMNA DE PROMEDIO
-        // ======================================================
-        const valoresValidos = item.valores.filter(v => v !== null && v.fallas > 0);
-        let promedioErrores = 0;
-        let promedioPorcentaje = 0;
-        if (valoresValidos.length > 0) {
-            const sumFallas = valoresValidos.reduce((sum, v) => sum + v.fallas, 0);
-            const sumPorcentaje = valoresValidos.reduce((sum, v) => sum + parseFloat(v.porcentaje), 0);
-            promedioErrores = sumFallas / valoresValidos.length;
-            promedioPorcentaje = sumPorcentaje / valoresValidos.length;
-        }
-        
-        html += `<td style="text-align: center; padding: 6px 4px; background: #f8fafc; font-weight: bold; color: ${promedioErrores > 5 ? '#d93025' : (promedioErrores > 2 ? '#f39c12' : '#28a745')};">
-            <div>${promedioPorcentaje > 0 ? promedioPorcentaje.toFixed(1) : 0}%</div>
-            <span style="font-size: 10px; color: var(--muted);">(${promedioErrores > 0 ? promedioErrores.toFixed(1) : 0})</span>
-        </td>`;
-        
-        html += `</tr>`;
-    }
-    
-    // ======================================================
-    // 10. FILA TOTAL AL FINAL
-    // ======================================================
-    if (topItems.length > 0) {
-        const totalFallasPorMes = new Array(meses.length).fill(0);
-        let totalFallasGlobal = 0;
-        let mesesConDatos = 0;
-        
-        for (const item of topItems) {
-            for (let i = 0; i < meses.length; i++) {
-                const val = item.valores[i];
-                if (val) {
-                    totalFallasPorMes[i] += val.fallas;
-                    totalFallasGlobal += val.fallas;
+                if (!itemsMap.has(key)) {
+                    itemsMap.set(key, {
+                        key: key,
+                        bloque: item.bloque,
+                        atributo: item.atributo,
+                        submotivo: item.submotivo,
+                        nombre: displayName,
+                        valores: new Array(mesesValidos.length).fill(null),
+                        gestoresPorMes: new Array(mesesValidos.length).fill(null)
+                    });
+                }
+                
+                const itemData = itemsMap.get(key);
+                const idx = mesesValidos.findIndex(m => m.clave === mes.clave);
+                if (idx !== -1) {
+                    itemData.valores[idx] = {
+                        fallas: item.fallas,
+                        porcentaje: item.porcentaje.toFixed(1)
+                    };
+                    itemData.gestoresPorMes[idx] = item.gestores || [];
                 }
             }
         }
         
-        for (const total of totalFallasPorMes) {
-            if (total > 0) mesesConDatos++;
+        // ======================================================
+        // 4. ORDENAR POR TOTAL DE FALLAS
+        // ======================================================
+        const itemsArray = Array.from(itemsMap.values());
+        for (const item of itemsArray) {
+            item.totalFallas = item.valores.reduce((sum, v) => sum + (v?.fallas || 0), 0);
+        }
+        itemsArray.sort((a, b) => b.totalFallas - a.totalFallas);
+        
+        let topLimit = 3;
+        if (tipo === 'atributos') topLimit = 10;
+        if (tipo === 'submotivos') topLimit = 10;
+        
+        const topItems = itemsArray.slice(0, topLimit);
+        
+        // ======================================================
+        // 5. GENERAR HTML
+        // ======================================================
+        let html = '';
+        
+        if (topItems.length === 0) {
+            const columnasFijas = tipo === 'bloques' ? 1 : (tipo === 'atributos' ? 2 : 3);
+            const colspan = columnasFijas + mesesValidos.length + 2;
+            html += `<tr><td colspan="${colspan}" style="text-align: center; padding: 20px; color: var(--muted);">No hay datos en este período</td></tr>`;
+            return html;
         }
         
-        const promedioGlobalErrores = mesesConDatos > 0 ? (totalFallasGlobal / mesesConDatos) : 0;
-        
-        let colspan = 1;
-        if (tipo === 'bloques') colspan = 1;
-        else if (tipo === 'atributos') colspan = 2;
-        else if (tipo === 'submotivos') colspan = 3;
-        
-        html += `<tr style="background: #f0f7ff; font-weight: bold; border-top: 2px solid var(--accent);">
-            <td colspan="${colspan}" style="text-align: right; padding: 8px;">
-                <strong>📊 TOTAL</strong>
+        // ======================================================
+        // 6. GENERAR FILAS DE DATOS
+        // ======================================================
+        for (const item of topItems) {
+            html += `<tr onclick="verAgentesJerarquia('${tipo}', '${item.key.replace(/'/g, "\\'")}', window.datosJerarquiaEvolutivos)" style="cursor: pointer;">`;
+            
+            // Columnas según el tipo
+            if (tipo === 'bloques') {
+                html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
+            } else if (tipo === 'atributos') {
+                html += `<td style="padding: 6px 8px;">📁 ${item.bloque || '-'}</td>`;
+                html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
+            } else {
+                html += `<td style="padding: 6px 8px;">📁 ${item.bloque || '-'}</td>`;
+                html += `<td style="padding: 6px 8px;">🏷️ ${item.atributo || '-'}</td>`;
+                html += `<td style="padding: 6px 8px;"><strong>${item.nombre}</strong></td>`;
+            }
+            
+            // ======================================================
+            // 7. VALORES POR MES CON VARIACIÓN
+            // ======================================================
+            for (let i = 0; i < mesesValidos.length; i++) {
+                const valor = item.valores[i];
+                let celdaHtml = '';
+                
+                if (valor && valor.fallas > 0) {
+                    let variacionHtml = '';
+                    if (i > 0) {
+                        const valorAnterior = item.valores[i - 1];
+                        if (valorAnterior && valorAnterior.fallas > 0) {
+                            const variacion = calcularVariacionMensual(valor.fallas, valorAnterior.fallas);
+                            variacionHtml = `<span style="color: ${variacion.color}; font-size: 10px; display: block; margin-top: 2px;">
+                                ${variacion.icono} ${variacion.texto}
+                            </span>`;
+                        } else if (valorAnterior && valorAnterior.fallas === 0 && valor.fallas > 0) {
+                            variacionHtml = `<span style="color: #019DF4; font-size: 10px; display: block; margin-top: 2px;">🆕 Nuevo</span>`;
+                        }
+                    }
+                    
+                    celdaHtml = `
+                        <div><strong>${valor.porcentaje}%</strong> <span style="font-size: 11px; color: var(--muted);">(${valor.fallas})</span></div>
+                        ${variacionHtml}
+                    `;
+                } else {
+                    celdaHtml = `<span style="color: var(--muted);">-</span>`;
+                }
+                
+                html += `<td style="padding: 6px 4px; text-align: center; vertical-align: middle;">${celdaHtml}</td>`;
+            }
+            
+            // ======================================================
+            // 8. COLUMNA DE TENDENCIA TOTAL
+            // ======================================================
+            const tendencia = calcularTendenciaTotal(item.valores);
+            html += `<td style="text-align: center; color: ${tendencia.color}; font-weight: bold; padding: 6px 4px;">
+                ${tendencia.icono} ${tendencia.texto}
             </td>`;
-        
-        for (let i = 0; i < meses.length; i++) {
-            const totalFallas = totalFallasPorMes[i] || 0;
-            html += `<td style="text-align: center; padding: 8px;">
-                <strong>100%</strong>
-                <span style="font-size: 11px; color: var(--muted);">(${totalFallas})</span>
+            
+            // ======================================================
+            // 9. COLUMNA DE PROMEDIO
+            // ======================================================
+            const valoresValidos = item.valores.filter(v => v !== null && v.fallas > 0);
+            let promedioErrores = 0;
+            let promedioPorcentaje = 0;
+            if (valoresValidos.length > 0) {
+                const sumFallas = valoresValidos.reduce((sum, v) => sum + v.fallas, 0);
+                const sumPorcentaje = valoresValidos.reduce((sum, v) => sum + parseFloat(v.porcentaje), 0);
+                promedioErrores = sumFallas / valoresValidos.length;
+                promedioPorcentaje = sumPorcentaje / valoresValidos.length;
+            }
+            
+            html += `<td style="text-align: center; padding: 6px 4px; background: #f8fafc; font-weight: bold; color: ${promedioErrores > 5 ? '#d93025' : (promedioErrores > 2 ? '#f39c12' : '#28a745')};">
+                <div>${promedioPorcentaje > 0 ? promedioPorcentaje.toFixed(1) : 0}%</div>
+                <span style="font-size: 10px; color: var(--muted);">(${promedioErrores > 0 ? promedioErrores.toFixed(1) : 0})</span>
             </td>`;
+            
+            html += `</tr>`;
         }
         
-        html += `<td style="text-align: center; color: var(--muted);">-</td>`;
-        html += `<td style="text-align: center; padding: 8px; background: #f8fafc; font-weight: bold; color: ${promedioGlobalErrores > 10 ? '#d93025' : (promedioGlobalErrores > 5 ? '#f39c12' : '#28a745')};">
-            <div>${mesesConDatos > 0 ? '100%' : '0%'}</div>
-            <span style="font-size: 11px; color: var(--muted);">(${promedioGlobalErrores.toFixed(1)})</span>
-        </td>`;
+        // ======================================================
+        // 10. FILA TOTAL AL FINAL
+        // ======================================================
+        if (topItems.length > 0) {
+            const totalFallasPorMes = new Array(mesesValidos.length).fill(0);
+            let totalFallasGlobal = 0;
+            let mesesConDatos = 0;
+            
+            for (const item of topItems) {
+                for (let i = 0; i < mesesValidos.length; i++) {
+                    const val = item.valores[i];
+                    if (val) {
+                        totalFallasPorMes[i] += val.fallas;
+                        totalFallasGlobal += val.fallas;
+                    }
+                }
+            }
+            
+            for (const total of totalFallasPorMes) {
+                if (total > 0) mesesConDatos++;
+            }
+            
+            const promedioGlobalErrores = mesesConDatos > 0 ? (totalFallasGlobal / mesesConDatos) : 0;
+            
+            let colspan = 1;
+            if (tipo === 'bloques') colspan = 1;
+            else if (tipo === 'atributos') colspan = 2;
+            else if (tipo === 'submotivos') colspan = 3;
+            
+            html += `<tr style="background: #f0f7ff; font-weight: bold; border-top: 2px solid var(--accent);">
+                <td colspan="${colspan}" style="text-align: right; padding: 8px;">
+                    <strong>📊 TOTAL</strong>
+                </td>`;
+            
+            for (let i = 0; i < mesesValidos.length; i++) {
+                const totalFallas = totalFallasPorMes[i] || 0;
+                html += `<td style="text-align: center; padding: 8px;">
+                    <strong>100%</strong>
+                    <span style="font-size: 11px; color: var(--muted);">(${totalFallas})</span>
+                </td>`;
+            }
+            
+            html += `<td style="text-align: center; color: var(--muted);">-</td>`;
+            html += `<td style="text-align: center; padding: 8px; background: #f8fafc; font-weight: bold; color: ${promedioGlobalErrores > 10 ? '#d93025' : (promedioGlobalErrores > 5 ? '#f39c12' : '#28a745')};">
+                <div>${mesesConDatos > 0 ? '100%' : '0%'}</div>
+                <span style="font-size: 11px; color: var(--muted);">(${promedioGlobalErrores.toFixed(1)})</span>
+            </td>`;
+            
+            html += `</tr>`;
+        }
         
-        html += `</tr>`;
+        return html;
     }
-    
-    // ======================================================
-    // 11. MENSAJE SI NO HAY DATOS
-    // ======================================================
-    if (topItems.length === 0) {
-        const columnasFijas = tipo === 'bloques' ? 1 : (tipo === 'atributos' ? 2 : 3);
-        const colspan = columnasFijas + meses.length + 2;
-        html += `<tr><td colspan="${colspan}" style="text-align: center; padding: 20px; color: var(--muted);">No hay datos en este período</td></tr>`;
-    }
-    
-    return html;
-}
 
     // ======================================================
     // NUEVA FUNCIÓN: Toggle expandir/contraer sección
@@ -10124,104 +10832,160 @@ async function actualizarTablaEvolutivaIndicadores() {
     // ===== 31. INICIO FUNCIÓN: aplicarFiltroReportes ========================
     
     async function aplicarFiltroReportes() {
-        console.log('🔄 Aplicando filtro de reportes...');
+    console.log('🔄 Aplicando filtro de reportes...');
+    console.log(`📊 Período seleccionado: ${filtroPeriodoActual}`);
+    
+    const loadingDiv = document.createElement('div');
+    loadingDiv.textContent = '⏳ Aplicando filtro...';
+    loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 15px 25px; border-radius: 30px; z-index: 10000; font-size: 14px;';
+    document.body.appendChild(loadingDiv);
+    
+    try {
+        const evaluaciones = await obtenerEvaluacionesConCache(false);
         
-        const loadingDiv = document.createElement('div');
-        loadingDiv.textContent = '⏳ Aplicando filtro...';
-        loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 15px 25px; border-radius: 30px; z-index: 10000; font-size: 14px;';
-        document.body.appendChild(loadingDiv);
-        
-        try {
-            const evaluaciones = await obtenerEvaluacionesConCache(false);
-            
-            if (evaluaciones.length === 0) {
-                console.warn('⚠️ No hay evaluaciones para filtrar');
-                mostrarMensajeSinDatosEnGraficos();
-                loadingDiv.remove();
-                return;
-            }
-            
-            const evaluacionesFiltradas = obtenerEvaluacionesFiltradasPorPeriodo(evaluaciones);
-            
-            console.log(`📊 Evaluaciones filtradas: ${evaluacionesFiltradas.length} de ${evaluaciones.length}`);
-            
-            // Guardar en variable global
-            window.evaluacionesFiltradasGlobal = evaluacionesFiltradas;
-            
-            // Actualizar resumen agrupado con los datos filtrados
-            if (typeof cambiarAgrupacion === 'function') {
-                await cambiarAgrupacion();
-            }
-
-            actualizarInfoFiltro();
-            
-            if (evaluacionesFiltradas.length === 0) {
-                mostrarMensajeSinDatosEnGraficos();
-                loadingDiv.remove();
-                return;
-            }
-            
-            // 1. Actualizar KPIs
-            await actualizarKPIsConFiltro(evaluacionesFiltradas);
-            
-            // 2. Actualizar ranking
-            const ranking = await construirRankingAgentes(evaluacionesFiltradas);
-            rankingCompletoGlobal = ranking;
-            await actualizarTablaRanking(ranking);
-            
-            
-            // 4. Actualizar tabla jerárquica de fallas
-            generarTablaJerarquicaFallas(evaluacionesFiltradas);
-            
-            // 5. Obtener datos agrupados
-            const periodo = filtroPeriodoActual;
-            const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
-            datosAgrupadosActualesGlobal = datosAgrupados;
-            
-            // 6. Actualizar cards
-            actualizarCardsPromedioMotivosAgrupados(datosAgrupados);
-            actualizarCardPorcentajeQuiebresAgrupados(datosAgrupados);
-            
-            // 7. Actualizar gráficos (llamadas síncronas, sin setTimeout anidado)
-            generarEvolutivoAudiosAgrupado(datosAgrupados, periodo);
-            generarDistribucionRangosAgrupado(evaluacionesFiltradas);
-            
-            if (vistaAtributosActual === 'general') {
-                generarEvolutivoAtributosAgrupado(evaluacionesFiltradas, datosAgrupados, periodo);
-            } else {
-                generarEvolutivoSubmotivosAgrupado(evaluacionesFiltradas, datosAgrupados, periodo);
-            }
-            
-            generarEvolutivoQuiebresAgrupado(datosAgrupados);
-            generarGraficoComparativaAgrupado(evaluacionesFiltradas);
-            generarGraficoGestionLlamadas(evaluacionesFiltradas);
-            renderizarEvolutivoConDatosFiltrados(evaluacionesFiltradas);
-            generarEvolutivoCuartiles(evaluacionesFiltradas, datosAgrupados, periodo);
-            
-            if (window.chartResultados) window.chartResultados.destroy();
-            if (window.chartTendencias) window.chartTendencias.destroy();
-            generarGraficosReportes(evaluacionesFiltradas);
-            
-            // ======================================================
-            // 8. 🔴 FORZAR ACTUALIZACIÓN DEL RESUMEN POR LÍDER
-            // ======================================================
-            await cambiarAgrupacion();
-            
-            console.log('✅ Filtro aplicado correctamente');
-            
-            const mensajeTemporal = document.createElement('div');
-            mensajeTemporal.textContent = `📊 Mostrando ${evaluacionesFiltradas.length} evaluaciones`;
-            mensajeTemporal.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--ok); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1000; animation: fadeOut 2s ease forwards;';
-            document.body.appendChild(mensajeTemporal);
-            setTimeout(() => mensajeTemporal.remove(), 2000);
-            
-        } catch (error) {
-            console.error('Error aplicando filtro:', error);
-            alert('❌ Error al aplicar el filtro: ' + error.message);
-        } finally {
+        if (evaluaciones.length === 0) {
+            console.warn('⚠️ No hay evaluaciones para filtrar');
+            mostrarMensajeSinDatosEnGraficos();
             loadingDiv.remove();
+            return;
         }
+        
+        const evaluacionesFiltradas = obtenerEvaluacionesFiltradasPorPeriodo(evaluaciones);
+        
+        console.log(`📊 Evaluaciones filtradas: ${evaluacionesFiltradas.length} de ${evaluaciones.length}`);
+        
+        // Guardar en variable global
+        window.evaluacionesFiltradasGlobal = evaluacionesFiltradas;
+        
+        // Actualizar resumen agrupado con los datos filtrados
+        if (typeof cambiarAgrupacion === 'function') {
+            await cambiarAgrupacion();
+        }
+
+        actualizarInfoFiltro();
+        
+        if (evaluacionesFiltradas.length === 0) {
+            mostrarMensajeSinDatosEnGraficos();
+            loadingDiv.remove();
+            return;
+        }
+        
+        // 1. Actualizar KPIs
+        await actualizarKPIsConFiltro(evaluacionesFiltradas);
+        
+        // 2. Actualizar ranking
+        const ranking = await construirRankingAgentes(evaluacionesFiltradas);
+        rankingCompletoGlobal = ranking;
+        await actualizarTablaRanking(ranking);
+        
+        // 3. Actualizar tabla jerárquica de fallas
+        generarTablaJerarquicaFallas(evaluacionesFiltradas);
+        
+        // 4. Obtener el período seleccionado sin modificaciones
+        let periodo = filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
+        console.log(`📊 Período para agrupar: ${periodo}`);
+
+        // 🔴 IMPORTANTE: Definir periodoGraficos correctamente
+        let periodoGraficos = periodo;
+
+        // 🔴 SI ES 'rango', VERIFICAR QUÉ TIPO DE RANGO ESTÁ SELECCIONADO
+        if (periodo === 'rango') {
+            const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+            if (tipoRango === 'mes') periodoGraficos = 'mes';
+            else if (tipoRango === 'trimestre') periodoGraficos = 'trimestre';
+            else if (tipoRango === 'anio') periodoGraficos = 'anio';
+            else if (tipoRango === 'dia') periodoGraficos = 'dia';
+            else periodoGraficos = 'mes';
+            console.log(`📊 Rango mapeado a período: ${periodoGraficos}`);
+        }
+
+        // 🔴 SI ES 'multiples', VERIFICAR QUÉ TIPO DE MÚLTIPLES ESTÁ SELECCIONADO
+        if (periodo === 'multiples') {
+            const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+            if (tipoMultiples === 'mes') periodoGraficos = 'mes';
+            else if (tipoMultiples === 'trimestre') periodoGraficos = 'trimestre';
+            else if (tipoMultiples === 'anio') periodoGraficos = 'anio';
+            else if (tipoMultiples === 'dia') periodoGraficos = 'dia';
+            else periodoGraficos = 'mes';
+            console.log(`📊 Múltiples mapeado a período: ${periodoGraficos}`);
+        }
+
+        // Si es 'todos', usar 'mes' (porque 'todos' no es un período de agrupación)
+        if (periodo === 'todos') {
+            periodoGraficos = 'mes';
+            console.log('📊 "todos" seleccionado, usando "mes" para agrupar los gráficos');
+        }
+        
+        console.log(`📊 periodoGraficos FINAL: ${periodoGraficos}`);
+
+        // 5. Obtener datos agrupados con el período correcto
+        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodoGraficos);
+        datosAgrupadosActualesGlobal = datosAgrupados;
+        
+        // 6. Actualizar cards
+        actualizarCardsPromedioMotivosAgrupados(datosAgrupados);
+        actualizarCardPorcentajeQuiebresAgrupados(datosAgrupados);
+        
+        // ======================================================
+        // 7. DESTRUIR GRÁFICOS EXISTENTES
+        // ======================================================
+        destruirTodosLosGraficosCompleto();
+
+        // ======================================================
+        // 8. ACTUALIZAR GRÁFICOS - UNA SOLA VEZ CADA UNO
+        // ======================================================
+        generarEvolutivoAudiosAgrupado(datosAgrupados, periodoGraficos);
+        generarDistribucionRangosAgrupado(evaluacionesFiltradas, periodoGraficos);
+        generarEvolutivoQuiebresAgrupado(datosAgrupados);
+        generarGraficoComparativaAgrupado(evaluacionesFiltradas, periodoGraficos);
+        generarGraficoGestionLlamadas(evaluacionesFiltradas, periodoGraficos);
+        renderizarEvolutivoConDatosFiltrados(evaluacionesFiltradas, periodoGraficos);
+        generarEvolutivoCuartiles(evaluacionesFiltradas, datosAgrupados, periodoGraficos);
+
+        // ======================================================
+        // 9. ATRIBUTOS - SEGÚN VISTA
+        // ======================================================
+        if (vistaAtributosActual === 'general') {
+            generarEvolutivoAtributosAgrupado(evaluacionesFiltradas, datosAgrupados, periodoGraficos);
+        } else {
+            generarEvolutivoSubmotivosAgrupado(evaluacionesFiltradas, datosAgrupados, periodoGraficos);
+        }
+        
+        // ======================================================
+        // 10. GRÁFICOS DE REPORTES (no dependen del período)
+        // ======================================================
+        if (window.chartResultados) window.chartResultados.destroy();
+        if (window.chartTendencias) window.chartTendencias.destroy();
+        generarGraficosReportes(evaluacionesFiltradas);
+        
+        // ======================================================
+        // 11. Actualizar tabla evolutiva de indicadores
+        // ======================================================
+        console.log('📊 Actualizando tabla evolutiva con datos filtrados...');
+        if (typeof actualizarTablaEvolutivaIndicadores === 'function') {
+            await actualizarTablaEvolutivaIndicadores();
+        }
+        
+        // ======================================================
+        // 12. Forzar actualización del resumen por líder
+        // ======================================================
+        await cambiarAgrupacion();
+        
+        console.log('✅ Filtro aplicado correctamente');
+        
+        const mensajeTemporal = document.createElement('div');
+        mensajeTemporal.textContent = `📊 Mostrando ${evaluacionesFiltradas.length} evaluaciones`;
+        mensajeTemporal.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--ok); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1000; animation: fadeOut 2s ease forwards;';
+        document.body.appendChild(mensajeTemporal);
+        setTimeout(() => mensajeTemporal.remove(), 2000);
+        
+    } catch (error) {
+        console.error('Error aplicando filtro:', error);
+        alert('❌ Error al aplicar el filtro: ' + error.message);
+    } finally {
+        loadingDiv.remove();
     }
+}
 
 
     // ===== FIN FUNCIÓN: aplicarFiltroReportes ===============================
@@ -10231,9 +10995,15 @@ async function actualizarTablaEvolutivaIndicadores() {
     console.log('🧹 Limpiando filtros de reportes...');
 
     // ======================================================
-    // 1. RESETEAR TODAS LAS VARIABLES DE FILTRO
+    // 1. RESETEAR EL SELECTOR A "TODOS"
     // ======================================================
-    filtroPeriodoActual = 'dia';
+    const periodoSelect = document.getElementById('filtroPeriodoReportes');
+    if (periodoSelect) periodoSelect.value = 'todos';
+    
+    // ======================================================
+    // 2. RESETEAR TODAS LAS VARIABLES DE FILTRO
+    // ======================================================
+    filtroPeriodoActual = 'todos';
     filtroCantidadActual = 'all';
     filtroFechaInicioActual = null;
     filtroFechaFinActual = null;
@@ -10251,23 +11021,21 @@ async function actualizarTablaEvolutivaIndicadores() {
     filtroRangoFin = null;
     filtroMultiples = [];
 
-    const periodoSelect = document.getElementById('filtroPeriodoReportes');
-    if (periodoSelect) periodoSelect.value = 'mes';
+    // ======================================================
+    // 3. RENDERIZAR CONTROLES Y ACTUALIZAR INFO
+    // ======================================================
     renderizarControlesPeriodo();
+    actualizarInfoFiltro();
 
     // ======================================================
-    // 2. RESETEAR FILTRO POR LÍDER
+    // 4. RESETEAR FILTRO POR LÍDER
     // ======================================================
     liderSeleccionadoActual = 'todos';
     const selectLider = document.getElementById('selectFiltrarLider');
     if (selectLider) selectLider.value = 'todos';
-    document.querySelectorAll('.fila-lider').forEach(row => {
-        row.style.background = '';
-        row.style.fontWeight = 'normal';
-    });
 
     // ======================================================
-    // 3. RESETEAR FILTRO POR CUARTIL
+    // 5. RESETEAR FILTRO POR CUARTIL
     // ======================================================
     if (typeof cuartilActivoGlobal !== 'undefined') {
         cuartilActivoGlobal = 'todos';
@@ -10275,15 +11043,7 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
 
     // ======================================================
-    // 4. ACTUALIZAR INFORMACIÓN VISUAL
-    // ======================================================
-    const infoSpan = document.getElementById('infoRangoSeleccionado');
-    if (infoSpan) {
-        infoSpan.innerHTML = '📅 Mostrando TODOS los datos (sin filtros)';
-    }
-
-    // ======================================================
-    // 5. RECARGAR DATOS COMPLETOS
+    // 6. RECARGAR DATOS COMPLETOS
     // ======================================================
     if (!window.evaluacionesGlobales || window.evaluacionesGlobales.length === 0) {
         await cargarEvaluacionesDesdePostgreSQL();
@@ -10298,26 +11058,21 @@ async function actualizarTablaEvolutivaIndicadores() {
     }
 
     // ======================================================
-    // 6. ACTUALIZAR DATOS FILTRADOS
+    // 7. ACTUALIZAR DATOS FILTRADOS CON TODOS LOS DATOS
     // ======================================================
     window.evaluacionesFiltradasGlobal = evaluacionesCompletas;
 
     // ======================================================
-    // 7. 🔴 ACTUALIZAR KPIs CON DATOS COMPLETOS
+    // 8. ACTUALIZAR KPIs CON DATOS COMPLETOS
     // ======================================================
     console.log('🔄 Actualizando KPIs con datos completos...');
     await actualizarKPIsConFiltro(evaluacionesCompletas);
 
     // ======================================================
-    // 8. 🔴 🔴 🔴 CLAVE: RECALCULAR TARJETAS DE PROMEDIOS 🔴 🔴 🔴
+    // 9. RECALCULAR TARJETAS DE PROMEDIOS
     // ======================================================
     console.log('🔄 Recalculando tarjetas de promedios...');
     actualizarCardsPromedioMotivos(evaluacionesCompletas);
-    
-    // ======================================================
-    // 9. 🔴 RECALCULAR TARJETA DE QUIEBRES
-    // ======================================================
-    console.log('🔄 Recalculando tarjeta de quiebres...');
     actualizarCardPorcentajeQuiebres(evaluacionesCompletas);
 
     // ======================================================
@@ -10346,338 +11101,43 @@ async function actualizarTablaEvolutivaIndicadores() {
     rankingCompletoGlobal = rankingCompleto;
     actualizarTablaRanking(rankingCompleto);
 
+    // ======================================================
+    // 12. ACTUALIZAR TABLA EVOLUTIVA Y JERARQUÍA
+    // ======================================================
+    console.log('📊 Actualizando tabla evolutiva con TODOS los datos...');
+    if (typeof actualizarTablaEvolutivaIndicadores === 'function') {
+        await actualizarTablaEvolutivaIndicadores();
+    }
+
+    console.log('📊 Actualizando análisis jerárquico con TODOS los datos...');
+    if (typeof generarTablaJerarquicaFallas === 'function') {
+        await generarTablaJerarquicaFallas(evaluacionesCompletas);
+    }
+
     window.evaluacionesFiltradasPorLider = null;
     
     console.log('✅ Filtros limpiados, mostrando todos los datos');
-    console.log(`   kpiPromedioENC: ${document.getElementById('kpiPromedioENC')?.textContent}`);
 }
     // ===== FIN FUNCIÓN: limpiarFiltrosReportes ==============================
     
-    // ======================================================
-// FUNCIÓN CORREGIDA: Cargar Agentes en Q4 por Mes
-// ======================================================
-async function cargarAgentesQ4PorMes() {
-    const mesSeleccionado = document.getElementById('selectorMesQ4')?.value;
-    const filtroEstadoPDA = document.getElementById('selectorEstadoPDA')?.value || 'todos';
-
-    if (!mesSeleccionado) {
-        const container = document.getElementById('agentesQ4PorMesContainer');
-        if (container) container.innerHTML = '<div style="text-align: center; padding: 40px;">📅 Seleccione un mes para ver los agentes en Q4</div>';
-        return;
-    }
-
-    const [anio, mes] = mesSeleccionado.split('-');
-    if (!anio || !mes) {
-        console.error('Formato de mes inválido:', mesSeleccionado);
-        return;
-    }
-
-    const container = document.getElementById('agentesQ4PorMesContainer');
-    if (container) container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Cargando agentes en Q4...</div>';
-
-    try {
-        const todasEvaluaciones = window.evaluacionesGlobales || [];
-        if (todasEvaluaciones.length === 0) {
-            container.innerHTML = '<div style="text-align: center; padding: 40px;">⚠️ No hay evaluaciones cargadas.</div>';
-            return;
-        }
-
-        const agentesUnicos = [...new Set(todasEvaluaciones.map(e => e.agente))];
-        
-        await cargarDatosPDA();
-        
-        // 🔴 Crear un Set con identificadores únicos de PDA por ciclo
-        // Formato: "agente|ciclo|fechaInicio"
-        const pdaPorCiclo = new Set();
-        (window.datosPDA || []).forEach(pda => {
-            if (pda.estado && ['pendiente', 'notificado', 'en_gestion', 'en_seguimiento'].includes(pda.estado)) {
-                // Crear clave única para este ciclo
-                const clave = `${pda.agente}|${pda.ciclo_basal_numero || ''}|${pda.fecha_inicio_ciclo_basal || ''}`;
-                pdaPorCiclo.add(clave);
-            }
-        });
-
-        const resultados = [];
-
-        for (const agente of agentesUnicos) {
-            const ciclos = await agruparEvaluacionesEnCiclos(agente);
-            if (ciclos.length === 0) continue;
-            
-            for (const ciclo of ciclos) {
-                if (ciclo.cuartil === 'Q4' && ciclo.esCompleto) {
-                    // Extraer fecha de fin del ciclo
-                    let fechaFinCiclo = null;
-                    if (ciclo.fechaFin && ciclo.fechaFin !== 'N/A') {
-                        const partes = ciclo.fechaFin.split('/');
-                        if (partes.length === 3) {
-                            fechaFinCiclo = new Date(partes[2], partes[1] - 1, partes[0]);
-                        }
-                    }
-                    
-                    if (fechaFinCiclo && 
-                        fechaFinCiclo.getFullYear() == anio && 
-                        (fechaFinCiclo.getMonth() + 1) == mes) {
-                        
-                        // 🔴 Verificar si ESTE ciclo específico ya tiene un PDA asociado
-                        const clavePDA = `${agente}|${ciclo.numero}|${ciclo.fechaInicio}`;
-                        const tienePDAactivo = pdaPorCiclo.has(clavePDA);
-                        
-                        resultados.push({
-                            agente: agente,
-                            ciclo: ciclo.numero,
-                            fechaInicio: ciclo.fechaInicio,
-                            fechaFin: ciclo.fechaFin,
-                            totalEvaluaciones: ciclo.totalEvaluaciones,
-                            promedio: ciclo.promedio,
-                            promedioENC: ciclo.promedioENC,
-                            promedioECUF: ciclo.promedioECUF,
-                            promedioECN: ciclo.promedioECN,
-                            cuartil: ciclo.cuartil,
-                            tienePDAactivo: tienePDAactivo
-                        });
-                    }
-                }
-            }
-        }
-
-        // Aplicar filtro de estado de PDA
-        let resultadosFiltrados = resultados;
-        if (filtroEstadoPDA === 'sin_pda') {
-            resultadosFiltrados = resultados.filter(r => !r.tienePDAactivo);
-        } else if (filtroEstadoPDA === 'con_pda') {
-            resultadosFiltrados = resultados.filter(r => r.tienePDAactivo);
-        }
-
-        mostrarResultadosQ4(resultadosFiltrados, mesSeleccionado, resultados.length);
-
-    } catch (error) {
-        console.error('Error en cargarAgentesQ4PorMes:', error);
-        if (container) container.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--danger);">❌ Error: ${error.message}</div>`;
-    }
-}
+   
     
 
-    // ======================================================
-    // FUNCIÓN AUXILIAR: Mostrar Resultados en HTML
-    // ======================================================
-    // ===== FUNCIÓN MODIFICADA: mostrarResultadosQ4 =====
-function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
-    const container = document.getElementById('agentesQ4PorMesContainer');
-    if (!container) return;
-
-    const [anio, mesNum] = mesSeleccionado.split('-');
-    const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    const nombreMes = mesesNombres[parseInt(mesNum) - 1];
-
-    if (resultados.length === 0) {
-        container.innerHTML = `
-            <div class="card" style="background: #fff4e5; margin-top: 15px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 24px;">✅</span>
-                    <div>
-                        <strong>No hay agentes en Q4 para ${nombreMes} ${anio}</strong>
-                        <span style="font-size: 13px;">(Total ciclos evaluados: ${totalSinFiltrar})</span>
-                    </div>
-                </div>
-            </div>
-        `;
-        return;
-    }
-
-    let html = `
-        <div style="margin-top: 15px;">
-            <div style="background: #f0f7ff; padding: 8px 15px; border-radius: 8px; margin-bottom: 15px;">
-                📊 Mostrando ${resultados.length} resultado(s) para ${nombreMes} ${anio} 
-                (Total ciclos completos en Q4: ${totalSinFiltrar})
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-    `;
-
-    for (const item of resultados) {
-        const infoPDA = obtenerInfoPDA(item.agente, 'Q4');
-        const tienePDAactivo = item.tienePDAactivo;
-
-        let estadoBadge = '';
-        let botonPDA = '';
-
-        if (tienePDAactivo) {
-            estadoBadge = '<span class="badge" style="background: var(--accent);">📋 PDA en curso</span>';
-            botonPDA = `
-                <button onclick="abrirGestionPDADesdeAlerta('${escapeHtml(item.agente)}')" 
-                        style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer;">
-                    📝 Ver PDA en curso
-                </button>
-            `;
-        } else {
-            estadoBadge = '<span class="badge" style="background: var(--danger);">🔴 Requiere PDA</span>';
-            // 🔴 CLAVE: Pasar el número de ciclo a la función generarPDAConDocumento
-            botonPDA = `
-                <button onclick="generarPDAConDocumento('${escapeHtml(item.agente)}', ${item.ciclo})" 
-                        style="background: var(--warning); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer;">
-                    📋 Generar PDA
-                </button>
-            `;
-        }
-
-        html += `
-            <div class="card" style="border-left: 5px solid var(--danger); padding: 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                    <div style="flex: 1;">
-                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                            <strong style="font-size: 16px;">⚠️ ${escapeHtml(item.agente)}</strong>
-                            ${estadoBadge}
-                            <span style="font-size: 11px; background: #e9ecef; padding: 2px 8px; border-radius: 12px;">
-                                📊 Ciclo #${item.ciclo} (${item.totalEvaluaciones}/5 eval)
-                            </span>
-                        </div>
-                        <div style="display: flex; gap: 15px; margin-top: 8px; flex-wrap: wrap;">
-                            <span>📊 Promedio ciclo: <strong style="color: var(--danger);">${item.promedio}%</strong></span>
-                            <span>📅 Período: ${item.fechaInicio} → ${item.fechaFin}</span>
-                            <span>🎯 ENC: ${item.promedioENC}%</span>
-                            <span>⚠️ ECUF: ${item.promedioECUF}%</span>
-                            <span>💰 ECN: ${item.promedioECN}%</span>
-                        </div>
-                        ${infoPDA.total > 0 && infoPDA.total !== '-' ? `
-                        <div style="margin-top: 6px; font-size: 11px; color: var(--muted);">
-                            📋 PDA aplicados: ${infoPDA.total} | Último PDA: ${infoPDA.ultimaFecha || 'N/A'}
-                        </div>
-                        ` : ''}
-                    </div>
-                    <div style="display: flex; gap: 8px;">
-                        ${botonPDA}
-                        <button onclick="verEvolucionCiclos('${escapeHtml(item.agente)}')" 
-                                style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer;">
-                            📊 Ver evolución
-                        </button>
-                        <button onclick="mostrarTimeline('${escapeHtml(item.agente)}')" 
-                                style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer;">
-                            📅 Ver timeline
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    html += `</div>`;
-    container.innerHTML = html;
-}
     
-    // ======================================================
-    // FUNCIÓN: Cargar Meses Disponibles en el Selector Q4
-    // ======================================================
-    async function cargarMesesParaSelectorQ4() {
-        const select = document.getElementById('selectorMesQ4');
-        if (!select) return;
-
-        const evaluaciones = window.evaluacionesGlobales || [];
-        if (evaluaciones.length === 0) {
-            select.innerHTML = '<option value="">⚠️ Cargue evaluaciones primero</option>';
-            return;
-        }
-
-        const mesesSet = new Set();
-        
-        for (const e of evaluaciones) {
-            let fechaStr = e.fechaOriginal || e.fecha || '';
-            if (fechaStr) {
-                // Extraer solo la fecha (sin hora)
-                let fechaParte = fechaStr;
-                if (fechaStr.includes(' ')) fechaParte = fechaStr.split(' ')[0];
-                if (fechaStr.includes('T')) fechaParte = fechaStr.split('T')[0];
-                
-                const partes = fechaParte.split('/');
-                if (partes.length === 3) {
-                    const anio = partes[2];
-                    const mes = partes[1];
-                    if (anio && anio.match(/^\d{4}$/) && mes && mes.match(/^\d{1,2}$/)) {
-                        mesesSet.add(`${anio}-${mes.padStart(2, '0')}`);
-                    }
-                } else {
-                    // Formato ISO (YYYY-MM-DD)
-                    const partesISO = fechaParte.split('-');
-                    if (partesISO.length === 3) {
-                        const anio = partesISO[0];
-                        const mes = partesISO[1];
-                        if (anio && anio.match(/^\d{4}$/) && mes && mes.match(/^\d{1,2}$/)) {
-                            mesesSet.add(`${anio}-${mes.padStart(2, '0')}`);
-                        }
-                    }
-                }
-            }
-        }
-
-        const meses = Array.from(mesesSet).sort();
-        const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-
-        select.innerHTML = '<option value="">-- Seleccionar mes --</option>';
-        
-        for (const mes of meses) {
-            const [anio, mesNum] = mes.split('-');
-            const nombreMes = mesesNombres[parseInt(mesNum) - 1];
-            select.innerHTML += `<option value="${mes}">${nombreMes} ${anio}</option>`;
-        }
-
-        // Seleccionar el último mes disponible por defecto
-        if (meses.length > 0) {
-            select.value = meses[meses.length - 1];
-            await cargarAgentesQ4PorMes();
-        }
-
-        console.log(`✅ ${meses.length} meses cargados para el selector Q4:`, meses);
-    }
+    
 
     // ===== 33. INICIO FUNCIÓN: filtrarEvaluacionesPorRangoFechas ============
     function filtrarEvaluacionesPorRangoFechas(evaluaciones, fechaInicio, fechaFin) {
-        if (!fechaInicio || !fechaFin) return evaluaciones;
-
-        // 🔴 Convertir a string YYYYMMDD para comparación exacta
-        const inicioComparable = fechaInicio.replace(/-/g, ''); // "2026-04-10" → "20260410"
-        const finComparable = fechaFin.replace(/-/g, '');       // "2026-04-10" → "20260410"
-
-        console.log(`📅 Filtro fechas: ${inicioComparable} - ${finComparable}`);
-
+        const inicio = new Date(fechaInicio + 'T00:00:00');
+        const fin = new Date(fechaFin + 'T23:59:59');
+        
         return evaluaciones.filter(eval => {
-            // Obtener fecha de la evaluación en formato YYYYMMDD
-            let fechaStr = eval.fechaOriginal || eval.fecha || '';
-            if (!fechaStr || fechaStr === 'Sin fecha') return false;
-
-            let fechaEvalComparable = null;
-
-            // Caso 1: "23/03/2026 14:49" o "23/03/2026"
-            if (fechaStr.includes('/')) {
-                const partesFecha = fechaStr.split(' ')[0].split('/');
-                if (partesFecha.length === 3) {
-                    // partesFecha = [dia, mes, anio] → "20260323"
-                    fechaEvalComparable = `${partesFecha[2]}${partesFecha[1]}${partesFecha[0]}`;
-                }
-            }
-
-            // Caso 2: "2026-03-23T14:49:00" (ISO)
-            if (!fechaEvalComparable && fechaStr.includes('T')) {
-                const [fechaParte] = fechaStr.split('T');
-                fechaEvalComparable = fechaParte.replace(/-/g, '');
-            }
-
-            // Caso 3: "2026-03-23 14:49:00"
-            if (!fechaEvalComparable && fechaStr.includes('-') && fechaStr.includes(':')) {
-                const [fechaParte] = fechaStr.split(' ');
-                fechaEvalComparable = fechaParte.replace(/-/g, '');
-            }
-
-            if (!fechaEvalComparable) {
-                console.warn('⚠️ Fecha no parseable:', fechaStr);
-                return false;
-            }
-
-            // Comparar como números (ej: 20260410 >= 20260410 && <= 20260410)
-            const fechaNum = parseInt(fechaEvalComparable, 10);
-            const inicioNum = parseInt(inicioComparable, 10);
-            const finNum = parseInt(finComparable, 10);
-
-            return fechaNum >= inicioNum && fechaNum <= finNum;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha >= inicio && fecha <= fin;
         });
     }
+
     // ===== FIN FUNCIÓN: filtrarEvaluacionesPorRangoFechas ===================
     
     // ===== 34. INICIO FUNCIÓN: filtrarEvaluacionesPorCantidadPeriodos =======
@@ -10712,107 +11172,186 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     }
     // ===== FIN FUNCIÓN: filtrarEvaluacionesPorCantidadPeriodos ==============
 
+
+
+
+
     // ===== 35. INICIO FUNCIÓN: agruparEvaluacionesPorPeriodo ================
     function agruparEvaluacionesPorPeriodo(evaluaciones, periodo) {
-        if (evaluaciones.length === 0) return [];
+    if (evaluaciones.length === 0) return [];
 
-        const agrupado = {};
-
-        evaluaciones.forEach(e => {
-            const fecha = obtenerFechaEvaluacion(e);
-            if (!fecha) return;
-
-            let clave = '';
-
-            switch (periodo) {
-                case 'dia':
-                    clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
-                    break;
-                case 'semana':
-                    const semana = getWeekNumber(fecha);
-                    clave = `${fecha.getFullYear()}-S${semana}`;
-                    break;
-                case 'mes':
-                    clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-                    break;
-                case 'trimestre':
-                    const trimestre = Math.floor(fecha.getMonth() / 3) + 1;
-                    clave = `${fecha.getFullYear()}-T${trimestre}`;
-                    break;
-                case 'anio':
-                    clave = `${fecha.getFullYear()}`;
-                    break;
-                default:
-                    clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
-            }
-
-            if (!agrupado[clave]) {
-                agrupado[clave] = {
-                    clave: clave,
-                    evaluaciones: [],
-                    sumaNotas: 0,
-                    count: 0,
-                    totalENC: 0,
-                    totalECUF: 0,
-                    totalECN: 0,
-                    quiebres: 0
-                };
-            }
-
-            agrupado[clave].evaluaciones.push(e);
-            agrupado[clave].sumaNotas += e.notaFinal || 0;
-            agrupado[clave].count++;
-            agrupado[clave].totalENC += e.totalENC || 0;
-            agrupado[clave].totalECUF += e.totalECUF || 0;
-            agrupado[clave].totalECN += e.totalECN || 0;
-            if ((e.notaFinal || 0) < 85) agrupado[clave].quiebres++;
-        });
-
-        // Convertir a array y ordenar por fecha/clave
-        let resultados = Object.values(agrupado);
-        resultados.sort((a, b) => a.clave.localeCompare(b.clave));
-
-        // Formatear etiquetas para mostrar
-        resultados = resultados.map(item => {
-            let label = '';
-            switch (periodo) {
-                case 'dia':
-                    const [anioD, mesD, diaD] = item.clave.split('-');
-                    label = `${diaD}/${mesD}`;
-                    break;
-                case 'semana':
-                    const [anioS, semana] = item.clave.split('-S');
-                    label = `Sem ${semana} (${anioS})`;
-                    break;
-                case 'mes':
-                    const [anioM, mesM] = item.clave.split('-');
-                    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-                    label = `${meses[parseInt(mesM) - 1]} ${anioM}`;
-                    break;
-                case 'trimestre':
-                    const [anioT, trim] = item.clave.split('-T');
-                    label = `T${trim} ${anioT}`;
-                    break;
-                case 'anio':
-                    label = item.clave;
-                    break;
-                default:
-                    label = item.clave;
-            }
-
-            return {
-                ...item,
-                label: label,
-                promedioNota: item.count > 0 ? (item.sumaNotas / item.count).toFixed(1) : 0,
-                promedioENC: item.count > 0 ? (item.totalENC / item.count).toFixed(1) : 0,
-                promedioECUF: item.count > 0 ? (item.totalECUF / item.count).toFixed(1) : 0,
-                promedioECN: item.count > 0 ? (item.totalECN / item.count).toFixed(1) : 0,
-                porcentajeQuiebres: item.count > 0 ? (item.quiebres / item.count) * 100 : 0
-            };
-        });
-
-        return resultados;
+    // Si es 'todos', usar 'mes'
+    if (periodo === 'todos') {
+        periodo = 'mes';
     }
+
+    console.log(`📊 agruparEvaluacionesPorPeriodo: ${evaluaciones.length} evaluaciones, período: ${periodo}`);
+
+    const agrupado = {};
+
+    for (const e of evaluaciones) {
+        const fecha = obtenerFechaEvaluacion(e);
+        if (!fecha) continue;
+
+        let clave = '';
+
+        switch (periodo) {
+            case 'dia':
+                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+                break;
+            case 'semana':
+                const semana = getWeekNumber(fecha);
+                clave = `${fecha.getFullYear()}-S${semana}`;
+                break;
+            case 'mes':
+                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+                break;
+            case 'trimestre':
+                const trimestre = Math.floor(fecha.getMonth() / 3) + 1;
+                clave = `${fecha.getFullYear()}-T${trimestre}`;
+                break;
+            case 'anio':
+                clave = `${fecha.getFullYear()}`;
+                break;
+            default:
+                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+        }
+
+        if (!agrupado[clave]) {
+            agrupado[clave] = {
+                clave: clave,
+                evaluaciones: [],
+                count: 0,
+                // Puntajes directos (sumas)
+                sumaNotas: 0,
+                sumaENC: 0,
+                sumaECUF: 0,
+                sumaECN: 0,
+                quiebres: 0,
+                // 🔴 NUEVO: Porcentajes (sumas de porcentajes individuales)
+                sumaPctENC: 0,
+                sumaPctECUF: 0,
+                sumaPctECN: 0,
+                // Pesos (para el detalle)
+                sumaPesosENC: 0,
+                sumaPesosECUF: 0,
+                sumaPesosECN: 0,
+                countPesos: 0
+            };
+        }
+
+        const item = agrupado[clave];
+        item.evaluaciones.push(e);
+        item.count++;
+        item.sumaNotas += e.notaFinal || 0;
+        item.sumaENC += e.totalENC || 0;
+        item.sumaECUF += e.totalECUF || 0;
+        item.sumaECN += e.totalECN || 0;
+        if ((e.notaFinal || 0) < 85) item.quiebres++;
+
+        // 🔴 CALCULAR PORCENTAJE DE ESTA EVALUACIÓN CON SU MATRIZ
+        const fechaEval = obtenerFechaEvaluacion(e);
+        if (fechaEval) {
+            const matriz = getMatrizByFecha(fechaEval);
+            const pesos = matriz.pesos;
+            
+            const enc = parseFloat(e.totalENC || e.total_enc || 0);
+            const ecuf = parseFloat(e.totalECUF || e.total_ecuf || 0);
+            const ecn = parseFloat(e.totalECN || e.total_ecn || 0);
+            
+            // Porcentaje individual de esta evaluación
+            const pctENC = Math.min((enc / pesos.ENC) * 100, 100);
+            const pctECUF = Math.min((ecuf / pesos.ECUF) * 100, 100);
+            const pctECN = Math.min((ecn / pesos.ECN) * 100, 100);
+            
+            // Acumular porcentajes
+            item.sumaPctENC += pctENC;
+            item.sumaPctECUF += pctECUF;
+            item.sumaPctECN += pctECN;
+            
+            // Acumular pesos para el promedio
+            item.sumaPesosENC += pesos.ENC;
+            item.sumaPesosECUF += pesos.ECUF;
+            item.sumaPesosECN += pesos.ECN;
+            item.countPesos++;
+        }
+    }
+
+    // Convertir a array y ordenar
+    let resultados = Object.values(agrupado);
+    resultados.sort((a, b) => a.clave.localeCompare(b.clave));
+
+    // Formatear etiquetas y calcular promedios
+    resultados = resultados.map(item => {
+        let label = '';
+        switch (periodo) {
+            case 'dia':
+                const [anioD, mesD, diaD] = item.clave.split('-');
+                label = `${diaD}/${mesD}`;
+                break;
+            case 'semana':
+                const [anioS, semana] = item.clave.split('-S');
+                label = `Sem ${semana} (${anioS})`;
+                break;
+            case 'mes':
+                const [anioM, mesM] = item.clave.split('-');
+                const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                label = `${meses[parseInt(mesM) - 1]} ${anioM}`;
+                break;
+            case 'trimestre':
+                const [anioT, trim] = item.clave.split('-T');
+                label = `T${trim} ${anioT}`;
+                break;
+            case 'anio':
+                label = item.clave;
+                break;
+            default:
+                label = item.clave;
+        }
+
+        const count = item.count || 0;
+        
+        // 🔴 PROMEDIOS DE PUNTAJES DIRECTOS
+        const promedioNota = count > 0 ? (item.sumaNotas / count) : 0;
+        const promedioENC = count > 0 ? (item.sumaENC / count) : 0;
+        const promedioECUF = count > 0 ? (item.sumaECUF / count) : 0;
+        const promedioECN = count > 0 ? (item.sumaECN / count) : 0;
+        const porcentajeQuiebres = count > 0 ? (item.quiebres / count) * 100 : 0;
+
+        // 🔴 PROMEDIOS DE PORCENTAJES (LO QUE DEBE MOSTRAR LA CARD)
+        const promedioENCPct = item.countPesos > 0 ? (item.sumaPctENC / item.countPesos) : 0;
+        const promedioECUFPct = item.countPesos > 0 ? (item.sumaPctECUF / item.countPesos) : 0;
+        const promedioECNPct = item.countPesos > 0 ? (item.sumaPctECN / item.countPesos) : 0;
+
+        // 🔴 PESOS PROMEDIO (para el detalle)
+        const pesoENC = item.countPesos > 0 ? Math.round(item.sumaPesosENC / item.countPesos) : 30;
+        const pesoECUF = item.countPesos > 0 ? Math.round(item.sumaPesosECUF / item.countPesos) : 30;
+        const pesoECN = item.countPesos > 0 ? Math.round(item.sumaPesosECN / item.countPesos) : 40;
+
+        return {
+            ...item,
+            label: label,
+            promedioNota: Math.round(promedioNota * 10) / 10,
+            promedioENC: Math.round(promedioENC * 10) / 10,
+            promedioECUF: Math.round(promedioECUF * 10) / 10,
+            promedioECN: Math.round(promedioECN * 10) / 10,
+            porcentajeQuiebres: Math.round(porcentajeQuiebres * 10) / 10,
+            // 🔴 NUEVOS CAMPOS CON PORCENTAJES
+            promedioENCPct: Math.round(promedioENCPct * 10) / 10,
+            promedioECUFPct: Math.round(promedioECUFPct * 10) / 10,
+            promedioECNPct: Math.round(promedioECNPct * 10) / 10,
+            pesoENC: pesoENC,
+            pesoECUF: pesoECUF,
+            pesoECN: pesoECN
+        };
+    });
+
+    console.log(`✅ Datos agrupados: ${resultados.length} períodos`);
+    if (resultados.length > 0) {
+        console.log(`   Ejemplo: ${resultados[0].label} - ENC: ${resultados[0].promedioENC} pts (${resultados[0].promedioENCPct}%)`);
+    }
+    return resultados;
+}
     // ===== FIN FUNCIÓN: agruparEvaluacionesPorPeriodo =======================
 
     // ===== 36. INICIO FUNCIÓN: actualizarCardsPromedioMotivosAgrupados ======
@@ -11470,13 +12009,144 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     // ======================================================
     // ACTUALIZAR BADGE DEL PERÍODO SELECCIONADO
     // ======================================================
+    async function renderizarControlesPeriodo() {
+        const container = document.getElementById('periodoControlesContainer');
+        if (!container) return;
+        
+        const periodo = document.getElementById('filtroPeriodoReportes').value;
+        filtroPeriodoActual = periodo;
+        
+        // 🔴 ACTUALIZAR BADGE DEL PERÍODO
+        actualizarBadgePeriodo();
+        
+        let html = '';
+        
+        // ========== MODO "TODOS LOS DATOS" ==========
+        if (periodo === 'todos') {
+            html = `
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 500;">📊 Mostrando TODOS los datos históricos</span>
+                    <span style="font-size: 11px; color: var(--muted);">(sin filtros aplicados)</span>
+                </div>
+            `;
+        }
+        // ========== MODOS ESTÁNDAR ==========
+        else if (periodo === 'dia') {
+            html = `
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 500;">Desde:</span>
+                    <input type="date" id="filtroFechaInicioReportes" value="${filtroDiaDesde || ''}" 
+                        style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none;">
+                    <span style="color: #94a3b8;">→</span>
+                    <input type="date" id="filtroFechaFinReportes" value="${filtroDiaHasta || ''}" 
+                        style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none;">
+                </div>
+            `;
+        } else if (periodo === 'mes') {
+            const meses = await obtenerMesesDisponiblesDinamicos();
+            if (meses.length === 0) {
+                html = `<div style="color: #94a3b8; font-size: 12px;">⏳ Cargando meses disponibles...</div>`;
+            } else {
+                html = `
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                        <span style="font-size: 12px; color: #64748b; font-weight: 500;">Mes:</span>
+                        <select id="filtroMesSelect" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none; cursor: pointer; min-width: 140px;">
+                            <option value="">Seleccionar mes</option>
+                            ${meses.map(m => `<option value="${m.valor}">${m.label}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            }
+        } else if (periodo === 'trimestre') {
+            const trimestres = await obtenerTrimestresDisponiblesDinamicos();
+            if (trimestres.length === 0) {
+                html = `<div style="color: #94a3b8; font-size: 12px;">⏳ Cargando trimestres disponibles...</div>`;
+            } else {
+                html = `
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                        <span style="font-size: 12px; color: #64748b; font-weight: 500;">Trimestre:</span>
+                        <select id="filtroTrimSelect" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none; cursor: pointer; min-width: 140px;">
+                            <option value="">Seleccionar trimestre</option>
+                            ${trimestres.map(t => `<option value="${t.valor}">${t.label}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            }
+        } else if (periodo === 'anio') {
+            const anios = await obtenerAniosDisponiblesDinamicos();
+            if (anios.length === 0) {
+                html = `<div style="color: #94a3b8; font-size: 12px;">⏳ Cargando años disponibles...</div>`;
+            } else {
+                html = `
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                        <span style="font-size: 12px; color: #64748b; font-weight: 500;">Año:</span>
+                        <select id="filtroAnioSelect" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none; cursor: pointer; min-width: 120px;">
+                            <option value="">Seleccionar año</option>
+                            ${anios.map(a => `<option value="${a.valor}">${a.label}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            }
+        }
+        // ========== MODO RANGO ==========
+        else if (periodo === 'rango') {
+            html = `
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 500;">Tipo:</span>
+                    <select id="filtroRangoTipo" onchange="renderizarControlesRango()" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none; cursor: pointer; min-width: 120px;">
+                        <option value="">Seleccionar</option>
+                        <option value="mes">📅 Mes</option>
+                        <option value="trimestre">📊 Trimestre</option>
+                        <option value="anio">📅 Año</option>
+                        <option value="dia">📆 Día</option>
+                    </select>
+                    <div id="filtroRangoControlesContainer" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"></div>
+                </div>
+            `;
+        }
+        // ========== MODO MÚLTIPLES ==========
+        else if (periodo === 'multiples') {
+            html = `
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
+                    <span style="font-size: 12px; color: #64748b; font-weight: 500;">Tipo:</span>
+                    <select id="filtroMultiplesTipo" onchange="renderizarControlesMultiples()" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none; cursor: pointer; min-width: 120px;">
+                        <option value="">Seleccionar</option>
+                        <option value="mes">📅 Mes</option>
+                        <option value="trimestre">📊 Trimestre</option>
+                        <option value="anio">📅 Año</option>
+                        <option value="dia">📆 Día</option>
+                    </select>
+                    <div id="filtroMultiplesControlesContainer" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;"></div>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+        
+        // Agregar event listeners
+        if (periodo !== 'todos') {
+            const inputs = container.querySelectorAll('input, select');
+            inputs.forEach(input => input.addEventListener('change', () => actualizarInfoFiltro()));
+        } else {
+            // Si es 'todos', actualizar la info inmediatamente
+            actualizarInfoFiltro();
+        }
+    }
+
+    // ======================================================
+    // ACTUALIZAR BADGE DEL PERÍODO SELECCIONADO
+    // ======================================================
     function actualizarBadgePeriodo() {
-        const periodo = document.getElementById('filtroPeriodoReportes')?.value || 'dia';
+        const periodo = document.getElementById('filtroPeriodoReportes')?.value || 'todos';
         const badge = document.getElementById('periodoActivoBadge');
         
-        if (!badge) return;
+        if (!badge) {
+            console.warn('⚠️ badge periodoActivoBadge no encontrado');
+            return;
+        }
         
         const nombres = {
+            'todos': 'TODOS LOS DATOS',
             'dia': 'DÍA',
             'mes': 'MES',
             'trimestre': 'TRIMESTRE',
@@ -11486,6 +12156,7 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         };
         
         const colores = {
+            'todos': '#6c757d',
             'dia': '#019DF4',
             'mes': '#28a745',
             'trimestre': '#7b1fa2',
@@ -11778,275 +12449,291 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         const mesesCortos = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
         
-        // 🔴 ACTUALIZAR VARIABLES GLOBALES con los valores actuales de los selects
-        switch (periodo) {
-            case 'dia':
-                filtroDiaDesde = document.getElementById('filtroFechaInicioReportes')?.value || null;
-                filtroDiaHasta = document.getElementById('filtroFechaFinReportes')?.value || null;
-                break;
-            case 'mes':
-                // Nuevos selectores más simples
-                break;
-            case 'trimestre':
-                // Nuevos selectores más simples
-                break;
-            case 'anio':
-                // Nuevos selectores más simples
-                break;
-            case 'rango':
-                // Valores se cargan dinámicamente según tipoRango
-                break;
-            case 'multiples':
-                // Valores se cargan dinámicamente en filtroMultiples
-                break;
-        }
-        
         let textoInfo = '';
         
-        switch (periodo) {
-            case 'dia':
-                if (filtroDiaDesde && filtroDiaHasta) {
-                    textoInfo = `📅 Mostrando datos del ${formatDateToDisplay(filtroDiaDesde)} al ${formatDateToDisplay(filtroDiaHasta)} | Período: Día`;
-                } else {
-                    textoInfo = `📅 Mostrando TODOS los datos (sin filtro de fechas) | Período: Día`;
-                }
-                break;
-                
-            case 'mes':
-                const mesVal = document.getElementById('filtroMesSelect')?.value;
-                if (mesVal) {
-                    const [anioM, mesM] = mesVal.split('-');
-                    const mesesNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-                    textoInfo = `📅 Mostrando ${mesesNames[parseInt(mesM) - 1]} ${anioM} | Período: Mes`;
-                } else {
-                    textoInfo = `📅 Seleccione un mes para filtrar | Período: Mes`;
-                }
-                break;
-                
-            case 'trimestre':
-                const trimVal = document.getElementById('filtroTrimSelect')?.value;
-                if (trimVal) {
-                    const [anioT, qT] = trimVal.split('-Q');
-                    textoInfo = `📊 Mostrando Q${qT} ${anioT} | Período: Trimestre`;
-                } else {
-                    textoInfo = `📊 Seleccione un trimestre para filtrar | Período: Trimestre`;
-                }
-                break;
-                
-            case 'anio':
-                const anioVal = document.getElementById('filtroAnioSelect')?.value;
-                if (anioVal) {
-                    textoInfo = `📅 Mostrando año ${anioVal} | Período: Año`;
-                } else {
-                    textoInfo = `📅 Seleccione un año para filtrar | Período: Año`;
-                }
-                break;
-                
-            case 'rango':
-                const tipoRango = document.getElementById('filtroRangoTipo')?.value;
-                if (tipoRango === 'dia') {
-                    const diaI = document.getElementById('filtroRangoDiaInicio')?.value;
-                    const diaF = document.getElementById('filtroRangoDiaFin')?.value;
-                    if (diaI && diaF) {
-                        textoInfo = `📅 Rango: ${formatDateToDisplay(diaI)} → ${formatDateToDisplay(diaF)} | Período: Rango de días`;
-                    } else {
-                        textoInfo = `📅 Seleccione rango de fechas | Período: Rango de días`;
-                    }
-                } else if (tipoRango === 'mes') {
-                    const mesInd = document.getElementById('filtroRangoMesInicio')?.value;
-                    const mesFin = document.getElementById('filtroRangoMesFin')?.value;
-                    if (mesInd && mesFin) {
-                        const [aI, mI] = mesInd.split('-');
-                        const [aF, mF] = mesFin.split('-');
-                        const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-                        textoInfo = `📅 Rango: ${meses[parseInt(mI) - 1]} ${aI} → ${meses[parseInt(mF) - 1]} ${aF} | Período: Rango de meses`;
-                    } else {
-                        textoInfo = `📅 Seleccione rango de meses | Período: Rango de meses`;
-                    }
-                } else if (tipoRango === 'trimestre') {
-                    const trimInd = document.getElementById('filtroRangoTrimInicio')?.value;
-                    const trimFin = document.getElementById('filtroRangoTrimFin')?.value;
-                    if (trimInd && trimFin) {
-                        const [aI, qI] = trimInd.split('-Q');
-                        const [aF, qF] = trimFin.split('-Q');
-                        textoInfo = `📊 Rango: Q${qI} ${aI} → Q${qF} ${aF} | Período: Rango de trimestres`;
-                    } else {
-                        textoInfo = `📊 Seleccione rango de trimestres | Período: Rango de trimestres`;
-                    }
-                } else if (tipoRango === 'anio') {
-                    const anioInd = document.getElementById('filtroRangoAnioInicio')?.value;
-                    const anioFin = document.getElementById('filtroRangoAnioFin')?.value;
-                    if (anioInd && anioFin) {
-                        textoInfo = `📅 Rango: ${anioInd} → ${anioFin} | Período: Rango de años`;
-                    } else {
-                        textoInfo = `📅 Seleccione rango de años | Período: Rango de años`;
-                    }
-                } else {
-                    textoInfo = `📊 Seleccione tipo y rango | Período: Rango de períodos`;
-                }
-                break;
-                
-            case 'multiples':
-                const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
-                if (filtroMultiples.length === 0) {
-                    textoInfo = `📌 Seleccione elementos | Período: Múltiples ${tipoMultiples || 'períodos'}`;
-                } else {
-                    if (tipoMultiples === 'dia') {
-                        const diasFormato = filtroMultiples.map(d => formatDateToDisplay(d)).slice(0, 3).join(', ');
-                        const mas = filtroMultiples.length > 3 ? `... +${filtroMultiples.length - 3}` : '';
-                        textoInfo = `📆 Mostrando ${filtroMultiples.length} día(s): ${diasFormato}${mas} | Período: Múltiples días`;
-                    } else if (tipoMultiples === 'mes') {
-                        const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-                        const mesesFormato = filtroMultiples.map(m => {
-                            const [a, me] = m.split('-');
-                            return `${meses[parseInt(me) - 1]} ${a}`;
-                        }).slice(0, 3).join(', ');
-                        const mas = filtroMultiples.length > 3 ? `... +${filtroMultiples.length - 3}` : '';
-                        textoInfo = `📅 Mostrando ${filtroMultiples.length} mes(es): ${mesesFormato}${mas} | Período: Múltiples meses`;
-                    } else if (tipoMultiples === 'trimestre') {
-                        const trimFormato = filtroMultiples.map(t => {
-                            const [a, q] = t.split('-Q');
-                            return `Q${q} ${a}`;
-                        }).slice(0, 3).join(', ');
-                        const mas = filtroMultiples.length > 3 ? `... +${filtroMultiples.length - 3}` : '';
-                        textoInfo = `📊 Mostrando ${filtroMultiples.length} trimestre(s): ${trimFormato}${mas} | Período: Múltiples trimestres`;
-                    } else if (tipoMultiples === 'anio') {
-                        const aniosFormato = filtroMultiples.slice(0, 3).join(', ');
-                        const mas = filtroMultiples.length > 3 ? `... +${filtroMultiples.length - 3}` : '';
-                        textoInfo = `📅 Mostrando ${filtroMultiples.length} año(s): ${aniosFormato}${mas} | Período: Múltiples años`;
-                    } else {
-                        textoInfo = `📌 Mostrando ${filtroMultiples.length} elemento(s) | Período: Múltiples períodos`;
-                    }
-                }
-                break;
-                
-            default:
-                textoInfo = `💡 Seleccione un período para visualizar los datos agrupados`;
+        // ========== MODO "TODOS LOS DATOS" ==========
+        if (periodo === 'todos') {
+            textoInfo = `📊 Mostrando TODOS los datos históricos (sin filtros)`;
+        }
+        // ========== RESTO DE PERÍODOS ==========
+        else if (periodo === 'dia') {
+            filtroDiaDesde = document.getElementById('filtroFechaInicioReportes')?.value || null;
+            filtroDiaHasta = document.getElementById('filtroFechaFinReportes')?.value || null;
+            
+            if (filtroDiaDesde && filtroDiaHasta) {
+                textoInfo = `📅 Mostrando datos del ${formatDateToDisplay(filtroDiaDesde)} al ${formatDateToDisplay(filtroDiaHasta)} | Período: Día`;
+            } else {
+                textoInfo = `📅 Seleccione un rango de fechas | Período: Día`;
+            }
+        } else if (periodo === 'mes') {
+            const mesVal = document.getElementById('filtroMesSelect')?.value;
+            if (mesVal) {
+                const [anioM, mesM] = mesVal.split('-');
+                textoInfo = `📅 Mostrando ${meses[parseInt(mesM) - 1]} ${anioM} | Período: Mes`;
+            } else {
+                textoInfo = `📅 Seleccione un mes para filtrar | Período: Mes`;
+            }
+        } else if (periodo === 'trimestre') {
+            const trimVal = document.getElementById('filtroTrimSelect')?.value;
+            if (trimVal) {
+                const [anioT, qT] = trimVal.split('-Q');
+                textoInfo = `📊 Mostrando Q${qT} ${anioT} | Período: Trimestre`;
+            } else {
+                textoInfo = `📊 Seleccione un trimestre para filtrar | Período: Trimestre`;
+            }
+        } else if (periodo === 'anio') {
+            const anioVal = document.getElementById('filtroAnioSelect')?.value;
+            if (anioVal) {
+                textoInfo = `📅 Mostrando año ${anioVal} | Período: Año`;
+            } else {
+                textoInfo = `📅 Seleccione un año para filtrar | Período: Año`;
+            }
+        } else if (periodo === 'rango') {
+            // ... (código existente para rango)
+            textoInfo = textoInfo || `📊 Seleccione tipo y rango | Período: Rango de períodos`;
+        } else if (periodo === 'multiples') {
+            // ... (código existente para multiples)
+            textoInfo = textoInfo || `📌 Seleccione elementos | Período: Múltiples períodos`;
+        } else {
+            textoInfo = `💡 Seleccione un período para visualizar los datos agrupados`;
         }
         
         infoSpan.innerHTML = textoInfo;
     }
 
-    // Obtener evaluaciones filtradas según el período seleccionado
-    function obtenerEvaluacionesFiltradasPorPeriodo(evaluaciones) {
-        const periodo = filtroPeriodoActual;
-        
-        // ========== MODOS ESTÁNDAR ==========
-        if (periodo === 'dia') {
-            const fechaInicio = document.getElementById('filtroFechaInicioReportes')?.value;
-            const fechaFin = document.getElementById('filtroFechaFinReportes')?.value;
-            if (fechaInicio && fechaFin) {
-                return filtrarEvaluacionesPorRangoFechas(evaluaciones, fechaInicio, fechaFin);
-            }
-            return evaluaciones;
-        }
-        else if (periodo === 'mes') {
-            const mesSelect = document.getElementById('filtroMesSelect')?.value;
-            if (mesSelect) {
-                const [anio, mes] = mesSelect.split('-');
-                return filtrarEvaluacionesPorMesEspecifico(evaluaciones, parseInt(anio), parseInt(mes));
-            }
-            return evaluaciones;
-        }
-        else if (periodo === 'trimestre') {
-            const trimSelect = document.getElementById('filtroTrimSelect')?.value;
-            if (trimSelect) {
-                const [anio, qTrim] = trimSelect.split('-Q');
-                return filtrarEvaluacionesPorTrimestre(evaluaciones, parseInt(anio), parseInt(qTrim));
-            }
-            return evaluaciones;
-        }
-        else if (periodo === 'anio') {
-            const anioSelect = document.getElementById('filtroAnioSelect')?.value;
-            if (anioSelect) {
-                return filtrarEvaluacionesPorAnio(evaluaciones, parseInt(anioSelect));
-            }
-            return evaluaciones;
-        }
-        // ========== MODO RANGO ==========
-        else if (periodo === 'rango') {
-            const tipoRango = document.getElementById('filtroRangoTipo')?.value;
-            
-            if (tipoRango === 'dia') {
-                const fechaInicio = document.getElementById('filtroRangoDiaInicio')?.value;
-                const fechaFin = document.getElementById('filtroRangoDiaFin')?.value;
-                if (fechaInicio && fechaFin) {
-                    return filtrarEvaluacionesPorRangoFechas(evaluaciones, fechaInicio, fechaFin);
-                }
-            }
-            else if (tipoRango === 'mes') {
-                const mesInicio = document.getElementById('filtroRangoMesInicio')?.value;
-                const mesFin = document.getElementById('filtroRangoMesFin')?.value;
-                if (mesInicio && mesFin) {
-                    const [anioI, mesI] = mesInicio.split('-');
-                    const [anioF, mesF] = mesFin.split('-');
-                    return filtrarEvaluacionesPorRangoMeses(evaluaciones, parseInt(anioI), parseInt(mesI), parseInt(anioF), parseInt(mesF));
-                }
-            }
-            else if (tipoRango === 'trimestre') {
-                const trimInicio = document.getElementById('filtroRangoTrimInicio')?.value;
-                const trimFin = document.getElementById('filtroRangoTrimFin')?.value;
-                if (trimInicio && trimFin) {
-                    const [anioI, qI] = trimInicio.split('-Q');
-                    const [anioF, qF] = trimFin.split('-Q');
-                    return filtrarEvaluacionesPorRangoTrimestres(evaluaciones, parseInt(anioI), parseInt(qI), parseInt(anioF), parseInt(qF));
-                }
-            }
-            else if (tipoRango === 'anio') {
-                const anioInicio = document.getElementById('filtroRangoAnioInicio')?.value;
-                const anioFin = document.getElementById('filtroRangoAnioFin')?.value;
-                if (anioInicio && anioFin) {
-                    return filtrarEvaluacionesPorRangoAnios(evaluaciones, parseInt(anioInicio), parseInt(anioFin));
-                }
-            }
-            
-            return evaluaciones;
-        }
-        // ========== MODO MÚLTIPLES ==========
-        else if (periodo === 'multiples') {
-            const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
-            
-            if (filtroMultiples.length === 0) return evaluaciones;
-            
-            if (tipoMultiples === 'dia') {
-                return filtrarEvaluacionesPorMultiplesDias(evaluaciones, filtroMultiples);
-            }
-            else if (tipoMultiples === 'mes') {
-                return filtrarEvaluacionesPorMultiplesMeses(evaluaciones, filtroMultiples);
-            }
-            else if (tipoMultiples === 'trimestre') {
-                return filtrarEvaluacionesPorMultiplesTrimestres(evaluaciones, filtroMultiples);
-            }
-            else if (tipoMultiples === 'anio') {
-                return filtrarEvaluacionesPorMultiplesAnios(evaluaciones, filtroMultiples);
-            }
-            
-            return evaluaciones;
-        }
-        
+    // ======================================================
+// FUNCIÓN: obtenerEvaluacionesFiltradasPorPeriodo (COMPLETA)
+// ======================================================
+function obtenerEvaluacionesFiltradasPorPeriodo(evaluaciones) {
+    console.log('📅 obtenerEvaluacionesFiltradasPorPeriodo - INICIO');
+    console.log(`   Período actual: ${filtroPeriodoActual}`);
+    console.log(`   Evaluaciones disponibles: ${evaluaciones?.length || 0}`);
+    
+    // 🔴 VALIDACIÓN INICIAL
+    if (!evaluaciones || evaluaciones.length === 0) {
+        console.log('⚠️ No hay evaluaciones para filtrar');
+        return [];
+    }
+    
+    const periodo = filtroPeriodoActual;
+    
+    // ======================================================
+    // MODO 1: "TODOS LOS DATOS" - Sin ningún filtro
+    // ======================================================
+    if (periodo === 'todos') {
+        console.log('📊 Mostrando TODOS los datos históricos (sin filtros)');
         return evaluaciones;
     }
+    
+    // ======================================================
+    // MODO 2: PERÍODO "DÍA" - Rango de fechas específico
+    // ======================================================
+    if (periodo === 'dia') {
+        const fechaInicio = document.getElementById('filtroFechaInicioReportes')?.value;
+        const fechaFin = document.getElementById('filtroFechaFinReportes')?.value;
+        
+        if (fechaInicio && fechaFin) {
+            console.log(`📅 Filtrando por rango de fechas: ${fechaInicio} → ${fechaFin}`);
+            const filtradas = filtrarEvaluacionesPorRangoFechas(evaluaciones, fechaInicio, fechaFin);
+            console.log(`   ✅ ${filtradas.length} evaluaciones en el rango`);
+            return filtradas;
+        }
+        
+        console.log('⚠️ No hay fechas seleccionadas para el período "dia", devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 3: PERÍODO "MES" - Mes específico
+    // ======================================================
+    if (periodo === 'mes') {
+        const mesSelect = document.getElementById('filtroMesSelect');
+        const mesVal = mesSelect?.value;
+        
+        if (mesVal) {
+            const [anio, mes] = mesVal.split('-');
+            console.log(`📅 Filtrando por mes: ${mes}/${anio}`);
+            const filtradas = filtrarEvaluacionesPorMesEspecifico(evaluaciones, parseInt(anio), parseInt(mes));
+            console.log(`   ✅ ${filtradas.length} evaluaciones en el mes`);
+            return filtradas;
+        }
+        
+        console.log('⚠️ No hay mes seleccionado para el período "mes", devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 4: PERÍODO "SEMANA" - Semana específica
+    // ======================================================
+    if (periodo === 'semana') {
+        const anioSelect = document.getElementById('filtroSemanaAnio');
+        const semanaSelect = document.getElementById('filtroSemanaNumero');
+        
+        const anio = anioSelect?.value;
+        const semana = semanaSelect?.value;
+        
+        if (anio && semana) {
+            console.log(`📅 Filtrando por semana: Semana ${semana} de ${anio}`);
+            const filtradas = filtrarEvaluacionesPorSemana(evaluaciones, parseInt(anio), parseInt(semana));
+            console.log(`   ✅ ${filtradas.length} evaluaciones en la semana`);
+            return filtradas;
+        }
+        
+        console.log('⚠️ No hay semana seleccionada, devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 5: PERÍODO "TRIMESTRE" - Trimestre específico
+    // ======================================================
+    if (periodo === 'trimestre') {
+        const trimSelect = document.getElementById('filtroTrimSelect');
+        const trimVal = trimSelect?.value;
+        
+        if (trimVal) {
+            const [anio, q] = trimVal.split('-Q');
+            console.log(`📅 Filtrando por trimestre: Q${q} de ${anio}`);
+            const filtradas = filtrarEvaluacionesPorTrimestre(evaluaciones, parseInt(anio), parseInt(q));
+            console.log(`   ✅ ${filtradas.length} evaluaciones en el trimestre`);
+            return filtradas;
+        }
+        
+        console.log('⚠️ No hay trimestre seleccionado, devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 6: PERÍODO "AÑO" - Año específico
+    // ======================================================
+    if (periodo === 'anio') {
+        const anioSelect = document.getElementById('filtroAnioSelect');
+        const anioVal = anioSelect?.value;
+        
+        if (anioVal) {
+            console.log(`📅 Filtrando por año: ${anioVal}`);
+            const filtradas = filtrarEvaluacionesPorAnio(evaluaciones, parseInt(anioVal));
+            console.log(`   ✅ ${filtradas.length} evaluaciones en el año`);
+            return filtradas;
+        }
+        
+        console.log('⚠️ No hay año seleccionado, devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 7: PERÍODO "RANGO" - Rango de períodos (meses, trimestres, años, días)
+    // ======================================================
+    if (periodo === 'rango') {
+        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        console.log(`📊 Filtrando por RANGO de tipo: ${tipoRango || 'no seleccionado'}`);
+        
+        if (tipoRango === 'dia') {
+            const inicio = document.getElementById('filtroRangoDiaInicio')?.value;
+            const fin = document.getElementById('filtroRangoDiaFin')?.value;
+            if (inicio && fin) {
+                console.log(`   📅 Días: ${inicio} → ${fin}`);
+                const filtradas = filtrarEvaluacionesPorRangoFechas(evaluaciones, inicio, fin);
+                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de días`);
+                return filtradas;
+            }
+        } else if (tipoRango === 'mes') {
+            const inicio = document.getElementById('filtroRangoMesInicio')?.value;
+            const fin = document.getElementById('filtroRangoMesFin')?.value;
+            if (inicio && fin) {
+                const [anioI, mesI] = inicio.split('-');
+                const [anioF, mesF] = fin.split('-');
+                console.log(`   📅 Meses: ${mesI}/${anioI} → ${mesF}/${anioF}`);
+                const filtradas = filtrarEvaluacionesPorRangoMeses(evaluaciones, parseInt(anioI), parseInt(mesI), parseInt(anioF), parseInt(mesF));
+                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de meses`);
+                return filtradas;
+            }
+        } else if (tipoRango === 'trimestre') {
+            const inicio = document.getElementById('filtroRangoTrimInicio')?.value;
+            const fin = document.getElementById('filtroRangoTrimFin')?.value;
+            if (inicio && fin) {
+                const [anioI, qI] = inicio.split('-Q');
+                const [anioF, qF] = fin.split('-Q');
+                console.log(`   📅 Trimestres: Q${qI} ${anioI} → Q${qF} ${anioF}`);
+                const filtradas = filtrarEvaluacionesPorRangoTrimestres(evaluaciones, parseInt(anioI), parseInt(qI), parseInt(anioF), parseInt(qF));
+                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de trimestres`);
+                return filtradas;
+            }
+        } else if (tipoRango === 'anio') {
+            const inicio = document.getElementById('filtroRangoAnioInicio')?.value;
+            const fin = document.getElementById('filtroRangoAnioFin')?.value;
+            if (inicio && fin) {
+                console.log(`   📅 Años: ${inicio} → ${fin}`);
+                const filtradas = filtrarEvaluacionesPorRangoAnios(evaluaciones, parseInt(inicio), parseInt(fin));
+                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de años`);
+                return filtradas;
+            }
+        }
+        
+        console.log('⚠️ No hay rango seleccionado o tipo no válido, devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // MODO 8: PERÍODO "MÚLTIPLES" - Múltiples períodos seleccionados
+    // ======================================================
+    if (periodo === 'multiples') {
+        const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+        console.log(`📊 Filtrando por MÚLTIPLES de tipo: ${tipoMultiples || 'no seleccionado'}`);
+        
+        if (filtroMultiples && filtroMultiples.length > 0) {
+            console.log(`   📋 Elementos seleccionados: ${filtroMultiples.length}`);
+            
+            if (tipoMultiples === 'dia') {
+                const filtradas = filtrarEvaluacionesPorMultiplesDias(evaluaciones, filtroMultiples);
+                console.log(`   ✅ ${filtradas.length} evaluaciones en los días seleccionados`);
+                return filtradas;
+            } else if (tipoMultiples === 'mes') {
+                const filtradas = filtrarEvaluacionesPorMultiplesMeses(evaluaciones, filtroMultiples);
+                console.log(`   ✅ ${filtradas.length} evaluaciones en los meses seleccionados`);
+                return filtradas;
+            } else if (tipoMultiples === 'trimestre') {
+                const filtradas = filtrarEvaluacionesPorMultiplesTrimestres(evaluaciones, filtroMultiples);
+                console.log(`   ✅ ${filtradas.length} evaluaciones en los trimestres seleccionados`);
+                return filtradas;
+            } else if (tipoMultiples === 'anio') {
+                const filtradas = filtrarEvaluacionesPorMultiplesAnios(evaluaciones, filtroMultiples);
+                console.log(`   ✅ ${filtradas.length} evaluaciones en los años seleccionados`);
+                return filtradas;
+            }
+        }
+        
+        console.log('⚠️ No hay elementos múltiples seleccionados, devolviendo TODAS');
+        return evaluaciones;
+    }
+    
+    // ======================================================
+    // CASO POR DEFECTO: Si ningún filtro coincide, devolver TODAS
+    // ======================================================
+    console.log(`⚠️ Período "${periodo}" no reconocido, devolviendo TODAS las evaluaciones`);
+    return evaluaciones;
+}
 
     // Filtrar por semana específica
     function filtrarEvaluacionesPorSemana(evaluaciones, anio, semana) {
-        // Obtener fechas de inicio y fin de la semana
         const fechaInicio = obtenerFechaInicioSemana(anio, semana);
         const fechaFin = new Date(fechaInicio);
         fechaFin.setDate(fechaFin.getDate() + 6);
+        fechaFin.setHours(23, 59, 59, 999);
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval >= fechaInicio && fechaEval <= fechaFin;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha >= fechaInicio && fecha <= fechaFin;
         });
     }
+
 
     // Filtrar por mes específico
     function filtrarEvaluacionesPorMesEspecifico(evaluaciones, anio, mes) {
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval.getFullYear() === anio && (fechaEval.getMonth() + 1) === mes;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha.getFullYear() === anio && (fecha.getMonth() + 1) === mes;
         });
     }
 
@@ -12056,19 +12743,19 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         const mesFin = trimestre * 3;
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            const mes = fechaEval.getMonth() + 1;
-            return fechaEval.getFullYear() === anio && mes >= mesInicio && mes <= mesFin;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            const mes = fecha.getMonth() + 1;
+            return fecha.getFullYear() === anio && mes >= mesInicio && mes <= mesFin;
         });
     }
 
     // Filtrar por año específico
     function filtrarEvaluacionesPorAnio(evaluaciones, anio) {
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval.getFullYear() === anio;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha.getFullYear() === anio;
         });
     }
 
@@ -12077,27 +12764,29 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     // Filtrar por rango de meses (desde mesDesde hasta mesHasta)
     function filtrarEvaluacionesPorRangoMeses(evaluaciones, desdeAnio, desdeMes, hastaAnio, hastaMes) {
         const fechaDesde = new Date(desdeAnio, desdeMes - 1, 1);
-        const fechaHasta = new Date(hastaAnio, hastaMes, 0); // Último día del mes
+        const fechaHasta = new Date(hastaAnio, hastaMes, 0);
+        fechaHasta.setHours(23, 59, 59, 999);
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval >= fechaDesde && fechaEval <= fechaHasta;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha >= fechaDesde && fecha <= fechaHasta;
         });
     }
     
     // Filtrar por rango de trimestres (desde trimDesde hasta trimHasta)
     function filtrarEvaluacionesPorRangoTrimestres(evaluaciones, desdeAnio, desdeTrim, hastaAnio, hastaTrim) {
         const mesDesde = (desdeTrim - 1) * 3 + 1;
-        const mesFin = hastaTrim * 3;
+        const mesHasta = hastaTrim * 3;
         
         const fechaDesde = new Date(desdeAnio, mesDesde - 1, 1);
-        const fechaHasta = new Date(hastaAnio, mesFin, 0); // Último día del mes final
+        const fechaHasta = new Date(hastaAnio, mesHasta, 0);
+        fechaHasta.setHours(23, 59, 59, 999);
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval >= fechaDesde && fechaEval <= fechaHasta;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha >= fechaDesde && fecha <= fechaHasta;
         });
     }
     
@@ -12105,11 +12794,12 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     function filtrarEvaluacionesPorRangoAnios(evaluaciones, desdeAnio, hastaAnio) {
         const fechaDesde = new Date(desdeAnio, 0, 1);
         const fechaHasta = new Date(hastaAnio, 11, 31);
+        fechaHasta.setHours(23, 59, 59, 999);
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            return fechaEval >= fechaDesde && fechaEval <= fechaHasta;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return fecha >= fechaDesde && fecha <= fechaHasta;
         });
     }
     
@@ -12119,17 +12809,16 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
     function filtrarEvaluacionesPorMultiplesDias(evaluaciones, diasSeleccionados) {
         if (!diasSeleccionados || diasSeleccionados.length === 0) return evaluaciones;
         
-        // Convertir strings de fechas a objetos Date
         const diasObjetos = diasSeleccionados.map(dia => new Date(dia + 'T00:00:00'));
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
             
             return diasObjetos.some(dia => {
-                return fechaEval.getFullYear() === dia.getFullYear() &&
-                       fechaEval.getMonth() === dia.getMonth() &&
-                       fechaEval.getDate() === dia.getDate();
+                return fecha.getFullYear() === dia.getFullYear() &&
+                    fecha.getMonth() === dia.getMonth() &&
+                    fecha.getDate() === dia.getDate();
             });
         });
     }
@@ -12139,14 +12828,14 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         if (!mesesSeleccionados || mesesSeleccionados.length === 0) return evaluaciones;
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
             
-            const anioDel = fechaEval.getFullYear();
-            const mesDel = String(fechaEval.getMonth() + 1).padStart(2, '0');
-            const mesEvalStr = `${anioDel}-${mesDel}`;
+            const anio = fecha.getFullYear();
+            const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+            const clave = `${anio}-${mes}`;
             
-            return mesesSeleccionados.includes(mesEvalStr);
+            return mesesSeleccionados.includes(clave);
         });
     }
     
@@ -12155,14 +12844,14 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         if (!trimestresSeleccionados || trimestresSeleccionados.length === 0) return evaluaciones;
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
             
-            const anio = fechaEval.getFullYear();
-            const trimestre = Math.floor(fechaEval.getMonth() / 3) + 1;
-            const trimEvalStr = `${anio}-Q${trimestre}`;
+            const anio = fecha.getFullYear();
+            const trimestre = Math.floor(fecha.getMonth() / 3) + 1;
+            const clave = `${anio}-Q${trimestre}`;
             
-            return trimestresSeleccionados.includes(trimEvalStr);
+            return trimestresSeleccionados.includes(clave);
         });
     }
     
@@ -12173,10 +12862,9 @@ function mostrarResultadosQ4(resultados, mesSeleccionado, totalSinFiltrar) {
         const aniosNum = aniosSeleccionados.map(a => parseInt(a));
         
         return evaluaciones.filter(eval => {
-            const fechaEval = obtenerFechaEvaluacion(eval);
-            if (!fechaEval) return false;
-            
-            return aniosNum.includes(fechaEval.getFullYear());
+            const fecha = obtenerFechaEvaluacion(eval);
+            if (!fecha) return false;
+            return aniosNum.includes(fecha.getFullYear());
         });
     }
 
@@ -14033,7 +14721,7 @@ async function mostrarResumenAgrupado(campoAgrupacion, titulo, icono) {
 
     // ===== 17. INICIO FUNCIÓN: cargarLideresEnSelectRanking =================
     let liderFiltroRankingActual = 'todos';
-    let rankingOriginalCompleto = []; // Guardar ranking original sin filtrar
+     // Guardar ranking original sin filtrar
     // DESPUÉS (usando API)
     async function cargarLideresEnSelectRanking() {
         console.log('🔄 cargarLideresEnSelectRanking - INICIANDO...');
@@ -14146,99 +14834,100 @@ async function mostrarResumenAgrupado(campoAgrupacion, titulo, icono) {
 
     // ===== FUNCIÓN CORREGIDA: agruparEvaluacionesEnCiclos =====
     async function agruparEvaluacionesEnCiclos(agente) {
-        console.log(`🔄 Agrupando evaluaciones de ${agente} en ciclos...`);
+    console.log(`🔄 Agrupando evaluaciones de ${agente} en ciclos...`);
 
-        const ahora = Date.now();
-        const cacheEntry = ciclosCacheGlobal.get(agente);
-        if (cacheEntry && (ahora - cacheEntry.timestamp) < CACHE_DURACION_CICLOS) {
-            console.log(`✅ Usando caché de ciclos para ${agente}`);
-            return cacheEntry.ciclos;
-        }
+    const ahora = Date.now();
+    const cacheEntry = ciclosCacheGlobal.get(agente);
+    if (cacheEntry && (ahora - cacheEntry.timestamp) < CACHE_DURACION_CICLOS) {
+        console.log(`✅ Usando caché de ciclos para ${agente}`);
+        return cacheEntry.ciclos;
+    }
 
-        try {
-            const evaluacionesAgente = (window.evaluacionesGlobales || []).filter(e => e.agente === agente);
-            
-            if (!evaluacionesAgente || evaluacionesAgente.length === 0) {
-                ciclosCacheGlobal.set(agente, { ciclos: [], timestamp: ahora });
-                return [];
-            }
-
-            evaluacionesAgente.sort((a, b) => {
-                const fechaA = obtenerFechaEvaluacion(a);
-                const fechaB = obtenerFechaEvaluacion(b);
-                if (!fechaA && !fechaB) return 0;
-                if (!fechaA) return 1;
-                if (!fechaB) return -1;
-                return fechaA - fechaB;
-            });
-
-            const TAMANO_CICLO = 5;
-            const ciclos = [];
-
-            for (let i = 0; i < evaluacionesAgente.length; i += TAMANO_CICLO) {
-                const evaluacionesCiclo = evaluacionesAgente.slice(i, i + TAMANO_CICLO);
-                const numeroCiclo = Math.floor(i / TAMANO_CICLO) + 1;
-
-                let sumaNotas = 0, sumaENC = 0, sumaECUF = 0, sumaECN = 0;
-                let fechasObj = [];
-
-                for (const evalItem of evaluacionesCiclo) {
-                    sumaNotas += evalItem.notaFinal || 0;
-                    sumaENC += evalItem.totalENC || 0;
-                    sumaECUF += evalItem.totalECUF || 0;
-                    sumaECN += evalItem.totalECN || 0;
-                    
-                    const fechaObj = obtenerFechaEvaluacion(evalItem);
-                    if (fechaObj) {
-                        fechasObj.push({
-                            fechaObj: fechaObj,
-                            fechaStr: formatearFechaParaDocumento(evalItem.fechaOriginal || evalItem.fecha || '')
-                        });
-                    }
-                }
-
-                const totalEvals = evaluacionesCiclo.length;
-                const promedioFinal = totalEvals > 0 ? (sumaNotas / totalEvals).toFixed(1) : 0;
-                const promedioENC = totalEvals > 0 ? (sumaENC / totalEvals).toFixed(1) : 0;
-                const promedioECUF = totalEvals > 0 ? (sumaECUF / totalEvals).toFixed(1) : 0;
-                const promedioECN = totalEvals > 0 ? (sumaECN / totalEvals).toFixed(1) : 0;
-
-                fechasObj.sort((a, b) => a.fechaObj - b.fechaObj);
-                
-                const fechaInicio = fechasObj.length > 0 ? fechasObj[0].fechaStr : 'N/A';
-                const fechaFin = fechasObj.length > 0 ? fechasObj[fechasObj.length - 1].fechaStr : 'N/A';
-
-                // 🔴 🔴 🔴 AQUÍ ESTÁ EL CAMBIO 🔴 🔴 🔴
-                // ANTES: if (promedioFinal >= 97) cuartil = 'Q1';
-                // AHORA: Usar el sistema dinámico
-                const resultadoCuartil = await obtenerCuartilPorNota(parseFloat(promedioFinal));
-                const cuartil = resultadoCuartil.cuartil;
-
-                ciclos.push({
-                    numero: numeroCiclo,
-                    fechaInicio: fechaInicio,
-                    fechaFin: fechaFin,
-                    totalEvaluaciones: totalEvals,
-                    promedio: parseFloat(promedioFinal),
-                    promedioENC: parseFloat(promedioENC),
-                    promedioECUF: parseFloat(promedioECUF),
-                    promedioECN: parseFloat(promedioECN),
-                    cuartil: cuartil,
-                    evaluaciones: evaluacionesCiclo,
-                    esCompleto: totalEvals === TAMANO_CICLO
-                });
-            }
-
-            ciclosCacheGlobal.set(agente, { ciclos: ciclos, timestamp: ahora });
-            
-            console.log(`✅ ${ciclos.length} ciclos calculados para ${agente}`);
-            return ciclos;
-
-        } catch (error) {
-            console.error(`Error agrupando evaluaciones de ${agente}:`, error);
+    try {
+        const evaluacionesAgente = (window.evaluacionesGlobales || []).filter(e => e.agente === agente);
+        
+        if (!evaluacionesAgente || evaluacionesAgente.length === 0) {
+            ciclosCacheGlobal.set(agente, { ciclos: [], timestamp: ahora });
             return [];
         }
+
+        // ======================================================
+        // 🔴 CORREGIDO: Ordenar por fecha (NO fecha_descarga)
+        // ======================================================
+        evaluacionesAgente.sort((a, b) => {
+            const fechaA = obtenerFechaEvaluacion(a);
+            const fechaB = obtenerFechaEvaluacion(b);
+            if (!fechaA && !fechaB) return 0;
+            if (!fechaA) return 1;
+            if (!fechaB) return -1;
+            return fechaA - fechaB;
+        });
+
+        const TAMANO_CICLO = 5;
+        const ciclos = [];
+
+        for (let i = 0; i < evaluacionesAgente.length; i += TAMANO_CICLO) {
+            const evaluacionesCiclo = evaluacionesAgente.slice(i, i + TAMANO_CICLO);
+            const numeroCiclo = Math.floor(i / TAMANO_CICLO) + 1;
+
+            let sumaNotas = 0, sumaENC = 0, sumaECUF = 0, sumaECN = 0;
+            let fechas = [];
+
+            for (const evalItem of evaluacionesCiclo) {
+                sumaNotas += evalItem.notaFinal || 0;
+                sumaENC += evalItem.totalENC || 0;
+                sumaECUF += evalItem.totalECUF || 0;
+                sumaECN += evalItem.totalECN || 0;
+                
+                // 🔴 CORREGIDO: Usar fecha (NO fecha_descarga)
+                const fecha = obtenerFechaEvaluacion(evalItem);
+                if (fecha) {
+                    fechas.push(fecha);
+                }
+            }
+
+            const totalEvals = evaluacionesCiclo.length;
+            const promedioFinal = totalEvals > 0 ? (sumaNotas / totalEvals).toFixed(1) : 0;
+            const promedioENC = totalEvals > 0 ? (sumaENC / totalEvals).toFixed(1) : 0;
+            const promedioECUF = totalEvals > 0 ? (sumaECUF / totalEvals).toFixed(1) : 0;
+            const promedioECN = totalEvals > 0 ? (sumaECN / totalEvals).toFixed(1) : 0;
+
+            // 🔴 CORREGIDO: Usar fecha (NO fecha_descarga)
+            fechas.sort((a, b) => a - b);
+            
+            const fechaInicio = fechas.length > 0 ? formatearFechaParaDocumento(fechas[0]) : 'N/A';
+            const fechaFin = fechas.length > 0 ? formatearFechaParaDocumento(fechas[fechas.length - 1]) : 'N/A';
+
+            const resultadoCuartil = await obtenerCuartilPorNota(parseFloat(promedioFinal));
+            const cuartil = resultadoCuartil.cuartil;
+
+            ciclos.push({
+                numero: numeroCiclo,
+                fechaInicio: fechaInicio,
+                fechaFin: fechaFin,
+                totalEvaluaciones: totalEvals,
+                promedio: parseFloat(promedioFinal),
+                promedioENC: parseFloat(promedioENC),
+                promedioECUF: parseFloat(promedioECUF),
+                promedioECN: parseFloat(promedioECN),
+                cuartil: cuartil,
+                evaluaciones: evaluacionesCiclo,
+                esCompleto: totalEvals === TAMANO_CICLO
+            });
+        }
+
+        ciclosCacheGlobal.set(agente, { ciclos: ciclos, timestamp: ahora });
+        
+        console.log(`✅ ${ciclos.length} ciclos calculados para ${agente}`);
+        return ciclos;
+
+    } catch (error) {
+        console.error(`Error agrupando evaluaciones de ${agente}:`, error);
+        return [];
     }
+}
+
+
 
     //  ===== 22. INICIO FUNCIÓN: invalidarCacheCiclos ========================
     function invalidarCacheCiclos() {
@@ -15533,12 +16222,12 @@ async function verEvolucionCiclos(agente) {
             aplicarFiltrosRankingCompletos();
         }
 
-        // Cargar meses disponibles en el selector
 async function cargarMesesParaSelectorQ4() {
     const select = document.getElementById('selectorMesQ4');
     if (!select) return;
     
     try {
+        // 1. Cargar meses
         const evaluaciones = await API.getHistorial();
         const mesesSet = new Set();
         
@@ -15560,18 +16249,20 @@ async function cargarMesesParaSelectorQ4() {
         }
         
         const meses = Array.from(mesesSet).sort();
-        
-        select.innerHTML = '<option value="">-- Seleccionar mes --</option>';
-        
         const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         
+        // 2. Llenar el select
+        select.innerHTML = '<option value="">-- Seleccionar mes --</option>';
         for (const mes of meses) {
             const [anio, mesNum] = mes.split('-');
             const nombreMes = mesesNombres[parseInt(mesNum) - 1];
             select.innerHTML += `<option value="${mes}">${nombreMes} ${anio}</option>`;
         }
         
-        // 🔴 Agregar event listener (eliminar el anterior para evitar duplicados)
+        console.log(`✅ ${meses.length} meses cargados:`, meses);
+        
+        // 3. 🔴 EVENTO: Actualizar automáticamente al cambiar de mes
+        // (Eliminar eventos anteriores para evitar duplicados)
         const nuevoSelect = select.cloneNode(true);
         select.parentNode.replaceChild(nuevoSelect, select);
         
@@ -15579,69 +16270,13 @@ async function cargarMesesParaSelectorQ4() {
             cargarAgentesQ4PorMes();
         });
         
-        console.log(`✅ ${meses.length} meses cargados:`, meses);
-        
-        // Seleccionar junio por defecto si existe
+        // 4. Seleccionar mes por defecto y cargar datos
         if (meses.includes('2026-06')) {
             nuevoSelect.value = '2026-06';
-            await cargarAgentesQ4PorMes();
         } else if (meses.length > 0) {
             nuevoSelect.value = meses[meses.length - 1];
-            await cargarAgentesQ4PorMes();
         }
         
-    } catch (error) {
-        console.error('Error cargando meses:', error);
-    }
-}
-// Función principal: cargar agentes en Q4 por mes
-async function cargarMesesParaSelectorQ4() {
-    const select = document.getElementById('selectorMesQ4');
-    if (!select) return;
-    
-    try {
-        const evaluaciones = await API.getHistorial();
-        const mesesSet = new Set();
-        
-        for (const e of evaluaciones) {
-            if (e.fecha_formateada) {
-                let fechaStr = e.fecha_formateada;
-                if (fechaStr.includes(' ')) {
-                    fechaStr = fechaStr.split(' ')[0];
-                }
-                const partes = fechaStr.split('/');
-                if (partes.length === 3) {
-                    const anio = partes[2];
-                    const mes = partes[1];
-                    if (anio && anio.match(/^\d{4}$/) && mes && mes.match(/^\d{1,2}$/) && parseInt(mes) >= 1 && parseInt(mes) <= 12) {
-                        mesesSet.add(`${anio}-${mes.padStart(2, '0')}`);
-                    }
-                }
-            }
-        }
-        
-        const meses = Array.from(mesesSet).sort();
-        
-        select.innerHTML = '<option value="">-- Seleccionar mes --</option>';
-        
-        const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-        
-        for (const mes of meses) {
-            const [anio, mesNum] = mes.split('-');
-            const nombreMes = mesesNombres[parseInt(mesNum) - 1];
-            select.innerHTML += `<option value="${mes}">${nombreMes} ${anio}</option>`;
-        }
-        
-        console.log(`✅ ${meses.length} meses cargados:`, meses);
-        
-        // 🔴 FORZAR QUE SE SELECCIONE UN MES Y SE CARGUEN LOS DATOS
-        if (meses.includes('2026-06')) {
-            select.value = '2026-06';
-        } else if (meses.length > 0) {
-            select.value = meses[meses.length - 1];
-        }
-        
-        // 🔴 LLAMAR A LA FUNCIÓN PARA CARGAR LOS DATOS
         if (typeof cargarAgentesQ4PorMes === 'function') {
             await cargarAgentesQ4PorMes();
         }
@@ -15649,9 +16284,13 @@ async function cargarMesesParaSelectorQ4() {
     } catch (error) {
         console.error('Error cargando meses:', error);
     }
-}        // Función auxiliar para aplicar todos los filtros (cuartil, líder, mes)
+}
+
+
+
+        // Función auxiliar para aplicar todos los filtros (cuartil, líder, mes)
         async function aplicarFiltrosRankingCompletos() {
-            let ranking = rankingOriginalCompleto || [];
+            //let ranking = rankingOriginalCompleto || [];
             
             // Aplicar filtro de mes
             if (filtroMesRankingActual && filtroMesRankingActual !== 'todos') {
@@ -15880,172 +16519,1505 @@ async function cargarMesesParaSelectorQ4() {
     }
     // ===== FIN FUNCIÓN: actualizarEstadisticasPDA ==========================
     
+    // ======================================================
+    // FUNCIÓN AUXILIAR: formatearFechaPeru
+    // ======================================================
+    function formatearFechaPeru(fechaIso) {
+        if (!fechaIso) return 'N/A';
+        
+        try {
+            // Caso 1: Si es string ISO (2026-07-13T05:00:00.000Z)
+            if (typeof fechaIso === 'string' && fechaIso.includes('T')) {
+                const fecha = new Date(fechaIso);
+                if (isNaN(fecha.getTime())) return fechaIso;
+                
+                // Extraer solo año, mes, día (sin hora)
+                const anio = fecha.getUTCFullYear();
+                const mes = (fecha.getUTCMonth() + 1).toString().padStart(2, '0');
+                const dia = fecha.getUTCDate().toString().padStart(2, '0');
+                
+                return `${dia}/${mes}/${anio}`;
+            }
+            
+            // Caso 2: Si es objeto Date
+            if (fechaIso instanceof Date) {
+                if (isNaN(fechaIso.getTime())) return 'N/A';
+                const dia = fechaIso.getDate().toString().padStart(2, '0');
+                const mes = (fechaIso.getMonth() + 1).toString().padStart(2, '0');
+                const anio = fechaIso.getFullYear();
+                return `${dia}/${mes}/${anio}`;
+            }
+            
+            // Caso 3: Si es string y ya está en formato DD/MM/YYYY
+            if (typeof fechaIso === 'string' && fechaIso.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                return fechaIso;
+            }
+            
+            // Caso 4: Si es string y tiene formato YYYY-MM-DD (sin hora)
+            if (typeof fechaIso === 'string' && fechaIso.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [anio, mes, dia] = fechaIso.split('-');
+                return `${dia}/${mes}/${anio}`;
+            }
+            
+            // Caso 5: Si es string y tiene formato DD-MM-YYYY
+            if (typeof fechaIso === 'string' && fechaIso.match(/^\d{2}-\d{2}-\d{4}$/)) {
+                const [dia, mes, anio] = fechaIso.split('-');
+                return `${dia}/${mes}/${anio}`;
+            }
+            
+            // Si no se pudo parsear, devolver el valor original
+            return fechaIso || 'N/A';
+        } catch (e) {
+            console.warn('Error formateando fecha:', fechaIso, e);
+            return fechaIso || 'N/A';
+        }
+    }
     // ===== 3. INICIO FUNCIÓN: actualizarListasPDA ========================
+    
     function actualizarListasPDA() {
-        console.log('📋 Actualizando listas PDA, total:', window.datosPDA?.length || 0);
+    console.log('📋 Actualizando listas PDA, total:', window.datosPDA?.length || 0);
 
-        const pendientes = (window.datosPDA || []).filter(p =>
-            p.estado === 'pendiente' || p.estado === 'notificado' || p.estado === 'en_gestion'
-        );
-        const seguimiento = (window.datosPDA || []).filter(p => p.estado === 'en_seguimiento');
-        const completados = (window.datosPDA || []).filter(p =>
-            p.estado === 'completado' || p.estado === 'escalado'
-        );
+    // 🔴 NUEVA CLASIFICACIÓN POR ESTADOS
+    const pendientesOperaciones = (window.datosPDA || []).filter(p =>
+        p.estado === 'pendiente_operaciones' || p.estado === 'pendiente'
+    );
+    
+    const gestorNotificado = (window.datosPDA || []).filter(p =>
+        p.estado === 'gestor_notificado' || p.estado === 'notificado'
+    );
+    
+    const feedbackRegistrado = (window.datosPDA || []).filter(p =>
+        p.estado === 'feedback_registrado'
+    );
+    
+    const enviadoCapacitacion = (window.datosPDA || []).filter(p =>
+        p.estado === 'enviado_capacitacion'
+    );
+    
+    const enCapacitacion = (window.datosPDA || []).filter(p =>
+        p.estado === 'en_capacitacion' || p.estado === 'en_gestion'
+    );
+    
+    const enSeguimiento = (window.datosPDA || []).filter(p =>
+        p.estado === 'en_seguimiento' || p.estado === 'en_seguimiento_capacitacion'
+    );
+    
+    const requiereCapacitacion = (window.datosPDA || []).filter(p =>
+        p.estado === 'requiere_capacitacion' || p.estado === 'listo_para_seguimiento'
+    );
+    
+    const completados = (window.datosPDA || []).filter(p =>
+        p.estado === 'completado' || p.estado === 'escalado' || p.estado === 'reiterativo'
+    );
 
-        // Actualizar contadores
-        const totalPendientes = document.getElementById('totalPendientes');
-        const totalSeguimiento = document.getElementById('totalSeguimiento');
-        const totalCompletados = document.getElementById('totalCompletados');
-        const totalPendientesBadge = document.getElementById('totalPendientesBadge');
-        const totalSeguimientoBadge = document.getElementById('totalSeguimientoBadge');
+    const capacitacionItems = [...enviadoCapacitacion, ...enCapacitacion];
 
-        if (totalPendientes) totalPendientes.textContent = pendientes.length;
-        if (totalSeguimiento) totalSeguimiento.textContent = seguimiento.length;
-        if (totalCompletados) totalCompletados.textContent = completados.length;
-        if (totalPendientesBadge) totalPendientesBadge.textContent = pendientes.length;
-        if (totalSeguimientoBadge) totalSeguimientoBadge.textContent = seguimiento.length;
+    // 🔴 ACTUALIZAR CONTADORES
+    const totalPendientes = document.getElementById('totalPendientes');
+    const totalSeguimiento = document.getElementById('totalSeguimiento');
+    const totalCompletados = document.getElementById('totalCompletados');
+    const totalPendientesBadge = document.getElementById('totalPendientesBadge');
+    const totalSeguimientoBadge = document.getElementById('totalSeguimientoBadge');
+    const totalCapacitacion = document.getElementById('totalCapacitacion');
 
-        // ======================================================
-        // SECCIÓN: PDA PENDIENTES
-        // ======================================================
-        const containerPendientes = document.getElementById('listaPendientes');
-        if (containerPendientes) {
-            if (pendientes.length === 0) {
-                containerPendientes.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">✅ No hay PDA pendientes</div>';
-            } else {
-                let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
-                for (const pda of pendientes) {
-                    const estadoTexto = obtenerTextoEstadoPDA(pda.estado);
-                    const estadoColor = obtenerColorEstadoPDA(pda.estado);
-                    const avance = pda.totalAcciones > 0 ? Math.round((pda.accionesCompletadas / pda.totalAcciones) * 100) : 0;
+    if (totalPendientes) totalPendientes.textContent = pendientesOperaciones.length + gestorNotificado.length;
+    if (totalSeguimiento) totalSeguimiento.textContent = enSeguimiento.length + requiereCapacitacion.length;
+    if (totalCompletados) totalCompletados.textContent = completados.length;
+    if (totalPendientesBadge) totalPendientesBadge.textContent = pendientesOperaciones.length + gestorNotificado.length;
+    if (totalSeguimientoBadge) totalSeguimientoBadge.textContent = enSeguimiento.length + requiereCapacitacion.length;
+    if (totalCapacitacion) totalCapacitacion.textContent = capacitacionItems.length;
 
-                    html += `
-                        <div class="card" style="padding: 15px; border-left: 5px solid ${estadoColor};">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-                                <div style="flex: 1;">
+    // ======================================================
+    // SECCIÓN: PDA PENDIENTES
+    // ======================================================
+    const containerPendientes = document.getElementById('listaPendientes');
+    if (containerPendientes) {
+        const todosPendientes = [...pendientesOperaciones, ...gestorNotificado];
+        if (todosPendientes.length === 0) {
+            containerPendientes.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">✅ No hay PDA pendientes</div>';
+        } else {
+            let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+            for (const pda of todosPendientes) {
+                const estadoTexto = obtenerTextoEstadoPDA(pda.estado);
+                const estadoColor = obtenerColorEstadoPDA(pda.estado);
+                const avance = pda.totalAcciones > 0 ? Math.round((pda.accionesCompletadas / pda.totalAcciones) * 100) : 0;
+                
+                const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
+                const fechaInicio = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
+                const fechaFin = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
+
+                html += `
+                    <div class="card" style="padding: 15px; border-left: 5px solid ${estadoColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <strong style="font-size: 16px;">⚠️ ${escapeHtml(pda.agente)}</strong>
+                                    <span class="badge" style="background: ${estadoColor};">${estadoTexto}</span>
+                                    <span style="font-size: 11px; color: var(--muted);">ID: ${pda.id}</span>
+                                </div>
+                                <div style="font-size: 12px; color: var(--muted); margin-top: 5px;">
+                                    📅 Detección: ${fechaDeteccion} | Ciclo basal: ${fechaInicio} al ${fechaFin}
+                                </div>
+                                <div style="margin-top: 8px;">
                                     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                        <strong style="font-size: 16px;">⚠️ ${escapeHtml(pda.agente)}</strong>
-                                        <span class="badge" style="background: ${estadoColor};">${estadoTexto}</span>
-                                        <span style="font-size: 11px; color: var(--muted);">ID: ${pda.id}</span>
-                                    </div>
-                                    <div style="font-size: 12px; color: var(--muted); margin-top: 5px;">
-                                        📅 Detección: ${pda.fecha_deteccion || 'N/A'} | Ciclo basal: ${pda.fecha_inicio_ciclo_basal || 'N/A'} al ${pda.fecha_fin_ciclo_basal || 'N/A'}
-                                    </div>
-                                    <div style="margin-top: 8px;">
-                                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                            <span style="font-size: 12px;">📋 Progreso:</span>
-                                            <div style="flex: 1; max-width: 200px; background: #e9ecef; border-radius: 10px; height: 8px;">
-                                                <div style="width: ${avance}%; height: 100%; background: ${estadoColor}; border-radius: 10px;"></div>
-                                            </div>
-                                            <span style="font-size: 11px;">${pda.accionesCompletadas}/${pda.totalAcciones} acciones</span>
+                                        <span style="font-size: 12px;">📋 Progreso:</span>
+                                        <div style="flex: 1; max-width: 200px; background: #e9ecef; border-radius: 10px; height: 8px;">
+                                            <div style="width: ${avance}%; height: 100%; background: ${estadoColor}; border-radius: 10px;"></div>
                                         </div>
+                                        <span style="font-size: 11px;">${pda.accionesCompletadas}/${pda.totalAcciones} acciones</span>
                                     </div>
                                 </div>
-                                <div>
-                                    <button onclick="abrirGestionPDA(${pda.id})" 
-                                            style="background: var(--accent); padding: 8px 20px; font-size: 13px; border-radius: 8px; border: none; cursor: pointer;">
-                                        ${pda.estado === 'pendiente' ? '📋 Iniciar gestión' : (pda.estado === 'notificado' ? '✏️ Completar acciones' : '📝 Continuar')}
-                                    </button>
-                                </div>
+                                ${pda.gescot_reunion ? `<div style="font-size: 11px; color: var(--accent); margin-top: 4px;">🔑 GESCOT Reunión: ${escapeHtml(pda.gescot_reunion)}</div>` : ''}
+                                ${pda.gescot_capacitacion ? `<div style="font-size: 11px; color: var(--ok); margin-top: 4px;">🔑 GESCOT Capacitación: ${escapeHtml(pda.gescot_capacitacion)}</div>` : ''}
                             </div>
-                        </div>
-                    `;
-                }
-                html += '</div>';
-                containerPendientes.innerHTML = html;
-            }
-        }
-
-        // ======================================================
-        // SECCIÓN: PDA EN SEGUIMIENTO
-        // ======================================================
-        const containerSeguimiento = document.getElementById('listaSeguimiento');
-        if (containerSeguimiento) {
-            if (seguimiento.length === 0) {
-                containerSeguimiento.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay PDA en seguimiento de mejora</div>';
-            } else {
-                let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
-                for (const pda of seguimiento) {
-                    html += `
-                        <div class="card" style="padding: 15px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                                <div>
-                                    <strong>📊 ${escapeHtml(pda.agente)}</strong>
-                                    <div style="font-size: 12px; color: var(--muted); margin-top: 3px;">
-                                        📅 Ciclo basal: ${pda.fecha_inicio_ciclo_basal || 'N/A'} al ${pda.fecha_fin_ciclo_basal || 'N/A'}
-                                    </div>
-                                    <div style="font-size: 12px; color: var(--muted);">
-                                        📈 Promedio basal: ${pda.promedio_Basal || 'N/A'}% | Cuartil: ${pda.cuartil_Basal || 'Q4'}
-                                    </div>
-                                </div>
-                                <div>
-                                    <button onclick="verEvaluacionMejora(${pda.id})" 
-                                            style="background: #f39c12; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer;">
-                                        📈 Ver evaluación de mejora
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }
-                html += '</div>';
-                containerSeguimiento.innerHTML = html;
-            }
-        }
-
-        // ======================================================
-        // SECCIÓN: HISTORIAL (Completados)
-        // ======================================================
-        const containerHistorial = document.getElementById('listaHistorial');
-        if (containerHistorial) {
-            if (completados.length === 0) {
-                containerHistorial.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">No hay PDA en el historial</div>';
-            } else {
-                let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
-                for (const pda of completados) {
-                    const estadoTexto = pda.estado === 'completado' ? '✅ Completado exitoso' : '🚨 Escalado';
-                    const estadoColor = pda.estado === 'completado' ? 'var(--ok)' : 'var(--danger)';
-
-                    html += `
-                        <div class="card" style="padding: 12px;">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-                                <div>
-                                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                        <strong>${escapeHtml(pda.agente)}</strong>
-                                        <span class="badge" style="background: ${estadoColor};">${estadoTexto}</span>
-                                    </div>
-                                    <div style="font-size: 12px; color: var(--muted); margin-top: 5px;">
-                                        📅 Detección: ${pda.fecha_deteccion || 'N/A'} | 
-                                        📊 Cuartil basal: ${pda.cuartil_basal || 'Q4'} | 
-                                        📈 Promedio: ${pda.promedio_basal || 'N/A'}%
-                                    </div>
-                                    ${pda.fecha_fin_gestion ? `<div style="font-size: 11px; color: var(--ok); margin-top: 3px;">✅ Gestionado: ${pda.fecha_fin_gestion}</div>` : ''}
-                                </div>
-                                <button onclick="verDetallePDACompleto(${pda.id})" 
-                                        style="background: var(--accent); padding: 5px 12px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer;">
-                                    👁️ Ver detalle
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                ${pda.ruta_archivo ? `
+                                <button onclick="verReportePDA('${escapeHtml(pda.ruta_archivo)}')" 
+                                        style="background: #019DF4; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                                    📄 Ver Reporte
+                                </button>
+                                ` : ''}
+                                <button onclick="abrirGestionPDA(${pda.id})" 
+                                        style="background: var(--accent); padding: 8px 20px; font-size: 13px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                                    ${pda.estado === 'pendiente_operaciones' || pda.estado === 'pendiente' ? '📋 Iniciar gestión' : 
+                                      pda.estado === 'gestor_notificado' || pda.estado === 'notificado' ? '✏️ Completar acciones' : 
+                                      '📝 Continuar'}
+                                </button>
+                                <button onclick="verHistorialPDA(${pda.id})" 
+                                        style="background: #6c757d; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                                    📋 Historial
                                 </button>
                             </div>
                         </div>
-                    `;
-                }
-                html += '</div>';
-                containerHistorial.innerHTML = html;
+                    </div>
+                `;
             }
+            html += '</div>';
+            containerPendientes.innerHTML = html;
         }
     }
+
+    // ======================================================
+// SECCIÓN: PDA EN CAPACITACIÓN (CORREGIDA)
+// ======================================================
+const containerCapacitacion = document.getElementById('listaCapacitacion');
+if (containerCapacitacion) {
+    // 🔴 CLASIFICAR CORRECTAMENTE
+    const enviadoCapacitacion = (window.datosPDA || []).filter(p =>
+        p.estado === 'enviado_capacitacion'
+    );
+    
+    const enCapacitacion = (window.datosPDA || []).filter(p =>
+        p.estado === 'en_capacitacion' || p.estado === 'en_gestion'
+    );
+    
+    const capacitacionItems = [...enviadoCapacitacion, ...enCapacitacion];
+    
+    console.log(`📚 PDA en capacitación (renderizado): ${capacitacionItems.length}`);
+    if (capacitacionItems.length > 0) {
+        capacitacionItems.forEach(p => {
+            console.log(`   ID: ${p.id} | Agente: ${p.agente} | Estado: ${p.estado}`);
+        });
+    }
+    
+    // 🔴 ACTUALIZAR BADGE
+    const totalCapacitacion = document.getElementById('totalCapacitacion');
+    if (totalCapacitacion) {
+        totalCapacitacion.textContent = capacitacionItems.length;
+    }
+    
+    if (capacitacionItems.length === 0) {
+        containerCapacitacion.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📚 No hay PDA en proceso de capacitación</div>';
+    } else {
+        let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+        for (const pda of capacitacionItems) {
+            const estadoTexto = obtenerTextoEstadoPDA(pda.estado);
+            const estadoColor = obtenerColorEstadoPDA(pda.estado);
+            const fechaInicio = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
+            const fechaFin = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
+            const promedio = parseFloat(pda.promedio_basal || 0).toFixed(1);
+            
+            const accionesPDA = pda.acciones || [];
+            const completadas = accionesPDA.filter(a => a.completado).length;
+            const totalAcciones = accionesPDA.length;
+            const avance = totalAcciones > 0 ? Math.round((completadas / totalAcciones) * 100) : 0;
+            
+            // 🔴 MOSTRAR SUBTEXTO SEGÚN ESTADO
+            let subtexto = '';
+            let botonAccion = '';
+            
+            if (pda.estado === 'enviado_capacitacion') {
+                subtexto = '📤 Pendiente de iniciar capacitación';
+                botonAccion = `
+                    <button onclick="abrirGestionPDA(${pda.id})" 
+                            style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                        📚 Iniciar Capacitación
+                    </button>
+                `;
+            } else if (pda.estado === 'en_capacitacion' || pda.estado === 'en_gestion') {
+                subtexto = '🔄 Capacitación en curso';
+                botonAccion = `
+                    <button onclick="abrirGestionPDA(${pda.id})" 
+                            style="background: var(--warning); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                        📝 Continuar Capacitación
+                    </button>
+                `;
+            }
+            
+            html += `
+                <div class="card" style="padding: 15px; border-left: 5px solid ${estadoColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <strong style="font-size: 16px;">📚 ${escapeHtml(pda.agente)}</strong>
+                                <span class="badge" style="background: ${estadoColor};">${estadoTexto}</span>
+                                <span style="font-size: 11px; color: var(--muted);">ID: ${pda.id}</span>
+                                <span style="font-size: 11px; color: ${estadoColor};">${subtexto}</span>
+                            </div>
+                            <div style="font-size: 12px; color: var(--muted); margin-top: 5px;">
+                                📅 Ciclo basal: ${fechaInicio} al ${fechaFin}
+                            </div>
+                            <div style="font-size: 12px; color: var(--muted);">
+                                📈 Promedio basal: ${promedio}% | Cuartil: ${pda.cuartil_basal || 'Q4'}
+                            </div>
+                            <div style="margin-top: 8px;">
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <span style="font-size: 12px;">📋 Progreso capacitación:</span>
+                                    <div style="flex: 1; max-width: 200px; background: #e9ecef; border-radius: 10px; height: 8px;">
+                                        <div style="width: ${avance}%; height: 100%; background: ${estadoColor}; border-radius: 10px;"></div>
+                                    </div>
+                                    <span style="font-size: 11px;">${completadas}/${totalAcciones} acciones</span>
+                                </div>
+                            </div>
+                            ${pda.gescot_capacitacion ? `<div style="font-size: 11px; color: var(--ok); margin-top: 4px;">🔑 GESCOT Capacitación: ${escapeHtml(pda.gescot_capacitacion)}</div>` : ''}
+                            ${pda.fecha_envio_capacitacion ? `<div style="font-size: 11px; color: var(--muted); margin-top: 4px;">📤 Enviado: ${formatearFechaPeru(pda.fecha_envio_capacitacion)}</div>` : ''}
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            ${botonAccion}
+                            <button onclick="verHistorialPDA(${pda.id})" 
+                                    style="background: #6c757d; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                                📋 Historial
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        html += '</div>';
+        containerCapacitacion.innerHTML = html;
+    }
+}
+
+    // ======================================================
+    // SECCIÓN: PDA EN SEGUIMIENTO
+    // ======================================================
+    const containerSeguimiento = document.getElementById('listaSeguimiento');
+    if (containerSeguimiento) {
+        const seguimientoItems = [...enSeguimiento, ...requiereCapacitacion];
+        if (seguimientoItems.length === 0) {
+            containerSeguimiento.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay PDA en seguimiento</div>';
+        } else {
+            let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+            for (const pda of seguimientoItems) {
+                const estadoTexto = obtenerTextoEstadoPDA(pda.estado);
+                const estadoColor = obtenerColorEstadoPDA(pda.estado);
+                const fechaInicio = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
+                const fechaFin = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
+                const promedio = parseFloat(pda.promedio_basal || 0).toFixed(1);
+                const cuartil = pda.cuartil_basal || 'Q4';
+                
+                html += `
+                    <div class="card" style="padding: 15px; border-left: 5px solid ${estadoColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <strong>📊 ${escapeHtml(pda.agente)}</strong>
+                                    <span class="badge" style="background: ${estadoColor};">${estadoTexto}</span>
+                                </div>
+                                <div style="font-size: 12px; color: var(--muted); margin-top: 3px;">
+                                    📅 Ciclo basal: ${fechaInicio} al ${fechaFin}
+                                </div>
+                                <div style="font-size: 12px; color: var(--muted);">
+                                    📈 Promedio basal: ${promedio}% | Cuartil: ${cuartil}
+                                </div>
+                                ${pda.gescot_reunion ? `<div style="font-size: 11px; color: var(--accent); margin-top: 4px;">🔑 GESCOT Reunión: ${escapeHtml(pda.gescot_reunion)}</div>` : ''}
+                                ${pda.gescot_capacitacion ? `<div style="font-size: 11px; color: var(--ok); margin-top: 4px;">🔑 GESCOT Capacitación: ${escapeHtml(pda.gescot_capacitacion)}</div>` : ''}
+                            </div>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button onclick="verEvaluacionMejora(${pda.id})" 
+                                        style="background: #f39c12; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                                    📈 Ver evaluación de mejora
+                                </button>
+                                <button onclick="verHistorialPDA(${pda.id})" 
+                                        style="background: #6c757d; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                                    📋 Historial
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            html += '</div>';
+            containerSeguimiento.innerHTML = html;
+        }
+    }
+
+    // ======================================================
+    // SECCIÓN: HISTORIAL (Completados) - VERSIÓN TABLA CON MEJORA
+    // ======================================================
+    const containerHistorial = document.getElementById('listaHistorial');
+    if (containerHistorial) {
+        if (completados.length === 0) {
+            containerHistorial.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📭 No hay PDA en el historial</div>';
+        } else {
+            const historialOrdenado = [...completados].sort((a, b) => {
+                const fechaA = new Date(a.fecha_deteccion || a.created_at || 0);
+                const fechaB = new Date(b.fecha_deteccion || b.created_at || 0);
+                return fechaB - fechaA;
+            });
+            
+            let html = `
+                <div style="overflow-x: auto; margin-top: 10px; border: 1px solid #e0e0e0; border-radius: 12px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 950px;">
+                        <thead>
+                            <tr style="background: linear-gradient(135deg, #f8f9fa, #e9ecef); border-bottom: 2px solid #dee2e6;">
+                                <th style="padding: 12px 10px; text-align: left; white-space: nowrap;">#</th>
+                                <th style="padding: 12px 10px; text-align: left; white-space: nowrap;">👤 Agente</th>
+                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📊 Basal</th>
+                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📈 Seguimiento</th>
+                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📊 Mejora</th>
+                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📋 Cuartil Final</th>
+                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">✅ Acciones</th>
+                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📊 Resultado</th>
+                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📅 Cierre</th>
+                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📋</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            for (let i = 0; i < historialOrdenado.length; i++) {
+                const pda = historialOrdenado[i];
+                const rowBg = i % 2 === 0 ? '#ffffff' : '#f8f9fa';
+                
+                const accionesPDA = pda.acciones || [];
+                const completadas = accionesPDA.filter(a => a.completado).length;
+                const totalAcciones = accionesPDA.length;
+                
+                let promedioSeguimiento = null;
+                let mejora = null;
+                let mejoraPorcentaje = null;
+                let mejoraColor = '#6c757d';
+                let mejoraIcono = '➡️';
+                
+                const promedioBasal = parseFloat(pda.promedio_basal || 0);
+                
+                if (pda.promedio_seguimiento !== null && pda.promedio_seguimiento !== undefined) {
+                    promedioSeguimiento = parseFloat(pda.promedio_seguimiento);
+                }
+                
+                if (promedioSeguimiento !== null && promedioSeguimiento > 0 && promedioBasal > 0) {
+                    mejora = promedioSeguimiento - promedioBasal;
+                    mejoraPorcentaje = (mejora / promedioBasal) * 100;
+                    
+                    if (mejora > 0.5) {
+                        mejoraColor = '#28a745';
+                        mejoraIcono = '📈';
+                    } else if (mejora < -0.5) {
+                        mejoraColor = '#d93025';
+                        mejoraIcono = '📉';
+                    } else {
+                        mejoraColor = '#6c757d';
+                        mejoraIcono = '➡️';
+                    }
+                } else {
+                    if (pda.estado === 'completado') {
+                        mejoraColor = '#28a745';
+                        mejoraIcono = '✅';
+                    } else if (pda.estado === 'escalado') {
+                        mejoraColor = '#d93025';
+                        mejoraIcono = '❌';
+                    }
+                }
+                
+                let cuartilFinal = pda.cuartil_seguimiento || pda.cuartil_basal || 'Q4';
+                let cuartilColor = '#6c757d';
+                let cuartilIcono = '📊';
+                if (cuartilFinal === 'Q1') { cuartilColor = '#28a745'; cuartilIcono = '🏆'; }
+                else if (cuartilFinal === 'Q2') { cuartilColor = '#019DF4'; cuartilIcono = '📈'; }
+                else if (cuartilFinal === 'Q3') { cuartilColor = '#f39c12'; cuartilIcono = '⚠️'; }
+                else { cuartilColor = '#d93025'; cuartilIcono = '🔴'; }
+                
+                let estadoFinal = '';
+                let estadoColor = '';
+                if (pda.estado === 'completado') {
+                    estadoFinal = '✅ Exitoso';
+                    estadoColor = '#28a745';
+                } else if (pda.estado === 'escalado') {
+                    estadoFinal = '🚨 Escalado';
+                    estadoColor = '#d93025';
+                } else {
+                    estadoFinal = pda.estado || 'Desconocido';
+                    estadoColor = '#6c757d';
+                }
+                
+                let mejoraDisplay = '-';
+                if (mejora !== null) {
+                    const signo = mejora > 0 ? '+' : '';
+                    mejoraDisplay = `${signo}${mejora.toFixed(1)}%`;
+                    if (mejoraPorcentaje !== null) {
+                        mejoraDisplay += ` (${signo}${mejoraPorcentaje.toFixed(1)}%)`;
+                    }
+                } else if (pda.estado === 'completado' && promedioSeguimiento === null) {
+                    mejoraDisplay = '✅ Mejoró';
+                } else if (pda.estado === 'escalado' && promedioSeguimiento === null) {
+                    mejoraDisplay = '❌ Sin mejora';
+                }
+                
+                const fechaCierre = formatearFechaPeru(pda.updated_at || pda.created_at);
+                const promedioSegDisplay = (promedioSeguimiento !== null && promedioSeguimiento > 0) ? `${promedioSeguimiento.toFixed(1)}%` : 'N/A';
+                const gescotMostrar = pda.gescot_capacitacion || pda.gescot_reunion || '-';
+                
+                html += `
+                    <tr style="border-bottom: 1px solid #e0e0e0; background: ${rowBg};">
+                        <td style="padding: 10px 10px; text-align: center; font-weight: bold; color: #6c757d; white-space: nowrap;">${i + 1}</td>
+                        <td style="padding: 10px 10px; font-weight: 600; white-space: nowrap;">
+                            ${escapeHtml(pda.agente)}
+                            <div style="font-size: 10px; color: #6c757d;">Ciclo #${pda.ciclo_basal_numero || 'N/A'}</div>
+                            ${gescotMostrar !== '-' ? `<div style="font-size: 10px; color: #7b1fa2;">🔑 ${gescotMostrar}</div>` : ''}
+                        </td>
+                        <td style="padding: 10px 10px; text-align: center; font-weight: bold; color: #d93025; white-space: nowrap;">
+                            ${promedioBasal.toFixed(1)}%
+                        </td>
+                        <td style="padding: 10px 10px; text-align: center; font-weight: bold; color: ${promedioSeguimiento !== null && promedioSeguimiento > 0 ? (promedioSeguimiento >= 85 ? '#28a745' : '#d93025') : '#6c757d'}; white-space: nowrap;">
+                            ${promedioSegDisplay}
+                        </td>
+                        <td style="padding: 10px 10px; text-align: center; font-weight: bold; color: ${mejoraColor}; white-space: nowrap;">
+                            <span title="Mejora porcentual">${mejoraDisplay}</span>
+                        </td>
+                        <td style="padding: 10px 10px; text-align: center; white-space: nowrap;">
+                            <span style="background: ${cuartilColor}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; white-space: nowrap;">
+                                ${cuartilIcono} ${cuartilFinal}
+                            </span>
+                            ${pda.cuartil_seguimiento ? `<div style="font-size: 9px; color: #6c757d;">(seguimiento)</div>` : ''}
+                        </td>
+                        <td style="padding: 10px 10px; text-align: center; font-size: 13px; white-space: nowrap;">
+                            <span style="color: ${completadas === totalAcciones ? '#28a745' : '#f39c12'}; font-weight: bold;">
+                                ${completadas}/${totalAcciones}
+                            </span>
+                            ${totalAcciones > 0 ? `<div style="font-size: 10px; color: #6c757d;">${Math.round((completadas/totalAcciones)*100)}%</div>` : ''}
+                        </td>
+                        <td style="padding: 10px 10px; text-align: center; white-space: nowrap;">
+                            <span style="background: ${estadoColor}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap;">
+                                ${estadoFinal}
+                            </span>
+                        </td>
+                        <td style="padding: 10px 10px; text-align: center; font-size: 12px; white-space: nowrap;">
+                            ${fechaCierre}
+                        </td>
+                        <td style="padding: 10px 10px; text-align: center; white-space: nowrap;">
+                            <button onclick="verHistorialPDA(${pda.id})" 
+                                    style="background: #6c757d; padding: 6px 12px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white; white-space: nowrap;">
+                                📋
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            const totalCompletadosCount = historialOrdenado.filter(p => p.estado === 'completado').length;
+            const totalEscalados = historialOrdenado.filter(p => p.estado === 'escalado').length;
+            const totalAccionesCompletadas = historialOrdenado.reduce((sum, p) => {
+                const acc = p.acciones || [];
+                return sum + acc.filter(a => a.completado).length;
+            }, 0);
+            const totalAccionesTotales = historialOrdenado.reduce((sum, p) => {
+                const acc = p.acciones || [];
+                return sum + acc.length;
+            }, 0);
+            const porcentajeExitoso = historialOrdenado.length > 0 ? Math.round((totalCompletadosCount / historialOrdenado.length) * 100) : 0;
+            const porcentajeAcciones = totalAccionesTotales > 0 ? Math.round((totalAccionesCompletadas / totalAccionesTotales) * 100) : 0;
+            
+            html += `
+                        </tbody>
+                        <tfoot>
+                            <tr style="background: #f0f7ff; font-weight: bold; border-top: 2px solid #dee2e6;">
+                                <td colspan="10" style="padding: 12px 10px; text-align: center; font-size: 13px; color: #019DF4;">
+                                    📊 Total PDA: <strong>${historialOrdenado.length}</strong>
+                                    | ✅ Exitosos: <strong style="color: #28a745;">${totalCompletadosCount} (${porcentajeExitoso}%)</strong>
+                                    ${totalEscalados > 0 ? `| 🚨 Escalados: <strong style="color: #d93025;">${totalEscalados}</strong>` : ''}
+                                    | 📋 Acciones: <strong>${totalAccionesCompletadas}/${totalAccionesTotales}</strong> (${porcentajeAcciones}% completadas)
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div style="margin-top: 8px; font-size: 11px; color: #6c757d; text-align: right; display: flex; justify-content: space-between; flex-wrap: wrap;">
+                    <span>💡 ${historialOrdenado.length} registros | Mostrando todos los PDA del historial</span>
+                    <span>📌 La mejora se calcula comparando el promedio basal con el ciclo de seguimiento</span>
+                </div>
+            `;
+            
+            containerHistorial.innerHTML = html;
+        }
+    }
+}
     // ===== FIN FUNCIÓN: actualizarListasPDA ================================
     
+async function verEvaluacionMejora(pdaId) {
+    console.log(`📈 Ver evaluación de mejora para PDA ID: ${pdaId}`);
+    
+    try {
+        const db = getDB();
+        if (!db) {
+            alert('❌ Base de datos no disponible');
+            return;
+        }
+        
+        // ======================================================
+        // 1. OBTENER DATOS DEL PDA
+        // ======================================================
+        const { data: pda, error: pdaError } = await db
+            .from('pda_cabecera')
+            .select('*')
+            .eq('id', pdaId)
+            .single();
+        
+        if (pdaError) throw pdaError;
+        if (!pda) {
+            alert('❌ PDA no encontrado');
+            return;
+        }
+        
+        // ======================================================
+        // 2. OBTENER CICLO BASAL
+        // ======================================================
+        const { data: cicloBasal, error: cicloError } = await db
+            .from('pda_ciclos_evaluacion')
+            .select('*')
+            .eq('pda_origen_id', pdaId)
+            .eq('tipo_ciclo', 'basal')
+            .maybeSingle();
+        
+        if (cicloError) throw cicloError;
+        
+        // ======================================================
+        // 3. OBTENER ACCIONES
+        // ======================================================
+        const { data: acciones, error: accError } = await db
+            .from('pda_acciones')
+            .select('*')
+            .eq('pda_id', pdaId);
+        
+        if (accError) throw accError;
+        
+        // ======================================================
+        // 4. DECLARAR TODAS LAS VARIABLES
+        // ======================================================
+        let esPostCapacitacion = pda.estado === 'en_seguimiento_capacitacion';
+        let fechaBasal = null;
+        let fechaBasalNormalizada = null;
+        let mesBasal = null;
+        let anioBasal = null;
+        let evaluacionesMismoMes = [];
+        let evaluacionesCount = 0;
+        let nuevoCiclo = [];
+        let promedioCalculado = 0;
+        let promedioSeguimiento = 0;
+        let cicloSeguimiento = [];
+        
+        // ======================================================
+        // 5. FUNCIÓN AUXILIAR: Normalizar fecha para comparación
+        // ======================================================
+        function normalizarFechaParaComparacion(fechaStr) {
+            if (!fechaStr) return null;
+            
+            try {
+                if (fechaStr instanceof Date) {
+                    const anio = fechaStr.getFullYear();
+                    const mes = String(fechaStr.getMonth() + 1).padStart(2, '0');
+                    const dia = String(fechaStr.getDate()).padStart(2, '0');
+                    return `${anio}${mes}${dia}`;
+                }
+                
+                if (typeof fechaStr === 'string') {
+                    let dia, mes, anio;
+                    
+                    // Formato ISO con T: 2026-04-29T16:19
+                    if (fechaStr.includes('T')) {
+                        const fechaLimpia = fechaStr.split('T')[0];
+                        const partes = fechaLimpia.split('-');
+                        if (partes.length === 3) {
+                            anio = partes[0];
+                            mes = partes[1];
+                            dia = partes[2];
+                            return `${anio}${mes}${dia}`;
+                        }
+                    }
+                    
+                    // Formato DD/MM/YYYY
+                    if (fechaStr.includes('/')) {
+                        const partes = fechaStr.split('/');
+                        if (partes.length === 3) {
+                            dia = partes[0].padStart(2, '0');
+                            mes = partes[1].padStart(2, '0');
+                            anio = partes[2];
+                            return `${anio}${mes}${dia}`;
+                        }
+                    }
+                    
+                    // Formato YYYY-MM-DD
+                    if (fechaStr.includes('-') && !fechaStr.includes('T')) {
+                        const partes = fechaStr.split('-');
+                        if (partes.length === 3) {
+                            anio = partes[0];
+                            mes = partes[1];
+                            dia = partes[2];
+                            return `${anio}${mes}${dia}`;
+                        }
+                    }
+                }
+                
+                return null;
+            } catch(e) {
+                console.warn('Error normalizando fecha:', fechaStr, e);
+                return null;
+            }
+        }
+        
+        // ======================================================
+        // 6. VALIDACIÓN: ¿Hay un NUEVO ciclo completo de 5 evaluaciones en el MISMO MES?
+        // ======================================================
+        
+        // 6a. Obtener el mes, año y fecha límite del ciclo basal
+        if (pda.fecha_fin_ciclo_basal) {
+            try {
+                const fechaBasalStr = normalizarFechaParaComparacion(pda.fecha_fin_ciclo_basal);
+                if (fechaBasalStr) {
+                    anioBasal = parseInt(fechaBasalStr.substring(0, 4));
+                    mesBasal = parseInt(fechaBasalStr.substring(4, 6));
+                    
+                    const fecha = new Date(pda.fecha_fin_ciclo_basal);
+                    fecha.setDate(fecha.getDate() + 1);
+                    fechaBasalNormalizada = normalizarFechaParaComparacion(fecha);
+                    fechaBasal = fecha;
+                    
+                    console.log(`📅 Mes basal: ${mesBasal}/${anioBasal}`);
+                    console.log(`📅 Fecha límite: ${fechaBasalNormalizada}`);
+                }
+            } catch(e) {
+                console.warn('Error parseando fecha:', e);
+            }
+        }
+        
+        // 6b. Si no hay fecha basal, usar fecha_notificacion_gestor como fallback
+        if (!fechaBasalNormalizada && pda.fecha_notificacion_gestor) {
+            try {
+                const fecha = new Date(pda.fecha_notificacion_gestor);
+                fecha.setDate(fecha.getDate() + 1);
+                fechaBasalNormalizada = normalizarFechaParaComparacion(fecha);
+                fechaBasal = fecha;
+                console.log('📅 Fecha límite (fallback - notificación):', fechaBasalNormalizada);
+            } catch(e) {
+                console.warn('Error parseando fecha de notificación:', e);
+            }
+        }
+        
+        // 6c. Si no hay fecha, mostrar error
+        if (!fechaBasalNormalizada) {
+            alert('❌ No se pudo determinar la fecha del ciclo basal para evaluar la mejora.');
+            return;
+        }
+        
+        // 6d. Obtener todas las evaluaciones del agente
+        const { data: todasEvaluaciones, error: evalError } = await db
+            .from('evaluaciones')
+            .select('*')
+            .eq('agente', pda.agente);
+        
+        if (evalError) throw evalError;
+        
+        // 6e. Filtrar evaluaciones del mismo mes y posteriores
+        evaluacionesMismoMes = (todasEvaluaciones || []).filter(e => {
+            if (!e.fecha) return false;
+            
+            try {
+                const fechaEvalNormalizada = normalizarFechaParaComparacion(e.fecha);
+                if (!fechaEvalNormalizada) return false;
+                
+                const anioEval = parseInt(fechaEvalNormalizada.substring(0, 4));
+                const mesEval = parseInt(fechaEvalNormalizada.substring(4, 6));
+                
+                const mismoMes = (mesEval === mesBasal && anioEval === anioBasal);
+                const esPosterior = fechaEvalNormalizada >= fechaBasalNormalizada;
+                
+                return mismoMes && esPosterior;
+            } catch(err) {
+                return false;
+            }
+        });
+        
+        evaluacionesCount = evaluacionesMismoMes.length;
+        
+        console.log(`📊 Evaluaciones en el mismo mes (${mesBasal}/${anioBasal}): ${evaluacionesCount}`);
+        
+        // 6f. Si hay menos de 5, mostrar mensaje
+        if (evaluacionesCount < 5) {
+            const mensaje = `📊 EVALUACIÓN DE MEJORA - PDA #${pda.id}\n\n` +
+                `📌 Agente: ${pda.agente}\n` +
+                `📊 Estado: ${esPostCapacitacion ? 'En Seguimiento Post-Capacitación' : 'En Seguimiento'}\n\n` +
+                `⏳ Evaluaciones en el mismo mes (${mesBasal}/${anioBasal}): ${evaluacionesCount} de 5 necesarias\n` +
+                `📊 Para evaluar la mejora, el agente debe completar 5 evaluaciones en el MISMO MES\n\n` +
+                `📈 Promedio basal: ${pda.promedio_basal || 0}%\n` +
+                `📅 Mes basal: ${mesBasal}/${anioBasal}\n` +
+                `📅 Fecha límite: ${fechaBasalNormalizada}\n\n` +
+                `📌 El agente debe completar ${5 - evaluacionesCount} evaluación(es) más\n` +
+                `   en el mismo mes para evaluar la mejora.\n\n` +
+                `📌 Si el agente cae en Q4 en otro mes, se generará un NUEVO PDA independiente.`;
+            
+            alert(mensaje);
+            return;
+        }
+        
+        // 6g. Ordenar evaluaciones por fecha (ascendente)
+        evaluacionesMismoMes.sort((a, b) => {
+            const fechaA = normalizarFechaParaComparacion(a.fecha);
+            const fechaB = normalizarFechaParaComparacion(b.fecha);
+            return (fechaA || '').localeCompare(fechaB || '');
+        });
+        
+        // 6h. Tomar las últimas 5 evaluaciones del mismo mes
+        nuevoCiclo = evaluacionesMismoMes.slice(-5);
+        
+        console.log(`📊 Nuevo ciclo (mismo mes):`);
+        nuevoCiclo.forEach(e => {
+            console.log(`   📅 ${e.fecha} | Nota: ${e.nota_final || e.notaFinal || 0}%`);
+        });
+        
+        // 6i. Calcular promedio del nuevo ciclo
+        const sumaNuevoCiclo = nuevoCiclo.reduce((acc, e) => {
+            const nota = parseFloat(e.nota_final || e.notaFinal || 0);
+            return acc + (isNaN(nota) ? 0 : nota);
+        }, 0);
+        promedioCalculado = sumaNuevoCiclo / nuevoCiclo.length;
+        
+        console.log(`📈 Promedio nuevo ciclo: ${promedioCalculado.toFixed(1)}%`);
+        
+        // 6j. Asignar a las variables para la sección 7
+        promedioSeguimiento = promedioCalculado;
+        cicloSeguimiento = nuevoCiclo;
+        
+        // ======================================================
+        // 7. CALCULAR PROMEDIOS (usando el nuevo ciclo)
+        // ======================================================
+        const toNumber = (val) => {
+            const num = parseFloat(val);
+            return isNaN(num) ? 0 : num;
+        };
+        
+        const promedioBasal = toNumber(pda.promedio_basal);
+        const cuartilBasal = pda.cuartil_basal || 'Q4';
+        
+        // 7a. Calcular promedios basales por frente
+        let basalENC = 0, basalECUF = 0, basalECN = 0;
+        let countENC = 0, countECUF = 0, countECN = 0;
+        
+        // Usar las evaluaciones del ciclo basal (primeras 5 del mismo mes)
+        const evaluacionesBasal = evaluacionesMismoMes.slice(0, 5);
+        
+        console.log(`📊 Evaluaciones del ciclo basal para promedios: ${evaluacionesBasal.length}`);
+        
+        for (const ev of evaluacionesBasal) {
+            const totalENC = toNumber(ev.total_enc || ev.totalENC || 0);
+            const totalECUF = toNumber(ev.total_ecuf || ev.totalECUF || 0);
+            const totalECN = toNumber(ev.total_ecn || ev.totalECN || 0);
+            
+            console.log(`   Procesando: ${ev.fecha} → ENC: ${totalENC}, ECUF: ${totalECUF}, ECN: ${totalECN}`);
+            
+            if (totalENC > 0) {
+                basalENC += totalENC;
+                countENC++;
+            }
+            if (totalECUF > 0) {
+                basalECUF += totalECUF;
+                countECUF++;
+            }
+            if (totalECN > 0) {
+                basalECN += totalECN;
+                countECN++;
+            }
+        }
+        
+        if (countENC > 0) {
+            basalENC = basalENC / countENC;
+            basalECUF = basalECUF / countECUF;
+            basalECN = basalECN / countECN;
+        } else {
+            // Fallback: usar valores basados en el promedio basal
+            const pct = promedioBasal / 100;
+            basalENC = 30 * pct;
+            basalECUF = 30 * pct;
+            basalECN = 40 * pct;
+            console.warn('⚠️ Usando valores fallback para promedios basales');
+        }
+        
+        console.log(`📊 Promedios Basales calculados: ENC=${basalENC.toFixed(1)}%, ECUF=${basalECUF.toFixed(1)}%, ECN=${basalECN.toFixed(1)}%`);
+        
+        // 7b. Calcular promedios del nuevo ciclo por frente
+        let sumENC = 0, sumECUF = 0, sumECN = 0;
+        let countENCNuevo = 0, countECUFNuevo = 0, countECNNuevo = 0;
+        
+        for (const ev of nuevoCiclo) {
+            const totalENC = toNumber(ev.total_enc || ev.totalENC || 0);
+            const totalECUF = toNumber(ev.total_ecuf || ev.totalECUF || 0);
+            const totalECN = toNumber(ev.total_ecn || ev.totalECN || 0);
+            
+            if (totalENC > 0) {
+                sumENC += totalENC;
+                countENCNuevo++;
+            }
+            if (totalECUF > 0) {
+                sumECUF += totalECUF;
+                countECUFNuevo++;
+            }
+            if (totalECN > 0) {
+                sumECN += totalECN;
+                countECNNuevo++;
+            }
+        }
+        
+        const promedioENC = countENCNuevo > 0 ? (sumENC / countENCNuevo) : 0;
+        const promedioECUF = countECUFNuevo > 0 ? (sumECUF / countECUFNuevo) : 0;
+        const promedioECN = countECNNuevo > 0 ? (sumECN / countECNNuevo) : 0;
+        
+        // Mejora por frente
+        const mejoraENC = promedioENC - basalENC;
+        const mejoraECUF = promedioECUF - basalECUF;
+        const mejoraECN = promedioECN - basalECN;
+        
+        console.log(`📊 Promedios Nuevo Ciclo: ENC=${promedioENC.toFixed(1)}%, ECUF=${promedioECUF.toFixed(1)}%, ECN=${promedioECN.toFixed(1)}%`);
+        console.log(`📊 Mejora: ENC=${mejoraENC.toFixed(1)}%, ECUF=${mejoraECUF.toFixed(1)}%, ECN=${mejoraECN.toFixed(1)}%`);
+        
+        // ======================================================
+        // 8. OBTENER CUARTIL DE SEGUIMIENTO
+        // ======================================================
+        const criterios = await obtenerCriteriosCuartiles(false);
+        let cuartilSeguimiento = 'Q4';
+        let cuartilSeguimientoNombre = 'Riesgo';
+        let cuartilSeguimientoColor = '#d93025';
+        let cuartilSeguimientoIcono = '🔴';
+        
+        if (criterios && criterios.length > 0) {
+            for (const c of criterios) {
+                if (promedioSeguimiento >= c.limite_inferior && promedioSeguimiento <= c.limite_superior) {
+                    cuartilSeguimiento = c.cuartil;
+                    cuartilSeguimientoNombre = c.nombre || cuartilSeguimiento;
+                    cuartilSeguimientoColor = c.color_hex || '#6c757d';
+                    cuartilSeguimientoIcono = c.icono || '📊';
+                    break;
+                }
+            }
+        }
+        
+        // ======================================================
+        // 9. EVALUAR MEJORA
+        // ======================================================
+        const mejoraTotal = promedioSeguimiento - promedioBasal;
+        const salioDeQ4 = cuartilSeguimiento !== 'Q4';
+        
+        // ======================================================
+        // 10. CLASIFICAR RESULTADO
+        // ======================================================
+        let resultado = {
+            tipo: '',
+            mensaje: '',
+            color: '',
+            icono: '',
+            accion: ''
+        };
+        
+        if (salioDeQ4) {
+            resultado.tipo = 'exitoso';
+            resultado.mensaje = '✅ El gestor logró salir de Q4 exitosamente.';
+            resultado.color = '#28a745';
+            resultado.icono = '🏆';
+            resultado.accion = 'Cerrar PDA automáticamente';
+        } else {
+            if (esPostCapacitacion) {
+                resultado.tipo = 'reiterativo';
+                resultado.mensaje = '🔴 El gestor persiste en Q4 después de capacitación. Caso reiterativo.';
+                resultado.color = '#d93025';
+                resultado.icono = '🔄';
+                resultado.accion = 'Marcar como Reiterativo';
+            } else {
+                resultado.tipo = 'requiere_capacitacion';
+                resultado.mensaje = '📋 El gestor sigue en Q4. Requiere capacitación formal.';
+                resultado.color = '#f39c12';
+                resultado.icono = '📋';
+                resultado.accion = 'Enviar a Capacitación';
+            }
+        }
+        
+        // ======================================================
+        // 11. GENERAR HTML DEL MODAL
+        // ======================================================
+        const modalHTML = `
+            <div id="modalEvaluacionMejora" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100060; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                <div style="background: white; border-radius: 16px; width: 95%; max-width: 750px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                    
+                    <!-- HEADER -->
+                    <div style="padding: 18px 24px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                        <div>
+                            <strong style="font-size: 18px;">📈 Evaluación de Mejora</strong>
+                            <div style="font-size: 13px; opacity: 0.9; margin-top: 2px;">
+                                PDA #${pda.id} - ${escapeHtml(pda.agente)}
+                            </div>
+                        </div>
+                        <button onclick="cerrarModalEvaluacionMejora()" style="background: rgba(255,255,255,0.15); border: none; color: white; font-size: 22px; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">✖</button>
+                    </div>
+                    
+                    <!-- BODY -->
+                    <div style="padding: 24px; overflow-y: auto; flex: 1; background: #f8fafc;">
+                        
+                        <!-- 1. COMPARATIVA DE PROMEDIOS -->
+                        <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e0e0;">
+                            <h4 style="margin: 0 0 15px 0; color: #333;">📊 Comparativa de Desempeño</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                <div style="background: #fff5f5; padding: 15px; border-radius: 10px; border-left: 4px solid #d93025;">
+                                    <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px;">Ciclo Basal (Q4)</div>
+                                    <div style="font-size: 28px; font-weight: bold; color: #d93025; margin: 8px 0;">${promedioBasal.toFixed(1)}%</div>
+                                    <div style="font-size: 13px; color: #6c757d;">Cuartil: ${cuartilBasal}</div>
+                                    <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">
+                                        📅 ${formatearFechaPeru(cicloBasal?.fecha_inicio)} → ${formatearFechaPeru(cicloBasal?.fecha_fin)}
+                                    </div>
+                                    <div style="font-size: 12px; color: #6c757d;">📞 ${cicloBasal?.total_evaluaciones || 0} evaluaciones</div>
+                                    <div style="font-size: 11px; color: #6c757d; margin-top: 4px;">📌 Mes: ${mesBasal}/${anioBasal}</div>
+                                </div>
+                                <div style="background: ${salioDeQ4 ? '#f0fff4' : '#fff8f0'}; padding: 15px; border-radius: 10px; border-left: 4px solid ${salioDeQ4 ? '#28a745' : '#f39c12'};">
+                                    <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px;">Nuevo Ciclo (Mismo Mes)</div>
+                                    <div style="font-size: 28px; font-weight: bold; color: ${salioDeQ4 ? '#28a745' : '#f39c12'}; margin: 8px 0;">${promedioSeguimiento.toFixed(1)}%</div>
+                                    <div style="font-size: 13px; color: #6c757d;">Cuartil: ${cuartilSeguimiento}</div>
+                                    <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">
+                                        📅 ${nuevoCiclo.length > 0 ? formatearFechaPeru(nuevoCiclo[0]?.fecha) : 'N/A'}
+                                    </div>
+                                    <div style="font-size: 12px; color: #6c757d;">📞 ${nuevoCiclo.length} evaluaciones</div>
+                                    ${esPostCapacitacion ? `<div style="font-size: 11px; color: #7b1fa2; margin-top: 4px;">📌 Evaluación POST-CAPACITACIÓN</div>` : ''}
+                                    <div style="font-size: 11px; color: #6c757d; margin-top: 4px;">📌 Mismo mes: ${mesBasal}/${anioBasal}</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Barra de progreso de mejora -->
+                            <div style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                    <span style="font-size: 13px; font-weight: 600;">📈 Evolución</span>
+                                    <span style="font-size: 14px; font-weight: bold; color: ${mejoraTotal > 0 ? '#28a745' : '#d93025'};">
+                                        ${mejoraTotal > 0 ? '+' : ''}${mejoraTotal.toFixed(1)}%
+                                    </span>
+                                </div>
+                                <div style="background: #e9ecef; border-radius: 10px; height: 8px; overflow: hidden;">
+                                    <div style="width: ${Math.min(Math.max((promedioSeguimiento / 100) * 100, 0), 100)}%; height: 100%; background: ${salioDeQ4 ? 'linear-gradient(90deg, #28a745, #20c997)' : 'linear-gradient(90deg, #f39c12, #e67e22)'}; border-radius: 10px; transition: width 0.5s;"></div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #6c757d; margin-top: 4px;">
+                                    <span>0%</span>
+                                    <span>💡 ${salioDeQ4 ? '✅ Salió de Q4' : '⚠️ Persiste en Q4'}</span>
+                                    <span>100%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 2. DESGLOSE POR FRENTE -->
+                        <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e0e0;">
+                            <h4 style="margin: 0 0 15px 0; color: #333;">📋 Desglose por Frente de Impacto</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                                <div style="text-align: center; padding: 12px; background: #f0f7ff; border-radius: 10px;">
+                                    <div style="font-size: 20px;">🎯</div>
+                                    <div style="font-size: 12px; color: #6c757d;">ENC (Cliente)</div>
+                                    <div style="font-size: 18px; font-weight: bold; color: ${mejoraENC > 0 ? '#28a745' : '#d93025'};">
+                                        ${promedioENC.toFixed(1)}%
+                                    </div>
+                                    <div style="font-size: 11px; color: ${mejoraENC > 0 ? '#28a745' : '#d93025'};">
+                                        ${mejoraENC > 0 ? '▲' : '▼'} ${Math.abs(mejoraENC).toFixed(1)}%
+                                    </div>
+                                    <div style="font-size: 10px; color: #6c757d;">Basal: ${basalENC.toFixed(1)}%</div>
+                                </div>
+                                <div style="text-align: center; padding: 12px; background: #f3e5f5; border-radius: 10px;">
+                                    <div style="font-size: 20px;">⚠️</div>
+                                    <div style="font-size: 12px; color: #6c757d;">ECUF (Negocio)</div>
+                                    <div style="font-size: 18px; font-weight: bold; color: ${mejoraECUF > 0 ? '#28a745' : '#d93025'};">
+                                        ${promedioECUF.toFixed(1)}%
+                                    </div>
+                                    <div style="font-size: 11px; color: ${mejoraECUF > 0 ? '#28a745' : '#d93025'};">
+                                        ${mejoraECUF > 0 ? '▲' : '▼'} ${Math.abs(mejoraECUF).toFixed(1)}%
+                                    </div>
+                                    <div style="font-size: 10px; color: #6c757d;">Basal: ${basalECUF.toFixed(1)}%</div>
+                                </div>
+                                <div style="text-align: center; padding: 12px; background: #fff8e0; border-radius: 10px;">
+                                    <div style="font-size: 20px;">💰</div>
+                                    <div style="font-size: 12px; color: #6c757d;">ECN (Proceso)</div>
+                                    <div style="font-size: 18px; font-weight: bold; color: ${mejoraECN > 0 ? '#28a745' : '#d93025'};">
+                                        ${promedioECN.toFixed(1)}%
+                                    </div>
+                                    <div style="font-size: 11px; color: ${mejoraECN > 0 ? '#28a745' : '#d93025'};">
+                                        ${mejoraECN > 0 ? '▲' : '▼'} ${Math.abs(mejoraECN).toFixed(1)}%
+                                    </div>
+                                    <div style="font-size: 10px; color: #6c757d;">Basal: ${basalECN.toFixed(1)}%</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 3. ACCIONES PENDIENTES AGRUPADAS -->
+                        <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e0e0;">
+                            <h4 style="margin: 0 0 15px 0; color: #333;">📋 Acciones Pendientes por Completar</h4>
+                            ${acciones && acciones.length > 0 ? (() => {
+                                const pendientes = acciones.filter(a => !a.completado);
+                                
+                                if (pendientes.length === 0) {
+                                    return '<div style="color: #28a745; font-size: 14px;">✅ Todas las acciones han sido completadas.</div>';
+                                }
+                                
+                                // Agrupar por submotivo
+                                const agrupado = {};
+                                pendientes.forEach(a => {
+                                    const key = a.submotivo || 'Sin submotivo';
+                                    if (!agrupado[key]) {
+                                        agrupado[key] = {
+                                            submotivo: key,
+                                            tipo: a.tipo_accion || 'proceso',
+                                            count: 0,
+                                            atributo: a.atributo || ''
+                                        };
+                                    }
+                                    agrupado[key].count++;
+                                });
+                                
+                                const ordenTipo = { 'proceso': 0, 'habilidades': 1, 'feedback': 2 };
+                                const agrupadoArray = Object.values(agrupado).sort((a, b) => {
+                                    if (ordenTipo[a.tipo] !== ordenTipo[b.tipo]) {
+                                        return ordenTipo[a.tipo] - ordenTipo[b.tipo];
+                                    }
+                                    return b.count - a.count;
+                                });
+                                
+                                const getIcono = (tipo) => {
+                                    if (tipo === 'proceso') return '📚';
+                                    if (tipo === 'habilidades') return '🎯';
+                                    if (tipo === 'feedback') return '💬';
+                                    return '📌';
+                                };
+                                
+                                const getTipoNombre = (tipo) => {
+                                    if (tipo === 'proceso') return 'Procesos (ECN)';
+                                    if (tipo === 'habilidades') return 'Habilidades Blandas (ENC)';
+                                    if (tipo === 'feedback') return 'Feedback (ECUF)';
+                                    return 'Otros';
+                                };
+                                
+                                const getTipoColor = (tipo) => {
+                                    if (tipo === 'proceso') return '#fd7e14';
+                                    if (tipo === 'habilidades') return '#7b1fa2';
+                                    if (tipo === 'feedback') return '#019DF4';
+                                    return '#6c757d';
+                                };
+                                
+                                let html = '';
+                                let currentTipo = '';
+                                
+                                agrupadoArray.forEach(item => {
+                                    const tipo = item.tipo;
+                                    
+                                    if (tipo !== currentTipo) {
+                                        if (currentTipo !== '') {
+                                            html += '</div>';
+                                        }
+                                        currentTipo = tipo;
+                                        const tipoNombre = getTipoNombre(tipo);
+                                        const tipoColor = getTipoColor(tipo);
+                                        const icono = getIcono(tipo);
+                                        html += `
+                                            <div style="margin-top: 12px; border-left: 4px solid ${tipoColor}; padding-left: 12px;">
+                                                <div style="font-weight: 600; color: ${tipoColor}; margin-bottom: 8px; font-size: 14px;">
+                                                    ${icono} ${tipoNombre}
+                                                </div>
+                                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        `;
+                                    }
+                                    
+                                    const icono = getIcono(tipo);
+                                    const count = item.count;
+                                    const countLabel = count > 1 ? `(${count} ocurrencias)` : '';
+                                    
+                                    html += `
+                                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; background: #f8f9fa; border-radius: 6px;">
+                                            <span style="font-size: 13px;">
+                                                ${icono} ${escapeHtml(item.submotivo)}
+                                            </span>
+                                            <span style="font-size: 11px; color: #f39c12; font-weight: 500;">
+                                                ${countLabel}
+                                            </span>
+                                        </div>
+                                    `;
+                                });
+                                
+                                if (currentTipo !== '') {
+                                    html += '</div></div>';
+                                }
+                                
+                                const totalPendientes = pendientes.length;
+                                const submotivosUnicos = agrupadoArray.length;
+                                
+                                html += `
+                                    <div style="margin-top: 15px; padding: 10px; background: #fff8e0; border-radius: 8px; font-size: 12px; color: #6c757d;">
+                                        📊 Resumen: <strong>${submotivosUnicos}</strong> submotivos únicos pendientes (${totalPendientes} ocurrencias totales)
+                                        <span style="margin-left: 15px;">💡 Los submotivos se agrupan por tipo y frecuencia.</span>
+                                    </div>
+                                `;
+                                
+                                return html;
+                            })() : '<div style="color: #6c757d; font-size: 13px;">No hay acciones registradas</div>'}
+                        </div>
+                        
+                        <!-- 4. TRAZABILIDAD GESCOT -->
+                        <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e0e0;">
+                            <h4 style="margin: 0 0 15px 0; color: #333;">🔑 Trazabilidad GESCOT</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div style="padding: 8px 12px; background: #f8f9fa; border-radius: 8px;">
+                                    <div style="font-size: 11px; color: #6c757d;">📨 Reunión 1:1</div>
+                                    <div style="font-size: 13px; font-weight: bold; color: #7b1fa2;">${pda.gescot_reunion || 'No registrado'}</div>
+                                    <div style="font-size: 11px; color: #6c757d;">${formatearFechaPeru(pda.fecha_notificacion_gestor)}</div>
+                                </div>
+                                <div style="padding: 8px 12px; background: #f8f9fa; border-radius: 8px;">
+                                    <div style="font-size: 11px; color: #6c757d;">📚 Capacitación</div>
+                                    <div style="font-size: 13px; font-weight: bold; color: #7b1fa2;">${pda.gescot_capacitacion || 'No registrado'}</div>
+                                    <div style="font-size: 11px; color: #6c757d;">${formatearFechaPeru(pda.fecha_capacitacion)}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 5. RESULTADO Y ACCIÓN -->
+                        <div style="background: ${resultado.color}15; border-radius: 12px; padding: 20px; border: 2px solid ${resultado.color};">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <span style="font-size: 32px;">${resultado.icono}</span>
+                                <div>
+                                    <div style="font-size: 18px; font-weight: bold; color: ${resultado.color};">${resultado.tipo.toUpperCase()}</div>
+                                    <div style="font-size: 14px; color: #333; margin-top: 4px;">${resultado.mensaje}</div>
+                                    <div style="font-size: 13px; color: #6c757d; margin-top: 4px;">
+                                        📌 Próximo paso: <strong>${resultado.accion}</strong>
+                                    </div>
+                                    ${esPostCapacitacion ? `<div style="font-size: 11px; color: #7b1fa2; margin-top: 4px;">🔵 Esta evaluación corresponde al CICLO POST-CAPACITACIÓN</div>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+                    
+                    <!-- FOOTER -->
+                    <div style="padding: 16px 24px; background: white; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
+                        ${resultado.tipo === 'exitoso' ? `
+                            <button onclick="cerrarPDAExitoso(${pda.id})" style="padding: 10px 24px; background: #28a745; border: none; border-radius: 10px; cursor: pointer; color: white; font-size: 14px; font-weight: 600;">
+                                🏆 Cerrar PDA (Mejora Exitosa)
+                            </button>
+                        ` : resultado.tipo === 'requiere_capacitacion' ? `
+                            <button onclick="enviarACapacitacion(${pda.id})" style="padding: 10px 24px; background: #f39c12; border: none; border-radius: 10px; cursor: pointer; color: white; font-size: 14px; font-weight: 600;">
+                                📤 Enviar a Capacitación
+                            </button>
+                        ` : resultado.tipo === 'reiterativo' ? `
+                            <button onclick="marcarComoReiterativo(${pda.id})" style="padding: 10px 24px; background: #d93025; border: none; border-radius: 10px; cursor: pointer; color: white; font-size: 14px; font-weight: 600;">
+                                🔄 Marcar como Reiterativo
+                            </button>
+                        ` : ''}
+                        <button onclick="cerrarModalEvaluacionMejora()" style="padding: 10px 24px; background: #6c757d; border: none; border-radius: 10px; cursor: pointer; color: white; font-size: 14px; font-weight: 500;">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const existing = document.getElementById('modalEvaluacionMejora');
+        if (existing) existing.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+    } catch (error) {
+        console.error('❌ Error en verEvaluacionMejora:', error);
+        alert('❌ Error al cargar la evaluación de mejora: ' + error.message);
+    }
+}
+
+// ======================================================
+// FUNCIONES AUXILIARES PARA EL MODAL
+// ======================================================
+
+function cerrarModalEvaluacionMejora() {
+    const modal = document.getElementById('modalEvaluacionMejora');
+    if (modal) modal.remove();
+}
+
+async function cerrarPDAExitoso(pdaId) {
+    // 🔴 SOLICITAR NOMBRE DE QUIÉN CIERRA
+    const nombreCierre = prompt('Ingrese su nombre completo para registrar el cierre del PDA:');
+    if (!nombreCierre || nombreCierre.trim() === '') {
+        alert('⚠️ Debe ingresar su nombre para cerrar el PDA');
+        return;
+    }
+    
+    if (!confirm(`🏆 ¿Cerrar este PDA como EXITOSO?\n\n👤 Cerrado por: ${nombreCierre.trim()}\n\nEl gestor logró salir de Q4. Esta acción no se puede deshacer.`)) {
+        return;
+    }
+    
+    try {
+        const db = getDB();
+        if (!db) {
+            alert('❌ Base de datos no disponible');
+            return;
+        }
+        
+        const { data: pda, error: pdaError } = await db
+            .from('pda_cabecera')
+            .select('*')
+            .eq('id', pdaId)
+            .single();
+        
+        if (pdaError) throw pdaError;
+        if (!pda) {
+            alert('❌ PDA no encontrado');
+            return;
+        }
+        
+        // Buscar o calcular el cuartil de seguimiento
+        let cuartilSeguimiento = null;
+        let promedioSeguimiento = null;
+        let cicloSeguimientoNumero = null;
+        
+        const { data: ciclosSeguimiento, error: cicloError } = await db
+            .from('pda_ciclos_evaluacion')
+            .select('*')
+            .eq('agente', pda.agente)
+            .eq('tipo_ciclo', 'seguimiento')
+            .order('id', { ascending: false })
+            .limit(1);
+        
+        if (ciclosSeguimiento && ciclosSeguimiento.length > 0) {
+            const ciclo = ciclosSeguimiento[0];
+            cuartilSeguimiento = ciclo.cuartil;
+            promedioSeguimiento = ciclo.promedio_nota;
+            cicloSeguimientoNumero = ciclo.ciclo_numero || ciclo.id;
+        } else {
+            let fechaLimite = null;
+            if (pda.fecha_fin_ciclo_basal) {
+                try {
+                    const fecha = new Date(pda.fecha_fin_ciclo_basal);
+                    fecha.setDate(fecha.getDate() + 1);
+                    fechaLimite = fecha.toISOString().split('T')[0];
+                } catch(e) {
+                    console.warn('Error parseando fecha:', e);
+                }
+            }
+            
+            let query = db
+                .from('evaluaciones')
+                .select('*')
+                .eq('agente', pda.agente)
+                .order('fecha', { ascending: false })
+                .limit(5);
+            
+            if (fechaLimite) {
+                query = query.gt('fecha', fechaLimite);
+            }
+            
+            const { data: evaluaciones, error: evalError } = await query;
+            
+            if (!evalError && evaluaciones && evaluaciones.length > 0) {
+                const toNumber = (val) => {
+                    const num = parseFloat(val);
+                    return isNaN(num) ? 0 : num;
+                };
+                const suma = evaluaciones.reduce((acc, e) => acc + toNumber(e.nota_final || e.notaFinal || 0), 0);
+                promedioSeguimiento = suma / evaluaciones.length;
+                
+                const criterios = await obtenerCriteriosCuartiles(false);
+                if (criterios && criterios.length > 0) {
+                    for (const c of criterios) {
+                        if (promedioSeguimiento >= c.limite_inferior && promedioSeguimiento <= c.limite_superior) {
+                            cuartilSeguimiento = c.cuartil;
+                            break;
+                        }
+                    }
+                }
+                if (!cuartilSeguimiento) cuartilSeguimiento = 'Q4';
+                cicloSeguimientoNumero = 1;
+            }
+        }
+        
+        const persona = nombreCierre.trim();
+        
+        // 🔴 ACTUALIZAR: SOLO columnas que existen en la tabla
+        const updateData = {
+            estado: 'completado',
+            updated_at: new Date().toISOString()
+        };
+        
+        if (cuartilSeguimiento) updateData.cuartil_seguimiento = cuartilSeguimiento;
+        if (promedioSeguimiento !== null && promedioSeguimiento > 0) updateData.promedio_seguimiento = promedioSeguimiento;
+        if (cicloSeguimientoNumero) updateData.ciclo_seguimiento_numero = cicloSeguimientoNumero;
+        
+        const { error } = await db
+            .from('pda_cabecera')
+            .update(updateData)
+            .eq('id', pdaId);
+        
+        if (error) throw error;
+        
+        // 🔴 REGISTRAR EVENTO CON LA PERSONA QUE CIERRA (esto se guarda en historial_estados JSONB)
+        await registrarEventoPDA(pdaId, 'cerrado_exitoso', {
+            cuartil_seguimiento: cuartilSeguimiento,
+            promedio_seguimiento: promedioSeguimiento,
+            cerrado_por: persona
+        }, persona);
+        
+        alert(`✅ PDA cerrado exitosamente.\n\n👤 Cerrado por: ${persona}\n📊 Cuartil de seguimiento: ${cuartilSeguimiento || 'N/A'}`);
+        
+        cerrarModalEvaluacionMejora();
+        await cargarDatosPDA();
+        
+    } catch (error) {
+        console.error('Error en cerrarPDAExitoso:', error);
+        alert('❌ Error al cerrar PDA: ' + error.message);
+    }
+}
+    // ======================================================
+    // FUNCIONES AUXILIARES PARA EL MODAL
+    // ======================================================
+
+    function cerrarModalEvaluacionMejora() {
+        const modal = document.getElementById('modalEvaluacionMejora');
+        if (modal) modal.remove();
+    }
+   
+
+// ======================================================
+// REGISTRAR EVENTO EN EL HISTORIAL DEL PDA
+// ======================================================
+async function registrarEventoPDA(pdaId, evento, detalle = {}, persona = null) {
+    try {
+        const db = getDB();
+        if (!db) {
+            console.warn('⚠️ Base de datos no disponible para registrar evento');
+            return;
+        }
+        
+        // 🔴 PRIORIDAD: 1. persona pasada explícitamente, 2. usuarioActual, 3. 'Sistema'
+        let usuario = 'Sistema';
+        let usuarioId = null;
+        
+        // Si se pasó una persona específica, usarla
+        if (persona && typeof persona === 'string' && persona.trim() !== '') {
+            usuario = persona.trim();
+        } 
+        // Si no, intentar obtener del usuario actual
+        else if (window.usuarioActual) {
+            usuario = window.usuarioActual?.nombre_completo || 
+                      window.usuarioActual?.usuario || 
+                      'Sistema';
+            usuarioId = window.usuarioActual?.id || null;
+        }
+        
+        // Obtener historial actual
+        const { data: pda, error } = await db
+            .from('pda_cabecera')
+            .select('historial_estados')
+            .eq('id', pdaId)
+            .single();
+        
+        if (error) {
+            console.warn('⚠️ Error obteniendo historial:', error.message);
+            return;
+        }
+        
+        let historial = [];
+        
+        if (pda.historial_estados) {
+            try {
+                if (typeof pda.historial_estados === 'string') {
+                    historial = JSON.parse(pda.historial_estados);
+                } else if (Array.isArray(pda.historial_estados)) {
+                    historial = pda.historial_estados;
+                } else if (typeof pda.historial_estados === 'object') {
+                    historial = Object.values(pda.historial_estados);
+                }
+            } catch(e) {
+                historial = [];
+            }
+        }
+        
+        if (!Array.isArray(historial)) {
+            historial = [];
+        }
+        
+        // Crear nuevo evento
+        const ahora = new Date();
+        const nuevoEvento = {
+            fecha: ahora.toISOString(),
+            fecha_display: ahora.toLocaleString('es-ES'),
+            usuario: usuario,  // ← Ahora usa la persona real
+            usuario_id: usuarioId,
+            evento: String(evento || 'desconocido'),
+            detalle: {}
+        };
+        
+        // Limpiar detalle
+        if (detalle && typeof detalle === 'object') {
+            for (const [key, value] of Object.entries(detalle)) {
+                if (value !== undefined && value !== null) {
+                    nuevoEvento.detalle[key] = typeof value === 'string' ? String(value) : value;
+                }
+            }
+        }
+        
+        historial.push(nuevoEvento);
+        
+        if (historial.length > 50) {
+            historial = historial.slice(-50);
+        }
+        
+        const { error: updateError } = await db
+            .from('pda_cabecera')
+            .update({
+                historial_estados: JSON.stringify(historial),
+                updated_at: ahora.toISOString()
+            })
+            .eq('id', pdaId);
+        
+        if (updateError) {
+            console.warn('⚠️ Error guardando historial:', updateError.message);
+            return;
+        }
+        
+        console.log(`📝 [EVENTO] PDA #${pdaId}: ${evento} - ${usuario}`);
+        
+    } catch (error) {
+        console.warn('⚠️ Error registrando evento:', error.message);
+    }
+}
     // ===== 3. INICIO FUNCIÓN: obtenerTextoEstadoPDA ======================
     function obtenerTextoEstadoPDA(estado) {
         const estados = {
+            // Estados existentes (mantener por compatibilidad)
             'pendiente': '⏳ Pendiente',
             'notificado': '📨 Notificado',
             'en_gestion': '✏️ En gestión',
             'en_seguimiento': '📊 En seguimiento',
             'listo_para_seguimiento': '✅ Listo para seguimiento',
             'completado': '✅ Completado',
-            'escalado': '🚨 Escalado'
+            'escalado': '🚨 Escalado',
+            
+            // 🔴 NUEVOS ESTADOS
+            'pendiente_operaciones': '⏳ Pendiente - Operaciones',
+            'gestor_notificado': '📨 Gestor Notificado',
+            'feedback_registrado': '💬 Feedback Registrado',
+            'enviado_capacitacion': '📤 Enviado a Capacitación',
+            'en_capacitacion': '📚 En Capacitación',
+            'en_seguimiento_capacitacion': '📊 Seguimiento Post-Capacitación',
+            'requiere_capacitacion': '📋 Requiere Capacitación',
+            'reiterativo': '🔄 Reiterativo'
         };
         return estados[estado] || estado || '📋 Desconocido';
     }
@@ -16054,13 +18026,24 @@ async function cargarMesesParaSelectorQ4() {
     // ===== 4. INICIO FUNCIÓN: obtenerColorEstadoPDA ======================
     function obtenerColorEstadoPDA(estado) {
         const colores = {
+            // Estados existentes
             'pendiente': 'var(--warning)',
             'notificado': 'var(--accent)',
             'en_gestion': '#7b1fa2',
             'en_seguimiento': '#f39c12',
             'listo_para_seguimiento': '#28a745',
             'completado': 'var(--ok)',
-            'escalado': 'var(--danger)'
+            'escalado': 'var(--danger)',
+            
+            // 🔴 NUEVOS ESTADOS
+            'pendiente_operaciones': '#f39c12',      // Naranja
+            'gestor_notificado': '#019DF4',          // Azul
+            'feedback_registrado': '#7b1fa2',        // Morado
+            'enviado_capacitacion': '#7b1fa2',       // Morado
+            'en_capacitacion': '#fd7e14',            // Naranja
+            'en_seguimiento_capacitacion': '#019DF4',// Azul
+            'requiere_capacitacion': '#fd7e14',      // Naranja
+            'reiterativo': '#d93025'                 // Rojo
         };
         return colores[estado] || 'var(--muted)';
     }
@@ -16155,12 +18138,86 @@ async function cargarMesesParaSelectorQ4() {
     }
     // ===== FIN FUNCIÓN: obtenerInfoPDA =====================================
     
+    function renderizarModalPendiente(pda) {
+        const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
+        const promedioBasal = pda.promedio_basal || 'Pendiente';
+        const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
+        const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
+        const totalAcciones = pda.acciones?.length || 0;
+
+        return `
+            <div class="modal-gestion-content">
+                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #f39c12, #e67e22);">
+                    <strong>📋 Notificar al Gestor - ${escapeHtml(pda.agente)}</strong>
+                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                </div>
+                <div class="modal-gestion-body">
+                    <div style="background: #fff8e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f39c12;">
+                        <strong>📌 PASO 1 DE 2:</strong> Registrar la reunión 1:1 con el gestor para notificarle su desempeño en Q4.
+                        <br><small style="color: var(--muted);">Luego de este paso, deberá registrar el feedback con código GESCOT.</small>
+                    </div>
+
+                    <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div><strong>👤 Gestor:</strong></div>
+                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
+                            <div><strong>📅 Fecha detección:</strong></div>
+                            <div>${fechaDeteccion}</div>
+                            <div><strong>📊 Ciclo basal:</strong></div>
+                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
+                            <div><strong>📊 Cuartil basal:</strong></div>
+                            <div>Q4</div>
+                            <div><strong>📈 Promedio ciclo basal:</strong></div>
+                            <div>${promedioBasal}%</div>
+                            <div><strong>📋 Acciones requeridas:</strong></div>
+                            <div>${totalAcciones}</div>
+                        </div>
+                    </div>
+                    
+                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <h4>📝 Registrar Notificación</h4>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">📅 Fecha de Notificación *</label>
+                            <input type="date" id="fechaNotificacion" value="${new Date().toISOString().split('T')[0]}" required 
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                        </div>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">👤 Supervisor que notificó *</label>
+                            <input type="text" id="supervisorNotifico" value="${window.usuarioActual?.nombre_completo || ''}" required 
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                        </div>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">📝 Observaciones (opcional)</label>
+                            <textarea id="observacionesNotificacion" rows="2" 
+                                    placeholder="Comentarios sobre la reunión con el gestor..."
+                                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line);"></textarea>
+                        </div>
+                        
+                        <div style="margin-top: 15px; background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #019DF4;">
+                            💡 <strong>Nota:</strong> Al marcar como notificado, el PDA pasará a estado <strong>"Notificado"</strong>.
+                            Luego deberá registrar el feedback con código GESCOT.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-gestion-footer">
+                    <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cancelar</button>
+                    <button onclick="marcarComoNotificado(${pda.id})" 
+                            style="background: var(--accent); padding: 10px 20px;">
+                        📨 Marcar como Notificado
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
     // ===== 6. INICIO FUNCIÓN: abrirGestionPDA ============================
     async function abrirGestionPDA(pdaId) {
         console.log(`📋 Abriendo gestión de PDA ID: ${pdaId}`);
 
         try {
-            // 🔴 CAMBIO: Usar API en lugar de PostgreSQL directo
             const pdaCompleto = await API.getPDADetalle(pdaId);
             
             if (!pdaCompleto) {
@@ -16171,6 +18228,7 @@ async function cargarMesesParaSelectorQ4() {
             let modalHTML = '';
 
             switch (pdaCompleto.estado) {
+                // 🔴 ESTADOS EXISTENTES (con funcionalidades actualizadas)
                 case 'pendiente':
                     modalHTML = renderizarModalPendiente(pdaCompleto);
                     break;
@@ -16183,11 +18241,24 @@ async function cargarMesesParaSelectorQ4() {
                 case 'en_seguimiento':
                     modalHTML = renderizarModalEnSeguimiento(pdaCompleto);
                     break;
+                
+                // 🔴 NUEVOS ESTADOS (para el flujo extendido)
+                case 'requiere_capacitacion':
+                    modalHTML = renderizarModalRequiereCapacitacion(pdaCompleto);
+                    break;
+                case 'reiterativo':
+                    modalHTML = renderizarModalReiterativo(pdaCompleto);
+                    break;
+                case 'completado':
+                case 'escalado':
+                    modalHTML = renderizarModalDetallePDA(pdaCompleto);
+                    break;
+                
                 default:
                     modalHTML = renderizarModalEnGestion(pdaCompleto);
             }
 
-            // Crear y mostrar modal
+            // Crear y mostrar modal (el resto se mantiene igual)
             const modalExistente = document.getElementById('modalGestionPDA');
             if (modalExistente) modalExistente.remove();
 
@@ -16212,24 +18283,42 @@ async function cargarMesesParaSelectorQ4() {
     }
     // ===== FIN FUNCIÓN: abrirGestionPDA ====================================
     
+    
     // ===== 7. INICIO FUNCIÓN: renderizarModalPendiente ===================
-    function renderizarModalPendiente(pda) {
-        // 🔴 USAR LOS NOMBRES CORRECTOS (snake_case)
-        const fechaDeteccion = pda.fecha_deteccion || 'Fecha no disponible';
+    
+    // ===== FIN FUNCIÓN: renderizarModalPendiente ===========================
+
+    
+    function renderizarModalFeedback(pda) {
+        const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
         const promedioBasal = pda.promedio_basal || 'Pendiente';
-        const fechaInicioCiclo = pda.fecha_inicio_ciclo_basal || 'No disponible';
-        const fechaFinCiclo = pda.fecha_fin_ciclo_basal || 'No disponible';
+        const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
+        const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
         const totalAcciones = pda.acciones?.length || 0;
+        const fechaNotificacion = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : 'No registrada';
+        const notificadoPor = pda.notificado_por || 'No registrado';
 
         return `
             <div class="modal-gestion-content">
-                <div class="modal-gestion-header">
-                    <strong>📋 Notificar PDA - ${escapeHtml(pda.agente)}</strong>
-                    <button onclick="cerrarModalGestionPDA()">✖</button>
+                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #7b1fa2, #9c27b0);">
+                    <strong>💬 Registrar Feedback - ${escapeHtml(pda.agente)}</strong>
+                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
                 </div>
                 <div class="modal-gestion-body">
+                    <div style="background: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #28a745;">
+                        <strong>✅ Gestor notificado el:</strong> ${fechaNotificacion}
+                        <br><strong>👤 Notificado por:</strong> ${notificadoPor}
+                    </div>
+
+                    <div style="background: #fff8e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f39c12;">
+                        <strong>📌 PASO 2 DE 2:</strong> Registrar el feedback proporcionado al gestor con código GESCOT.
+                        <br><small style="color: var(--muted);">El código GESCOT es obligatorio para la trazabilidad.</small>
+                    </div>
+
                     <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div><strong>👤 Gestor:</strong></div>
+                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
                             <div><strong>📅 Fecha detección:</strong></div>
                             <div>${fechaDeteccion}</div>
                             <div><strong>📊 Ciclo basal:</strong></div>
@@ -16243,194 +18332,708 @@ async function cargarMesesParaSelectorQ4() {
                         </div>
                     </div>
                     
-                    <div style="margin-top: 20px;">
-                        <label>📨 Fecha de notificación al gestor *</label>
-                        <input type="date" id="fechaNotificacion" value="${new Date().toISOString().split('T')[0]}" required style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <h4>📝 Registrar Feedback (GESCOT)</h4>
                         
-                        <label style="margin-top: 15px;">👤 Supervisor que notifica *</label>
-                        <input type="text" id="supervisorNotifico" value="${window.usuarioActual?.nombre_completo || ''}" required style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">🔑 Código GESCOT *</label>
+                            <input type="text" id="gescotFeedback" 
+                                placeholder="Ej: GESCOT-2026-07-1234"
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                            <small style="color: var(--danger);">⚠️ Obligatorio para registrar el feedback</small>
+                        </div>
                         
-                        <div class="warning-box" style="margin-top: 15px; background: #fff3e0; padding: 12px; border-radius: 8px;">
-                            ⚠️ Al marcar como notificado, el gestor quedará informado y se iniciará el plazo para la gestión.
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">📅 Fecha del Feedback *</label>
+                            <input type="date" id="fechaFeedback" value="${new Date().toISOString().split('T')[0]}" required 
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                        </div>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">👤 Supervisor que realizó el feedback *</label>
+                            <input type="text" id="supervisorFeedback" 
+                                value="${window.usuarioActual?.nombre_completo || ''}" required 
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                        </div>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">📝 Observaciones del Feedback (opcional)</label>
+                            <textarea id="observacionesFeedback" rows="3" 
+                                    placeholder="Detalles del feedback proporcionado al gestor..."
+                                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line);"></textarea>
+                        </div>
+                        
+                        <div style="margin-top: 15px; background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #019DF4;">
+                            💡 <strong>Nota:</strong> Al registrar el feedback con GESCOT, el PDA pasará automáticamente a 
+                            <strong>estado "En Seguimiento"</strong> y el sistema evaluará la mejora en el próximo ciclo.
                         </div>
                     </div>
                 </div>
                 <div class="modal-gestion-footer">
                     <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cancelar</button>
-                    <button onclick="marcarComoNotificado(${pda.id})" style="background: var(--accent); padding: 10px 20px;">
-                        📨 Marcar como notificado
+                    <button onclick="registrarFeedbackYEnviarSeguimiento(${pda.id})" 
+                            style="background: var(--ok); padding: 10px 20px;">
+                        💾 Registrar Feedback y Enviar a Seguimiento
                     </button>
                 </div>
             </div>
         `;
     }
-    // ===== FIN FUNCIÓN: renderizarModalPendiente ===========================
 
-    // ===== 8. INICIO FUNCIÓN: renderizarModalNotificado ==================
-    function renderizarModalNotificado(pda) {
-        // Filtrar acciones pendientes por tipo
-        const accionesPendientes = pda.acciones.filter(a => !a.completado);
+    async function registrarFeedbackYEnviarSeguimiento(pdaId) {
+    const gescot = document.getElementById('gescotFeedback').value.trim();
+    const fecha = document.getElementById('fechaFeedback').value;
+    const supervisor = document.getElementById('supervisorFeedback').value.trim();
+    const observaciones = document.getElementById('observacionesFeedback').value.trim();
+    
+    if (!gescot) {
+        alert('⚠️ El código GESCOT es obligatorio para registrar el feedback');
+        document.getElementById('gescotFeedback').focus();
+        return;
+    }
+    
+    if (!fecha || !supervisor) {
+        alert('⚠️ Complete todos los campos obligatorios');
+        return;
+    }
+    
+    try {
+        const db = getDB();
+        if (!db) {
+            alert('❌ Base de datos no disponible');
+            return;
+        }
+        
+        const { error } = await db
+            .from('pda_cabecera')
+            .update({
+                estado: 'en_seguimiento',
+                gescot_reunion: gescot,
+                fecha_feedback: fecha,
+                feedback_por: supervisor,
+                observaciones_feedback: observaciones,
+                fecha_inicio_seguimiento: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', pdaId);
+        
+        if (error) throw error;
+        
+        // 🔴 REGISTRAR EVENTO CON EL SUPERVISOR
+        await registrarEventoPDA(pdaId, 'feedback_registrado', {
+            gescot: gescot,
+            fecha_feedback: fecha,
+            supervisor: supervisor,
+            observaciones: observaciones
+        }, supervisor);  // ← PASAR EL SUPERVISOR COMO PERSONA
+        
+        alert(`✅ Feedback registrado correctamente\n\n🔑 GESCOT: ${gescot}\n👤 Supervisor: ${supervisor}`);
+        
+        cerrarModalGestionPDA();
+        await cargarDatosPDA();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al registrar feedback: ' + error.message);
+    }
+}
 
-        // Agrupar acciones pendientes por tipo y submotivo
-        const accionesPorTipo = {
-            feedback: { items: [], submotivosSet: new Set() },
-            proceso: { items: [], submotivosSet: new Set() },
-            habilidades: { items: [], submotivosSet: new Set() }
-        };
+    
 
-        accionesPendientes.forEach(accion => {
-            const tipo = accion.tipo_accion;
-            if (accionesPorTipo[tipo]) {
-                accionesPorTipo[tipo].items.push(accion);
-                accionesPorTipo[tipo].submotivosSet.add(accion.submotivo);
+    async function registrarCapacitacionYEnviarSeguimiento(pdaId) {
+        const gescot = document.getElementById('gescotCapacitacion').value.trim();
+        const fecha = document.getElementById('fechaCapacitacion').value;
+        const capacitador = document.getElementById('capacitador').value.trim();
+        const observaciones = document.getElementById('observacionesCapacitacion').value.trim();
+        
+        // 🔴 VALIDAR GESCOT - OBLIGATORIO
+        if (!gescot) {
+            alert('⚠️ El código GESCOT es obligatorio para registrar la capacitación');
+            document.getElementById('gescotCapacitacion').focus();
+            return;
+        }
+        
+        if (!fecha || !capacitador) {
+            alert('⚠️ Complete todos los campos obligatorios');
+            return;
+        }
+        
+        // Obtener items seleccionados
+        const itemsSeleccionados = document.querySelectorAll('.item-capacitacion:checked');
+        if (itemsSeleccionados.length === 0) {
+            alert('⚠️ Seleccione al menos un item a capacitar');
+            return;
+        }
+        
+        try {
+            const db = getDB();
+            if (!db) {
+                alert('❌ Base de datos no disponible');
+                return;
             }
-        });
-
-        // Generar HTML para cada tipo
-        const generarHTMLPorTipo = (tipoKey, config, accionesData) => {
-            if (accionesData.items.length === 0) return '';
-
-            const tieneItems = accionesData.submotivosSet.size > 0;
-            const gruposDelTipo = config.grupos;
-
-            // Filtrar solo grupos que tienen submotivos pendientes
-            const gruposConPendientes = {};
-            for (const [grupoNombre, grupoData] of Object.entries(gruposDelTipo)) {
-                const submotivosPendientes = grupoData.submotivos.filter(sub => accionesData.submotivosSet.has(sub));
-                if (submotivosPendientes.length > 0) {
-                    gruposConPendientes[grupoNombre] = {
-                        ...grupoData,
-                        submotivosPendientes: submotivosPendientes
-                    };
-                }
+            
+            const itemIds = Array.from(itemsSeleccionados).map(cb => parseInt(cb.dataset.id));
+            
+            // 1. Marcar items como completados
+            for (const id of itemIds) {
+                const { error } = await db
+                    .from('pda_acciones')
+                    .update({
+                        completado: true,
+                        codigo_gescot: gescot,
+                        fecha_completado: fecha,
+                        completado_por: capacitador,
+                        observaciones: observaciones,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', id);
+                
+                if (error) throw error;
             }
+            
+            // 2. Actualizar PDA cabecera a 'en_seguimiento_capacitacion'
+            const { error } = await db
+                .from('pda_cabecera')
+                .update({
+                    estado: 'en_seguimiento_capacitacion',
+                    gescot_capacitacion: gescot,
+                    fecha_capacitacion: fecha,
+                    capacitador: capacitador,
+                    observaciones_capacitacion: observaciones,
+                    fecha_inicio_seguimiento_capacitacion: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', pdaId);
+            
+            if (error) throw error;
+            
+            // 3. Registrar en historial
+            await registrarHistorialPDA(pdaId, 'en_capacitacion', 'en_seguimiento_capacitacion',
+                `Capacitación registrada - GESCOT: ${gescot} - ${itemsSeleccionados.length} items`);
+            
+            alert(`✅ Capacitación registrada correctamente\n\n🔑 GESCOT: ${gescot}\n📅 Fecha: ${fecha}\n📊 Items: ${itemsSeleccionados.length}\n📊 Estado: Seguimiento Post-Capacitación`);
+            
+            cerrarModalGestionPDA();
+            await cargarDatosPDA();
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al registrar capacitación: ' + error.message);
+        }
+    }
 
-            if (Object.keys(gruposConPendientes).length === 0) return '';
-
-            const requiereCodigo = config.requiereCodigo;
-            const inputCodigoId = `codigo_${tipoKey}`;
-            const checkboxesGrupoId = `checkboxes_${tipoKey}`;
-
-            let gruposHTML = '';
-            for (const [grupoNombre, grupoData] of Object.entries(gruposConPendientes)) {
-                gruposHTML += `
-                    <div style="margin-bottom: 15px; padding-left: 15px; border-left: 2px solid #e0e0e0;">
-                        <div style="font-weight: 600; margin-bottom: 8px; color: #555;">📁 ${escapeHtml(grupoNombre)}</div>
-                        <div style="display: flex; flex-direction: column; gap: 6px; margin-left: 10px;">
-                            ${grupoData.submotivosPendientes.map(sub => `
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                    <input type="checkbox" 
-                                        class="check-submotivo-${tipoKey}" 
-                                        data-grupo="${escapeHtml(grupoNombre)}"
-                                        data-submotivo="${escapeHtml(sub)}"
-                                        value="${escapeHtml(sub)}"
-                                        style="width: 16px; height: 16px; cursor: pointer;">
-                                    <span style="font-size: 13px;">❌ ${escapeHtml(sub)}</span>
-                                </label>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            // Botón seleccionar todos
-            const selectAllId = `selectAll_${tipoKey}`;
-
-            return `
-                <div class="card" style="margin-bottom: 20px; padding: 15px; border-left: 4px solid ${tipoKey === 'feedback' ? '#f39c12' : (tipoKey === 'proceso' ? '#7b1fa2' : '#fd7e14')};">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
-                        <div>
-                            <strong style="font-size: 15px;">${config.nombre}</strong>
-                            <span class="badge" style="background: ${tipoKey === 'feedback' ? '#f39c12' : (tipoKey === 'proceso' ? '#7b1fa2' : '#fd7e14')}; margin-left: 10px;">
-                                ${accionesData.items.length} acción(es)
-                            </span>
-                        </div>
-                        ${requiereCodigo ? `
-                            <button type="button" class="btn-select-all" data-tipo="${tipoKey}" 
-                                    style="background: #e9ecef; color: #555; padding: 4px 12px; font-size: 11px; border-radius: 20px; border: none; cursor: pointer;">
-                                ☑️ Seleccionar todos
-                            </button>
-                        ` : ''}
-                    </div>
-                    
-                    ${requiereCodigo ? `
-                        <div style="margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 8px;">
-                            <label style="font-size: 12px; font-weight: 600; margin-bottom: 4px; display: block;">🔑 Código GESCOT *</label>
-                            <input type="text" id="${inputCodigoId}" 
-                                placeholder="Ej: GESCOT-2024-00123"
-                                style="width: 100%; padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid var(--line);">
-                            <small style="color: var(--danger); display: none;" id="${inputCodigoId}-error">⚠️ Este campo es obligatorio</small>
-                        </div>
-                    ` : `
-                        <div style="margin-bottom: 15px;">
-                            <label style="font-size: 12px; font-weight: 600; margin-bottom: 4px; display: block;">📝 Observaciones / Feedback</label>
-                            <textarea id="observaciones_${tipoKey}" rows="2" 
-                                    placeholder="Describa el feedback proporcionado al gestor..."
-                                    style="width: 100%; padding: 8px 10px; font-size: 13px; border-radius: 6px; border: 1px solid var(--line);"></textarea>
-                        </div>
-                    `}
-                    
-                    <div id="${checkboxesGrupoId}">
-                        ${gruposHTML}
-                    </div>
-                </div>
-            `;
-        };
-
-        // Construir HTML completo
-        const fechaHoy = new Date().toISOString().split('T')[0];
-        const supervisorActual = window.usuarioActual?.nombre_completo || window.usuarioActual?.usuario || '';
+    function renderizarModalRequiereCapacitacion(pda) {
+        const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
+        const promedioBasal = pda.promedio_basal || 'Pendiente';
+        const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
+        const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
+        const fechaNotificacion = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : 'No registrada';
+        const notificadoPor = pda.notificado_por || 'No registrado';
+        const gescotReunion = pda.gescot_reunion || 'No registrado';
+        
+        // Contar acciones pendientes
+        const accionesPendientes = (pda.acciones || []).filter(a => !a.completado);
+        const totalPendientes = accionesPendientes.length;
 
         return `
-            <div class="modal-gestion-content" style="max-width: 950px;">
-                <div class="modal-gestion-header">
-                    <strong>✏️ Gestionar PDA - ${escapeHtml(pda.agente)}</strong>
-                    <button onclick="cerrarModalGestionPDA()" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer;">✖</button>
+            <div class="modal-gestion-content">
+                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #fd7e14, #e67e22);">
+                    <strong>📋 Requiere Capacitación - ${escapeHtml(pda.agente)}</strong>
+                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
                 </div>
                 <div class="modal-gestion-body">
-                    <!-- Información general -->
+                    <div style="background: #fff3e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #fd7e14;">
+                        <strong>📌 EVALUACIÓN DE MEJORA:</strong> El gestor NO logró salir de Q4 en el ciclo de seguimiento.
+                        <br><small style="color: var(--muted);">Requiere capacitación formal antes de un nuevo intento.</small>
+                    </div>
+
                     <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div><strong>📅 Fecha detección:</strong> ${pda.fechaDeteccion || 'N/A'}</div>
-                            <div><strong>📊 Cuartil basal:</strong> ${pda.cuartilBasal || 'Q4'}</div>
-                            <div><strong>📈 Promedio basal:</strong> ${pda.promedioBasal || 'N/A'}%</div>
-                            <div><strong>📅 Ciclo basal:</strong> ${pda.fechaInicioCicloBasal || 'N/A'} → ${pda.fechaFinCicloBasal || 'N/A'}</div>
+                            <div><strong>👤 Gestor:</strong></div>
+                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
+                            <div><strong>📅 Fecha detección:</strong></div>
+                            <div>${fechaDeteccion}</div>
+                            <div><strong>📊 Ciclo basal:</strong></div>
+                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
+                            <div><strong>📊 Cuartil basal:</strong></div>
+                            <div>Q4</div>
+                            <div><strong>📈 Promedio basal:</strong></div>
+                            <div>${promedioBasal}%</div>
+                            <div><strong>📅 Notificado:</strong></div>
+                            <div>${fechaNotificacion}</div>
+                            <div><strong>👤 Notificado por:</strong></div>
+                            <div>${notificadoPor}</div>
+                            <div><strong>🔑 GESCOT Reunión:</strong></div>
+                            <div><strong style="color: #7b1fa2;">${gescotReunion}</strong></div>
+                            <div><strong>📋 Acciones pendientes:</strong></div>
+                            <div><strong style="color: #d93025;">${totalPendientes}</strong></div>
                         </div>
                     </div>
                     
-                    <!-- Datos de gestión -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-                        <div>
-                            <label style="font-size: 12px; font-weight: 600;">✏️ Fecha de inicio de gestión *</label>
-                            <input type="date" id="fechaInicioGestion" value="${fechaHoy}" required 
-                                style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line);">
-                        </div>
-                        <div>
-                            <label style="font-size: 12px; font-weight: 600;">👤 Supervisor que gestiona *</label>
-                            <input type="text" id="supervisorGestion" value="${escapeHtml(supervisorActual)}" required 
-                                style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line);">
+                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <h4>📌 Resumen de Items Pendientes</h4>
+                        ${totalPendientes > 0 ? `
+                            <ul style="margin-top: 10px; padding-left: 20px;">
+                                ${accionesPendientes.map(a => `
+                                    <li style="margin-bottom: 5px;">
+                                        ❌ ${escapeHtml(a.submotivo)} 
+                                        <span style="font-size: 11px; color: var(--muted);">(${a.tipo_accion})</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        ` : `
+                            <div style="color: var(--ok); margin-top: 10px;">✅ No hay items pendientes</div>
+                        `}
+                        
+                        <div style="margin-top: 20px; background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #019DF4;">
+                            💡 <strong>Próximo paso:</strong> Enviar este PDA a Capacitación para que ejecuten la formación necesaria.
+                            <br><small>Use el botón "📤 Enviar a Capacitación" para continuar con el flujo.</small>
                         </div>
                     </div>
-                    
-                    <!-- Paneles por tipo de gestión -->
-                    <div style="max-height: 500px; overflow-y: auto; padding-right: 5px;">
-                        ${generarHTMLPorTipo('feedback', MAPEO_ACCIONES_PDA.feedback, accionesPorTipo.feedback)}
-                        ${generarHTMLPorTipo('proceso', MAPEO_ACCIONES_PDA.proceso, accionesPorTipo.proceso)}
-                        ${generarHTMLPorTipo('habilidades', MAPEO_ACCIONES_PDA.habilidades, accionesPorTipo.habilidades)}
-                    </div>
-                    
-                    <!-- Mensaje si no hay acciones -->
-                    ${accionesPendientes.length === 0 ? `
-                        <div style="text-align: center; padding: 30px; color: var(--ok);">
-                            ✅ No hay acciones pendientes. Puede iniciar el seguimiento.
-                        </div>
-                    ` : ''}
                 </div>
                 <div class="modal-gestion-footer">
                     <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cancelar</button>
-                    <button id="btnGuardarGestionAgrupada" onclick="guardarGestionAgrupada(${pda.id})" 
-                            style="background: var(--accent); padding: 10px 20px;" ${accionesPendientes.length === 0 ? 'disabled' : ''}>
-                        💾 Guardar y continuar
+                    <button onclick="enviarACapacitacion(${pda.id})" 
+                            style="background: var(--accent); padding: 10px 20px;">
+                        📤 Enviar a Capacitación
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    async function enviarACapacitacion(pdaId) {
+        if (!confirm(`⚠️ ¿Enviar este PDA a Capacitación?\n\nEl PDA pasará a estado "Enviado a Capacitación".`)) {
+            return;
+        }
+        
+        try {
+            const db = getDB();
+            if (!db) {
+                alert('❌ Base de datos no disponible');
+                return;
+            }
+            
+            const { data: pda, error: fetchError } = await db
+                .from('pda_cabecera')
+                .select('*')
+                .eq('id', pdaId)
+                .single();
+            
+            if (fetchError) throw fetchError;
+            
+            // 🔴 OBTENER QUIÉN ESTÁ REALIZANDO LA ACCIÓN
+            const persona = window.usuarioActual?.nombre_completo || 
+                            window.usuarioActual?.usuario || 
+                            prompt('Ingrese su nombre para registrar el envío a Capacitación:') || 
+                            'Operaciones';
+            
+            await db
+                .from('pda_cabecera')
+                .update({
+                    estado: 'enviado_capacitacion',
+                    fecha_envio_capacitacion: new Date().toISOString().split('T')[0],
+                    enviado_por: persona,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', pdaId);
+            
+            // 🔴 REGISTRAR EVENTO CON LA PERSONA
+            await registrarEventoPDA(pdaId, 'enviado_capacitacion', {
+                fecha_envio: new Date().toISOString().split('T')[0],
+                enviado_por: persona
+            }, persona);
+            
+            alert(`✅ PDA enviado a Capacitación correctamente\n\n👤 Enviado por: ${persona}`);
+            
+            cerrarModalGestionPDA();
+            await cargarDatosPDA();
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al enviar a Capacitación: ' + error.message);
+        }
+    }
+
+    function renderizarModalReiterativo(pda) {
+        const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
+        const promedioBasal = pda.promedio_basal || 'Pendiente';
+        const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
+        const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
+        const fechaNotificacion = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : 'No registrada';
+        const notificadoPor = pda.notificado_por || 'No registrado';
+        const gescotReunion = pda.gescot_reunion || 'No registrado';
+        const gescotCapacitacion = pda.gescot_capacitacion || 'No registrado';
+        const fechaCapacitacion = pda.fecha_capacitacion ? formatearFechaPeru(pda.fecha_capacitacion) : 'No registrada';
+        const capacitador = pda.capacitador || 'No registrado';
+
+        return `
+            <div class="modal-gestion-content">
+                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #d93025, #b71c1c);">
+                    <strong>🔄 Reiterativo - ${escapeHtml(pda.agente)}</strong>
+                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                </div>
+                <div class="modal-gestion-body">
+                    <div style="background: #ffebee; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #d93025;">
+                        <strong>🚨 CASO REITERATIVO:</strong> El gestor NO logró salir de Q4 después de la capacitación formal.
+                        <br><small style="color: var(--danger);">Requiere escalamiento a Gerencia para evaluación de continuidad.</small>
+                    </div>
+
+                    <!-- Historial completo del PDA -->
+                    <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div><strong>👤 Gestor:</strong></div>
+                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
+                            <div><strong>📅 Fecha detección:</strong></div>
+                            <div>${fechaDeteccion}</div>
+                            <div><strong>📊 Ciclo basal:</strong></div>
+                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
+                            <div><strong>📈 Promedio basal:</strong></div>
+                            <div>${promedioBasal}%</div>
+                            <div><strong>📅 Notificación:</strong></div>
+                            <div>${fechaNotificacion}</div>
+                            <div><strong>👤 Notificado por:</strong></div>
+                            <div>${notificadoPor}</div>
+                            <div><strong>🔑 GESCOT Reunión:</strong></div>
+                            <div><strong style="color: #7b1fa2;">${gescotReunion}</strong></div>
+                            <div><strong>📅 Capacitación:</strong></div>
+                            <div>${fechaCapacitacion}</div>
+                            <div><strong>👤 Capacitador:</strong></div>
+                            <div>${capacitador}</div>
+                            <div><strong>🔑 GESCOT Capacitación:</strong></div>
+                            <div><strong style="color: #7b1fa2;">${gescotCapacitacion}</strong></div>
+                        </div>
+                    </div>
+                    
+                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <h4>📌 Resumen de Acciones Realizadas</h4>
+                        <ul style="margin-top: 10px; padding-left: 20px;">
+                            <li>✅ Reunión 1:1 con gestor (${fechaNotificacion})</li>
+                            <li>✅ Feedback registrado con GESCOT: ${gescotReunion}</li>
+                            <li>✅ Capacitación formal (${fechaCapacitacion})</li>
+                            <li>✅ GESCOT Capacitación: ${gescotCapacitacion}</li>
+                            <li style="color: #d93025; font-weight: bold;">❌ El gestor PERSISTE en Q4</li>
+                        </ul>
+                        
+                        <div style="margin-top: 20px; background: #ffebee; padding: 12px; border-radius: 8px; border-left: 4px solid #d93025;">
+                            <strong>🚨 ACCIÓN REQUERIDA:</strong>
+                            <br>Este caso debe ser <strong>ESCALADO A GERENCIA</strong> para evaluación de continuidad.
+                            <br><small>El reporte de reiterativos mensual incluirá este caso automáticamente.</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-gestion-footer">
+                    <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cerrar</button>
+                    <button onclick="marcarComoReiterativo(${pda.id})" 
+                            style="background: #d93025; padding: 10px 20px;">
+                        🚨 Marcar como Escalado a Gerencia
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    async function marcarComoReiterativo(pdaId) {
+    // 🔴 SOLICITAR NOMBRE DE QUIÉN ESCALA
+    const nombreEscala = prompt('Ingrese su nombre completo para escalar este caso a Gerencia:');
+    if (!nombreEscala || nombreEscala.trim() === '') {
+        alert('⚠️ Debe ingresar su nombre para escalar el caso');
+        return;
+    }
+    
+    if (!confirm(`🚨 ¿Marcar este PDA como REITERATIVO y escalar a Gerencia?\n\n👤 Escalado por: ${nombreEscala.trim()}\n\nEsta acción no se puede deshacer.`)) {
+        return;
+    }
+    
+    try {
+        const db = getDB();
+        if (!db) {
+            alert('❌ Base de datos no disponible');
+            return;
+        }
+        
+        const { data: pda, error: fetchError } = await db
+            .from('pda_cabecera')
+            .select('*')
+            .eq('id', pdaId)
+            .single();
+        
+        if (fetchError) throw fetchError;
+        
+        const persona = nombreEscala.trim();
+        
+        await db
+            .from('pda_cabecera')
+            .update({
+                estado: 'escalado',
+                fecha_escalamiento: new Date().toISOString().split('T')[0],
+                escalado_por: persona,
+                observaciones_escalamiento: 'Caso reiterativo - Persiste en Q4 después de capacitación formal',
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', pdaId);
+        
+        // 🔴 REGISTRAR EVENTO CON LA PERSONA QUE ESCALA
+        await registrarEventoPDA(pdaId, 'marcado_reiterativo', {
+            escalado_por: persona,
+            motivo: 'Persiste en Q4 después de capacitación formal'
+        }, persona);
+        
+        alert(`🚨 PDA escalado a Gerencia correctamente\n\n👤 Escalado por: ${persona}`);
+        
+        cerrarModalGestionPDA();
+        await cargarDatosPDA();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al escalar el PDA: ' + error.message);
+    }
+}
+
+// ======================================================
+// VER HISTORIAL COMPLETO DEL PDA
+// ======================================================
+async function verHistorialPDA(pdaId) {
+    try {
+        const db = getDB();
+        if (!db) {
+            alert('❌ Base de datos no disponible');
+            return;
+        }
+        
+        const { data: pda, error } = await db
+            .from('pda_cabecera')
+            .select('agente, historial_estados, estado, created_at, cuartil_basal, promedio_basal')
+            .eq('id', pdaId)
+            .single();
+        
+        if (error) throw error;
+        
+        let historial = [];
+        try {
+            historial = pda.historial_estados || [];
+            if (typeof historial === 'string') {
+                historial = JSON.parse(historial);
+            }
+            if (!Array.isArray(historial)) {
+                historial = [];
+            }
+        } catch(e) {
+            historial = [];
+        }
+        
+        if (historial.length === 0) {
+            alert(`📋 PDA #${pdaId} - ${pda.agente}\n\nNo hay eventos registrados en el historial.`);
+            return;
+        }
+        
+        // Construir mensaje
+        let mensaje = `📋 HISTORIAL COMPLETO - PDA #${pdaId}\n`;
+        mensaje += `👤 Agente: ${pda.agente}\n`;
+        mensaje += `📊 Estado actual: ${obtenerTextoEstadoPDA(pda.estado)}\n`;
+        mensaje += `📅 Creado: ${formatearFechaPeru(pda.created_at)}\n`;
+        mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        
+        // Mostrar eventos en orden cronológico
+        const eventosOrdenados = [...historial].sort((a, b) => 
+            new Date(a.fecha) - new Date(b.fecha)
+        );
+        
+        for (let i = 0; i < eventosOrdenados.length; i++) {
+            const ev = eventosOrdenados[i];
+            const icono = obtenerIconoEvento(ev.evento);
+            const eventoNombre = ev.evento.toUpperCase().replace(/_/g, ' ');
+            
+            // 🔴 Obtener la persona que realizó la acción (usuario del evento)
+            const persona = ev.usuario || 'Sistema';
+            
+            mensaje += `${icono} ${eventoNombre}\n`;
+            mensaje += `   📅 ${ev.fecha_display || formatearFechaPeru(ev.fecha)}\n`;
+            mensaje += `   👤 ${persona}\n`;
+            
+            // Mostrar detalles según el evento (sin repetir la persona)
+            if (ev.detalle) {
+                const d = ev.detalle;
+                
+                // Evento: GENERADO
+                if (ev.evento === 'generado') {
+                    mensaje += `   📊 Ciclo #${d.ciclo || 'N/A'}\n`;
+                    mensaje += `   📈 Promedio: ${d.promedio || 'N/A'}%\n`;
+                    mensaje += `   📋 Cuartil: ${d.cuartil || 'N/A'}\n`;
+                    mensaje += `   📞 Evaluaciones: ${d.total_evaluaciones || 'N/A'}\n`;
+                }
+                
+                // Evento: NOTIFICADO
+                if (ev.evento === 'notificado') {
+                    mensaje += `   📅 Fecha notificación: ${d.fecha_notificacion || 'N/A'}\n`;
+                    // 🔴 NO mostrar supervisor porque ya está en la línea 👤
+                    // Solo mostrar observaciones si existen
+                    if (d.observaciones) {
+                        mensaje += `   📝 ${d.observaciones}\n`;
+                    }
+                }
+                
+                // Evento: FEEDBACK_REGISTRADO
+                if (ev.evento === 'feedback_registrado') {
+                    mensaje += `   🔑 GESCOT: ${d.gescot || 'N/A'}\n`;
+                    mensaje += `   📅 Fecha: ${d.fecha_feedback || 'N/A'}\n`;
+                    // 🔴 NO mostrar supervisor porque ya está en la línea 👤
+                    if (d.observaciones) {
+                        mensaje += `   📝 ${d.observaciones}\n`;
+                    }
+                }
+                
+                // Evento: ENVIADO_CAPACITACION
+                if (ev.evento === 'enviado_capacitacion') {
+                    mensaje += `   📅 Fecha envío: ${d.fecha_envio || 'N/A'}\n`;
+                    // 🔴 NO mostrar enviado_por porque ya está en la línea 👤
+                }
+                
+                // Evento: CAPACITACION_REGISTRADA
+                if (ev.evento === 'capacitacion_registrada') {
+                    mensaje += `   🔑 GESCOT: ${d.gescot || 'N/A'}\n`;
+                    mensaje += `   📅 Fecha: ${d.fecha_capacitacion || 'N/A'}\n`;
+                    mensaje += `   📋 Items completados: ${d.items_completados || 0}\n`;
+                    // 🔴 NO mostrar capacitador porque ya está en la línea 👤
+                    if (d.observaciones) {
+                        mensaje += `   📝 ${d.observaciones}\n`;
+                    }
+                }
+                
+                // Evento: CERRADO_EXITOSO
+                if (ev.evento === 'cerrado_exitoso') {
+                    mensaje += `   📊 Cuartil seguimiento: ${d.cuartil_seguimiento || 'N/A'}\n`;
+                    mensaje += `   📈 Promedio seguimiento: ${d.promedio_seguimiento ? d.promedio_seguimiento.toFixed(1) : 'N/A'}%\n`;
+                    // 🔴 NO mostrar cerrado_por porque ya está en la línea 👤
+                }
+                
+                // Evento: MARCADO_REITERATIVO
+                if (ev.evento === 'marcado_reiterativo') {
+                    mensaje += `   📌 ${d.motivo || 'Persiste en Q4'}\n`;
+                    // 🔴 NO mostrar escalado_por porque ya está en la línea 👤
+                }
+            }
+            
+            mensaje += `\n`;
+        }
+        
+        mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        mensaje += `📌 Total eventos: ${eventosOrdenados.length}`;
+        
+        alert(mensaje);
+        
+    } catch (error) {
+        console.error('Error en verHistorialPDA:', error);
+        alert('❌ Error al cargar el historial: ' + error.message);
+    }
+}
+
+// ======================================================
+// OBTENER ICONO SEGÚN EVENTO
+// ======================================================
+function obtenerIconoEvento(evento) {
+    const iconos = {
+        'generado': '🟢',
+        'notificado': '📨',
+        'feedback_registrado': '💬',
+        'enviado_capacitacion': '📤',
+        'capacitacion_registrada': '📚',
+        'cerrado_exitoso': '🏆',
+        'marcado_reiterativo': '🔄',
+        'escalado': '🚨'
+    };
+    return iconos[evento] || '📌';
+}
+
+    // ===== 8. INICIO FUNCIÓN: renderizarModalNotificado ==================
+    function renderizarModalNotificado(pda) {
+        // Esta función ahora es el PASO 2: Feedback con GESCOT
+        // Pero mantiene el nombre original para compatibilidad con el switch
+        
+        const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
+        const promedioBasal = pda.promedio_basal || 'Pendiente';
+        const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
+        const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
+        const totalAcciones = pda.acciones?.length || 0;
+        const fechaNotificacion = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : 'No registrada';
+        const notificadoPor = pda.notificado_por || 'No registrado';
+
+        return `
+            <div class="modal-gestion-content">
+                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #7b1fa2, #9c27b0);">
+                    <strong>💬 Registrar Feedback - ${escapeHtml(pda.agente)}</strong>
+                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                </div>
+                <div class="modal-gestion-body">
+                    <div style="background: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #28a745;">
+                        <strong>✅ Gestor notificado el:</strong> ${fechaNotificacion}
+                        <br><strong>👤 Notificado por:</strong> ${notificadoPor}
+                    </div>
+
+                    <div style="background: #fff8e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f39c12;">
+                        <strong>📌 PASO 2 DE 2:</strong> Registrar el feedback proporcionado al gestor con código GESCOT.
+                        <br><small style="color: var(--muted);">El código GESCOT es obligatorio para la trazabilidad.</small>
+                    </div>
+
+                    <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div><strong>👤 Gestor:</strong></div>
+                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
+                            <div><strong>📅 Fecha detección:</strong></div>
+                            <div>${fechaDeteccion}</div>
+                            <div><strong>📊 Ciclo basal:</strong></div>
+                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
+                            <div><strong>📊 Cuartil basal:</strong></div>
+                            <div>Q4</div>
+                            <div><strong>📈 Promedio ciclo basal:</strong></div>
+                            <div>${promedioBasal}%</div>
+                            <div><strong>📋 Acciones requeridas:</strong></div>
+                            <div>${totalAcciones}</div>
+                        </div>
+                    </div>
+                    
+                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <h4>📝 Registrar Feedback (GESCOT)</h4>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">🔑 Código GESCOT *</label>
+                            <input type="text" id="gescotFeedback" 
+                                placeholder="Ej: GESCOT-2026-07-1234"
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                            <small style="color: var(--danger);">⚠️ Obligatorio para registrar el feedback</small>
+                        </div>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">📅 Fecha del Feedback *</label>
+                            <input type="date" id="fechaFeedback" value="${new Date().toISOString().split('T')[0]}" required 
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                        </div>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">👤 Supervisor que realizó el feedback *</label>
+                            <input type="text" id="supervisorFeedback" 
+                                value="${window.usuarioActual?.nombre_completo || ''}" required 
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                        </div>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">📝 Observaciones del Feedback (opcional)</label>
+                            <textarea id="observacionesFeedback" rows="3" 
+                                    placeholder="Detalles del feedback proporcionado al gestor..."
+                                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line);"></textarea>
+                        </div>
+                        
+                        <div style="margin-top: 15px; background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #019DF4;">
+                            💡 <strong>Nota:</strong> Al registrar el feedback con GESCOT, el PDA pasará automáticamente a 
+                            <strong>estado "En Seguimiento"</strong> y el sistema evaluará la mejora en el próximo ciclo.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-gestion-footer">
+                    <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cancelar</button>
+                    <button onclick="registrarFeedbackYEnviarSeguimiento(${pda.id})" 
+                            style="background: var(--ok); padding: 10px 20px;">
+                        💾 Registrar Feedback y Enviar a Seguimiento
                     </button>
                 </div>
             </div>
@@ -16440,68 +19043,238 @@ async function cargarMesesParaSelectorQ4() {
 
     // ===== 9. INICIO FUNCIÓN: renderizarModalEnGestion ===================
     function renderizarModalEnGestion(pda) {
-        const accionesPendientes = pda.acciones.filter(a => !a.completado);
-        const accionesCompletadas = pda.acciones.filter(a => a.completado);
-        const progreso = pda.totalAcciones > 0 ? Math.round((pda.accionesCompletadas / pda.totalAcciones) * 100) : 0;
-        const todasCompletadas = accionesPendientes.length === 0;
+        // Esta función ahora es el modal de Capacitación
+        // Pero mantiene el nombre original para compatibilidad
+        
+        const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
+        const promedioBasal = pda.promedio_basal || 'Pendiente';
+        const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
+        const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
+        const fechaNotificacion = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : 'No registrada';
+        const notificadoPor = pda.notificado_por || 'No registrado';
+        const gescotReunion = pda.gescot_reunion || 'No registrado';
+        
+        // Filtrar acciones pendientes
+        const accionesPendientes = (pda.acciones || []).filter(a => !a.completado);
+        const totalPendientes = accionesPendientes.length;
+        
+        // Agrupar por tipo
+        const accionesPorTipo = {
+            procesos: accionesPendientes.filter(a => a.tipo_accion === 'proceso'),
+            habilidades: accionesPendientes.filter(a => a.tipo_accion === 'habilidades'),
+            feedback: accionesPendientes.filter(a => a.tipo_accion === 'feedback')
+        };
 
         return `
             <div class="modal-gestion-content">
-                <div class="modal-gestion-header">
-                    <strong>📝 Completar acciones - ${escapeHtml(pda.agente)}</strong>
-                    <button onclick="cerrarModalGestionPDA()">✖</button>
+                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #fd7e14, #f39c12);">
+                    <strong>📚 Registrar Capacitación - ${escapeHtml(pda.agente)}</strong>
+                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
                 </div>
                 <div class="modal-gestion-body">
-                    <!-- Barra de progreso -->
-                    <div class="progress-section">
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>📊 Progreso general</span>
-                            <span>${pda.accionesCompletadas}/${pda.totalAcciones} acciones (${progreso}%)</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div class="progress-bar-fill" style="width: ${progreso}%; background: var(--ok);"></div>
+                    <div style="background: #fff8e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f39c12;">
+                        <strong>📌 CAPACITACIÓN FORMAL:</strong> Registrar la capacitación realizada al gestor.
+                        <br><small style="color: var(--muted);">El código GESCOT es obligatorio para la trazabilidad.</small>
+                    </div>
+
+                    <div style="background: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #28a745;">
+                        <strong>✅ Gestor notificado el:</strong> ${fechaNotificacion}
+                        <br><strong>👤 Notificado por:</strong> ${notificadoPor}
+                        <br><strong>🔑 GESCOT Reunión:</strong> ${gescotReunion}
+                    </div>
+
+                    <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div><strong>👤 Gestor:</strong></div>
+                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
+                            <div><strong>📅 Fecha detección:</strong></div>
+                            <div>${fechaDeteccion}</div>
+                            <div><strong>📊 Ciclo basal:</strong></div>
+                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
+                            <div><strong>📊 Cuartil basal:</strong></div>
+                            <div>Q4</div>
+                            <div><strong>📈 Promedio ciclo basal:</strong></div>
+                            <div>${promedioBasal}%</div>
+                            <div><strong>📋 Acciones pendientes:</strong></div>
+                            <div><strong style="color: #d93025;">${totalPendientes}</strong></div>
                         </div>
                     </div>
                     
-                    
-                    ${accionesCompletadas.length > 0 ? `
-                        <details style="margin-top: 15px;">
-                            <summary style="cursor: pointer; color: var(--ok);">✅ Acciones completadas (${accionesCompletadas.length})</summary>
-                            <div style="margin-top: 10px; font-size: 12px; color: var(--muted);">
-                                ${accionesCompletadas.map(a => `• ${a.submotivo} (${a.tipo_accion}) - Completado: ${a.fecha_completado}`).join('<br>')}
-                            </div>
-                        </details>
-                    ` : ''}
-                    
-                    <!-- Acciones pendientes -->
-                    <h4 style="margin-top: 15px;">⏳ Acciones pendientes (${accionesPendientes.length})</h4>
-                    <div id="checklistContainer">
-                        ${renderizarChecklistAcciones(accionesPendientes)}
-                    </div>
-                    
-                    ${todasCompletadas ? `
-                        <div class="success-box" style="margin-top: 20px;">
-                            ✅ ¡Todas las acciones han sido completadas! Ahora puede iniciar el seguimiento.
+                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
+                        <h4>📝 Registrar Capacitación</h4>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">🔑 Código GESCOT de Capacitación *</label>
+                            <input type="text" id="gescotCapacitacion" 
+                                placeholder="Ej: GESCOT-2026-07-5678"
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                            <small style="color: var(--danger);">⚠️ Obligatorio para registrar la capacitación</small>
                         </div>
-                    ` : ''}
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">📅 Fecha de Capacitación *</label>
+                            <input type="date" id="fechaCapacitacion" value="${new Date().toISOString().split('T')[0]}" required 
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                        </div>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">👤 Capacitador *</label>
+                            <input type="text" id="capacitador" 
+                                value="${window.usuarioActual?.nombre_completo || ''}" required 
+                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                        </div>
+                        
+                        <!-- Items agrupados por tipo -->
+                        <div style="margin-top: 20px;">
+                            <h5>📋 Items a Capacitar</h5>
+                            
+                            ${accionesPorTipo.procesos.length > 0 ? `
+                                <div style="margin-top: 10px; border-left: 4px solid #fd7e14; padding-left: 15px;">
+                                    <strong style="color: #fd7e14;">📚 Procesos (ECN)</strong>
+                                    ${accionesPorTipo.procesos.map(a => `
+                                        <label style="display: block; margin-top: 5px;">
+                                            <input type="checkbox" class="item-capacitacion" data-id="${a.id}" checked>
+                                            ${escapeHtml(a.submotivo)}
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                            
+                            ${accionesPorTipo.habilidades.length > 0 ? `
+                                <div style="margin-top: 10px; border-left: 4px solid #7b1fa2; padding-left: 15px;">
+                                    <strong style="color: #7b1fa2;">🎯 Habilidades Blandas (ENC)</strong>
+                                    ${accionesPorTipo.habilidades.map(a => `
+                                        <label style="display: block; margin-top: 5px;">
+                                            <input type="checkbox" class="item-capacitacion" data-id="${a.id}" checked>
+                                            ${escapeHtml(a.submotivo)}
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                            
+                            ${accionesPorTipo.feedback.length > 0 ? `
+                                <div style="margin-top: 10px; border-left: 4px solid #019DF4; padding-left: 15px;">
+                                    <strong style="color: #019DF4;">💬 Feedback (ENC/ECUF)</strong>
+                                    ${accionesPorTipo.feedback.map(a => `
+                                        <label style="display: block; margin-top: 5px;">
+                                            <input type="checkbox" class="item-capacitacion" data-id="${a.id}" checked>
+                                            ${escapeHtml(a.submotivo)}
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                            
+                            ${totalPendientes === 0 ? `
+                                <div style="margin-top: 10px; color: var(--ok);">
+                                    ✅ No hay acciones pendientes de capacitación.
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        <div style="margin-top: 10px;">
+                            <label style="font-size: 12px; font-weight: 600;">📝 Observaciones (opcional)</label>
+                            <textarea id="observacionesCapacitacion" rows="3" 
+                                    placeholder="Detalles de la capacitación realizada..."
+                                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line);"></textarea>
+                        </div>
+                        
+                        <div style="margin-top: 15px; background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #019DF4;">
+                            💡 <strong>Nota:</strong> Al registrar la capacitación con GESCOT, el PDA pasará a 
+                            <strong>estado "En Seguimiento"</strong> y el sistema evaluará la mejora en el próximo ciclo.
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-gestion-footer">
-                    <button onclick="cerrarModalGestionPDA()" class="secondary">Cancelar</button>
-                    ${!todasCompletadas ? `
-                        <button onclick="guardarProgresoAcciones(${pda.id})" style="background: var(--accent);">
-                            💾 Guardar progreso
-                        </button>
-                    ` : `
-                        <button onclick="iniciarSeguimientoPDA(${pda.id})" style="background: var(--ok);">
-                            📊 Iniciar seguimiento de mejora
-                        </button>
-                    `}
+                    <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cancelar</button>
+                    <button onclick="guardarGestionCapacitacion(${pda.id})" 
+                            style="background: var(--ok); padding: 10px 20px;">
+                        💾 Registrar Capacitación y Enviar a Seguimiento
+                    </button>
                 </div>
             </div>
         `;
     }
     // ===== FIN FUNCIÓN: renderizarModalEnGestion ===========================
     
+    async function guardarGestionCapacitacion(pdaId) {
+    const gescot = document.getElementById('gescotCapacitacion').value.trim();
+    const fecha = document.getElementById('fechaCapacitacion').value;
+    const capacitador = document.getElementById('capacitador').value.trim();
+    const observaciones = document.getElementById('observacionesCapacitacion').value.trim();
+    
+    if (!gescot) {
+        alert('⚠️ El código GESCOT es obligatorio para registrar la capacitación');
+        document.getElementById('gescotCapacitacion').focus();
+        return;
+    }
+    
+    if (!fecha || !capacitador) {
+        alert('⚠️ Complete todos los campos obligatorios');
+        return;
+    }
+    
+    const itemsSeleccionados = document.querySelectorAll('.item-capacitacion:checked');
+    if (itemsSeleccionados.length === 0) {
+        alert('⚠️ Seleccione al menos un item a capacitar');
+        return;
+    }
+    
+    try {
+        const db = getDB();
+        if (!db) {
+            alert('❌ Base de datos no disponible');
+            return;
+        }
+        
+        const itemIds = Array.from(itemsSeleccionados).map(cb => parseInt(cb.dataset.id));
+        
+        for (const id of itemIds) {
+            await db
+                .from('pda_acciones')
+                .update({
+                    completado: true,
+                    codigo_gescot: gescot,
+                    fecha_completado: fecha,
+                    completado_por: capacitador,
+                    observaciones: observaciones,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', id);
+        }
+        
+        await db
+            .from('pda_cabecera')
+            .update({
+                estado: 'en_seguimiento_capacitacion',
+                gescot_capacitacion: gescot,
+                fecha_capacitacion: fecha,
+                capacitador: capacitador,
+                observaciones_capacitacion: observaciones,
+                fecha_inicio_seguimiento_capacitacion: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', pdaId);
+        
+        // 🔴 REGISTRAR EVENTO CON EL CAPACITADOR
+        await registrarEventoPDA(pdaId, 'capacitacion_registrada', {
+            gescot: gescot,
+            fecha_capacitacion: fecha,
+            capacitador: capacitador,
+            items_completados: itemsSeleccionados.length,
+            observaciones: observaciones
+        }, capacitador);  // ← PASAR EL CAPACITADOR COMO PERSONA
+        
+        alert(`✅ Capacitación registrada correctamente\n\n🔑 GESCOT: ${gescot}\n👤 Capacitador: ${capacitador}`);
+        
+        cerrarModalGestionPDA();
+        await cargarDatosPDA();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al registrar capacitación: ' + error.message);
+    }
+}
+
     // ===== 10. INICIO FUNCIÓN: renderizarModalEnSeguimiento ===============
     function renderizarModalEnSeguimiento(pda) {
         return `
@@ -16739,34 +19512,65 @@ async function cargarMesesParaSelectorQ4() {
     
     // ===== 13. INICIO FUNCIÓN: marcarComoNotificado =======================
     async function marcarComoNotificado(pdaId) {
-        const fechaNotificacion = document.getElementById('fechaNotificacion')?.value;
-        const supervisorNotifico = document.getElementById('supervisorNotifico')?.value;
-
-        if (!fechaNotificacion || !supervisorNotifico) {
-            alert('⚠️ Complete todos los campos');
+    const fecha = document.getElementById('fechaNotificacion').value;
+    const supervisor = document.getElementById('supervisorNotifico').value.trim();
+    const observaciones = document.getElementById('observacionesNotificacion').value.trim();
+    
+    if (!fecha || !supervisor) {
+        alert('⚠️ Complete todos los campos obligatorios');
+        return;
+    }
+    
+    try {
+        const db = getDB();
+        if (!db) {
+            alert('❌ Base de datos no disponible');
             return;
         }
-
-        const db = getDB();
+        
+        // Actualizar estado a 'notificado'
         const { error } = await db
             .from('pda_cabecera')
             .update({
                 estado: 'notificado',
-                fecha_notificacion: fechaNotificacion,
-                supervisor_notifico: supervisorNotifico,
+                fecha_notificacion_gestor: fecha,
+                notificado_por: supervisor,
+                observaciones_notificacion: observaciones,
                 updated_at: new Date().toISOString()
             })
             .eq('id', pdaId);
-
-        if (error) {
-            alert('❌ Error: ' + error.message);
-            return;
-        }
-
-        alert('✅ PDA marcado como notificado');
+        
+        if (error) throw error;
+        
+        // 🔴 REGISTRAR EVENTO CON EL SUPERVISOR (persona real)
+        await registrarEventoPDA(pdaId, 'notificado', {
+            fecha_notificacion: fecha,
+            supervisor: supervisor,
+            observaciones: observaciones
+        }, supervisor);  // ← PASAR EL SUPERVISOR COMO PERSONA
+        
+        alert(`✅ Notificación registrada correctamente\n\n📅 Fecha: ${fecha}\n👤 Supervisor: ${supervisor}`);
+        
         cerrarModalGestionPDA();
+        
+        const pdaCompleto = await API.getPDADetalle(pdaId);
+        if (pdaCompleto) {
+            const modalHTML = renderizarModalNotificado(pdaCompleto);
+            const nuevoModal = document.createElement('div');
+            nuevoModal.id = 'modalGestionPDA';
+            nuevoModal.className = 'modal-gestion-pda';
+            nuevoModal.innerHTML = modalHTML;
+            document.body.appendChild(nuevoModal);
+            window.pdaActualGestion = { id: pdaId, cabecera: pdaCompleto };
+        }
+        
         await cargarDatosPDA();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al registrar notificación: ' + error.message);
     }
+}
     // ===== FIN FUNCIÓN: marcarComoNotificado ===============================
 
     // ===== 14. INICIO FUNCIÓN: guardarYcontinuarGestion ===================⚠️ Redundante (similar a guardarGestionAgrupada)
@@ -16964,23 +19768,55 @@ async function cargarMesesParaSelectorQ4() {
     // ===== FIN FUNCIÓN: renderizarChecklistAcciones ========================
     
 // ======================================================
+// NUEVA FUNCIÓN: verificarInformeGenerado
+// ======================================================
+async function verificarInformeGenerado(anio, mes, agente, cicloNumero) {
+    try {
+        const db = getDB();
+        if (!db) {
+            console.warn('⚠️ BD no disponible para verificar');
+            return false;
+        }
+
+        const { data, error } = await db
+            .from('control_informes_generados')
+            .select('id, estado')
+            .eq('anio', anio)
+            .eq('mes', mes)
+            .eq('agente', agente)
+            .eq('ciclo_numero', cicloNumero)
+            .maybeSingle();
+
+        if (error) {
+            console.warn('Error verificando informe:', error);
+            return false;
+        }
+
+        return data && data.estado === 'exitoso';
+    } catch (error) {
+        console.error('Error en verificarInformeGenerado:', error);
+        return false;
+    }
+}
+
+// ======================================================
 // FUNCIÓN COMPLETA: generarPDAConDocumento (CON SOPORTE PARA MÚLTIPLES CICLOS Q4)
 // ======================================================
 
 async function generarPDAConDocumento(agente, numeroCiclo = null) {
     console.log('📝 Generando documento PDA profesional para:', agente);
     if (numeroCiclo) {
-        console.log(`   Ciclo específico solicitado: #${numeroCiclo}`);
+        console.log('   Ciclo especifico solicitado: #' + numeroCiclo);
     }
 
     const db = getDB();
     if (!db) {
-        alert('❌ Base de datos no disponible');
+        alert('Base de datos no disponible');
         return;
     }
 
     // ======================================================
-    // PASO 1: VERIFICAR PDA ACTIVO (SOLO PARA EL MISMO CICLO)
+    // PASO 1: VERIFICAR PDA ACTIVO
     // ======================================================
     if (!window.datosPDA || window.datosPDA.length === 0) {
         await cargarDatosPDA();
@@ -16992,21 +19828,20 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
     const ciclos = await agruparEvaluacionesEnCiclos(agente);
     
     if (ciclos.length === 0) {
-        alert(`⚠️ No se encontraron ciclos de evaluación para ${agente}`);
+        alert('⚠️ No se encontraron ciclos de evaluacion para ' + agente);
         return;
     }
     
-    // Filtrar ciclos Q4 y completos
     const ciclosQ4 = ciclos.filter(c => c.cuartil === 'Q4' && c.esCompleto);
     
     if (ciclosQ4.length === 0) {
-        alert(`⚠️ El gestor ${agente} no tiene ciclos Q4 completos\n\nSe requieren 5 evaluaciones para cerrar un ciclo basal.`);
+        alert('⚠️ El gestor ' + agente + ' no tiene ciclos Q4 completos\n\nSe requieren 5 evaluaciones para cerrar un ciclo basal.');
         return;
     }
     
-    console.log(`📊 Ciclos Q4 encontrados: ${ciclosQ4.length}`);
+    console.log('📊 Ciclos Q4 encontrados:', ciclosQ4.length);
     ciclosQ4.forEach(c => {
-        console.log(`   Ciclo #${c.numero} (${c.fechaInicio} → ${c.fechaFin}) - Promedio: ${c.promedio}%`);
+        console.log('   Ciclo #' + c.numero + ' (' + c.fechaInicio + ' → ' + c.fechaFin + ') - Promedio: ' + c.promedio + '%');
     });
     
     // ======================================================
@@ -17015,24 +19850,21 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
     let cicloSeleccionado = null;
     
     if (numeroCiclo) {
-        // Buscar el ciclo específico
         cicloSeleccionado = ciclosQ4.find(c => c.numero === numeroCiclo);
         if (!cicloSeleccionado) {
-            alert(`❌ No se encontró el ciclo Q4 #${numeroCiclo} para ${agente}`);
+            alert('❌ No se encontro el ciclo Q4 #' + numeroCiclo + ' para ' + agente);
             return;
         }
-        console.log(`✅ Usando ciclo específico #${numeroCiclo}`);
+        console.log('✅ Usando ciclo especifico #' + numeroCiclo);
     } else if (ciclosQ4.length === 1) {
-        // Solo un ciclo Q4, usarlo
         cicloSeleccionado = ciclosQ4[0];
-        console.log(`✅ Usando único ciclo Q4: #${cicloSeleccionado.numero}`);
+        console.log('✅ Usando unico ciclo Q4: #' + cicloSeleccionado.numero);
     } else {
-        // 🔴 MÚLTIPLES CICLOS Q4 - Preguntar al usuario
-        let mensaje = `⚠️ El gestor ${agente} tiene ${ciclosQ4.length} ciclos en Q4:\n\n`;
+        let mensaje = '⚠️ El gestor ' + agente + ' tiene ' + ciclosQ4.length + ' ciclos en Q4:\n\n';
         ciclosQ4.forEach((c, i) => {
-            mensaje += `${i + 1}. Ciclo #${c.numero} (${c.fechaInicio} → ${c.fechaFin}) - ${c.promedio}%\n`;
+            mensaje += (i + 1) + '. Ciclo #' + c.numero + ' (' + c.fechaInicio + ' → ' + c.fechaFin + ') - ' + c.promedio + '%\n';
         });
-        mensaje += `\n¿Para qué ciclo desea generar el PDA? (Ingrese el número de ciclo)`;
+        mensaje += '\n¿Para qué ciclo desea generar el PDA? (Ingrese el número de ciclo)';
         
         const respuesta = prompt(mensaje);
         if (!respuesta) return;
@@ -17041,10 +19873,10 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
         cicloSeleccionado = ciclosQ4.find(c => c.numero === cicloNumero);
         
         if (!cicloSeleccionado) {
-            alert(`❌ Ciclo #${cicloNumero} no encontrado o no está en Q4`);
+            alert('❌ Ciclo #' + cicloNumero + ' no encontrado o no está en Q4');
             return;
         }
-        console.log(`✅ Usando ciclo seleccionado: #${cicloSeleccionado.numero}`);
+        console.log('✅ Usando ciclo seleccionado: #' + cicloSeleccionado.numero);
     }
 
     // ======================================================
@@ -17071,10 +19903,35 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
             default: estadoTexto = pdaActivo.estado;
         }
 
+        // 🔴 OBTENER FECHA DE DETECCIÓN CORRECTAMENTE
+        let fechaDeteccion = 'N/A';
+
+        if (pdaActivo.fecha_deteccion) {
+            fechaDeteccion = pdaActivo.fecha_deteccion;
+        } else if (pdaActivo.fechaDeteccion) {
+            fechaDeteccion = pdaActivo.fechaDeteccion;
+        } else if (pdaActivo.fecha_deteccion_ciclo) {
+            fechaDeteccion = pdaActivo.fecha_deteccion_ciclo;
+        } else if (pdaActivo.created_at) {
+            const fecha = new Date(pdaActivo.created_at);
+            fechaDeteccion = fecha.toLocaleDateString('es-ES');
+        } else if (pdaActivo.fecha_creacion) {
+            const fecha = new Date(pdaActivo.fecha_creacion);
+            fechaDeteccion = fecha.toLocaleDateString('es-ES');
+        }
+
+        // Si tiene formato ISO, convertirlo a DD/MM/YYYY
+        if (fechaDeteccion !== 'N/A' && fechaDeteccion.includes('T')) {
+            const fecha = new Date(fechaDeteccion);
+            if (!isNaN(fecha.getTime())) {
+                fechaDeteccion = fecha.toLocaleDateString('es-ES');
+            }
+        }
+
         const mensaje = `⚠️ El gestor ${agente} ya tiene un PDA activo para el ciclo #${cicloSeleccionado.numero}.\n\n` +
             `📋 Estado actual: ${estadoTexto}\n` +
             `🆔 ID: ${pdaActivo.id}\n` +
-            `📅 Fecha detección: ${pdaActivo.fechaDeteccion || 'N/A'}\n\n` +
+            `📅 Fecha detección: ${fechaDeteccion}\n\n` +
             `Complete o cierre el PDA actual antes de generar uno nuevo para este ciclo.`;
 
         if (confirm(mensaje + '\n\n¿Desea ir a la pestaña de Gestión PDA para verlo?')) {
@@ -17084,7 +19941,48 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
     }
 
     // ======================================================
-    // PASO 5: VERIFICAR LÍMITE DE 2 PDA POR MES (POR AGENTE)
+    // PASO 5: 🔴 VERIFICAR SI YA EXISTE UN INFORME GENERADO (CONTROL DE DUPLICADOS)
+    // ======================================================
+    let mes = null;
+    let anio = null;
+    const fechaInicioCiclo = cicloSeleccionado.fechaInicio || 'N/A';
+    
+    if (fechaInicioCiclo !== 'N/A') {
+        const partes = fechaInicioCiclo.split('/');
+        if (partes.length === 3) {
+            mes = parseInt(partes[1]);
+            anio = parseInt(partes[2]);
+        }
+    }
+    
+    if (!mes || !anio) {
+        const ahora = new Date();
+        mes = ahora.getMonth() + 1;
+        anio = ahora.getFullYear();
+        console.warn('⚠️ No se pudo extraer mes/año del ciclo, usando fecha actual: ' + mes + '/' + anio);
+    }
+    
+    console.log('📅 Verificando duplicados para: ' + agente + ' - Ciclo #' + cicloSeleccionado.numero + ' (' + mes + '/' + anio + ')');
+    
+    try {
+        const yaGenerado = await verificarReporteExistente(agente, cicloSeleccionado.numero, mes, anio);
+        
+        if (yaGenerado) {
+            const mensaje = '⚠️ El PDA para ' + agente + ' - Ciclo #' + cicloSeleccionado.numero + ' (' + mes + '/' + anio + ') YA FUE GENERADO.\n\n' +
+                'Para evitar duplicados, no se generará nuevamente.\n\n' +
+                '¿Desea ver el reporte existente?';
+            
+            if (confirm(mensaje)) {
+                await mostrarReporteExistente(agente, cicloSeleccionado.numero);
+            }
+            return;
+        }
+    } catch (error) {
+        console.error('❌ Error verificando duplicados:', error);
+    }
+
+    // ======================================================
+    // PASO 6: VERIFICAR LÍMITE DE 2 PDA POR MES
     // ======================================================
     const mesActual = new Date().getMonth();
     const anioActual = new Date().getFullYear();
@@ -17096,14 +19994,14 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
     ).length || 0;
 
     if (pdaCompletadosEsteMes >= 2) {
-        alert(`⚠️ El gestor ${agente} ya tiene ${pdaCompletadosEsteMes} PDA completados este mes.\n\n` +
-            `Debe escalar el caso a Gerencia antes de aplicar otro PDA.\n` +
-            `Límite: 2 PDA por gestor por mes.`);
+        alert('⚠️ El gestor ' + agente + ' ya tiene ' + pdaCompletadosEsteMes + ' PDA completados este mes.\n\n' +
+            'Debe escalar el caso a Gerencia antes de aplicar otro PDA.\n' +
+            'Límite: 2 PDA por gestor por mes.');
         return;
     }
 
     // ======================================================
-    // PASO 6: MOSTRAR INDICADOR DE CARGA
+    // PASO 7: MOSTRAR INDICADOR DE CARGA
     // ======================================================
     const loadingMsg = document.createElement('div');
     loadingMsg.textContent = '⏳ Generando documento...';
@@ -17112,13 +20010,12 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
 
     try {
         // ======================================================
-        // PASO 7: DATOS DEL CICLO SELECCIONADO
+        // PASO 8: DATOS DEL CICLO SELECCIONADO
         // ======================================================
         const cicloBasal = cicloSeleccionado;
         const totalEvals = cicloBasal.totalEvaluaciones;
         const evaluacionesCicloBasal = cicloBasal.evaluaciones;
         
-        // Extraer fechas del ciclo
         const fechasCiclo = [];
         for (const evalItem of evaluacionesCicloBasal) {
             const fechaStr = evalItem.fechaOriginal || evalItem.fecha || '';
@@ -17133,22 +20030,21 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
             periodoHasta = formatearFechaParaDocumento(fechasCiclo[fechasCiclo.length - 1]);
         }
         
-        console.log(`✅ Ciclo basal: Ciclo ${cicloBasal.numero} (${periodoDesde} → ${periodoHasta}) - ${totalEvals} evaluaciones`);
+        console.log('✅ Ciclo basal: Ciclo ' + cicloBasal.numero + ' (' + periodoDesde + ' → ' + periodoHasta + ') - ' + totalEvals + ' evaluaciones');
 
-        // Fecha de referencia para la matriz
         const primeraEvaluacion = evaluacionesCicloBasal[0];
         const fechaEvaluacion = primeraEvaluacion?.fechaOriginal || primeraEvaluacion?.fecha || null;
-        console.log(`   📅 Fecha de referencia para matriz: ${fechaEvaluacion || 'actual'}`);
+        console.log('   📅 Fecha de referencia para matriz: ' + (fechaEvaluacion || 'actual'));
 
         // ======================================================
-        // PASO 8: GENERAR ESTRUCTURA DEL INFORME
+        // PASO 9: GENERAR ESTRUCTURA DEL INFORME
         // ======================================================
         console.log('📊 Generando estructura del informe...');
         const informe = await generarEstructuraInformePDA(agente, cicloBasal);
         console.log('📊 Informe generado');
 
         // ======================================================
-        // PASO 9: EXTRAER DATOS PARA EL HTML
+        // PASO 10: EXTRAER DATOS PARA EL HTML
         // ======================================================
         const resumenPorTipoParaHTML = 
             informe.resumen?.resumenPorTipo || 
@@ -17160,12 +20056,11 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
         console.log('📊 resumenPorTipoParaHTML keys:', Object.keys(resumenPorTipoParaHTML));
         console.log('📊 evaluaciones en informe:', informe.evaluaciones?.length || 0);
 
-        // Obtener la matriz para la fecha
         const versionMatriz = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
         const matrizCompleta = versionMatriz ? await obtenerMatrizPorVersion(versionMatriz.id) : null;
 
         // ======================================================
-        // PASO 10: GENERAR DOCUMENTO ID
+        // PASO 11: GENERAR DOCUMENTO ID
         // ======================================================
         const documentoId = generarDocumentoId();
         const fechaEmision = new Date().toLocaleDateString('es-ES');
@@ -17173,13 +20068,12 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
         fechaProximaEvaluacion.setDate(fechaProximaEvaluacion.getDate() + 7);
         const fechaProximaEvaluacionStr = fechaProximaEvaluacion.toLocaleDateString('es-ES');
 
-        // Obtener items para compatibilidad
         const itemsFallas = Object.values(informe.detalleQuiebres?.resumen?.submotivosMasFrecuentes || {});
         const itemsCriticos = itemsFallas.filter(item => (item?.ocurrencias || 0) >= 3);
         const itemsNoCriticos = itemsFallas.filter(item => (item?.ocurrencias || 0) < 3);
 
         // ======================================================
-        // PASO 11: GENERAR DOCUMENTO HTML
+        // PASO 12: GENERAR DOCUMENTO HTML
         // ======================================================
         console.log('📄 Generando documento HTML...');
 
@@ -17194,7 +20088,6 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
         const promedioECUF = cicloBasal.promedioECUF || 0;
         const promedioECN = cicloBasal.promedioECN || 0;
 
-        // Calcular porcentajes para cada motivo
         const pesos = { ENC: 30, ECUF: 30, ECN: 40 };
         const pctENC = Math.round((promedioENC / pesos.ENC) * 100);
         const pctECUF = Math.round((promedioECUF / pesos.ECUF) * 100);
@@ -17228,7 +20121,7 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
         });
 
         // ======================================================
-        // PASO 12: GENERAR DOCUMENTO TEXTO
+        // PASO 13: GENERAR DOCUMENTO TEXTO
         // ======================================================
         console.log('📄 Generando documento TXT...');
         const documentoTexto = generarDocumentoTexto({
@@ -17251,30 +20144,29 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
         });
 
         // ======================================================
-        // PASO 13: GUARDAR EN BASE DE DATOS
+        // PASO 14: GUARDAR EN BASE DE DATOS VIA API
         // ======================================================
-        console.log('💾 Guardando PDA completo en base de datos...');
-        const guardado = await guardarPDAEnBaseDeDatos(informe);
+        console.log('💾 Guardando PDA completo en base de datos via API...');
+        const guardado = await guardarPDAEnBaseDeDatos(informe, documentoHTML);
         
         if (!guardado) {
             throw new Error('No se pudo guardar el PDA en la base de datos');
         }
 
         // ======================================================
-        // PASO 14: MOSTRAR MODAL CON EL DOCUMENTO
+        // PASO 15: MOSTRAR MODAL CON EL DOCUMENTO
         // ======================================================
         document.body.removeChild(loadingMsg);
         mostrarModalDocumentoProfesional(documentoHTML, documentoTexto, agente);
 
-        // Recargar listas de PDA
         await cargarDatosPDA();
 
         console.log('✅ PDA generado correctamente para:', agente);
-        console.log(`   Ciclo: #${cicloBasal.numero}`);
-        console.log(`   Promedio: ${cicloBasal.promedio}%`);
+        console.log('   Ciclo: #' + cicloBasal.numero);
+        console.log('   Promedio: ' + cicloBasal.promedio + '%');
 
     } catch (error) {
-        console.error('Error generando documento:', error);
+        console.error('❌ Error generando documento:', error);
         if (loadingMsg && loadingMsg.parentNode) {
             document.body.removeChild(loadingMsg);
         }
@@ -17282,139 +20174,172 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
     }
 }
 // ======================================================
-// FUNCIÓN: guardarPDAEnBaseDeDatos
+// FUNCIÓN: verificarReporteExistente (MEJORADA)
 // ======================================================
-
-async function guardarPDAEnBaseDeDatos(informe) {
-    console.log(`💾 Guardando PDA completo para ${informe.agente}`);
-
-    const db = getDB();
-    if (!db) {
-        alert('❌ Base de datos no disponible');
+async function verificarReporteExistente(agente, ciclo, mes, anio) {
+    console.log(`🔍 Verificando reporte existente: ${agente} - Ciclo ${ciclo} (${mes}/${anio})`);
+    
+    // 🔴 VALIDAR PARÁMETROS
+    if (!agente || !ciclo || !mes || !anio) {
+        console.warn('⚠️ Parámetros incompletos para verificar:', { agente, ciclo, mes, anio });
         return false;
     }
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        if (!token) {
+            console.warn('⚠️ No hay token para verificar');
+            return false;
+        }
+        
+        const url = `/api/reportes/verificar?agente=${encodeURIComponent(agente)}&ciclo=${ciclo}&mes=${mes}&anio=${anio}`;
+        console.log(`   📡 URL: ${url}`);
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(`⚠️ Error en verificación (${response.status}):`, errorText);
+            return false;
+        }
+        
+        const data = await response.json();
+        console.log(`   📊 Respuesta: existe=${data.existe}`);
+        
+        if (data.existe === true) {
+            console.log('   ✅ Reporte YA EXISTE en control_informes_generados');
+            if (data.info) {
+                console.log(`   📋 ID: ${data.info.id}, Fecha: ${data.info.fecha_procesamiento}`);
+            }
+            return true;
+        } else {
+            console.log('   ❌ Reporte NO EXISTE en control_informes_generados');
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en verificarReporteExistente:', error);
+        return false;
+    }
+}
+
+// ======================================================
+// FUNCIÓN MODIFICADA: guardarPDAEnBaseDeDatos (vía API)
+// ======================================================
+async function guardarPDAEnBaseDeDatos(informe, htmlContent) {
+    console.log(`💾 Guardando PDA completo para ${informe.agente} via API`);
 
     try {
-        // ======================================================
-        // 1. GENERAR ID PARA PDA_CABECERA
-        // ======================================================
+        const token = localStorage.getItem('meca_token');
         
-        const { data: maxIdData } = await db
-            .from('pda_cabecera')
-            .select('id')
-            .order('id', { ascending: false })
-            .limit(1);
-
-        let nuevoId = 1;
-        if (maxIdData && maxIdData.length > 0 && maxIdData[0].id !== null && maxIdData[0].id !== undefined) {
-            nuevoId = Number(maxIdData[0].id) + 1;
-            console.log(`   ID máximo cabecera: ${maxIdData[0].id}, nuevo: ${nuevoId}`);
-        } else {
-            console.log('   📭 Tabla pda_cabecera vacía, empezando desde ID: 1');
-        }
-
-        // ======================================================
-        // 2. INSERTAR EN PDA_CABECERA
-        // ======================================================
-        
-        const pdaData = {
-            id: nuevoId,
-            agente: informe.agente,
-            fecha_deteccion: new Date().toISOString().split('T')[0],
-            fecha_inicio_ciclo_basal: informe.ciclo.fechaInicio !== 'N/A' ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaInicio) : null,
-            fecha_fin_ciclo_basal: informe.ciclo.fechaFin !== 'N/A' ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaFin) : null,
-            ciclo_basal_numero: informe.ciclo.numero,
-            promedio_basal: parseFloat(informe.ciclo.promedio),
-            cuartil_basal: informe.ciclo.cuartil,
-            estado: 'pendiente',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        };
-
-        console.log('📤 Insertando en pda_cabecera...');
-        console.log('   ID:', pdaData.id, '| Agente:', pdaData.agente, '| Ciclo:', pdaData.ciclo_basal_numero);
-
-        const { error: cabeceraError } = await db
-            .from('pda_cabecera')
-            .insert(pdaData);
-
-        if (cabeceraError) {
-            console.error('❌ Error en pda_cabecera:', cabeceraError);
-            throw cabeceraError;
-        }
-
-        const pdaId = nuevoId;
-        console.log(`✅ PDA_CABECERA: #${pdaId}`);
-
-        // ======================================================
-        // 3. EXTRAER TODAS LAS FALLAS DEL INFORME
-        // ======================================================
-        const todasLasFallas = [];
-        // El informe tiene 'evaluaciones' que contienen 'fallas'
-        if (informe.evaluaciones && informe.evaluaciones.length > 0) {
-            for (const ev of informe.evaluaciones) {
-                if (ev.fallas && ev.fallas.length > 0) {
-                    for (const falla of ev.fallas) {
-                        todasLasFallas.push(falla);
-                    }
-                }
-            }
-        }
-        // Si no hay fallas en evaluaciones, intentar desde detalleQuiebres
-        if (todasLasFallas.length === 0 && informe.detalleQuiebres) {
-            // Si detalleQuiebres tiene evaluaciones con fallas
-            for (const ev of (informe.detalleQuiebres.evaluaciones || [])) {
-                if (ev.fallas && ev.fallas.length > 0) {
-                    for (const falla of ev.fallas) {
-                        todasLasFallas.push(falla);
-                    }
-                }
+        let mes = null, anio = null;
+        const fechaInicio = informe.ciclo.fechaInicio;
+        if (fechaInicio && fechaInicio !== 'N/A') {
+            const partes = fechaInicio.split('/');
+            if (partes.length === 3) {
+                mes = parseInt(partes[1]);
+                anio = parseInt(partes[2]);
             }
         }
 
-        console.log(`📊 Total fallas extraídas: ${todasLasFallas.length}`);
-
-        // ======================================================
-        // 4. GUARDAR ACCIONES EN PDA_ACCIONES
-        // ======================================================
-        if (todasLasFallas.length > 0) {
-            await crearAccionesPDADesdeMatriz(pdaId, todasLasFallas);
-        } else {
-            console.warn('⚠️ No hay fallas para crear acciones');
+        if (!mes || !anio) {
+            console.warn('⚠️ No se pudo extraer mes/año del ciclo, usando fecha actual');
+            const ahora = new Date();
+            mes = ahora.getMonth() + 1;
+            anio = ahora.getFullYear();
         }
 
-        // ======================================================
-        // 5. GUARDAR CICLO BASAL EN PDA_CICLOS_EVALUACION
-        // ======================================================
-        await guardarCicloBasalPDA(pdaId, informe);
+        console.log(`📅 Guardando con mes=${mes}, anio=${anio}, ciclo=${informe.ciclo.numero}`);
 
-        // ======================================================
-        // 6. GUARDAR DOCUMENTO EN PDA_DOCUMENTOS
-        // ======================================================
-        await guardarDocumentoPDA(pdaId, informe);
+        const response = await fetch('/api/reportes/guardar-pda', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                agente: informe.agente,
+                ciclo_numero: informe.ciclo.numero,
+                anio: anio,
+                mes: mes,
+                html_content: htmlContent
+            })
+        });
 
-        // ======================================================
-        // 7. RESUMEN FINAL
-        // ======================================================
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al guardar');
+        }
+
+        const result = await response.json();
+        console.log('✅ PDA guardado correctamente:', result);
         
-        console.log('\n📊 === RESUMEN DE INSERCIÓN ===');
-        console.log(`✅ pda_cabecera: ID ${pdaId}`);
-        console.log(`✅ pda_acciones: ${todasLasFallas.length} acciones`);
-        console.log(`✅ pda_ciclos_evaluacion: guardado`);
-        console.log(`✅ pda_documentos: guardado`);
-
-        alert(`✅ PDA COMPLETO GUARDADO\n\n` +
-            `👤 Agente: ${informe.agente}\n` +
-            `📊 Ciclo: #${informe.ciclo.numero}\n` +
-            `🆔 ID: ${pdaId}`);
-
-        await cargarDatosPDA();
+        const pdaId = result.id || result.pda_id;
+        if (pdaId) {
+            // 🔴 EL EVENTO "GENERADO" LO HACE EL SISTEMA (no hay persona específica)
+            await registrarEventoPDA(pdaId, 'generado', {
+                ciclo: informe.ciclo.numero,
+                promedio: informe.ciclo.promedio,
+                cuartil: informe.ciclo.cuartil,
+                total_evaluaciones: informe.ciclo.totalEvaluaciones
+            }, 'Sistema');
+            console.log(`✅ Evento "generado" registrado para PDA #${pdaId}`);
+        }
+        
         return true;
 
     } catch (error) {
         console.error('❌ Error:', error);
-        alert('❌ Error al guardar: ' + error.message);
         return false;
+    }
+}
+
+// ======================================================
+// FUNCIÓN: mostrarReporteExistente
+// ======================================================
+async function mostrarReporteExistente(agente, cicloNumero) {
+    console.log(`📄 Buscando reporte existente para ${agente} - Ciclo #${cicloNumero}`);
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const url = `/api/reportes/buscar?agente=${encodeURIComponent(agente)}&ciclo=${cicloNumero}`;
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            console.warn('⚠️ Error buscando reporte:', error);
+            alert('❌ No se pudo encontrar el reporte existente');
+            return;
+        }
+        
+        const data = await response.json();
+        console.log('📊 Respuesta buscar:', data);
+        
+        if (data.success && data.reporte && data.reporte.ruta_completa) {
+            const ruta = data.reporte.ruta_completa;
+            console.log(`✅ Reporte encontrado: ${ruta}`);
+            // Abrir en nueva pestaña
+            window.open(`/api/reportes/abrir-por-ruta?ruta=${encodeURIComponent(ruta)}`, '_blank');
+        } else {
+            alert('⚠️ No se encontró el reporte existente');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error mostrando reporte existente:', error);
+        alert('❌ Error al mostrar el reporte: ' + error.message);
     }
 }
 
@@ -17569,264 +20494,265 @@ async function generarIdUnicoPDA() {
     }
 }
 
-    // ======================================================
-    // FUNCIÓN: Cargar Meses Disponibles para el Selector Q3
-    // ======================================================
-    async function cargarMesesParaSelectorQ3() {
-        const select = document.getElementById('selectorMesQ3');
-        if (!select) return;
+// ======================================================
+// FUNCIÓN CORREGIDA - Usa SOLO lo que ya tienes
+// ======================================================
+async function cargarAgentesQ4PorMes() {
+    console.log('📊 cargarAgentesQ4PorMes - INICIO');
+    
+    const mesSeleccionado = document.getElementById('selectorMesQ4')?.value;
+    const filtroEstadoPDA = document.getElementById('selectorEstadoPDA')?.value || 'todos';
 
-        const evaluaciones = window.evaluacionesGlobales || [];
-        if (evaluaciones.length === 0) {
-            select.innerHTML = '<option value="">⚠️ Cargue evaluaciones primero</option>';
-            return;
-        }
-
-        const mesesSet = new Set();
-        
-        for (const e of evaluaciones) {
-            let fechaStr = e.fechaOriginal || e.fecha || '';
-            if (fechaStr) {
-                let fechaParte = fechaStr;
-                if (fechaStr.includes(' ')) fechaParte = fechaStr.split(' ')[0];
-                if (fechaStr.includes('T')) fechaParte = fechaStr.split('T')[0];
-                
-                const partes = fechaParte.split('/');
-                if (partes.length === 3) {
-                    const anio = partes[2];
-                    const mes = partes[1];
-                    if (anio && anio.match(/^\d{4}$/) && mes && mes.match(/^\d{1,2}$/)) {
-                        mesesSet.add(`${anio}-${mes.padStart(2, '0')}`);
-                    }
-                } else {
-                    const partesISO = fechaParte.split('-');
-                    if (partesISO.length === 3) {
-                        const anio = partesISO[0];
-                        const mes = partesISO[1];
-                        if (anio && anio.match(/^\d{4}$/) && mes && mes.match(/^\d{1,2}$/)) {
-                            mesesSet.add(`${anio}-${mes.padStart(2, '0')}`);
-                        }
-                    }
-                }
-            }
-        }
-
-        const meses = Array.from(mesesSet).sort();
-        const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-
-        select.innerHTML = '<option value="">-- Seleccionar mes --</option>';
-        
-        for (const mes of meses) {
-            const [anio, mesNum] = mes.split('-');
-            const nombreMes = mesesNombres[parseInt(mesNum) - 1];
-            select.innerHTML += `<option value="${mes}">${nombreMes} ${anio}</option>`;
-        }
-
-        if (meses.length > 0) {
-            select.value = meses[meses.length - 1];
-            await cargarAgentesQ3PorMes();
-        }
-
-        console.log(`✅ ${meses.length} meses cargados para el selector Q3`);
-    }
-
-    // ======================================================
-    // FUNCIÓN PRINCIPAL: Cargar Agentes en Q3 por Mes
-    // ======================================================
-    async function cargarAgentesQ3PorMes() {
-        const mesSeleccionado = document.getElementById('selectorMesQ3')?.value;
-        const filtroQ3 = document.getElementById('selectorFiltroQ3')?.value || 'con_historial';
-
-        if (!mesSeleccionado) {
-            const container = document.getElementById('agentesQ3PorMesContainer');
-            if (container) container.innerHTML = '<div style="text-align: center; padding: 40px;">📅 Seleccione un mes para ver los agentes en Q3</div>';
-            return;
-        }
-
-        const [anio, mes] = mesSeleccionado.split('-');
-        if (!anio || !mes) {
-            console.error('Formato de mes inválido:', mesSeleccionado);
-            return;
-        }
-
-        const container = document.getElementById('agentesQ3PorMesContainer');
-        if (container) container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Cargando agentes en Q3...</div>';
-
-        try {
-            const todasEvaluaciones = window.evaluacionesGlobales || [];
-            if (todasEvaluaciones.length === 0) {
-                container.innerHTML = '<div style="text-align: center; padding: 40px;">⚠️ No hay evaluaciones cargadas.</div>';
-                return;
-            }
-
-            const agentesUnicos = [...new Set(todasEvaluaciones.map(e => e.agente))];
-            
-            // Cargar PDA para saber si un ciclo Q4 tuvo PDA asociado
-            await cargarDatosPDA();
-            
-            // Crear mapa de ciclos Q4 que tuvieron PDA
-            const ciclosQ4ConPDA = new Set();
-            (window.datosPDA || []).forEach(pda => {
-                if (pda.ciclo_basal_numero && pda.agente) {
-                    ciclosQ4ConPDA.add(`${pda.agente}|${pda.ciclo_basal_numero}`);
-                }
-            });
-
-            const resultados = [];
-
-            for (const agente of agentesUnicos) {
-                const ciclos = await agruparEvaluacionesEnCiclos(agente);
-                if (ciclos.length === 0) continue;
-                
-                // Primero, identificar qué ciclos Q4 tuvo este agente (para saber historial)
-                const ciclosQ4 = ciclos.filter(c => c.cuartil === 'Q4' && c.esCompleto);
-                const tieneHistorialQ4 = ciclosQ4.length > 0;
-                
-                // Si el filtro es "con_historial" y no tiene historial Q4, saltar
-                if (filtroQ3 === 'con_historial' && !tieneHistorialQ4) continue;
-                
-                for (const ciclo of ciclos) {
-                    // Buscar ciclos Q3 completos
-                    if (ciclo.cuartil === 'Q3' && ciclo.esCompleto) {
-                        // Extraer fecha de fin del ciclo
-                        let fechaFinCiclo = null;
-                        if (ciclo.fechaFin && ciclo.fechaFin !== 'N/A') {
-                            const partes = ciclo.fechaFin.split('/');
-                            if (partes.length === 3) {
-                                fechaFinCiclo = new Date(partes[2], partes[1] - 1, partes[0]);
-                            }
-                        }
-                        
-                        if (fechaFinCiclo && 
-                            fechaFinCiclo.getFullYear() == anio && 
-                            (fechaFinCiclo.getMonth() + 1) == mes) {
-                            
-                            // Construir lista de ciclos Q4 con sus meses
-                            const historialQ4List = ciclosQ4.map(c => {
-                                let mesFin = '';
-                                if (c.fechaFin && c.fechaFin !== 'N/A') {
-                                    const partes = c.fechaFin.split('/');
-                                    if (partes.length === 3) {
-                                        const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-                                        mesFin = `${mesesNombres[parseInt(partes[1]) - 1]} ${partes[2]}`;
-                                    }
-                                }
-                                const tienePDA = ciclosQ4ConPDA.has(`${agente}|${c.numero}`);
-                                return `#${c.numero} (${mesFin})${tienePDA ? ' 📋' : ''}`;
-                            });
-                            
-                            resultados.push({
-                                agente: agente,
-                                ciclo: ciclo.numero,
-                                fechaInicio: ciclo.fechaInicio,
-                                fechaFin: ciclo.fechaFin,
-                                totalEvaluaciones: ciclo.totalEvaluaciones,
-                                promedio: ciclo.promedio,
-                                promedioENC: ciclo.promedioENC,
-                                promedioECUF: ciclo.promedioECUF,
-                                promedioECN: ciclo.promedioECN,
-                                cuartil: ciclo.cuartil,
-                                tieneHistorialQ4: tieneHistorialQ4,
-                                historialQ4List: historialQ4List,
-                                cantidadCiclosQ4: ciclosQ4.length
-                            });
-                        }
-                    }
-                }
-            }
-
-            // Mostrar resultados
-            mostrarResultadosQ3(resultados, mesSeleccionado);
-
-        } catch (error) {
-            console.error('Error en cargarAgentesQ3PorMes:', error);
-            if (container) container.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--danger);">❌ Error: ${error.message}</div>`;
-        }
-    }
-
-    // ======================================================
-    // FUNCIÓN: Mostrar Resultados Q3
-    // ======================================================
-    function mostrarResultadosQ3(resultados, mesSeleccionado) {
-        const container = document.getElementById('agentesQ3PorMesContainer');
-        if (!container) return;
-
-        const [anio, mesNum] = mesSeleccionado.split('-');
-        const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-        const nombreMes = mesesNombres[parseInt(mesNum) - 1];
-
-        if (resultados.length === 0) {
+    if (!mesSeleccionado) {
+        const container = document.getElementById('agentesQ4PorMesContainer');
+        if (container) {
             container.innerHTML = `
-                <div class="card" style="background: #fff8e0; margin-top: 15px;">
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span style="font-size: 24px;">✅</span>
-                        <div>
-                            <strong>No hay agentes en Q3 con historial Q4 para ${nombreMes} ${anio}</strong>
-                            <span style="font-size: 13px;">Todos los Q3 de este mes no tienen antecedentes de Q4.</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-            return;
-        }
-
-        let html = `
-            <div style="margin-top: 15px;">
-                <div style="background: #fff8e0; padding: 8px 15px; border-radius: 8px; margin-bottom: 15px;">
-                    📊 Mostrando ${resultados.length} resultado(s) para ${nombreMes} ${anio}
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-        `;
-
-        for (const item of resultados) {
-            const historialTexto = item.historialQ4List.length > 0 
-                ? item.historialQ4List.join(', ') 
-                : 'Sin historial Q4';
-            
-            const alertaBadge = item.cantidadCiclosQ4 > 0 
-                ? `<span class="badge" style="background: #f39c12;">⚠️ ${item.cantidadCiclosQ4} ciclo(s) Q4 previo(s)</span>`
-                : '<span class="badge" style="background: #6c757d;">✅ Sin historial Q4</span>';
-
-            html += `
-                <div class="card" style="border-left: 5px solid #f39c12; padding: 16px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                        <div style="flex: 1;">
-                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                <strong style="font-size: 16px;">🟡 ${escapeHtml(item.agente)}</strong>
-                                ${alertaBadge}
-                                <span style="font-size: 11px; background: #e9ecef; padding: 2px 8px; border-radius: 12px;">
-                                    📊 Ciclo #${item.ciclo} (${item.totalEvaluaciones}/5 eval)
-                                </span>
-                            </div>
-                            <div style="display: flex; gap: 15px; margin-top: 8px; flex-wrap: wrap;">
-                                <span>📊 Promedio ciclo: <strong style="color: #f39c12;">${item.promedio}%</strong></span>
-                                <span>📅 Período: ${item.fechaInicio} → ${item.fechaFin}</span>
-                                <span>🎯 ENC: ${item.promedioENC}%</span>
-                                <span>⚠️ ECUF: ${item.promedioECUF}%</span>
-                                <span>💰 ECN: ${item.promedioECN}%</span>
-                            </div>
-                            <div style="margin-top: 8px; font-size: 12px; color: var(--muted);">
-                                📜 Historial Q4: ${historialTexto}
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 8px;">
-                            <button onclick="verEvolucionCiclos('${escapeHtml(item.agente)}')" 
-                                    style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer;">
-                                📊 Ver evolución
-                            </button>
-                            <button onclick="mostrarTimeline('${escapeHtml(item.agente)}')" 
-                                    style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer;">
-                                📅 Ver timeline
-                            </button>
-                        </div>
-                    </div>
+                <div style="text-align: center; padding: 40px; color: var(--muted);">
+                    📅 Seleccione un mes para ver los agentes en Q4
                 </div>
             `;
         }
-
-        html += `</div>`;
-        container.innerHTML = html;
+        return;
     }
+
+    const [anio, mes] = mesSeleccionado.split('-');
+    if (!anio || !mes) {
+        console.error('Formato de mes inválido:', mesSeleccionado);
+        return;
+    }
+
+    const container = document.getElementById('agentesQ4PorMesContainer');
+    if (container) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+                ⏳ Cargando agentes en Q4...
+            </div>
+        `;
+    }
+
+    try {
+        // ======================================================
+        // PASO 1: Asegurar evaluaciones
+        // ======================================================
+        if (!window.evaluacionesGlobales || window.evaluacionesGlobales.length === 0) {
+            console.log('🔄 Cargando evaluaciones...');
+            await cargarEvaluacionesDesdePostgreSQL();
+        }
+
+        // ======================================================
+        // PASO 2: Asegurar ranking completo
+        // ======================================================
+        if (!window.rankingCompletoGlobal || window.rankingCompletoGlobal.length === 0) {
+            console.log('🔄 Construyendo ranking...');
+            const evaluaciones = window.evaluacionesGlobales || [];
+            window.rankingCompletoGlobal = await construirRankingAgentes(evaluaciones);
+        }
+
+        console.log(`📊 Ranking: ${window.rankingCompletoGlobal.length} agentes`);
+
+        // ======================================================
+// PASO 3: Filtrar agentes Q4 del mes seleccionado
+// ======================================================
+const resultados = [];
+const anioNum = parseInt(anio);
+const mesNum = parseInt(mes);
+
+for (const agente of window.rankingCompletoGlobal) {
+    if (agente.cuartil !== 'Q4') continue;
+    
+    const ciclos = await agruparEvaluacionesEnCiclos(agente.agente);
+    const ciclosQ4 = ciclos.filter(c => c.cuartil === 'Q4' && c.esCompleto);
+    
+    let cicloEncontrado = null;
+    for (const ciclo of ciclosQ4) {
+        if (ciclo.fechaFin && ciclo.fechaFin !== 'N/A') {
+            let mesCiclo, anioCiclo;
+            
+            if (typeof ciclo.fechaFin === 'string') {
+                if (ciclo.fechaFin.includes('/')) {
+                    const partes = ciclo.fechaFin.split('/');
+                    if (partes.length === 3) {
+                        mesCiclo = parseInt(partes[1]);
+                        anioCiclo = parseInt(partes[2]);
+                    }
+                } else if (ciclo.fechaFin.includes('-')) {
+                    const partes = ciclo.fechaFin.split('-');
+                    if (partes.length >= 2) {
+                        anioCiclo = parseInt(partes[0]);
+                        mesCiclo = parseInt(partes[1]);
+                    }
+                }
+            } else if (ciclo.fechaFin instanceof Date || ciclo.fechaFin?.getMonth) {
+                mesCiclo = ciclo.fechaFin.getMonth() + 1;
+                anioCiclo = ciclo.fechaFin.getFullYear();
+            }
+            
+            if (anioCiclo === anioNum && mesCiclo === mesNum) {
+                cicloEncontrado = ciclo;
+                break;
+            }
+        }
+    }
+    
+    if (!cicloEncontrado) continue;
+    
+    const tienePDA = (window.datosPDA || []).some(pda => 
+        pda.agente === agente.agente && 
+        pda.ciclo_basal_numero === cicloEncontrado.numero &&
+        ['pendiente', 'notificado', 'en_gestion', 'en_seguimiento', 
+         'pendiente_operaciones', 'gestor_notificado', 'enviado_capacitacion'].includes(pda.estado)
+    );
+    
+    // ✅ CORREGIDO: Usar el promedio del ciclo, NO el del ranking
+    resultados.push({
+        agente: agente.agente,
+        promedio: cicloEncontrado.promedio,  // ← AHORA USA 79.6% (no 89.8%)
+        total_evaluaciones: cicloEncontrado.totalEvaluaciones,
+        fecha_inicio: cicloEncontrado.fechaInicio,
+        fecha_fin: cicloEncontrado.fechaFin,
+        ciclo_numero: cicloEncontrado.numero,
+        tienePDAactivo: tienePDA
+    });
+}
+
+        // ======================================================
+        // PASO 4: Aplicar filtro de estado PDA
+        // ======================================================
+        let resultadosFiltrados = resultados;
+        if (filtroEstadoPDA === 'sin_pda') {
+            resultadosFiltrados = resultados.filter(r => !r.tienePDAactivo);
+        } else if (filtroEstadoPDA === 'con_pda') {
+            resultadosFiltrados = resultados.filter(r => r.tienePDAactivo);
+        }
+
+        // ======================================================
+        // PASO 5: RENDERIZAR RESULTADOS
+        // ======================================================
+        renderizarResultadosQ4Interno(resultadosFiltrados, mesSeleccionado, resultados.length);
+
+    } catch (error) {
+        console.error('❌ Error en cargarAgentesQ4PorMes:', error);
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: var(--danger);">
+                    ❌ Error: ${error.message}
+                </div>
+            `;
+        }
+    }
+}
+
+// ======================================================
+// FUNCIÓN DE RENDERIZADO INTERNO
+// ======================================================
+function renderizarResultadosQ4Interno(resultados, mesSeleccionado, totalSinFiltrar) {
+    const container = document.getElementById('agentesQ4PorMesContainer');
+    if (!container) return;
+
+    const [anio, mesNum] = mesSeleccionado.split('-');
+    const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const nombreMes = mesesNombres[parseInt(mesNum) - 1];
+
+    if (resultados.length === 0) {
+        container.innerHTML = `
+            <div style="background: #fff4e5; margin-top: 15px; padding: 20px; border-radius: 12px; border: 1px solid #f39c12;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 24px;">✅</span>
+                    <div>
+                        <strong>No hay agentes en Q4 para ${nombreMes} ${anio}</strong>
+                        <div style="font-size: 13px; color: var(--muted);">
+                            (Total ciclos evaluados: ${totalSinFiltrar})
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div style="margin-top: 15px;">
+            <div style="background: #f0f7ff; padding: 8px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <span>
+                    📊 Mostrando <strong>${resultados.length}</strong> resultado(s) para <strong>${nombreMes} ${anio}</strong>
+                </span>
+                <span style="font-size: 12px; color: var(--muted);">
+                    Total ciclos completos en Q4: ${totalSinFiltrar}
+                </span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+    `;
+
+    for (const item of resultados) {
+        const tienePDAactivo = item.tienePDAactivo;
+        const infoPDA = obtenerInfoPDA(item.agente, 'Q4');
+
+        let estadoBadge = '';
+        let botonPDA = '';
+
+        if (tienePDAactivo) {
+            estadoBadge = '<span class="badge" style="background: var(--accent);">📋 PDA en curso</span>';
+            botonPDA = `
+                <button onclick="abrirGestionPDADesdeAlerta('${escapeHtml(item.agente)}')" 
+                        style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                    📝 Ver PDA en curso
+                </button>
+            `;
+        } else {
+            estadoBadge = '<span class="badge" style="background: var(--danger);">🔴 Requiere PDA</span>';
+            botonPDA = `
+                <button onclick="generarPDAConDocumento('${escapeHtml(item.agente)}', ${item.ciclo_numero})" 
+                        style="background: var(--warning); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                    📋 Generar PDA
+                </button>
+            `;
+        }
+
+        html += `
+            <div style="border-left: 5px solid var(--danger); padding: 16px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e0e0e0;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <strong style="font-size: 16px;">⚠️ ${escapeHtml(item.agente)}</strong>
+                            ${estadoBadge}
+                            <span style="font-size: 11px; background: #e9ecef; padding: 2px 8px; border-radius: 12px; white-space: nowrap;">
+                                📊 Ciclo #${item.ciclo_numero} (${item.total_evaluaciones}/5 eval)
+                            </span>
+                        </div>
+                        <div style="display: flex; gap: 15px; margin-top: 8px; flex-wrap: wrap; font-size: 13px;">
+                            <span>📊 Promedio ciclo: <strong style="color: var(--danger);">${item.promedio}%</strong></span>
+                            <span>📅 Período: ${item.fecha_inicio} → ${item.fecha_fin}</span>
+                        </div>
+                        ${infoPDA.total > 0 && infoPDA.total !== '-' ? `
+                        <div style="margin-top: 6px; font-size: 11px; color: var(--muted);">
+                            📋 PDA aplicados: ${infoPDA.total} | Último PDA: ${infoPDA.ultimaFecha || 'N/A'}
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        ${botonPDA}
+                        <button onclick="verEvolucionCiclos('${escapeHtml(item.agente)}')" 
+                                style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                            📊 Ver evolución
+                        </button>
+                        <button onclick="mostrarTimeline('${escapeHtml(item.agente)}')" 
+                                style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                            📅 Ver timeline
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    html += `
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+   
 
 // ======================================================
 // FUNCIÓN: generarDocumentoHTML (COMPLETA Y CORREGIDA)
@@ -20912,47 +23838,126 @@ function generarDocumentoHTML(data) {
     }
     // ===== FIN FUNCIÓN: generarDetalleErroresAuditorHTML ===================
 
-    // ===== 28. INICIO FUNCIÓN: calcularProductividadAuditor ================
-    async function calcularProductividadAuditor(evaluaciones) {
-        if (!evaluaciones || evaluaciones.length === 0) {
-            return { porAuditor: 0, capacidadTotal: 0 };
+    // ======================================================
+// FUNCIÓN: calcularProductividadAuditor (CON TOKEN RENOVADO)
+// ======================================================
+async function calcularProductividadAuditor(evaluaciones) {
+    console.log('📊 calcularProductividadAuditor - INICIO');
+    console.log(`   Evaluaciones recibidas: ${evaluaciones?.length || 0}`);
+    
+    if (!evaluaciones || evaluaciones.length === 0) {
+        console.log('⚠️ No hay evaluaciones, retornando 0');
+        return { porAuditor: 0, capacidadTotal: 0 };
+    }
+
+    try {
+        // 🔴 OBTENER TOKEN ACTUAL
+        const token = localStorage.getItem('meca_token');
+        
+        if (!token) {
+            console.warn('⚠️ No hay token disponible, usando fallback local');
+            return calcularProductividadLocal(evaluaciones);
         }
 
+        // 🔴 OBTENER AUDITORES ACTIVOS DESDE LA BD CON EL TOKEN
+        let auditoresActivos = [];
+        let errorAutenticacion = false;
+        
         try {
-            // 🔴 CAMBIO: Usar API en lugar de PostgreSQL directo
-            const auditores = await API.getAuditoresActivos();
-            
-            const numeroAuditores = auditores?.length || 2;
-
-            // Obtener días únicos trabajados
-            let fechasUnicas = [];
-            evaluaciones.forEach(e => {
-                let fechaStr = e.fechaOriginal || e.fecha || '';
-                if (fechaStr) {
-                    let fechaSolo = fechaStr.split(' ')[0];
-                    if (fechaSolo && !fechasUnicas.includes(fechaSolo)) {
-                        fechasUnicas.push(fechaSolo);
-                    }
+            console.log('📡 Solicitando auditores activos a la BD...');
+            const response = await fetch('/api/usuarios/auditores-activos', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
                 }
             });
+            
+            if (!response.ok) {
+                if (response.status === 401) {
+                    console.warn('⚠️ Token expirado o inválido. Intentando renovar...');
+                    errorAutenticacion = true;
+                    
+                    // Intentar renovar sesión
+                    const renovado = await renovarSesion();
+                    if (renovado) {
+                        // Reintentar con el nuevo token
+                        const nuevoToken = localStorage.getItem('meca_token');
+                        const retryResponse = await fetch('/api/usuarios/auditores-activos', {
+                            headers: {
+                                'Authorization': `Bearer ${nuevoToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        if (retryResponse.ok) {
+                            auditoresActivos = await retryResponse.json();
+                            console.log(`   ✅ ${auditoresActivos.length} auditores activos (después de renovar)`);
+                        }
+                    }
+                } else {
+                    console.warn(`⚠️ Error ${response.status} al obtener auditores`);
+                }
+            } else {
+                auditoresActivos = await response.json();
+                console.log(`   ✅ ${auditoresActivos.length} auditores activos desde BD`);
+            }
+        } catch (fetchError) {
+            console.warn('⚠️ Error de red al obtener auditores:', fetchError.message);
+        }
 
-            const diasTrabajados = fechasUnicas.length;
-            if (diasTrabajados === 0) return { porAuditor: 0, capacidadTotal: 0 };
+        // 🔴 FALLBACK: Si no se obtuvieron auditores de la BD, contar de evaluaciones
+        if (auditoresActivos.length === 0) {
+            console.log('📊 Usando fallback: auditores desde evaluaciones');
+            const auditoresSet = new Set();
+            evaluaciones.forEach(e => {
+                if (e.evaluador) auditoresSet.add(e.evaluador);
+            });
+            auditoresActivos = Array.from(auditoresSet);
+            console.log(`   👥 ${auditoresActivos.length} auditores únicos desde evaluaciones`);
+        }
 
-            const totalEvaluaciones = evaluaciones.length;
-            const productividadReal = totalEvaluaciones / (numeroAuditores * diasTrabajados);
-            const capacidadReal = totalEvaluaciones / diasTrabajados;
+        const numeroAuditores = Math.max(auditoresActivos.length, 1);
+        console.log(`   👥 Auditores considerados: ${numeroAuditores}`);
 
-            return {
-                porAuditor: Math.round(productividadReal),
-                capacidadTotal: Math.round(capacidadReal)
-            };
+        // Obtener días únicos trabajados
+        const fechasUnicas = new Set();
+        evaluaciones.forEach(e => {
+            let fechaStr = e.fechaOriginal || e.fecha || '';
+            if (fechaStr) {
+                let fechaSolo = fechaStr.split(' ')[0];
+                if (fechaSolo) {
+                    fechasUnicas.add(fechaSolo);
+                }
+            }
+        });
 
-        } catch (error) {
-            console.error('Error calculando productividad:', error);
+        const diasTrabajados = fechasUnicas.size;
+        console.log(`   📅 Días trabajados: ${diasTrabajados}`);
+        
+        if (diasTrabajados === 0) {
+            console.log('⚠️ No hay días trabajados, retornando 0');
             return { porAuditor: 0, capacidadTotal: 0 };
         }
+
+        const totalEvaluaciones = evaluaciones.length;
+        console.log(`   📊 Total evaluaciones: ${totalEvaluaciones}`);
+        
+        const productividadReal = totalEvaluaciones / (numeroAuditores * diasTrabajados);
+        const capacidadReal = totalEvaluaciones / diasTrabajados;
+
+        const resultado = {
+            porAuditor: Math.round(productividadReal * 10) / 10,
+            capacidadTotal: Math.round(capacidadReal * 10) / 10
+        };
+        
+        console.log(`   ✅ Resultado: porAuditor=${resultado.porAuditor}, capacidadTotal=${resultado.capacidadTotal}`);
+        return resultado;
+
+    } catch (error) {
+        console.error('❌ Error calculando productividad:', error);
+        // Fallback final
+        return calcularProductividadLocal(evaluaciones);
     }
+}
     // ===== FIN FUNCIÓN: calcularProductividadAuditor =======================
 
 // =============================CIERRE BLOQUE 6==========================================    
@@ -23349,7 +26354,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     // ===== FIN FUNCIÓN: marcarIncidenciaResuelta ===========================
 
     // ===== 29. INICIO FUNCIÓN: cargarHistorialLotes =======================
-    let lotesHistorialGlobal = [];
+    
     let loteSeleccionadoId = null;            
     async function cargarHistorialLotes() {
         console.log('📦 Cargando historial de lotes...');
@@ -33210,10 +36215,7 @@ async function showTab(tabName, event) {
                 await cargarAgentesQ4PorMes();
                 console.log('✅ Agentes Q4 cargados');
             }
-            if (typeof cargarAgentesQ3PorMes === 'function') {
-                await cargarAgentesQ3PorMes();
-                console.log('✅ Agentes Q3 cargados');
-            }
+           
             
             // 6. Evolución de cuartiles
             setTimeout(() => {
@@ -33293,11 +36295,15 @@ async function showTab(tabName, event) {
             }
         }
 
-        if (tabName === 'reportespda') {
-            // Esperar a que el DOM se actualice
-            setTimeout(async () => {
+        // Si es la pestaña de reportes, cargar datos
+        if (tabName === 'reportespda' || tabName === 'reportesAuto') {
+            console.log('📊 Cargando datos de reportes...');
+            setTimeout(() => {
+                if (typeof cargarTareasReportes === 'function') {
+                    cargarTareasReportes();
+                }
                 if (typeof cargarEstadoReportes === 'function') {
-                    await cargarEstadoReportes();
+                    cargarEstadoReportes();
                 }
             }, 300);
         }
@@ -33318,96 +36324,35 @@ async function showTab(tabName, event) {
     }
     // ===== FIN FUNCIÓN: escapeHtml =========================================
 
-    // ===== 3. INICIO FUNCIÓN: formatearFechaPeru ===========================
-        function formatearFechaPeru(fechaIso) {
-            if (!fechaIso) return '-';
+    // ======================================================
+    // FORMATEAR DURACIÓN (para mostrar en el timeline)
+    // ======================================================
+    function formatearDuracion(fechaInicio, fechaFin) {
+        if (!fechaInicio) return '-';
+        
+        try {
+            const inicio = new Date(fechaInicio);
+            const fin = fechaFin ? new Date(fechaFin) : new Date();
             
-            try {
-                // Crear fecha en UTC y luego ajustar manualmente a UTC-5
-                // PostgreSQL guarda en UTC, Perú es UTC-5 (sin horario de verano)
-                
-                // Método 1: Parsear el string ISO directamente y restar 5 horas
-                let fechaStr = fechaIso;
-                
-                // Si tiene formato ISO completo (2026-04-04T18:53:07.697Z)
-                if (fechaIso.includes('T') && fechaIso.includes('Z')) {
-                    const fecha = new Date(fechaIso);
-                    // Restar 5 horas manualmente (sin usar toLocaleString que puede tener problemas)
-                    const offsetPeru = -5 * 60; // -5 horas en minutos
-                    const utc = fecha.getTime() + (fecha.getTimezoneOffset() * 60000);
-                    const fechaPeru = new Date(utc + (offsetPeru * 60000));
-                    
-                    const dia = fechaPeru.getUTCDate().toString().padStart(2, '0');
-                    const mes = (fechaPeru.getUTCMonth() + 1).toString().padStart(2, '0');
-                    const anio = fechaPeru.getUTCFullYear();
-                    const horas = fechaPeru.getUTCHours().toString().padStart(2, '0');
-                    const minutos = fechaPeru.getUTCMinutes().toString().padStart(2, '0');
-                    
-                    return `${dia}/${mes}/${anio} ${horas}:${minutos}`;
-                }
-                
-                // Si tiene formato YYYY-MM-DDTHH:MM:SS (sin Z)
-                if (fechaIso.includes('T') && !fechaIso.includes('Z')) {
-                    // Reemplazar la T por espacio y eliminar milisegundos
-                    let limpia = fechaIso.replace('T', ' ').split('.')[0];
-                    
-                    // Verificar si ya tiene formato DD/MM/YYYY HH:MM
-                    if (limpia.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
-                        const [fechaParte, horaParte] = limpia.split(' ');
-                        const [anio, mes, dia] = fechaParte.split('-');
-                        
-                        // Convertir hora de UTC a UTC-5
-                        let [horas, minutos, segundos] = horaParte.split(':');
-                        let horasInt = parseInt(horas);
-                        horasInt = horasInt - 5;
-                        if (horasInt < 0) horasInt += 24;
-                        
-                        return `${dia}/${mes}/${anio} ${horasInt.toString().padStart(2, '0')}:${minutos}`;
-                    }
-                }
-                
-                // Si ya tiene formato DD/MM/YYYY (asumir que ya está en hora local)
-                if (fechaIso.match(/^\d{2}\/\d{2}\/\d{4}/)) {
-                    return fechaIso.split(' ')[0];
-                }
-                
-                return fechaIso;
-                
-            } catch (error) {
-                console.error('Error formateando fecha a Perú:', error);
-                return fechaIso;
-            }
-        }
-
-        // ======================================================
-        // FORMATEAR DURACIÓN (para mostrar en el timeline)
-        // ======================================================
-        function formatearDuracion(fechaInicio, fechaFin) {
-            if (!fechaInicio) return '-';
+            // Ajustar a UTC-5 para cálculo
+            const offsetPeru = -5 * 60;
             
-            try {
-                const inicio = new Date(fechaInicio);
-                const fin = fechaFin ? new Date(fechaFin) : new Date();
-                
-                // Ajustar a UTC-5 para cálculo
-                const offsetPeru = -5 * 60;
-                
-                const inicioPeru = new Date(inicio.getTime() + (offsetPeru * 60000));
-                const finPeru = new Date(fin.getTime() + (offsetPeru * 60000));
-                
-                const diffMs = finPeru - inicioPeru;
-                const diffHoras = Math.floor(diffMs / (1000 * 60 * 60));
-                const diffMinutos = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                
-                if (diffHoras > 0) {
-                    return `${diffHoras}h ${diffMinutos}m`;
-                }
-                return `${diffMinutos}m`;
-                
-            } catch(e) {
-                return '-';
+            const inicioPeru = new Date(inicio.getTime() + (offsetPeru * 60000));
+            const finPeru = new Date(fin.getTime() + (offsetPeru * 60000));
+            
+            const diffMs = finPeru - inicioPeru;
+            const diffHoras = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffMinutos = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            
+            if (diffHoras > 0) {
+                return `${diffHoras}h ${diffMinutos}m`;
             }
+            return `${diffMinutos}m`;
+            
+        } catch(e) {
+            return '-';
         }
+    }
     // ===== FIN FUNCIÓN: formatearFechaPeru =================================
 
     // ===== 4. INICIO FUNCIÓN: formatearFechaDiaMes =========================
@@ -33768,57 +36713,87 @@ async function showTab(tabName, event) {
     
     // ===== 19. INICIO FUNCIÓN: destruirGraficoPorCanvas ====================
     function destruirGraficoPorCanvas(canvasId) {
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return false;
-
-        // Buscar la instancia del gráfico por su ID
-        const chartKey = `chart-${canvasId}`;
-
-        // Método 1: Buscar en window por nombre común
-        const posiblesNombres = [
-            canvasId,
-            chartKey,
-            `chart_${canvasId}`,
-            canvasId.replace('chart', '').toLowerCase()
-        ];
-
-        for (const nombre of posiblesNombres) {
-            if (window[nombre] && typeof window[nombre].destroy === 'function') {
-                try {
-                    window[nombre].destroy();
-                    window[nombre] = null;
-                    console.log(`✅ Gráfico "${nombre}" destruido`);
-                    return true;
-                } catch (e) {
-                    console.warn(`Error destruyendo ${nombre}:`, e.message);
-                }
-            }
-        }
-
-        // Método 2: Buscar en Chart.instances (si existe)
-        if (Chart && Chart.instances) {
-            for (const [id, instance] of Object.entries(Chart.instances)) {
-                if (instance.canvas && instance.canvas.id === canvasId) {
-                    try {
-                        instance.destroy();
-                        console.log(`✅ Gráfico con canvas "${canvasId}" destruido vía Chart.instances`);
-                        return true;
-                    } catch (e) { }
-                }
-            }
-        }
-
-        // Método 3: Limpiar el canvas manualmente
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-            canvas.width = canvas.clientWidth;
-            canvas.height = canvas.clientHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            console.log(`🧹 Canvas "${canvasId}" limpiado manualmente`);
-        }
-
+    console.log(`🧹 destruirGraficoPorCanvas - Intentando destruir: ${canvasId}`);
+    
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        console.log(`   Canvas ${canvasId} no encontrado en el DOM`);
         return false;
     }
+
+    // 🔴 MÉTODO 1: Buscar en Chart.instances (la más confiable)
+    if (Chart && Chart.instances) {
+        let instanciaEncontrada = null;
+        for (const [id, instance] of Object.entries(Chart.instances)) {
+            if (instance.canvas && instance.canvas.id === canvasId) {
+                instanciaEncontrada = instance;
+                break;
+            }
+        }
+        if (instanciaEncontrada) {
+            try {
+                instanciaEncontrada.destroy();
+                console.log(`✅ Gráfico con canvas "${canvasId}" destruido vía Chart.instances`);
+                return true;
+            } catch (e) {
+                console.warn(`   Error destruyendo instancia:`, e);
+            }
+        }
+    }
+
+    // 🔴 MÉTODO 2: Buscar en window por nombres comunes
+    const posiblesNombres = [
+        canvasId,
+        `chart${canvasId.charAt(0).toUpperCase() + canvasId.slice(1)}`,
+        `chart_${canvasId}`,
+        canvasId.replace('chart', '').toLowerCase(),
+        // Nombres específicos para este caso
+        'chartEvolutivoCuartiles',
+        'chartComparativa',
+        'chartGestionLlamadas',
+        'chartDistribucionRangos',
+        'chartEvolutivoAudios',
+        'chartEvolutivoAtributos',
+        'chartEvolutivoQuiebres',
+        'chartEvolutivo',
+        'chartEvolutivoFrentes',
+        'chartResultados',
+        'chartTendencias',
+        'chartAuditoriasPorAuditor',
+        'chartEvolutivoAuditorias',
+        'chartTablasSize'
+    ];
+
+    for (const nombre of posiblesNombres) {
+        if (window[nombre] && typeof window[nombre].destroy === 'function') {
+            try {
+                window[nombre].destroy();
+                window[nombre] = null;
+                console.log(`✅ Gráfico "${nombre}" destruido desde window`);
+                return true;
+            } catch (e) {
+                console.warn(`   Error destruyendo ${nombre}:`, e.message);
+            }
+        }
+    }
+
+    // 🔴 MÉTODO 3: Limpiar el canvas manualmente
+    try {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            canvas.width = canvas.clientWidth || 1;
+            canvas.height = canvas.clientHeight || 1;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            console.log(`🧹 Canvas "${canvasId}" limpiado manualmente`);
+            return true;
+        }
+    } catch (e) {
+        console.warn(`   Error limpiando canvas:`, e);
+    }
+
+    console.log(`⚠️ No se pudo destruir el gráfico del canvas "${canvasId}"`);
+    return false;
+}
     // ===== FIN FUNCIÓN: destruirGraficoPorCanvas ===========================
 
     // ===== 20. INICIO FUNCIÓN: destruirTodosLosGraficosCompleto ============
@@ -34197,20 +37172,65 @@ async function showTab(tabName, event) {
     // ===== FIN FUNCIÓN: convertirFechaDDMMYYYYaISO =========================
     
     // ===== 31. INICIO FUNCIÓN: formatearFechaParaDocumento =================
-    function formatearFechaParaDocumento(fechaStr) {
-        if (!fechaStr) return 'N/A';
-
-        if (fechaStr.includes('/')) {
-            return fechaStr.split(' ')[0];
-        }
-
-        if (fechaStr.includes('-')) {
-            const [anio, mes, dia] = fechaStr.split('T')[0].split('-');
-            return `${dia}/${mes}/${anio}`;
-        }
-
-        return fechaStr;
+    function formatearFechaParaDocumento(fecha) {
+    if (!fecha) return 'N/A';
+    
+    // ======================================================
+    // CASO 1: Ya es un objeto Date
+    // ======================================================
+    if (fecha instanceof Date) {
+        if (isNaN(fecha.getTime())) return 'N/A';
+        const dia = String(fecha.getDate()).padStart(2, '0');
+        const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+        const anio = fecha.getFullYear();
+        return `${dia}/${mes}/${anio}`;
     }
+    
+    // ======================================================
+    // CASO 2: Es un string
+    // ======================================================
+    if (typeof fecha === 'string') {
+        // Formato DD/MM/YYYY
+        if (fecha.includes('/')) {
+            const partes = fecha.split(' ')[0].split('/');
+            if (partes.length === 3) {
+                // Validar que sean números
+                const dia = partes[0].padStart(2, '0');
+                const mes = partes[1].padStart(2, '0');
+                const anio = partes[2];
+                if (anio && anio.match(/^\d{4}$/)) {
+                    return `${dia}/${mes}/${anio}`;
+                }
+            }
+        }
+        // Formato YYYY-MM-DD
+        if (fecha.includes('-')) {
+            const partes = fecha.split('T')[0].split('-');
+            if (partes.length === 3) {
+                const anio = partes[0];
+                const mes = partes[1].padStart(2, '0');
+                const dia = partes[2].padStart(2, '0');
+                if (anio && anio.match(/^\d{4}$/)) {
+                    return `${dia}/${mes}/${anio}`;
+                }
+            }
+        }
+        return fecha;
+    }
+    
+    // ======================================================
+    // CASO 3: Tiene método toDateString (es Date-like)
+    // ======================================================
+    if (fecha && typeof fecha.getMonth === 'function') {
+        const dia = String(fecha.getDate()).padStart(2, '0');
+        const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+        const anio = fecha.getFullYear();
+        return `${dia}/${mes}/${anio}`;
+    }
+    
+    // Fallback
+    return String(fecha);
+}
     // ===== FIN FUNCIÓN: formatearFechaParaDocumento ========================
     
     // ===== 32. INICIO FUNCIÓN: crearPDAEnPostgreSQL ==========================
@@ -40093,54 +43113,6 @@ async function testSharepointConexion() {
 // FUNCIONES PARA REPORTES AUTOMÁTICOS
 // =============================================
 
-let estadoReportesCache = null;
-
-/**
- * Actualiza la tabla de tareas programadas
- */
-function actualizarTablaTareasReportes(tareas) {
-    console.log('📋 Actualizando tabla de tareas...', tareas?.length || 0);
-    
-    const tbody = document.getElementById('tablaTareasReportes');
-    if (!tbody) {
-        console.warn('⚠️ tablaTareasReportes no encontrada');
-        return;
-    }
-    
-    if (!tareas || tareas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">📭 No hay tareas programadas</td></tr>';
-        return;
-    }
-    
-    let html = '';
-    for (const t of tareas) {
-        const estadoBadge = t.estado === 'activo' 
-            ? '<span class="badge" style="background: #28a745;">✅ Activo</span>'
-            : '<span class="badge" style="background: #6c757d;">⏸️ Inactivo</span>';
-        
-        const frecuenciaMap = {
-            'diaria': '📅 Diaria',
-            'semanal': '📅 Semanal',
-            'mensual': '📅 Mensual',
-            'intervalo': '⏱️ Intervalo',
-            'manual': '✋ Manual'
-        };
-        
-        html += `
-            <tr>
-                <td>${t.id || '-'}</td>
-                <td><strong>${escapeHtml(t.nombre || 'Sin nombre')}</strong></td>
-                <td>${t.tipo || '-'}</td>
-                <td>${frecuenciaMap[t.frecuencia] || t.frecuencia || '-'}</td>
-                <td>${t.hora || '-'}</td>
-                <td>${t.ultima_ejecucion || 'Nunca'}</td>
-                <td>${estadoBadge}</td>
-            </tr>
-        `;
-    }
-    tbody.innerHTML = html;
-    console.log(`✅ ${tareas.length} tareas cargadas en la tabla`);
-}
 
 /**
  * Actualiza la tabla de reportes generados
@@ -40325,7 +43297,9 @@ async function cargarEstadoReportes() {
         }
         
         // 2. Actualizar tabla de tareas
-        actualizarTablaTareasReportes(result.tareas || []);
+        if (typeof cargarTareasReportes === 'function') {
+            await cargarTareasReportes();
+        }
         
         // 3. Actualizar tabla de reportes
         if (result.ultimos_reportes && result.ultimos_reportes.length > 0) {
@@ -40425,12 +43399,56 @@ async function generarReporteManual(tipo = 'todos') {
 }
 
 
-/**
- * Abre la carpeta de reportes en el explorador
- */
 function abrirCarpetaReportes() {
-    // En Windows, abre el explorador de archivos
-    window.open('file:///C:/MECA_ML/reportes_generados', '_blank');
+    // Intentar abrir con el endpoint
+    const token = localStorage.getItem('meca_token');
+    
+    fetch('http://localhost:5000/api/reportes/abrir-carpeta', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            console.log('✅ Carpeta abierta');
+        } else {
+            alert('❌ ' + (data.error || 'Error al abrir carpeta'));
+        }
+    })
+    .catch(err => {
+        console.error('Error:', err);
+        // Fallback: mostrar ruta y copiar
+        const ruta = 'C:\\MECA_ML\\reportes_generados';
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(ruta)
+                .then(() => alert(`📁 Carpeta: ${ruta}\n\n✅ Ruta copiada al portapapeles`))
+                .catch(() => alert(`📁 Carpeta: ${ruta}`));
+        } else {
+            alert(`📁 Carpeta: ${ruta}`);
+        }
+    });
+}
+
+function mostrarRutaCarpeta(ruta) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ruta)
+            .then(() => {
+                alert(`📁 La carpeta de reportes está en:\n\n${ruta}\n\n✅ La ruta ha sido copiada al portapapeles. Puedes pegarla en el explorador de archivos.`);
+            })
+            .catch(() => {
+                alert(`📁 La carpeta de reportes está en:\n\n${ruta}\n\nPor favor, copia esta ruta manualmente.`);
+            });
+    } else {
+        alert(`📁 La carpeta de reportes está en:\n\n${ruta}\n\nPor favor, copia esta ruta manualmente.`);
+    }
 }
 
 /**
@@ -40446,7 +43464,707 @@ async function verificarSchedulerReportes() {
     }
 }
 
+// =============================================
+// CRUD - TAREAS PROGRAMADAS DE REPORTES
+// =============================================
 
+/**
+ * Carga la lista de tareas en la tabla con botones
+ */
+
+let tareasCargando = false;
+
+async function cargarTareasReportes() {
+    if (tareasCargando) {
+        console.log('⏳ Tareas ya están cargando, omitiendo...');
+        return;
+    }
+    
+    console.log('📋 Cargando tareas de reportes...');
+    tareasCargando = true;
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('http://localhost:5000/api/reportes/tareas', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Error al listar tareas');
+        }
+        
+        // =============================================
+        // 1. ACTUALIZAR TABLA DE TAREAS CON BOTONES
+        // =============================================
+        const tbody = document.getElementById('tablaTareasReportes');
+        if (tbody) {
+            if (!result.tareas || result.tareas.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">📭 No hay tareas programadas</td></tr>';
+            } else {
+                let html = '';
+                for (const t of result.tareas) {
+                    const estadoBadge = t.estado === 'activo' 
+                        ? '<span class="badge" style="background: #28a745;">✅ Activo</span>'
+                        : '<span class="badge" style="background: #6c757d;">⏸️ Inactivo</span>';
+                    
+                    const frecuenciaMap = {
+                        'diaria': '📅 Diaria',
+                        'semanal': '📅 Semanal',
+                        'mensual': '📅 Mensual',
+                        'intervalo': '⏱️ Intervalo',
+                        'manual': '✋ Manual'
+                    };
+                    
+                    html += `
+                        <tr>
+                            <td style="padding: 8px; text-align: center; font-weight: bold;">${t.id}</td>
+                            <td style="padding: 8px;"><strong>${escapeHtml(t.nombre)}</strong></td>
+                            <td style="padding: 8px; text-align: center;">${t.tipo_reporte || '-'}</td>
+                            <td style="padding: 8px; text-align: center;">${frecuenciaMap[t.frecuencia] || t.frecuencia || '-'}</td>
+                            <td style="padding: 8px; text-align: center;">${t.hora_ejecucion || '-'}</td>
+                            <td style="padding: 8px; text-align: center;">${t.ultima_ejecucion || 'Nunca'}</td>
+                            <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
+                            <td style="padding: 8px; text-align: center; white-space: nowrap;">
+                                <button onclick="editarTareaReporte(${t.id})" 
+                                        style="background: #f39c12; padding: 6px 12px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 4px; font-size: 12px; font-weight: 500;">
+                                    ✏️
+                                </button>
+                                <button onclick="eliminarTareaReporte(${t.id})" 
+                                        style="background: #d93025; padding: 6px 12px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 12px; font-weight: 500;">
+                                    🗑️
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }
+                tbody.innerHTML = html;
+                console.log(`✅ ${result.tareas.length} tareas cargadas con botones`);
+            }
+        }
+        
+        // =============================================
+        // 2. ACTUALIZAR ÚLTIMOS REPORTES GENERADOS
+        // =============================================
+        await actualizarUltimosReportes();
+        
+        tareasCargando = false;
+        
+    } catch (error) {
+        console.error('Error cargando tareas:', error);
+        const tbody = document.getElementById('tablaTareasReportes');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 20px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+        }
+        tareasCargando = false;
+    }
+}
+
+// =============================================
+// FUNCIÓN: ACTUALIZAR ÚLTIMOS REPORTES
+// =============================================
+async function actualizarUltimosReportes() {
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('http://localhost:5000/api/reportes/listar', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        const tbody = document.getElementById('tablaUltimosReportes');
+        if (!tbody) return;
+        
+        if (!result.archivos || result.archivos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px;">📭 No hay reportes generados aún</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        for (const r of result.archivos.slice(0, 10)) {
+            const fecha = r.fecha || 'N/A';
+            const tamanio = (r.tamanio / 1024).toFixed(1) + ' KB';
+            const nombre = r.nombre || 'sin_nombre.html';
+            const carpeta = r.carpeta || '-';
+            
+            html += `
+                <tr>
+                    <td style="padding: 8px;"><strong>${escapeHtml(nombre)}</strong></td>
+                    <td style="padding: 8px; text-align: center;">${fecha}</td>
+                    <td style="padding: 8px; text-align: center;">${tamanio}</td>
+                    <td style="padding: 8px; text-align: center;"><span class="badge" style="background: #28a745;">✅ Exitoso</span></td>
+                    <td style="padding: 8px; text-align: center; white-space: nowrap;">
+                        <button onclick="verReporte('${escapeHtml(nombre)}')" 
+                                style="background: #019DF4; padding: 4px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 4px; font-size: 11px;">
+                            👁️ Ver
+                        </button>
+                        <button onclick="descargarReporte('${escapeHtml(nombre)}')" 
+                                style="background: #28a745; padding: 4px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 11px;">
+                            📥
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
+        tbody.innerHTML = html;
+        console.log(`✅ ${result.archivos.length} reportes cargados en la tabla`);
+        
+    } catch (error) {
+        console.error('Error cargando últimos reportes:', error);
+        const tbody = document.getElementById('tablaUltimosReportes');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+        }
+    }
+}
+
+
+// =============================================
+// FUNCIONES DE EDICIÓN Y ELIMINACIÓN
+// =============================================
+
+function editarTareaReporte(id) {
+    console.log(`✏️ editarTareaReporte llamada con ID: ${id}`);
+    abrirModalEditarTarea(id);
+}
+
+
+/**
+ * Abre el modal para crear una nueva tarea
+ */
+function abrirModalNuevaTarea() {
+    console.log('📝 Abriendo modal de nueva tarea...');
+    
+    const modal = document.getElementById('modalTareaReporte');
+    if (!modal) {
+        console.error('❌ Modal de tareas no encontrado');
+        alert('Error: Modal de tareas no encontrado. Verifique que el HTML esté actualizado.');
+        return;
+    }
+    
+    // Limpiar formulario - 🔴 VERIFICAR QUE EL ID ES CORRECTO
+    const nombreInput = document.getElementById('tareaNombre');
+    if (nombreInput) {
+        nombreInput.value = '';
+        console.log('✅ Campo nombre limpiado');
+    } else {
+        console.error('❌ Campo tareaNombre no encontrado');
+    }
+    
+    document.getElementById('tareaId').value = '';
+    document.getElementById('tareaTipoReporte').value = 'pda';
+    document.getElementById('tareaFrecuencia').value = 'diaria';
+    document.getElementById('tareaHoraReporte').value = '06:00';
+    document.getElementById('tareaDiaSemana').value = '1';
+    document.getElementById('tareaDiaMes').value = '1';
+    document.getElementById('tareaIntervalo').value = '30';
+    document.getElementById('tareaFormato').value = 'html';
+    document.getElementById('tareaDestinoCarpeta').value = 'C:\\MECA_ML\\reportes_generados';
+    document.getElementById('tareaEstado').value = 'activo';
+    
+    // Mostrar campos según frecuencia
+    toggleCamposFrecuencia();
+    
+    document.getElementById('modalTareaTitulo').textContent = '➕ Nueva Tarea Programada';
+    document.getElementById('btnGuardarTarea').textContent = '💾 Crear Tarea';
+    document.getElementById('btnGuardarTarea').onclick = guardarTareaReporte;
+    
+    modal.style.display = 'flex';
+    console.log('✅ Modal abierto correctamente');
+}
+
+/**
+ * Abre el modal para editar una tarea existente
+ */
+async function abrirModalEditarTarea(id) {
+    console.log(`✏️ EDITANDO TAREA ID: ${id}`);
+    
+    try {
+        const modal = document.getElementById('modalTareaReporte');
+        if (!modal) {
+            console.error('❌ Modal no encontrado');
+            alert('Error: Modal de tareas no encontrado');
+            return;
+        }
+        
+        // 🔴 LIMPIAR DUPLICADOS DE HORA
+        const oldInputs = modal.querySelectorAll('#tareaHora');
+        oldInputs.forEach(el => el.remove());
+        
+        // 🔴 OBTENER DATOS DE LA TAREA
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('http://localhost:5000/api/reportes/tareas', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error);
+        
+        const tarea = result.tareas.find(t => t.id === id);
+        if (!tarea) throw new Error('Tarea no encontrada');
+        
+        console.log('📋 Tarea cargada:', tarea);
+        
+        // 🔴 ASIGNAR VALORES
+        document.getElementById('tareaId').value = tarea.id;
+        document.getElementById('tareaNombre').value = tarea.nombre || '';
+        document.getElementById('tareaTipoReporte').value = tarea.tipo_reporte || 'pda';
+        document.getElementById('tareaFrecuencia').value = tarea.frecuencia || 'diaria';
+        
+        // 🔴 ASIGNAR HORA
+        const horaElement = document.getElementById('tareaHoraReporte');
+        if (horaElement) {
+            horaElement.value = tarea.hora_ejecucion || '06:00';
+            console.log('✅ Hora asignada:', horaElement.value);
+        }
+        
+        // 🔴 ASIGNAR DÍA SEMANA (CRUCIAL)
+        const diaSemanaSelect = document.getElementById('tareaDiaSemana');
+        if (diaSemanaSelect) {
+            diaSemanaSelect.value = tarea.dia_semana || '1';
+            console.log('✅ Día Semana asignado:', diaSemanaSelect.value);
+        } else {
+            console.warn('⚠️ tareaDiaSemana no encontrado');
+        }
+        
+        // 🔴 ASIGNAR DÍA MES
+        const diaMesInput = document.getElementById('tareaDiaMes');
+        if (diaMesInput) {
+            diaMesInput.value = tarea.dia_mes || '1';
+        }
+        
+        // 🔴 ASIGNAR INTERVALO
+        const intervaloInput = document.getElementById('tareaIntervalo');
+        if (intervaloInput) {
+            intervaloInput.value = tarea.intervalo_minutos || '30';
+        }
+        
+        document.getElementById('tareaFormato').value = tarea.formato || 'html';
+        document.getElementById('tareaDestinoCarpeta').value = tarea.destino_carpeta || 'C:\\MECA_ML\\reportes_generados';
+        document.getElementById('tareaEstado').value = tarea.estado || 'activo';
+        
+        // 🔴 ACTUALIZAR VISIBILIDAD
+        if (typeof toggleCamposFrecuencia === 'function') {
+            toggleCamposFrecuencia();
+        }
+        
+        // 🔴 CAMBIAR TÍTULO Y BOTÓN
+        const titulo = document.getElementById('modalTareaTitulo');
+        if (titulo) {
+            titulo.textContent = `✏️ Editar Tarea: ${tarea.nombre}`;
+        }
+        
+        const btnGuardar = document.getElementById('btnGuardarTarea');
+        if (btnGuardar) {
+            btnGuardar.textContent = '💾 Actualizar Tarea';
+            btnGuardar.onclick = guardarTareaReporte;
+        }
+
+        const freqSelect = document.getElementById('tareaFrecuenciaReporte');
+        if (freqSelect) {
+            freqSelect.value = tarea.frecuencia || 'diaria';
+            console.log('✅ Frecuencia asignada:', freqSelect.value);
+        }
+        
+        modal.style.display = 'flex';
+        console.log('✅ Modal abierto correctamente');
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al cargar tarea: ' + error.message);
+    }
+}
+
+/**
+ * Guarda una tarea (crear o actualizar)
+ */
+async function guardarTareaReporte() {
+    console.log('📝 Iniciando guardado de tarea...');
+    
+    // =============================================
+    // 1. CAPTURAR VALORES EN EL MOMENTO DE GUARDAR
+    // =============================================
+    
+    const id = document.getElementById('tareaId').value;
+    const nombre = document.getElementById('tareaNombre').value.trim();
+    const tipo_reporte = document.getElementById('tareaTipoReporte').value;
+    
+    // 🔴🔴🔴 CAPTURAR FRECUENCIA DIRECTAMENTE DEL SELECT 🔴🔴🔴
+    const frecuenciaSelect = document.getElementById('tareaFrecuenciaReporte');
+    const frecuencia = frecuenciaSelect ? frecuenciaSelect.value : 'diaria';
+    
+    console.log('🔴🔴🔴 FRECUENCIA CAPTURADA DEL SELECT:', frecuencia);
+    
+    // 🔴 CAPTURAR HORA
+    const horaInput = document.getElementById('tareaHoraReporte');
+    const hora_ejecucion = horaInput ? horaInput.value : null;
+    console.log('🔴 HORA CAPTURADA:', hora_ejecucion);
+    
+    const formato = document.getElementById('tareaFormato').value;
+    const destino_carpeta = document.getElementById('tareaDestinoCarpeta').value.trim();
+    const estado = document.getElementById('tareaEstado').value;
+    
+    // =============================================
+    // 2. CAPTURAR CAMPO SEGÚN FRECUENCIA
+    // =============================================
+    
+    let dia_semana = null;
+    let dia_mes = null;
+    let intervalo_minutos = null;
+    
+    if (frecuencia === 'semanal') {
+        const diaSelect = document.getElementById('tareaDiaSemana');
+        dia_semana = diaSelect ? parseInt(diaSelect.value) || null : null;
+        console.log('🔴 DÍA SEMANA CAPTURADO:', dia_semana);
+    } else if (frecuencia === 'mensual') {
+        const diaInput = document.getElementById('tareaDiaMes');
+        dia_mes = diaInput ? parseInt(diaInput.value) || null : null;
+        console.log('🔴 DÍA MES CAPTURADO:', dia_mes);
+    } else if (frecuencia === 'intervalo') {
+        const intInput = document.getElementById('tareaIntervalo');
+        intervalo_minutos = intInput ? parseInt(intInput.value) || null : null;
+        console.log('🔴 INTERVALO CAPTURADO:', intervalo_minutos);
+    }
+    
+    // =============================================
+    // 3. VALIDACIONES
+    // =============================================
+    
+    if (!nombre) {
+        alert('⚠️ Ingrese un nombre para la tarea');
+        document.getElementById('tareaNombre').focus();
+        return;
+    }
+    
+    if (!hora_ejecucion) {
+        alert('⚠️ Seleccione una hora de ejecución');
+        document.getElementById('tareaHoraReporte').focus();
+        return;
+    }
+    
+    if (frecuencia === 'semanal' && !dia_semana) {
+        alert('⚠️ Seleccione un día de la semana');
+        document.getElementById('tareaDiaSemana').focus();
+        return;
+    }
+    
+    if (frecuencia === 'mensual' && !dia_mes) {
+        alert('⚠️ Seleccione un día del mes');
+        document.getElementById('tareaDiaMes').focus();
+        return;
+    }
+    
+    if (frecuencia === 'intervalo' && !intervalo_minutos) {
+        alert('⚠️ Ingrese el intervalo en minutos');
+        document.getElementById('tareaIntervalo').focus();
+        return;
+    }
+    
+    // =============================================
+    // 4. CONSTRUIR DATA
+    // =============================================
+    
+    const data = {
+        nombre,
+        tipo_reporte,
+        frecuencia,  // ← ESTE ES EL VALOR CORRECTO
+        hora_ejecucion,
+        formato,
+        destino_carpeta,
+        estado
+    };
+    
+    if (frecuencia === 'semanal') {
+        data.dia_semana = dia_semana;
+    } else if (frecuencia === 'mensual') {
+        data.dia_mes = dia_mes;
+    } else if (frecuencia === 'intervalo') {
+        data.intervalo_minutos = intervalo_minutos;
+    }
+    
+    console.log('📤 PAYLOAD FINAL:', JSON.stringify(data, null, 2));
+    
+    // =============================================
+    // 5. ENVIAR SOLICITUD
+    // =============================================
+    
+    const token = localStorage.getItem('meca_token');
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `http://localhost:5000/api/reportes/tareas/${id}` : 'http://localhost:5000/api/reportes/tareas';
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        console.log('📥 Respuesta:', result);
+        
+        if (result.success) {
+            alert(`✅ Tarea ${id ? 'actualizada' : 'creada'} correctamente`);
+            cerrarModalTarea();
+            cargarTareasReportes();
+            cargarEstadoReportes();
+        } else {
+            alert('❌ Error: ' + (result.error || 'Error desconocido'));
+        }
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al guardar: ' + error.message);
+    }
+}
+
+/**
+ * Elimina una tarea de reporte
+ */
+async function eliminarTareaReporte(id) {
+    let nombre = '';
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('http://localhost:5000/api/reportes/tareas', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const result = await response.json();
+        const tarea = result.tareas?.find(t => t.id === id);
+        nombre = tarea?.nombre || `ID ${id}`;
+    } catch(e) {}
+    
+    if (!confirm(`⚠️ ¿Eliminar la tarea "${nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`http://localhost:5000/api/reportes/tareas/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || `HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ Tarea eliminada correctamente');
+            // Recargar todo
+            cargarTareasReportes();
+            if (typeof cargarEstadoReportes === 'function') {
+                cargarEstadoReportes();
+            }
+        } else {
+            throw new Error(result.error || 'Error desconocido');
+        }
+    } catch (error) {
+        alert('❌ Error al eliminar: ' + error.message);
+    }
+}
+
+/**
+ * Cierra el modal de tareas
+ */
+function cerrarModalTarea() {
+    const modal = document.getElementById('modalTareaReporte');
+    if (modal) modal.style.display = 'none';
+}
+
+/**
+ * Muestra/oculta campos según la frecuencia seleccionada
+ */
+function toggleCamposFrecuencia() {
+    const frecuencia = document.getElementById('tareaFrecuenciaReporte').value;
+    
+    console.log('🔄 toggleCamposFrecuencia - Frecuencia seleccionada:', frecuencia);
+    
+    // Obtener referencias a los contenedores
+    const campoHora = document.getElementById('campoHora');
+    const campoDiaSemana = document.getElementById('campoDiaSemana');
+    const campoDiaMes = document.getElementById('campoDiaMes');
+    const campoIntervalo = document.getElementById('campoIntervalo');
+    
+    // Obtener referencias a los inputs
+    const diaSemanaInput = document.getElementById('tareaDiaSemana');
+    const diaMesInput = document.getElementById('tareaDiaMes');
+    const intervaloInput = document.getElementById('tareaIntervalo');
+    
+    // 🔴 PRIMERO: OCULTAR TODOS LOS CAMPOS CONDICIONALES
+    if (campoDiaSemana) campoDiaSemana.style.display = 'none';
+    if (campoDiaMes) campoDiaMes.style.display = 'none';
+    if (campoIntervalo) campoIntervalo.style.display = 'none';
+    
+    // 🔴 SEGUNDO: LIMPIAR VALORES DE TODOS LOS CAMPOS CONDICIONALES
+    if (diaSemanaInput) diaSemanaInput.value = '';
+    if (diaMesInput) diaMesInput.value = '';
+    if (intervaloInput) intervaloInput.value = '';
+    
+    // 🔴 TERCERO: MOSTRAR SOLO EL CAMPO CORRESPONDIENTE
+    if (frecuencia === 'semanal') {
+        if (campoDiaSemana) {
+            campoDiaSemana.style.display = 'block';
+            console.log('✅ Mostrando campo Día Semana');
+        }
+        // Poner valor por defecto en día semana si está vacío
+        if (diaSemanaInput && !diaSemanaInput.value) {
+            diaSemanaInput.value = '1';
+        }
+    } else if (frecuencia === 'mensual') {
+        if (campoDiaMes) {
+            campoDiaMes.style.display = 'block';
+            console.log('✅ Mostrando campo Día Mes');
+        }
+        if (diaMesInput && !diaMesInput.value) {
+            diaMesInput.value = '1';
+        }
+    } else if (frecuencia === 'intervalo') {
+        if (campoIntervalo) {
+            campoIntervalo.style.display = 'block';
+            console.log('✅ Mostrando campo Intervalo');
+        }
+        if (intervaloInput && !intervaloInput.value) {
+            intervaloInput.value = '30';
+        }
+    } else {
+        // Frecuencia diaria - todos ocultos
+        console.log('📌 Frecuencia diaria - todos los campos ocultos');
+    }
+    
+    // La hora siempre se muestra para diaria, semanal y mensual
+    if (campoHora) {
+        campoHora.style.display = (frecuencia === 'diaria' || frecuencia === 'semanal' || frecuencia === 'mensual') ? 'block' : 'none';
+    }
+    
+    console.log('📋 ESTADO FINAL:');
+    console.log('   campoDiaSemana display:', campoDiaSemana?.style.display);
+    console.log('   campoDiaMes display:', campoDiaMes?.style.display);
+    console.log('   campoIntervalo display:', campoIntervalo?.style.display);
+    console.log('   diaSemana value:', diaSemanaInput?.value);
+    console.log('   diaMes value:', diaMesInput?.value);
+    console.log('   intervalo value:', intervaloInput?.value);
+}
+
+/**
+ * Abre el modal para configurar la carpeta
+ */
+function abrirModalConfigurarCarpeta() {
+    const token = localStorage.getItem('meca_token');
+    
+    fetch('http://localhost:5000/api/reportes/config/carpeta', {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    })
+    .then(result => {
+        if (!result.success) throw new Error(result.error);
+        
+        const modal = document.getElementById('modalConfigurarCarpeta');
+        if (!modal) {
+            console.error('❌ Modal de carpeta no encontrado');
+            return;
+        }
+        
+        document.getElementById('carpetaActual').value = result.carpeta_actual || '';
+        document.getElementById('carpetaNueva').value = result.carpeta_actual || '';
+        
+        const subcarpetas = document.getElementById('subcarpetasInfo');
+        if (subcarpetas && result.carpetas) {
+            subcarpetas.innerHTML = `
+                📁 <strong>Subcarpetas:</strong><br>
+                • PDA: ${result.carpetas.pda}<br>
+                • Mensual: ${result.carpetas.mensual}<br>
+                • Capacitación: ${result.carpetas.capacitacion}<br>
+                • Reiterativos: ${result.carpetas.reiterativos}
+            `;
+        }
+        
+        modal.style.display = 'flex';
+    })
+    .catch(err => alert('❌ Error al obtener carpeta actual: ' + err.message));
+}
+
+/**
+ * Guarda la nueva carpeta
+ */
+async function guardarCarpetaReportes() {
+    const nuevaCarpeta = document.getElementById('carpetaNueva').value.trim();
+    const carpetaActual = document.getElementById('carpetaActual').value;
+    
+    if (!nuevaCarpeta) {
+        alert('⚠️ Ingrese una ruta válida');
+        return;
+    }
+    
+    if (nuevaCarpeta === carpetaActual) {
+        alert('⚠️ La carpeta es la misma que la actual');
+        return;
+    }
+    
+    if (!confirm(`⚠️ ¿Cambiar carpeta de reportes?\n\nDe: ${carpetaActual}\nA: ${nuevaCarpeta}\n\nLos reportes existentes NO se moverán automáticamente.`)) {
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('http://localhost:5000/api/reportes/config/carpeta', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ carpeta_base: nuevaCarpeta })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || `HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ Carpeta actualizada correctamente');
+            cerrarModalCarpeta();
+            cargarEstadoReportes();
+        } else {
+            throw new Error(result.error || 'Error desconocido');
+        }
+    } catch (error) {
+        alert('❌ Error al actualizar carpeta: ' + error.message);
+    }
+}
+
+/**
+ * Cierra el modal de carpeta
+ */
+function cerrarModalCarpeta() {
+    const modal = document.getElementById('modalConfigurarCarpeta');
+    if (modal) modal.style.display = 'none';
+}
+
+/**
+ * Muestra/oculta campos según la frecuencia seleccionada
+ */
+
+
+// Exponer función globalmente
+window.toggleCamposFrecuencia = toggleCamposFrecuencia;
 
 // =============================================
 // INICIALIZAR AL CARGAR LA PESTAÑA
