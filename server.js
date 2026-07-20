@@ -5068,7 +5068,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                 totalSizeBytes: totalSizeBytes,
                 totalRows: totalRows,
                 totalTables: tablas.length,
-                tablas: tablas.slice(0, 15)
+                tablas: tablas
             }));
             
         } catch (error) {

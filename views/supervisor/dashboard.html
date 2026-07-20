@@ -755,10 +755,10 @@
                         <div>
                             <label style="font-weight: bold;">📊 Mostrar:</label>
                             <select id="selectorEstadoPDA" style="padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);">
-                                    <option value="todos">Todos (con y sin PDA)</option>
-                                    <option value="sin_pda" selected>⚠️ Solo sin PDA pendiente</option>
-                                    <option value="con_pda">✅ Solo con PDA</option>
-                                </select>
+                                <option value="todos" selected>📊 Todos (con y sin PDA)</option>
+                                <option value="sin_pda">⚠️ Solo sin PDA pendiente</option>
+                                <option value="con_pda">✅ Solo con PDA</option>
+                            </select>
                         </div>
                        
                     </div>
@@ -2159,10 +2159,6 @@
                             <button onclick="mostrarModalNuevoRol()" style="background: var(--accent); padding: 5px 12px; font-size: 12px;">
                                 ➕ Nuevo Rol
                             </button>
-                            <!-- 🔴 AGREGAR ESTE BOTÓN -->
-                            <button onclick="agregarNuevaPestana()" style="background: #7b1fa2; padding: 5px 12px; font-size: 12px;">
-                                📋 Nueva Pestaña
-                            </button>
                             <button onclick="cargarRoles()" style="background: var(--ok); padding: 5px 12px; font-size: 12px;">
                                 🔄 Refrescar
                             </button>
@@ -2264,6 +2260,16 @@
                     </div>
                 </div>
 
+                <!-- ====================================================== -->
+                <!-- GESTIÓN DE PESTAÑAS DEL SISTEMA                       -->
+                <!-- ====================================================== -->
+                <div id="listaPestanasContainer" class="card" style="margin-top: 20px;">
+                    <!-- Las pestañas se renderizarán aquí -->
+                    <div style="text-align: center; padding: 20px; color: var(--muted);">
+                        ⏳ Cargando pestañas...
+                    </div>
+                </div>
+                
                 <!-- Sección de Estadísticas -->
                 <div class="card" style="margin-top: 25px;">
                     <h3>📊 Estadísticas de Usuarios</h3>
