@@ -100,46 +100,6 @@
     }
 
 // ======================================================
-// CONFIGURACIÓN DE LA API - AUTO DETECCIÓN DE IP
-// ======================================================
-
-/**
- * Obtiene la URL base de la API automáticamente
- * - Si es localhost (desarrollo) → usa localhost
- * - Si es una IP de red → usa esa misma IP
- * - Puerto fijo: 5000 (Python) o 8080 (Node.js)
- */
-// ======================================================
-// CONFIGURACIÓN DE LA API - AUTO DETECCIÓN DE IP
-// ======================================================
-
-/**
- * Obtiene la URL base de la API automáticamente
- */
-function obtenerURLBaseAPI(puerto = 5000) {
-    const hostname = window.location.hostname;
-    
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return `http://localhost:${puerto}`;
-    }
-    
-    const esIP = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
-    if (esIP) {
-        return `http://${hostname}:${puerto}`;
-    }
-    
-    return `http://${hostname}:${puerto}`;
-}
-
-// 🔴 IMPORTANTE: Usar `const` y verificar que estén definidas
-const API_URL_PYTHON = obtenerURLBaseAPI(5000);  // Python (reportes)
-const API_URL_NODE = obtenerURLBaseAPI(8080);    // Node.js (principal)
-
-console.log('🌐 Configuración de API:');
-console.log(`   📡 Python (reportes): ${API_URL_PYTHON}`);
-console.log(`   📡 Node.js (principal): ${API_URL_NODE}`);
-
-// ======================================================
 // 2. FUNCIONES DE INICIALIZACIÓN Y SESIÓN
 // ======================================================
 
@@ -4047,12 +4007,8 @@ function actualizarCardPorcentajeQuiebres(evaluaciones) {
     if (detalleElem) detalleElem.textContent = quiebres + ' de ' + total + ' evaluaciones';
 }
 
-// ======================================================
-// ACTUALIZAR KPIs CON FILTRO - VERSIÓN DINÁMICA
-// ======================================================
 async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
-    console.log('📊 actualizarKPIsConFiltro - VERSIÓN DINÁMICA POR PERÍODO');
-    console.log('   Evaluaciones:', evaluacionesFiltradas?.length || 0);
+    console.log('📊 Actualizando KPIs con', evaluacionesFiltradas.length, 'evaluaciones filtradas');
     
     if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
         resetearKPIs();
@@ -4062,391 +4018,226 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
     const totalEval = evaluacionesFiltradas.length;
     
     // ======================================================
-    // 1. AGRUPAR POR PERÍODO (MES) Y CALCULAR PESOS POR PERÍODO
+    // 1. KPI: Promedio General
     // ======================================================
-    const periodo = 'mes';
-    const datosAgrupados = agruparEvaluacionesPorPeriodoConPesos(evaluacionesFiltradas, periodo);
-    
-    if (datosAgrupados.length === 0) {
-        resetearKPIs();
-        return;
-    }
+    const promedioGeneral = Math.round(evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.notaFinal), 0) / totalEval);
+    document.getElementById('kpiPromedio').textContent = promedioGeneral + '%';
+    document.getElementById('kpiTotalEval').textContent = totalEval;
     
     // ======================================================
-    // 2. CALCULAR PROMEDIOS PONDERADOS POR PERÍODO
+    // 2. KPIs: % de llamadas con motivos bajos (CON VERSIÓN DINÁMICA)
     // ======================================================
-    let totalEvaluaciones = 0;
-    let sumaNotasPonderada = 0;
-    let sumaENCPonderada = 0;
-    let sumaECUFPonderada = 0;
-    let sumaECNPonderada = 0;
-    let totalQuiebres = 0;
-    let totalConENC = 0, totalConECUF = 0, totalConECN = 0;
+    const conteosMotivos = contarMotivosPorDebajoDePeso(evaluacionesFiltradas);
+    const conENC = conteosMotivos.conENC;
+    const conECUF = conteosMotivos.conECUF;
+    const conECN = conteosMotivos.conECN;
     
-    // Para matriz info
-    let countMatrizAntigua = 0;
-    let countMatrizNueva = 0;
+    const pctENC = totalEval > 0 ? Math.round((conENC / totalEval) * 100) : 0;
+    const pctECUF = totalEval > 0 ? Math.round((conECUF / totalEval) * 100) : 0;
+    const pctECN = totalEval > 0 ? Math.round((conECN / totalEval) * 100) : 0;
     
-    for (const grupo of datosAgrupados) {
-        const count = grupo.count || 0;
-        const pesos = grupo.pesos || { ENC: 30, ECUF: 30, ECN: 40 };
-        
-        // Calcular promedios del grupo (RAW)
-        const promNota = count > 0 ? grupo.sumaNotas / count : 0;
-        const promENC = count > 0 ? grupo.sumENC / count : 0;
-        const promECUF = count > 0 ? grupo.sumECUF / count : 0;
-        const promECN = count > 0 ? grupo.sumECN / count : 0;
-        
-        // Calcular porcentajes del grupo con sus pesos
-        const pctENC = Math.min((promENC / pesos.ENC) * 100, 100);
-        const pctECUF = Math.min((promECUF / pesos.ECUF) * 100, 100);
-        const pctECN = Math.min((promECN / pesos.ECN) * 100, 100);
-        
-        // Ponderar por la cantidad de evaluaciones del grupo
-        totalEvaluaciones += count;
-        sumaNotasPonderada += promNota * count;
-        sumaENCPonderada += pctENC * count;
-        sumaECUFPonderada += pctECUF * count;
-        sumaECNPonderada += pctECN * count;
-        
-        // Contar quiebres del grupo (nota < 85%)
-        for (const e of grupo.evaluaciones) {
-            if ((e.notaFinal || 0) < 85) totalQuiebres++;
-        }
-        
-        // Contar motivos bajos según la matriz del período
-        for (const e of grupo.evaluaciones) {
+    // Actualizar valores
+    document.getElementById('kpiConENC').textContent = pctENC + '%';
+    document.getElementById('kpiConECUF').textContent = pctECUF + '%';
+    document.getElementById('kpiConECN').textContent = pctECN + '%';
+    document.getElementById('kpiConENCDetalle').textContent = `${conENC} de ${totalEval} llamadas`;
+    document.getElementById('kpiConECUFDetalle').textContent = `${conECUF} de ${totalEval} llamadas`;
+    document.getElementById('kpiConECNDetalle').textContent = `${conECN} de ${totalEval} llamadas`;
+    
+    // ======================================================
+    // 🔴 NUEVO: OBTENER MATRIZ DOMINANTE Y UMBRALES DINÁMICOS
+    // ======================================================
+    const matrizDominante = obtenerMatrizDominante(evaluacionesFiltradas);
+    const pesos = matrizDominante ? matrizDominante.pesos : { ENC: 30, ECUF: 30, ECN: 40 };
+    const nombreMatriz = matrizDominante ? matrizDominante.nombre : 'Original (30|30|40)';
+    
+    // Detectar si hay mezcla de matrices
+    let esMixto = false;
+    let infoMixto = null;
+    
+    if (!matrizDominante) {
+        esMixto = true;
+        let countAntigua = 0, countNueva = 0;
+        for (const e of evaluacionesFiltradas) {
             const fecha = obtenerFechaEvaluacion(e);
-            if (fecha) {
-                const matriz = getMatrizByFecha(fecha);
-                if (matriz.nombre === MATRIZ_ANTIGUA.nombre) {
-                    countMatrizAntigua++;
-                } else {
-                    countMatrizNueva++;
-                }
-                if ((e.totalENC || 0) < matriz.pesos.ENC) totalConENC++;
-                if ((e.totalECUF || 0) < matriz.pesos.ECUF) totalConECUF++;
-                if ((e.totalECN || 0) < matriz.pesos.ECN) totalConECN++;
+            const matriz = getMatrizByFecha(fecha);
+            if (matriz.nombre === MATRIZ_ANTIGUA.nombre) {
+                countAntigua++;
+            } else {
+                countNueva++;
             }
         }
+        const pctAntigua = (countAntigua / totalEval * 100).toFixed(0);
+        const pctNueva = (countNueva / totalEval * 100).toFixed(0);
+        
+        infoMixto = {
+            enc: `${MATRIZ_NUEVA.pesos.ENC}/${MATRIZ_ANTIGUA.pesos.ENC}`,
+            ecuf: `${MATRIZ_NUEVA.pesos.ECUF}/${MATRIZ_ANTIGUA.pesos.ECUF}`,
+            ecn: `${MATRIZ_NUEVA.pesos.ECN}/${MATRIZ_ANTIGUA.pesos.ECN}`,
+            pctAntigua: pctAntigua,
+            pctNueva: pctNueva,
+            countAntigua: countAntigua,
+            countNueva: countNueva
+        };
     }
     
     // ======================================================
-    // 3. CALCULAR PROMEDIOS FINALES
+    // 🔴 ACTUALIZAR UMBRALES DINÁMICOS EN LA UI
     // ======================================================
-    const promedioGeneral = totalEvaluaciones > 0 ? Math.round(sumaNotasPonderada / totalEvaluaciones) : 0;
-    const promedioENC = totalEvaluaciones > 0 ? Math.round(sumaENCPonderada / totalEvaluaciones) : 0;
-    const promedioECUF = totalEvaluaciones > 0 ? Math.round(sumaECUFPonderada / totalEvaluaciones) : 0;
-    const promedioECN = totalEvaluaciones > 0 ? Math.round(sumaECNPonderada / totalEvaluaciones) : 0;
-    const pctQuiebres = totalEvaluaciones > 0 ? Math.round((totalQuiebres / totalEvaluaciones) * 100) : 0;
     
-    const pctConENC = totalEvaluaciones > 0 ? Math.round((totalConENC / totalEvaluaciones) * 100) : 0;
-    const pctConECUF = totalEvaluaciones > 0 ? Math.round((totalConECUF / totalEvaluaciones) * 100) : 0;
-    const pctConECN = totalEvaluaciones > 0 ? Math.round((totalConECN / totalEvaluaciones) * 100) : 0;
+    // Actualizar umbral ENC
+    const umbralENC = document.getElementById('kpiUmbralENC');
+    const labelENC = document.getElementById('kpiLabelENC');
+    if (umbralENC) {
+        umbralENC.textContent = esMixto ? infoMixto.enc : pesos.ENC;
+        // Cambiar color si el umbral cambió
+        umbralENC.style.color = (esMixto ? '#ffffff' : (pesos.ENC === 15 ? '#ffffff' : '#ffffff'));
+    }
+    if (labelENC) {
+        if (esMixto) {
+            labelENC.innerHTML = `🎯 % Llam con ENC &lt; <span style="color: #ffffff;">15% (nueva)</span> / <span style="color: #ffffff;">30% (antigua)</span>`;
+        } else {
+            const color = pesos.ENC === 15 ? '#ffffff' : '#ffffff';
+            labelENC.innerHTML = `🎯 % Llam con ENC &lt; <span style="color: ${color};">${pesos.ENC}%</span>`;
+        }
+    }
+    
+    // Actualizar umbral ECUF
+    const umbralECUF = document.getElementById('kpiUmbralECUF');
+    const labelECUF = document.getElementById('kpiLabelECUF');
+    if (umbralECUF) {
+        umbralECUF.textContent = esMixto ? infoMixto.ecuf : pesos.ECUF;
+        umbralECUF.style.color = (esMixto ? '#ffffff' : (pesos.ECUF === 15 ? '#ffffff' : '#ffffff'));
+    }
+    if (labelECUF) {
+        if (esMixto) {
+            labelECUF.innerHTML = `⚠️ % Llam con ECUF &lt; <span style="color: #ffffff;">15% (nueva)</span> / <span style="color: #ffffff;">30% (antigua)</span>`;
+        } else {
+            const color = pesos.ECUF === 15 ? '#ffffff' : '#ffffff';
+            labelECUF.innerHTML = `⚠️ % Llam con ECUF &lt; <span style="color: ${color};">${pesos.ECUF}%</span>`;
+        }
+    }
+    
+    // Actualizar umbral ECN
+    const umbralECN = document.getElementById('kpiUmbralECN');
+    const labelECN = document.getElementById('kpiLabelECN');
+    if (umbralECN) {
+        umbralECN.textContent = esMixto ? infoMixto.ecn : pesos.ECN;
+        umbralECN.style.color = (esMixto ? '#ffffff' : (pesos.ECN === 70 ? '#ffffff' : '#ffffff'));
+    }
+    if (labelECN) {
+        if (esMixto) {
+            labelECN.innerHTML = `💰 % Llam con ECN &lt; <span style="color: #ffffff;">70% (nueva)</span> / <span style="color: #ffffff;">40% (antigua)</span>`;
+        } else {
+            const color = pesos.ECN === 70 ? '#ffffff' : '#ffffff';
+            labelECN.innerHTML = `💰 % Llam con ECN &lt; <span style="color: ${color};">${pesos.ECN}%</span>`;
+        }
+    }
     
     // ======================================================
-    // 4. ACTUALIZAR KPIs
+    // 🔴 ACTUALIZAR INFO DE MATRIZ
     // ======================================================
-    const kpiTotalEval = document.getElementById('kpiTotalEval');
-    const kpiPromedio = document.getElementById('kpiPromedio');
-    if (kpiTotalEval) kpiTotalEval.textContent = totalEvaluaciones;
-    if (kpiPromedio) kpiPromedio.textContent = promedioGeneral + '%';
+    const matrizInfo = document.getElementById('kpiMatrizInfo');
+    const matrizNombre = document.getElementById('kpiMatrizNombre');
+    if (matrizInfo && matrizNombre) {
+        if (esMixto) {
+            matrizNombre.textContent = `⚠️ Mezcla de matrices`;
+            matrizInfo.innerHTML = `
+                📊 <span id="kpiMatrizNombre" style="color: #f39c12;">⚠️ Mezcla de matrices</span>
+                <span style="font-size: 11px; color: var(--muted); margin-left: 10px;">
+                    (${infoMixto.countAntigua} eval - 30/30/40 = ${infoMixto.pctAntigua}% | 
+                    ${infoMixto.countNueva} eval - 15/15/70 = ${infoMixto.pctNueva}%)
+                </span>
+            `;
+        } else {
+            matrizNombre.textContent = nombreMatriz;
+            matrizInfo.innerHTML = `📊 <span id="kpiMatrizNombre">${nombreMatriz}</span>`;
+        }
+    }
     
-    // KPIs de motivos bajos
-    const kpiConENC = document.getElementById('kpiConENC');
-    const kpiConECUF = document.getElementById('kpiConECUF');
-    const kpiConECN = document.getElementById('kpiConECN');
-    const kpiConENCDetalle = document.getElementById('kpiConENCDetalle');
-    const kpiConECUFDetalle = document.getElementById('kpiConECUFDetalle');
-    const kpiConECNDetalle = document.getElementById('kpiConECNDetalle');
-    
-    if (kpiConENC) kpiConENC.textContent = pctConENC + '%';
-    if (kpiConECUF) kpiConECUF.textContent = pctConECUF + '%';
-    if (kpiConECN) kpiConECN.textContent = pctConECN + '%';
-    if (kpiConENCDetalle) kpiConENCDetalle.textContent = `${totalConENC} de ${totalEvaluaciones} llamadas`;
-    if (kpiConECUFDetalle) kpiConECUFDetalle.textContent = `${totalConECUF} de ${totalEvaluaciones} llamadas`;
-    if (kpiConECNDetalle) kpiConECNDetalle.textContent = `${totalConECN} de ${totalEvaluaciones} llamadas`;
-    
-    // Promedios de motivos
-    const kpiPromedioENC = document.getElementById('kpiPromedioENC');
-    const kpiPromedioECUF = document.getElementById('kpiPromedioECUF');
-    const kpiPromedioECN = document.getElementById('kpiPromedioECN');
-    const kpiPromedioENCDetalle = document.getElementById('kpiPromedioENCDetalle');
-    const kpiPromedioECUFDetalle = document.getElementById('kpiPromedioECUFDetalle');
-    const kpiPromedioECNDetalle = document.getElementById('kpiPromedioECNDetalle');
-    
-    if (kpiPromedioENC) kpiPromedioENC.textContent = promedioENC + '%';
-    if (kpiPromedioECUF) kpiPromedioECUF.textContent = promedioECUF + '%';
-    if (kpiPromedioECN) kpiPromedioECN.textContent = promedioECN + '%';
-    if (kpiPromedioENCDetalle) kpiPromedioENCDetalle.textContent = `${(sumaENCPonderada / totalEvaluaciones).toFixed(1)}%`;
-    if (kpiPromedioECUFDetalle) kpiPromedioECUFDetalle.textContent = `${(sumaECUFPonderada / totalEvaluaciones).toFixed(1)}%`;
-    if (kpiPromedioECNDetalle) kpiPromedioECNDetalle.textContent = `${(sumaECNPonderada / totalEvaluaciones).toFixed(1)}%`;
-    
-    // Porcentaje de quiebres
-    const kpiPorcentajeQuiebres = document.getElementById('kpiPorcentajeQuiebres');
-    const kpiPorcentajeQuiebresDetalle = document.getElementById('kpiPorcentajeQuiebresDetalle');
-    if (kpiPorcentajeQuiebres) kpiPorcentajeQuiebres.textContent = pctQuiebres + '%';
-    if (kpiPorcentajeQuiebresDetalle) kpiPorcentajeQuiebresDetalle.textContent = `${totalQuiebres} de ${totalEvaluaciones} evaluaciones`;
-    
-    // Total Gestores
+    // ======================================================
+    // 3. KPI: Total Gestores Evaluados
+    // ======================================================
     const gestoresUnicos = new Set();
     evaluacionesFiltradas.forEach(e => { if (e.agente) gestoresUnicos.add(e.agente); });
     const totalGestores = gestoresUnicos.size;
-    
-    const kpiTotalGestores = document.getElementById('kpiTotalGestores');
-    const kpiTotalGestoresDetalle = document.getElementById('kpiTotalGestoresDetalle');
-    if (kpiTotalGestores) kpiTotalGestores.textContent = totalGestores;
-    if (kpiTotalGestoresDetalle) kpiTotalGestoresDetalle.textContent = totalGestores === 1 ? '1 gestor único' : `${totalGestores} gestores únicos`;
+    document.getElementById('kpiTotalGestores').textContent = totalGestores;
+    document.getElementById('kpiTotalGestoresDetalle').textContent = totalGestores === 1 ? '1 gestor único' : `${totalGestores} gestores únicos`;
     
     // ======================================================
-    // 5. RANKING Y CUARTILES
+    // 4. Promedios de motivos (ENC, ECUF, ECN)
+    // ======================================================
+    const sumENC = evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.totalENC), 0);
+    const sumECUF = evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.totalECUF), 0);
+    const sumECN = evaluacionesFiltradas.reduce((sum, e) => sum + numeroSeguro(e.totalECN), 0);
+    
+    const promedioENC = (sumENC / totalEval).toFixed(1);
+    const promedioECUF = (sumECUF / totalEval).toFixed(1);
+    const promedioECN = (sumECN / totalEval).toFixed(1);
+    
+    // 🔴 Usar los pesos dinámicos para calcular porcentajes
+    const pctPromedioENC = Math.round((promedioENC / pesos.ENC) * 100);
+    const pctPromedioECUF = Math.round((promedioECUF / pesos.ECUF) * 100);
+    const pctPromedioECN = Math.round((promedioECN / pesos.ECN) * 100);
+
+    document.getElementById('kpiPromedioENC').textContent = pctPromedioENC + '%';
+    document.getElementById('kpiPromedioECUF').textContent = pctPromedioECUF + '%';
+    document.getElementById('kpiPromedioECN').textContent = pctPromedioECN + '%';
+    document.getElementById('kpiPromedioENCDetalle').textContent = promedioENC + '/' + pesos.ENC + ' pts';
+    document.getElementById('kpiPromedioECUFDetalle').textContent = promedioECUF + '/' + pesos.ECUF + ' pts';
+    document.getElementById('kpiPromedioECNDetalle').textContent = promedioECN + '/' + pesos.ECN + ' pts';
+    
+    // ======================================================
+    // 5. Porcentaje de quiebres (nota < 85%)
+    // ======================================================
+    const quiebresCount = evaluacionesFiltradas.filter(e => numeroSeguro(e.notaFinal) < 85).length;
+    const pctQuiebres = totalEval > 0 ? Math.round((quiebresCount / totalEval) * 100) : 0;
+    document.getElementById('kpiPorcentajeQuiebres').textContent = pctQuiebres + '%';
+    document.getElementById('kpiPorcentajeQuiebresDetalle').textContent = `${quiebresCount} de ${totalEval} evaluaciones`;
+    
+    // ======================================================
+    // 6. Ranking de agentes (para cálculos de cuartiles)
     // ======================================================
     const ranking = await construirRankingAgentes(evaluacionesFiltradas);
-    const totalAgentes = ranking.length || 0;
+    const totalAgentes = ranking.length;
     
-    const q1 = ranking.filter(a => a.cuartil === 'Q1').length || 0;
-    const q2 = ranking.filter(a => a.cuartil === 'Q2').length || 0;
-    const q3 = ranking.filter(a => a.cuartil === 'Q3').length || 0;
-    const q4 = ranking.filter(a => a.cuartil === 'Q4').length || 0;
+    const q1 = ranking.filter(a => a.cuartil === 'Q1').length;
+    const q2 = ranking.filter(a => a.cuartil === 'Q2').length;
+    const q3 = ranking.filter(a => a.cuartil === 'Q3').length;
+    const q4 = ranking.filter(a => a.cuartil === 'Q4').length;
     
     const pctQ1 = totalAgentes > 0 ? Math.round((q1 / totalAgentes) * 100) : 0;
     const pctQ2 = totalAgentes > 0 ? Math.round((q2 / totalAgentes) * 100) : 0;
     const pctQ3 = totalAgentes > 0 ? Math.round((q3 / totalAgentes) * 100) : 0;
     const pctQ4 = totalAgentes > 0 ? Math.round((q4 / totalAgentes) * 100) : 0;
     
-    const kpiPorcentajeQ1 = document.getElementById('kpiPorcentajeQ1');
-    const kpiPorcentajeQ2 = document.getElementById('kpiPorcentajeQ2');
-    const kpiPorcentajeQ3 = document.getElementById('kpiPorcentajeQ3');
-    const kpiTasaQuiebre = document.getElementById('kpiTasaQuiebre');
-    const kpiPorcentajeQ1Detalle = document.getElementById('kpiPorcentajeQ1Detalle');
-    const kpiPorcentajeQ2Detalle = document.getElementById('kpiPorcentajeQ2Detalle');
-    const kpiPorcentajeQ3Detalle = document.getElementById('kpiPorcentajeQ3Detalle');
-    const kpiTasaQuiebreDetalle = document.getElementById('kpiTasaQuiebreDetalle');
+    document.getElementById('kpiPorcentajeQ1').textContent = pctQ1 + '%';
+    document.getElementById('kpiPorcentajeQ2').textContent = pctQ2 + '%';
+    document.getElementById('kpiPorcentajeQ3').textContent = pctQ3 + '%';
+    document.getElementById('kpiTasaQuiebre').textContent = pctQ4 + '%';
     
-    if (kpiPorcentajeQ1) kpiPorcentajeQ1.textContent = pctQ1 + '%';
-    if (kpiPorcentajeQ2) kpiPorcentajeQ2.textContent = pctQ2 + '%';
-    if (kpiPorcentajeQ3) kpiPorcentajeQ3.textContent = pctQ3 + '%';
-    if (kpiTasaQuiebre) kpiTasaQuiebre.textContent = pctQ4 + '%';
-    if (kpiPorcentajeQ1Detalle) kpiPorcentajeQ1Detalle.textContent = `${q1} gestores`;
-    if (kpiPorcentajeQ2Detalle) kpiPorcentajeQ2Detalle.textContent = `${q2} gestores`;
-    if (kpiPorcentajeQ3Detalle) kpiPorcentajeQ3Detalle.textContent = `${q3} gestores`;
-    if (kpiTasaQuiebreDetalle) kpiTasaQuiebreDetalle.textContent = `${q4} gestores`;
+    document.getElementById('kpiPorcentajeQ1Detalle').textContent = `${q1} gestores`;
+    document.getElementById('kpiPorcentajeQ2Detalle').textContent = `${q2} gestores`;
+    document.getElementById('kpiPorcentajeQ3Detalle').textContent = `${q3} gestores`;
+    document.getElementById('kpiTasaQuiebreDetalle').textContent = `${q4} gestores`;
     
     // ======================================================
-    // 6. PRODUCTIVIDAD
+    // 7. KPIs de productividad (auditores)
     // ======================================================
     const productividad = await calcularProductividadAuditor(evaluacionesFiltradas);
-    const kpiProductividad = document.getElementById('kpiProductividad');
-    const kpiCapacidadTotal = document.getElementById('kpiCapacidadTotal');
-    if (kpiProductividad) kpiProductividad.textContent = productividad.porAuditor;
-    if (kpiCapacidadTotal) kpiCapacidadTotal.textContent = productividad.capacidadTotal;
+    document.getElementById('kpiProductividad').textContent = productividad.porAuditor;
+    document.getElementById('kpiCapacidadTotal').textContent = productividad.capacidadTotal;
     
     // ======================================================
-    // 7. MATRIZ INFO
+    // 8. Mostrar resumen de matriz (solo en consola para depuración)
     // ======================================================
-    const matrizInfo = document.getElementById('kpiMatrizInfo');
-    const matrizNombre = document.getElementById('kpiMatrizNombre');
-    
-    if (matrizInfo && matrizNombre) {
-        const totalConMatriz = countMatrizAntigua + countMatrizNueva;
-        if (totalConMatriz > 0) {
-            const pctAntigua = Math.round((countMatrizAntigua / totalConMatriz) * 100);
-            const pctNueva = Math.round((countMatrizNueva / totalConMatriz) * 100);
-            
-            if (countMatrizAntigua > 0 && countMatrizNueva > 0) {
-                matrizNombre.textContent = `⚠️ Mezcla de matrices`;
-                matrizInfo.innerHTML = `
-                    📊 <span id="kpiMatrizNombre" style="color: #f39c12;">⚠️ Mezcla de matrices</span>
-                    <span style="font-size: 11px; color: var(--muted); margin-left: 10px;">
-                        (${countMatrizAntigua} eval - 30/30/40 = ${pctAntigua}% | 
-                        ${countMatrizNueva} eval - 15/15/70 = ${pctNueva}%)
-                    </span>
-                `;
-            } else if (countMatrizAntigua > 0) {
-                matrizNombre.textContent = MATRIZ_ANTIGUA.nombre;
-                matrizInfo.innerHTML = `📊 <span id="kpiMatrizNombre">${MATRIZ_ANTIGUA.nombre}</span>`;
-            } else {
-                matrizNombre.textContent = MATRIZ_NUEVA.nombre;
-                matrizInfo.innerHTML = `📊 <span id="kpiMatrizNombre">${MATRIZ_NUEVA.nombre}</span>`;
-            }
-        }
+    console.log(`📊 Matriz actual: ${nombreMatriz} (${esMixto ? '⚠️ MIXTA' : 'unificada'})`);
+    console.log(`   Umbrales: ENC=${pesos.ENC}%, ECUF=${pesos.ECUF}%, ECN=${pesos.ECN}%`);
+    if (esMixto) {
+        console.log(`   Mezcla: ${infoMixto.countAntigua} eval (30|30|40) + ${infoMixto.countNueva} eval (15|15|70)`);
     }
     
-    console.log(`✅ KPIs actualizados - ${totalEvaluaciones} evaluaciones, ${datosAgrupados.length} períodos`);
-}
-
-// ======================================================
-// AGRUPAR EVALUACIONES POR PERÍODO CON PESOS DINÁMICOS
-// ======================================================
-function agruparEvaluacionesPorPeriodoConPesos(evaluaciones, periodo) {
-    if (!evaluaciones || evaluaciones.length === 0) return [];
-    
-    if (periodo === 'todos') {
-        periodo = 'mes';
-    }
-    
-    console.log(`📊 agruparEvaluacionesPorPeriodoConPesos: ${evaluaciones.length} evaluaciones, período: ${periodo}`);
-    
-    const agrupado = {};
-    
-    for (const e of evaluaciones) {
-        const fecha = obtenerFechaEvaluacion(e);
-        if (!fecha) continue;
-        
-        let clave = '';
-        switch (periodo) {
-            case 'dia':
-                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
-                break;
-            case 'semana':
-                const semana = getWeekNumber(fecha);
-                clave = `${fecha.getFullYear()}-S${semana}`;
-                break;
-            case 'mes':
-                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-                break;
-            case 'trimestre':
-                const trimestre = Math.floor(fecha.getMonth() / 3) + 1;
-                clave = `${fecha.getFullYear()}-T${trimestre}`;
-                break;
-            case 'anio':
-                clave = `${fecha.getFullYear()}`;
-                break;
-            default:
-                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-        }
-        
-        if (!agrupado[clave]) {
-            agrupado[clave] = {
-                clave: clave,
-                evaluaciones: [],
-                count: 0,
-                sumaNotas: 0,
-                sumENC: 0,
-                sumECUF: 0,
-                sumECN: 0,
-                quiebres: 0,
-                // 🔴 NUEVO: Pesos del período
-                pesos: null,
-                // Para porcentajes
-                sumaPctENC: 0,
-                sumaPctECUF: 0,
-                sumaPctECN: 0,
-                countPesos: 0
-            };
-        }
-        
-        const item = agrupado[clave];
-        item.evaluaciones.push(e);
-        item.count++;
-        item.sumaNotas += e.notaFinal || 0;
-        item.sumENC += e.totalENC || 0;
-        item.sumECUF += e.totalECUF || 0;
-        item.sumECN += e.totalECN || 0;
-        if ((e.notaFinal || 0) < 85) item.quiebres++;
-        
-        // 🔴 DETERMINAR PESOS DEL PERÍODO (usar la primera evaluación)
-        if (!item.pesos) {
-            const fechaEval = obtenerFechaEvaluacion(e);
-            if (fechaEval) {
-                const matriz = getMatrizByFecha(fechaEval);
-                item.pesos = matriz.pesos;
-            } else {
-                item.pesos = { ENC: 30, ECUF: 30, ECN: 40 };
-            }
-        }
-        
-        // 🔴 CALCULAR PORCENTAJE DE ESTA EVALUACIÓN CON SU MATRIZ
-        const fechaEval = obtenerFechaEvaluacion(e);
-        if (fechaEval) {
-            const matriz = getMatrizByFecha(fechaEval);
-            const pesos = matriz.pesos;
-            
-            const enc = parseFloat(e.totalENC || e.total_enc || 0);
-            const ecuf = parseFloat(e.totalECUF || e.total_ecuf || 0);
-            const ecn = parseFloat(e.totalECN || e.total_ecn || 0);
-            
-            // Porcentaje individual de esta evaluación
-            const pctENC = Math.min((enc / pesos.ENC) * 100, 100);
-            const pctECUF = Math.min((ecuf / pesos.ECUF) * 100, 100);
-            const pctECN = Math.min((ecn / pesos.ECN) * 100, 100);
-            
-            // Acumular porcentajes
-            item.sumaPctENC += pctENC;
-            item.sumaPctECUF += pctECUF;
-            item.sumaPctECN += pctECN;
-            item.countPesos++;
-        }
-    }
-    
-    // Convertir a array y ordenar
-    let resultados = Object.values(agrupado);
-    resultados.sort((a, b) => a.clave.localeCompare(b.clave));
-    
-    // Formatear etiquetas y calcular promedios
-    const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    
-    resultados = resultados.map(item => {
-        let label = '';
-        switch (periodo) {
-            case 'dia':
-                const [anioD, mesD, diaD] = item.clave.split('-');
-                label = `${diaD}/${mesD}`;
-                break;
-            case 'semana':
-                const [anioS, semana] = item.clave.split('-S');
-                label = `Sem ${semana} (${anioS})`;
-                break;
-            case 'mes':
-                const [anioM, mesM] = item.clave.split('-');
-                label = `${mesesNombres[parseInt(mesM) - 1]} ${anioM}`;
-                break;
-            case 'trimestre':
-                const [anioT, trim] = item.clave.split('-T');
-                label = `T${trim} ${anioT}`;
-                break;
-            case 'anio':
-                label = item.clave;
-                break;
-            default:
-                label = item.clave;
-        }
-        
-        const count = item.count || 0;
-        
-        const promedioNota = count > 0 ? (item.sumaNotas / count) : 0;
-        const promedioENC = count > 0 ? (item.sumENC / count) : 0;
-        const promedioECUF = count > 0 ? (item.sumECUF / count) : 0;
-        const promedioECN = count > 0 ? (item.sumECN / count) : 0;
-        const porcentajeQuiebres = count > 0 ? (item.quiebres / count) * 100 : 0;
-        
-        // 🔴 PROMEDIOS DE PORCENTAJES
-        const promedioENCPct = item.countPesos > 0 ? (item.sumaPctENC / item.countPesos) : 0;
-        const promedioECUFPct = item.countPesos > 0 ? (item.sumaPctECUF / item.countPesos) : 0;
-        const promedioECNPct = item.countPesos > 0 ? (item.sumaPctECN / item.countPesos) : 0;
-        
-        return {
-            ...item,
-            label: label,
-            promedioNota: Math.round(promedioNota * 10) / 10,
-            promedioENC: Math.round(promedioENC * 10) / 10,
-            promedioECUF: Math.round(promedioECUF * 10) / 10,
-            promedioECN: Math.round(promedioECN * 10) / 10,
-            porcentajeQuiebres: Math.round(porcentajeQuiebres * 10) / 10,
-            // 🔴 NUEVOS CAMPOS CON PORCENTAJES
-            promedioENCPct: Math.round(promedioENCPct * 10) / 10,
-            promedioECUFPct: Math.round(promedioECUFPct * 10) / 10,
-            promedioECNPct: Math.round(promedioECNPct * 10) / 10
-        };
-    });
-    
-    console.log(`✅ Datos agrupados: ${resultados.length} períodos con pesos dinámicos`);
-    if (resultados.length > 0) {
-        console.log(`   Ejemplo: ${resultados[0].label} - ENC: ${resultados[0].promedioENC} pts (${resultados[0].promedioENCPct}%)`);
-        console.log(`   Pesos del período: ENC=${resultados[0].pesos?.ENC}, ECUF=${resultados[0].pesos?.ECUF}, ECN=${resultados[0].pesos?.ECN}`);
-    }
-    
-    return resultados;
+    console.log('✅ KPIs actualizados con datos filtrados y umbrales dinámicos');
 }
 
 function actualizarCardsPromedioMotivosAgrupados(datosAgrupados) {
@@ -7280,23 +7071,30 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
         return;
     }
 
-    // Obtener evaluaciones
+    // 🔴 OBTENER EVALUACIONES
     let evaluacionesFiltradas;
     if (evaluacionesParam !== null) {
         evaluacionesFiltradas = evaluacionesParam;
+        console.log(`📊 Usando evaluaciones pasadas como parámetro: ${evaluacionesFiltradas.length}`);
     } else {
         evaluacionesFiltradas = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
+        console.log(`📊 Usando evaluaciones de window: ${evaluacionesFiltradas.length}`);
     }
 
     // Destruir gráfico existente
     if (window.chartEvolutivo && typeof window.chartEvolutivo.destroy === 'function') {
         try {
             window.chartEvolutivo.destroy();
-        } catch (e) {}
+            console.log('✅ Gráfico chartEvolutivo destruido');
+        } catch (e) {
+            console.warn('Error destruyendo gráfico:', e);
+        }
         window.chartEvolutivo = null;
     }
 
+    // Verificar si hay evaluaciones
     if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
+        console.warn('⚠️ No hay evaluaciones para mostrar en el gráfico evolutivo');
         const ctx = canvas.getContext('2d');
         if (ctx) {
             canvas.width = canvas.clientWidth;
@@ -7310,130 +7108,47 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
         return;
     }
 
-    // Determinar período
+    // 🔴 OBTENER EL PERÍODO CORRECTO - CON MAPEO DE 'rango'
     let periodo = periodoParam || filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
+    console.log(`   Período inicial: ${periodo}`);
     
+    // 🔴 MAPEAR 'rango' A SU SUBTIPO
     if (periodo === 'rango') {
         const tipoRango = document.getElementById('filtroRangoTipo')?.value;
+        console.log(`   Rango detectado, tipo: ${tipoRango}`);
         if (tipoRango === 'mes') periodo = 'mes';
         else if (tipoRango === 'trimestre') periodo = 'trimestre';
         else if (tipoRango === 'anio') periodo = 'anio';
         else if (tipoRango === 'dia') periodo = 'dia';
         else periodo = 'mes';
+        console.log(`   Rango mapeado a: ${periodo}`);
     }
     
+    // 🔴 MAPEAR 'multiples' A SU SUBTIPO
     if (periodo === 'multiples') {
         const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
+        console.log(`   Múltiples detectado, tipo: ${tipoMultiples}`);
         if (tipoMultiples === 'mes') periodo = 'mes';
         else if (tipoMultiples === 'trimestre') periodo = 'trimestre';
         else if (tipoMultiples === 'anio') periodo = 'anio';
         else if (tipoMultiples === 'dia') periodo = 'dia';
         else periodo = 'mes';
+        console.log(`   Múltiples mapeado a: ${periodo}`);
     }
     
+    // Si es 'todos', usar 'mes'
     if (periodo === 'todos') {
         periodo = 'mes';
+        console.log('   "todos" → "mes"');
     }
-
+    
     console.log(`   Período FINAL para agrupar: ${periodo}`);
 
-    // 🔴 FUNCIÓN INTERNA: Agrupar con pesos por período
-    function agruparConPesosPorPeriodo(evalData, periodo) {
-        const agrupado = {};
-        
-        for (const e of evalData) {
-            const fecha = obtenerFechaEvaluacion(e);
-            if (!fecha) continue;
-            
-            // Obtener clave del período
-            let clave = '';
-            if (periodo === 'mes') {
-                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-            } else if (periodo === 'trimestre') {
-                const trim = Math.floor(fecha.getMonth() / 3) + 1;
-                clave = `${fecha.getFullYear()}-T${trim}`;
-            } else if (periodo === 'anio') {
-                clave = `${fecha.getFullYear()}`;
-            } else {
-                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-            }
-            
-            if (!agrupado[clave]) {
-                agrupado[clave] = {
-                    clave: clave,
-                    label: clave,
-                    evaluaciones: [],
-                    sumENC: 0,
-                    sumECUF: 0,
-                    sumECN: 0,
-                    count: 0,
-                    pesos: null
-                };
-            }
-            
-            const item = agrupado[clave];
-            item.evaluaciones.push(e);
-            item.sumENC += e.totalENC || 0;
-            item.sumECUF += e.totalECUF || 0;
-            item.sumECN += e.totalECN || 0;
-            item.count++;
-            
-            // Determinar pesos del período (usar la primera evaluación)
-            if (!item.pesos) {
-                const pesosEval = obtenerPesosPorEvaluacion(e);
-                item.pesos = pesosEval;
-            }
-        }
-        
-        // Calcular promedios y porcentajes
-        const resultados = Object.values(agrupado).map(item => {
-            const count = item.count || 0;
-            const pesos = item.pesos || { ENC: 30, ECUF: 30, ECN: 40 };
-            
-            const promENC = count > 0 ? item.sumENC / count : 0;
-            const promECUF = count > 0 ? item.sumECUF / count : 0;
-            const promECN = count > 0 ? item.sumECN / count : 0;
-            
-            // Calcular porcentajes con los pesos del período
-            const pctENC = Math.round((promENC / pesos.ENC) * 100);
-            const pctECUF = Math.round((promECUF / pesos.ECUF) * 100);
-            const pctECN = Math.round((promECN / pesos.ECN) * 100);
-            
-            return {
-                ...item,
-                promedioENC: promENC,
-                promedioECUF: promECUF,
-                promedioECN: promECN,
-                pctENC: pctENC,
-                pctECUF: pctECUF,
-                pctECN: pctECN,
-                pesos: pesos,
-                label: formatearLabelPeriodo(item.clave, periodo)
-            };
-        });
-        
-        return resultados.sort((a, b) => a.clave.localeCompare(b.clave));
-    }
-
-    function formatearLabelPeriodo(clave, periodo) {
-        const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        
-        if (periodo === 'mes') {
-            const [anio, mes] = clave.split('-');
-            return `${meses[parseInt(mes) - 1]} ${anio}`;
-        } else if (periodo === 'trimestre') {
-            const [anio, trim] = clave.split('-T');
-            return `T${trim} ${anio}`;
-        } else if (periodo === 'anio') {
-            return clave;
-        }
-        return clave;
-    }
-
-    // 🔴 USAR LA FUNCIÓN CORREGIDA con pesos por período
-    const datosAgrupados = agruparConPesosPorPeriodo(evaluacionesFiltradas, periodo);
+    // Agrupar evaluaciones por el período seleccionado
+    const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodo);
 
     if (datosAgrupados.length === 0) {
+        console.warn('⚠️ No hay datos agrupados para el período seleccionado');
         const ctx = canvas.getContext('2d');
         if (ctx) {
             canvas.width = canvas.clientWidth;
@@ -7447,26 +7162,34 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
         return;
     }
 
+    // Extraer etiquetas para el eje X
     const labels = datosAgrupados.map(item => item.label);
-    
-    // 🔴 USAR LOS PORCENTAJES CORRECTOS (ya calculados con los pesos del período)
-    const dataCliente = datosAgrupados.map(item => Math.min(item.pctENC, 100));
-    const dataNegocio = datosAgrupados.map(item => Math.min(item.pctECUF, 100));
-    const dataProceso = datosAgrupados.map(item => Math.min(item.pctECN, 100));
+    console.log(`   Labels generadas: ${labels.join(', ')}`);
 
-    // Calcular escala dinámica
+    // Usar matrices dinámicas
+    const matrizDominante = obtenerMatrizDominante(datosAgrupados.flatMap(d => d.evaluaciones || []));
+    const pesos = matrizDominante ? matrizDominante.pesos : { ENC: 30, ECUF: 30, ECN: 40 };
+    
+    // Calcular porcentajes de cada frente (ENC, ECUF, ECN) usando pesos dinámicos
+    const dataCliente = datosAgrupados.map(item => Math.round((parseFloat(item.promedioENC) / pesos.ENC) * 100));
+    const dataNegocio = datosAgrupados.map(item => Math.round((parseFloat(item.promedioECUF) / pesos.ECUF) * 100));
+    const dataProceso = datosAgrupados.map(item => Math.round((parseFloat(item.promedioECN) / pesos.ECN) * 100));
+
+    // Calcular escala dinámica del eje Y
     const todosValores = [...dataCliente, ...dataNegocio, ...dataProceso];
     const minValor = Math.min(...todosValores);
     const maxValor = Math.max(...todosValores);
     let yMin = Math.max(0, minValor - 5);
     let yMax = Math.min(100, maxValor + 5);
 
+    // Ajustar escala si el rango es muy pequeño
     if (yMax - yMin < 15) {
         const centro = (yMin + yMax) / 2;
         yMin = Math.max(0, centro - 10);
         yMax = Math.min(100, centro + 10);
     }
 
+    // Determinar el step size según el rango
     let stepSize = 5;
     const rango = yMax - yMin;
     if (rango <= 10) stepSize = 2;
@@ -7474,9 +7197,11 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
     else if (rango <= 40) stepSize = 10;
     else stepSize = 20;
 
+    // Líneas de meta (85% y 90%)
     const lineaMeta85 = new Array(datosAgrupados.length).fill(85);
     const lineaMeta90 = new Array(datosAgrupados.length).fill(90);
 
+    // Determinar título del eje X según el período
     let xTitle = 'Período';
     if (periodo === 'dia') xTitle = 'Fecha (Día/Mes)';
     else if (periodo === 'semana') xTitle = 'Semana';
@@ -7484,13 +7209,16 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
     else if (periodo === 'trimestre') xTitle = 'Trimestre';
     else if (periodo === 'anio') xTitle = 'Año';
 
+    // Obtener el contexto del canvas
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Limpiar el canvas antes de dibujar
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Crear el nuevo gráfico
     window.chartEvolutivo = new Chart(ctx, {
         type: 'line',
         data: {
@@ -7694,7 +7422,7 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
         }
     });
 
-    console.log(`✅ Gráfico Evolutivo corregido - ${datosAgrupados.length} períodos, ${evaluacionesFiltradas.length} evaluaciones`);
+    console.log(`✅ Gráfico Evolutivo unificado actualizado - ${datosAgrupados.length} períodos, ${evaluacionesFiltradas.length} evaluaciones`);
     console.log(`   Período usado: ${periodo}`);
 }
 
@@ -14258,6 +13986,11 @@ function calcularNotaPorcentaje(evaluacion, pesos) {
     return (pctENC + pctECUF + pctECN) / 3;
 }
 
+function obtenerPesosPorEvaluacion(evaluacion) {
+    const fecha = obtenerFechaEvaluacion(evaluacion);
+    const matriz = getMatrizByFecha(fecha);
+    return matriz.pesos;
+}
 
 // Devuelve los pesos aplicables al conjunto filtrado (si todas las evaluaciones comparten matriz),
 // o valores por defecto si no hay matriz dominante.
@@ -15116,7 +14849,7 @@ if (document.readyState === 'loading') {
         console.log('📄 Abriendo reporte:', nombreArchivo);
         
         // 🔴 USAR EL PUERTO 5000 (NO 8080)
-        const url = `${API_URL_PYTHON}/api/reportes/descargar/${encodeURIComponent(nombreArchivo)}`;
+        const url = `http://localhost:5000/api/reportes/descargar/${encodeURIComponent(nombreArchivo)}`;
         console.log('🔗 URL:', url);
         
         window.open(url, '_blank');
@@ -37213,136 +36946,39 @@ function exportarDetalleCicloGP() {
     alert(`✅ Exportados ${rows.length} errores del Ciclo #${ciclo.numero}`);
 }
 
-// ======================================================
-// EXPORTAR GESTIÓN DE PERSONAS - VERSIÓN DINÁMICA
-// ======================================================
 function exportarGestionPersonasGP() {
     if (gestoresFiltradosGP.length === 0) {
         alert('⚠️ No hay datos para exportar');
         return;
     }
     
-    const evaluaciones = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
+    const headers = ['Gestor', 'Promedio Global', 'Cuartil', 'ENC', 'ECUF', 'ECN', 'Total Errores', 'Reincidencia', 'Tendencia'];
+    const matrizDominante = obtenerMatrizDominante(window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || []);
+    const pesos = matrizDominante ? matrizDominante.pesos : { ENC: 30, ECUF: 30, ECN: 40 };
+
+    const rows = gestoresFiltradosGP.map(g => [
+        `"${g.nombre}"`,
+        g.promedioGlobal,
+        g.cuartilGlobal,
+        `${g.encGlobal}/${pesos.ENC}`,
+        `${g.ecufGlobal}/${pesos.ECUF}`,
+        `${g.ecnGlobal}/${pesos.ECN}`,
+        g.totalErrores,
+        `${g.reincidencia}%`,
+        `${g.tendencia.icono} ${g.tendencia.texto}`
+    ]);
     
-    // ======================================================
-    // HEADERS DEL CSV
-    // ======================================================
-    const headers = [
-        'Gestor',
-        'Promedio Global (%)',
-        'Cuartil',
-        'ENC (%)',
-        'ECUF (%)',
-        'ECN (%)',
-        'Total Errores',
-        'Reincidencia (%)',
-        'Tendencia',
-        'Períodos con Matriz Antigua (30/30/40)',
-        'Períodos con Matriz Nueva (15/15/70)'
-    ];
-    
-    // ======================================================
-    // CONSTRUIR FILAS CON CÁLCULO DINÁMICO POR EVALUACIÓN
-    // ======================================================
-    const rows = gestoresFiltradosGP.map(g => {
-        // Obtener evaluaciones del gestor
-        const evalGestor = evaluaciones.filter(e => e.agente === g.nombre);
-        
-        if (evalGestor.length === 0) {
-            return [
-                `"${g.nombre}"`,
-                g.promedioGlobal,
-                g.cuartilGlobal,
-                '0%',
-                '0%',
-                '0%',
-                g.totalErrores,
-                `${g.reincidencia}%`,
-                `${g.tendencia.icono} ${g.tendencia.texto}`,
-                '0',
-                '0'
-            ];
-        }
-        
-        // ======================================================
-        // CALCULAR PORCENTAJES POR EVALUACIÓN CON SU MATRIZ
-        // ======================================================
-        let sumPctENC = 0, sumPctECUF = 0, sumPctECN = 0;
-        let countEval = 0;
-        let countMatrizAntigua = 0;
-        let countMatrizNueva = 0;
-        
-        for (const e of evalGestor) {
-            const fecha = obtenerFechaEvaluacion(e);
-            if (fecha) {
-                const matriz = getMatrizByFecha(fecha);
-                
-                // Contar qué matriz usó
-                if (matriz.nombre === MATRIZ_ANTIGUA.nombre) {
-                    countMatrizAntigua++;
-                } else {
-                    countMatrizNueva++;
-                }
-                
-                // Calcular porcentaje con la matriz correcta
-                const pctENC = Math.min(((e.totalENC || 0) / matriz.pesos.ENC) * 100, 100);
-                const pctECUF = Math.min(((e.totalECUF || 0) / matriz.pesos.ECUF) * 100, 100);
-                const pctECN = Math.min(((e.totalECN || 0) / matriz.pesos.ECN) * 100, 100);
-                
-                sumPctENC += pctENC;
-                sumPctECUF += pctECUF;
-                sumPctECN += pctECN;
-                countEval++;
-            }
-        }
-        
-        // Promedios finales
-        const pctENC = countEval > 0 ? Math.round(sumPctENC / countEval) : 0;
-        const pctECUF = countEval > 0 ? Math.round(sumPctECUF / countEval) : 0;
-        const pctECN = countEval > 0 ? Math.round(sumPctECN / countEval) : 0;
-        
-        return [
-            `"${g.nombre}"`,
-            g.promedioGlobal,
-            g.cuartilGlobal,
-            `${pctENC}%`,
-            `${pctECUF}%`,
-            `${pctECN}%`,
-            g.totalErrores,
-            `${g.reincidencia}%`,
-            `${g.tendencia.icono} ${g.tendencia.texto}`,
-            countMatrizAntigua,
-            countMatrizNueva
-        ];
-    });
-    
-    // ======================================================
-    // GENERAR Y DESCARGAR CSV
-    // ======================================================
     const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `gestion_personas_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    // ======================================================
-    // MOSTRAR RESUMEN
-    // ======================================================
-    const totalFilas = rows.length;
-    const totalConMatrizAntigua = rows.reduce((sum, row) => sum + parseInt(row[9] || 0), 0);
-    const totalConMatrizNueva = rows.reduce((sum, row) => sum + parseInt(row[10] || 0), 0);
-    
-    alert(`✅ Exportación completada\n\n📊 ${totalFilas} gestores exportados\n📌 Matriz antigua: ${totalConMatrizAntigua} evaluaciones\n📌 Matriz nueva: ${totalConMatrizNueva} evaluaciones`);
-    
-    console.log(`✅ Exportados ${totalFilas} gestores con cálculos dinámicos por matriz`);
+    alert(`✅ Exportados ${gestoresFiltradosGP.length} gestores`);
 }
-
-
 
 async function refrescarGestionPersonasGP() {
     await cargarGestionPersonasGP();
@@ -44056,7 +43692,7 @@ async function cargarListaReportes() {
     
     try {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`${API_URL_PYTHON}/api/reportes/listar`, {
+        const response = await fetch('http://localhost:5000/api/reportes/listar', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -44089,7 +43725,7 @@ function verReporte(nombre) {
         alert('⚠️ No hay reporte para ver');
         return;
     }
-    const url = `${API_URL_PYTHON}/api/reportes/descargar/${encodeURIComponent(nombre)}`;
+    const url = `http://localhost:5000/api/reportes/descargar/${encodeURIComponent(nombre)}`;
     window.open(url, '_blank');
 }
 
@@ -44104,7 +43740,7 @@ async function descargarReporte(nombre) {
     
     try {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`${API_URL_PYTHON}/api/reportes/descargar/${encodeURIComponent(nombre)}`, {
+        const response = await fetch(`http://localhost:5000/api/reportes/descargar/${encodeURIComponent(nombre)}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -44138,7 +43774,7 @@ async function cargarEstadoReportes() {
     
     try {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`${API_URL_PYTHON}/api/reportes/estado`, {
+        const response = await fetch('http://localhost:5000/api/reportes/estado', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -44219,6 +43855,7 @@ async function generarReporteManual(tipo = 'todos') {
         return;
     }
     
+    // Mostrar indicador de carga
     const statusDiv = document.getElementById('reporteEjecucionStatus');
     const mensaje = document.getElementById('reporteEjecucionMensaje');
     
@@ -44232,9 +43869,7 @@ async function generarReporteManual(tipo = 'todos') {
     
     try {
         const token = localStorage.getItem('meca_token');
-        
-        // 🔴 CAMBIADO: Usar la URL dinámica
-        const response = await fetch(`${API_URL_PYTHON}/api/reportes/ejecutar`, {
+        const response = await fetch('http://localhost:5000/api/reportes/ejecutar', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -44255,8 +43890,10 @@ async function generarReporteManual(tipo = 'todos') {
                 mensaje.textContent = `✅ ${result.message || 'Reporte generado correctamente'}`;
                 mensaje.style.color = '#28a745';
             }
+            // Recargar la lista de reportes
             setTimeout(() => {
                 cargarListaReportes();
+                // También actualizar estado completo
                 cargarEstadoReportes();
             }, 1500);
         } else {
@@ -44272,6 +43909,7 @@ async function generarReporteManual(tipo = 'todos') {
         alert('❌ Error al generar reporte: ' + error.message);
     }
     
+    // Ocultar después de 5 segundos
     setTimeout(() => {
         if (statusDiv) {
             statusDiv.style.display = 'none';
@@ -44284,7 +43922,7 @@ function abrirCarpetaReportes() {
     // Intentar abrir con el endpoint
     const token = localStorage.getItem('meca_token');
     
-    fetch(`${API_URL_PYTHON}/api/reportes/abrir-carpeta`, {
+    fetch('http://localhost:5000/api/reportes/abrir-carpeta', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -44366,7 +44004,7 @@ async function cargarTareasReportes() {
     
     try {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`${API_URL_PYTHON}/api/reportes/tareas`, {
+        const response = await fetch('http://localhost:5000/api/reportes/tareas', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -44452,7 +44090,7 @@ async function cargarTareasReportes() {
 async function actualizarUltimosReportes() {
     try {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`${API_URL_PYTHON}/api/reportes/listar`, {
+        const response = await fetch('http://localhost:5000/api/reportes/listar', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
