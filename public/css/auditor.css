@@ -196,9 +196,6 @@ body {
 
 .tabs-container {
     background: transparent;
-    border-radius: var(--radius);
-    overflow: visible;
-    width: 100%;
 }
 
 .tabs-header {
@@ -238,18 +235,27 @@ body {
 
 /* Contenido de pestañas */
 .tab-content {
-    background: white;
+    background: white !important;
     border-radius: 0 15px 15px 15px;
     padding: 25px;
     box-shadow: var(--shadow);
 }
 
+.tab-content.active {
+    display: block !important;
+}
+
 .tab-pane {
-    display: none;  /* Oculto por defecto */
+    display: none;
+    background: white !important;  /* ← FORZAR FONDO BLANCO */
+    border-radius: 0 15px 15px 15px;
+    padding: 25px;
+    box-shadow: var(--shadow);
 }
 
 .tab-pane.active {
-    display: block;  /* Mostrar solo la activa */
+    display: block !important;
+    background: white !important;  /* ← FORZAR FONDO BLANCO */
 }
 
 /* ======================================================

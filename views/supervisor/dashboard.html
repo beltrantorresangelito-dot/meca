@@ -920,7 +920,20 @@
                         <div class="kpi-detail">ciclo cerrado</div>
                     </div>
                 </div>
-
+                <!-- Dentro de la pestaña PDA, junto a otros botones -->
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <button onclick="generarReporteConsolidadoPDA()" 
+                            style="background: linear-gradient(135deg, #7b1fa2, #9c27b0); 
+                                padding: 8px 20px; 
+                                border: none; 
+                                border-radius: 8px; 
+                                color: white; 
+                                cursor: pointer; 
+                                font-weight: bold;">
+                        📊 Visualizar Reporte Consolidado
+                    </button>
+                    <!-- Otros botones existentes -->
+                </div>
                 <!-- ====================================================== -->
                 <!-- SECCIÓN: PDA PENDIENTES (requieren acción) -->
                 <!-- ====================================================== -->
@@ -969,9 +982,7 @@
                             <button onclick="exportarReportePDA()" style="background: var(--accent); padding: 6px 12px; font-size: 12px;">
                                 📥 Exportar reporte
                             </button>
-                            <button onclick="limpiarTodosPDA()" style="background: var(--danger); padding: 6px 12px; font-size: 12px; color: white;">
-                                🗑️ Limpiar historial
-                            </button>
+                            
                         </div>
                     </h3>
                     <div id="listaHistorial" style="max-height: 400px; overflow-y: auto;">
@@ -1516,6 +1527,86 @@
                         <!-- El contenido se genera dinámicamente -->
                     </div>
                 </div>
+
+                <!-- ====================================================== -->
+                <!-- CONFIGURACIÓN DE AUDIOS -->
+                <!-- ====================================================== -->
+                <div class="card" style="margin-top: 20px;">
+                    <h3>📁 Configuración de Audios</h3>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: end;">
+                        <div style="flex: 2; min-width: 250px;">
+                            <label style="font-size: 12px; font-weight: 600;">📂 Ruta base de audios</label>
+                            <input type="text" id="configRutaAudios" 
+                                placeholder="C:\MECA_ML\whisper\audios" 
+                                style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px;">
+                        </div>
+                        <div style="flex: 1; min-width: 120px;">
+                            <label style="font-size: 12px; font-weight: 600;">📋 Extensiones</label>
+                            <input type="text" id="configExtensiones" 
+                                value=".mp3,.wav,.m4a,.flac,.aac,.ogg" 
+                                style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 13px;">
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button onclick="guardarConfiguracionAudios()" 
+                                    style="background: var(--ok); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: 500;">
+                                💾 Guardar
+                            </button>
+                            <button onclick="probarRutaAudios()" 
+                                    style="background: var(--accent); padding: 10px 20px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: 500;">
+                                🔍 Probar Ruta
+                            </button>
+                        </div>
+                    </div>
+                    <div id="configAudiosStatus" style="margin-top: 10px; font-size: 13px; min-height: 20px;"></div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- PROCESAR AUDIOS DEL LOTE -->
+                <!-- ====================================================== -->
+                <div class="card" style="margin-top: 20px;">
+                    <h3>🎧 Procesar Audios del Lote</h3>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+                        <div>
+                            <span style="font-size: 13px; color: var(--muted);">Buscará automáticamente los archivos de audio usando:</span>
+                            
+                        </div>
+                        <button onclick="procesarAudiosDeLoteActivo()" 
+                                id="btnProcesarAudiosLote"
+                                style="background: linear-gradient(135deg, #7b1fa2, #9c27b0); 
+                                    padding: 12px 28px; 
+                                    border: none; 
+                                    border-radius: 8px; 
+                                    color: white; 
+                                    cursor: pointer; 
+                                    font-weight: bold; 
+                                    font-size: 14px;
+                                    box-shadow: 0 4px 12px rgba(123,31,162,0.3);
+                                    transition: all 0.2s;">
+                            🎧 Procesar Lote Activo
+                        </button>
+                    </div>
+                    <!-- Opciones de procesamiento de audios -->
+                    <div style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 1px solid #e0e0e0;">
+                        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+                            <!-- Checkbox para forzar reprocesamiento -->
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="forzarReprocesamiento" 
+                                    style="width: 18px; height: 18px; cursor: pointer;">
+                                <span style="font-size: 13px; font-weight: 500;">🔄 Reprocesar audios ya transcritos</span>
+                            </label>
+                            <span style="font-size: 11px; color: var(--muted);">
+                                ⚠️ Si está activado, reemplazará las transcripciones existentes con nuevas versiones.
+                                <br>Útil para aplicar mejoras en Whisper o en la lógica de análisis.
+                            </span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 12px; color: var(--muted);">
+                        ⚡ Al procesar, el sistema buscará los audios, los transcribirá y 
+                        <span id="analisisOpcionTexto">analizará con IA</span>.
+                        <br>💡 Si ya tiene transcripciones, puede analizarlas desde la bandeja del auditor.
+                    </div>
+                </div>
+                
             </div>
 
             <!-- ====================================================== -->
@@ -1938,7 +2029,7 @@
                             <thead>
                                 <tr style="background: #f8f9fa; position: sticky; top: 0;">
                                     <th>ID</th>
-                                    <th>Cuartil</th>
+                                    <th>Rendimiento</th>
                                     <th>Nombre</th>
                                     <th>Límite Inf.</th>
                                     <th>Límite Sup.</th>
@@ -2040,263 +2131,317 @@
 
             <!-- PESTAÑA DE GESTIÓN DE USUARIOS -->
             <div id="tab-gestionUsuarios" class="tab-content tab-pane">
-                <div style="display: flex; gap: 25px; flex-wrap: wrap;">
-
-                    <!-- ====================================================== -->
-                    <!-- COLUMNA IZQUIERDA: FORMULARIO DE USUARIO (40%) -->
-                    <!-- ====================================================== -->
-                    <div class="card" style="flex: 0 0 40%; min-width: 350px;">
-                        <h3>📝 Registrar / Editar Usuario</h3>
-                        <form id="formUsuario" style="display: flex; flex-direction: column; gap: 15px;">
-                            <div>
-                                <label>Nombre de Usuario (login) *</label>
-                                <input type="text" id="usuarioUsername" required placeholder="Ej: mgonzalez">
-                                <small style="color: var(--muted);">Nombre único para iniciar sesión</small>
-                            </div>
-                            <div>
-                                <label>Nombre Completo *</label>
-                                <input type="text" id="usuarioNombreCompleto" required placeholder="Ej: MARIA GONZALEZ PEREZ">
-                            </div>
-                            <div>
-                                <label>Contraseña *</label>
-                                <input type="password" id="usuarioPassword" placeholder="Mínimo 6 caracteres">
-                                <small style="color: var(--muted);">Dejar en blanco para mantener la contraseña actual (solo en edición)</small>
-                            </div>
-                            <div>
-                                <label>Confirmar Contraseña</label>
-                                <input type="password" id="usuarioPasswordConfirm" placeholder="Repita la contraseña">
-                            </div>
-                            <div>
-                                <label>Rol *</label>
-                                <select id="usuarioRol">
-                                        <option value="">-- Seleccionar rol --</option>
-                                    </select>
-                                <small style="color: var(--muted);">El rol define los permisos y accesos del usuario</small>
-                            </div>
-                            <div>
-                                <label>Estado</label>
-                                <select id="usuarioActivo">
-                                        <option value="true">✅ ACTIVO</option>
-                                        <option value="false">❌ INACTIVO</option>
-                                    </select>
-                            </div>
-                            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                                <button type="submit" style="background: var(--ok);">💾 Guardar Usuario</button>
-                                <button type="button" onclick="limpiarFormUsuario()" class="secondary">🗑️ Limpiar</button>
-                            </div>
-                        </form>
-                    </div>
-
-                    <!-- ====================================================== -->
-                    <!-- COLUMNA DERECHA: LISTA DE USUARIOS (60%) -->
-                    <!-- ====================================================== -->
-                    <div class="card" style="flex: 1; min-width: 450px;">
-                        <h3 style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                            <span>📋 Lista de Usuarios del Sistema</span>
-                            <div style="display: flex; gap: 8px;">
-                                <button onclick="cargarUsuarios()" style="background: var(--accent); padding: 5px 12px; font-size: 12px;">
-                                    🔄 Refrescar
-                                </button>
-                                <button onclick="exportarUsuariosCSV()" style="background: var(--ok); padding: 5px 12px; font-size: 12px;">
-                                    📥 Exportar CSV
-                                </button>
-                            </div>
-                        </h3>
-                        <div style="margin-bottom: 15px;">
-                            <input type="text" id="buscarUsuario" placeholder="🔍 Buscar por usuario o nombre..." onkeyup="filtrarUsuarios()" style="width: 100%;">
+     
+                <!-- ====================================================== -->
+                <!-- SECCIÓN 1: ESTADÍSTICAS RÁPIDAS                       -->
+                <!-- ====================================================== -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; padding: 15px;">
+                        <div style="text-align: center; background: #e3f2fd; padding: 12px; border-radius: 10px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #019DF4;" id="kpiTotalUsuarios">0</div>
+                            <div style="font-size: 11px; color: #6c757d;">👥 Usuarios</div>
                         </div>
-                        <div class="table-container" style="max-height: 400px;">
-                            <table style="width: 100%; min-width: 700px;">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Usuario</th>
-                                        <th>Nombre Completo</th>
-                                        <th>Rol</th>
-                                        <th>Estado</th>
-                                        <th>Fecha Registro</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tablaUsuarios">
-                                    <tr>
-                                        <td colspan="7" style="text-align: center; padding: 50px;">Cargando usuarios...</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <div style="text-align: center; background: #f3e5f5; padding: 12px; border-radius: 10px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #7b1fa2;" id="kpiTotalRoles">0</div>
+                            <div style="font-size: 11px; color: #6c757d;">🔐 Roles</div>
                         </div>
-                        <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                            <span><strong>Total:</strong> <span id="totalUsuarios">0</span></span>
-                            <span><strong>Activos:</strong> <span id="totalUsuariosActivos">0</span></span>
+                        <div style="text-align: center; background: #e8f5e9; padding: 12px; border-radius: 10px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #28a745;" id="kpiTotalPestanas">0</div>
+                            <div style="font-size: 11px; color: #6c757d;">📋 Pestañas</div>
+                        </div>
+                        <div style="text-align: center; background: #fff3e0; padding: 12px; border-radius: 10px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #f39c12;" id="kpiTotalSesiones">0</div>
+                            <div style="font-size: 11px; color: #6c757d;">🔑 Sesiones</div>
+                        </div>
+                        <div style="text-align: center; background: #e8f5e9; padding: 12px; border-radius: 10px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #28a745;" id="kpiUsuariosActivos">0</div>
+                            <div style="font-size: 11px; color: #6c757d;">✅ Activos</div>
+                        </div>
+                        <div style="text-align: center; background: #ffebee; padding: 12px; border-radius: 10px;">
+                            <div style="font-size: 24px; font-weight: bold; color: #d93025;" id="kpiUsuariosInactivos">0</div>
+                            <div style="font-size: 11px; color: #6c757d;">⚠️ Inactivos</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- ====================================================== -->
-                <!-- SECCIÓN DE GESTIÓN DE ROLES -->
+                <!-- SECCIÓN 2: USUARIOS (EXISTENTE, SIN CAMBIOS)          -->
                 <!-- ====================================================== -->
-                <div class="card" style="margin-top: 25px;">
-                    <h3 style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                        <span>🔐 Gestión de Roles y Permisos</span>
+                <div class="card" style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid var(--line);">
+                        <h3 style="margin: 0;">👤 USUARIOS</h3>
                         <div style="display: flex; gap: 8px;">
-                            <button onclick="mostrarModalNuevoRol()" style="background: var(--accent); padding: 5px 12px; font-size: 12px;">
-                                ➕ Nuevo Rol
+                            <button onclick="mostrarModalNuevoUsuario()" class="btn-primary" style="padding: 6px 16px; background: #019DF4; border: none; border-radius: 6px; color: white; cursor: pointer;">
+                                ➕ Nuevo Usuario
                             </button>
-                            <button onclick="cargarRoles()" style="background: var(--ok); padding: 5px 12px; font-size: 12px;">
-                                🔄 Refrescar
+                            <button onclick="exportarUsuariosCSV()" style="padding: 6px 16px; background: #28a745; border: none; border-radius: 6px; color: white; cursor: pointer;">
+                                📥 Exportar
                             </button>
                         </div>
-                    </h3>
+                    </div>
+                    <div style="padding: 15px 20px;">
+                        <!-- Filtros -->
+                        <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                            <input type="text" id="buscarUsuario" placeholder="🔍 Buscar usuario..." 
+                                style="flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--line);"
+                                oninput="filtrarUsuarios()">
+                        </div>
+                        
+                        <!-- Tabla de usuarios (existe) -->
+                        <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                            <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #f8f9fa; position: sticky; top: 0;">
+                                        <th style="padding: 10px; text-align: center; width: 40px;">#</th>
+                                        <th style="padding: 10px; text-align: left;">Usuario</th>
+                                        <th style="padding: 10px; text-align: left;">Nombre</th>
+                                        <th style="padding: 10px; text-align: center;">Rol</th>
+                                        <th style="padding: 10px; text-align: center;">Estado</th>
+                                        <th style="padding: 10px; text-align: center;">Fecha</th>
+                                        <th style="padding: 10px; text-align: center;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaUsuarios">
+                                    <!-- Generado por actualizarTablaUsuarios() -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Estadísticas de usuarios -->
+                        <div style="margin-top: 10px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between;">
+                            <span id="totalUsuarios">📊 Total: 0 usuarios</span>
+                            <span id="statsUsuariosActivos">✅ Activos: 0 | ❌ Inactivos: 0</span>
+                        </div>
+                    </div>
+                </div>
 
-                    <!-- Tabla de Roles -->
-                    <div class="table-container" style="max-height: 300px; overflow-x: auto;">
-                        <table style="width: 100%; min-width: 800px;">
-                            <thead>
+                <!-- ====================================================== -->
+                <!-- SECCIÓN 3: ROLES Y PERMISOS (EXISTENTE)               -->
+                <!-- ====================================================== -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid var(--line);">
+                        <h3 style="margin: 0;">🔐 ROLES Y PERMISOS</h3>
+                        <button onclick="mostrarModalNuevoRol()" style="padding: 6px 16px; background: #7b1fa2; border: none; border-radius: 6px; color: white; cursor: pointer;">
+                            ➕ Nuevo Rol
+                        </button>
+                    </div>
+                    <div style="padding: 15px 20px;">
+                        <!-- Tabla de roles (existe) -->
+                        <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+                            <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: #f8f9fa; position: sticky; top: 0;">
+                                        <th style="padding: 10px; text-align: center; width: 40px;">ID</th>
+                                        <th style="padding: 10px; text-align: left;">Código</th>
+                                        <th style="padding: 10px; text-align: left;">Nombre</th>
+                                        <th style="padding: 10px; text-align: center;">📋 Pestañas</th>
+                                        <th style="padding: 10px; text-align: center;">👥 Usuarios</th>
+                                        <th style="padding: 10px; text-align: center;">Estado</th>
+                                        <th style="padding: 10px; text-align: center;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaRoles">
+                                    <!-- Generado por actualizarTablaRoles() -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top: 10px; font-size: 12px; color: var(--muted);">
+                            💡 Clic en <strong>📋</strong> para administrar las pestañas del rol
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ====================================================== -->
+                <!-- GESTIÓN DE ROLES - REDIRECCIONES DINÁMICAS -->
+                <!-- ====================================================== -->
+                <div class="card" style="margin-top: 20px;">
+                    <h3>🔄 Redirecciones por Rol</h3>
+                    <p style="color: var(--muted); font-size: 13px; margin-bottom: 15px;">
+                        Configura a qué página deben ir los usuarios al iniciar sesión según su rol.
+                    </p>
+                    
+                    <div style="overflow-x: auto; border: 1px solid #e0e0e0; border-radius: 8px; max-height: 400px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Código</th>
-                                    <th>Nombre del Rol</th>
-                                    <th>Pestañas Permitidas</th>
-                                    <th>Usuarios</th>
-                                    <th>Estado</th>
-                                    <th>Acciones</th>
+                                    <th style="padding: 10px 12px; text-align: left;">ID</th>
+                                    <th style="padding: 10px 12px; text-align: left;">Código</th>
+                                    <th style="padding: 10px 12px; text-align: left;">Nombre</th>
+                                    <th style="padding: 10px 12px; text-align: left;">Redirección</th>
+                                    <th style="padding: 10px 12px; text-align: center;">Estado</th>
+                                    <th style="padding: 10px 12px; text-align: center;">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody id="tablaRoles">
-                                <tr>
-                                    <td colspan="7" style="text-align: center; padding: 40px;">Cargando roles...</td>
-                                </tr>
+                            <tbody id="tablaRedirectRoles">
+                                <!-- Cargado dinámicamente -->
+                                <tr><td colspan="6" style="text-align: center; padding: 40px;">⏳ Cargando...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- Modal para editar/crear rol -->
-                <div id="modalEditarRol" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10001; justify-content: center; align-items: center;">
-                    <div class="card" style="max-width: 600px; width: 90%; margin: 20px; padding: 25px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h3 style="margin: 0; color: var(--accent);" id="modalRolTitulo">✏️ Editar Rol</h3>
-                            <button onclick="cerrarModalRol()" style="background: none; border: none; font-size: 24px; cursor: pointer;">✖</button>
-                        </div>
-
-                        <!-- 🔴 EL FORMULARIO DEBE ESTAR AQUÍ DENTRO -->
-                        <form id="formRol" style="display: flex; flex-direction: column; gap: 15px;">
-                            <input type="hidden" id="rolId" value="">
-
-                            <div>
-                                <label>Código del Rol *</label>
-                                <input type="text" id="rolCodigo" required placeholder="Ej: SUPERVISOR, ADMIN, AUDITOR">
-                                <small>Identificador único del rol (en mayúsculas)</small>
-                            </div>
-
-                            <div>
-                                <label>Nombre del Rol *</label>
-                                <input type="text" id="rolNombre" required placeholder="Ej: Supervisor de Calidad">
-                            </div>
-
-                            <div>
-                                <label>Estado</label>
-                                <select id="rolActivo">
-                                        <option value="true">✅ ACTIVO</option>
-                                        <option value="false">❌ INACTIVO</option>
-                                    </select>
-                            </div>
-
-                            <div>
-                                <label>📋 Pestañas Permitidas</label>
-                                <div style="background: #f8f9fa; border-radius: 10px; padding: 15px; max-height: 250px; overflow-y: auto;">
-                                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; text-transform: none;">
-                                            <input type="checkbox" value="reportes"> 📈 Reportes
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; text-transform: none;">
-                                            <input type="checkbox" value="historialAgente"> 📋 Avance_Gestores
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; text-transform: none;">
-                                            <input type="checkbox" value="gestionPDA"> 📋 PDA
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; text-transform: none;">
-                                            <input type="checkbox" value="productividad"> 🎯 Auditores
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; text-transform: none;">
-                                            <input type="checkbox" value="gestionEscuchas"> 🎧 Escuchas
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; text-transform: none;">
-                                            <input type="checkbox" value="gestionAgentes"> 👥 FTE
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; text-transform: none;">
-                                            <input type="checkbox" value="gestionUsuarios"> 👤 Usuarios
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; text-transform: none;">
-                                            <input type="checkbox" value="estadoBD"> 💾 BD
-                                        </label>
-                                    </div>
-                                </div>
-                                <small style="color: var(--muted);">Seleccione las pestañas que podrá ver este rol</small>
-                            </div>
-
-                            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
-                                <button type="button" onclick="cerrarModalRol()" class="secondary">Cancelar</button>
-                                <button type="submit" style="background: var(--ok);" id="btnGuardarRol">💾 Guardar Rol</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
                 <!-- ====================================================== -->
-                <!-- GESTIÓN DE PESTAÑAS DEL SISTEMA                       -->
+                <!-- SECCIÓN 4: PESTAÑAS DEL SISTEMA (EXISTENTE)           -->
                 <!-- ====================================================== -->
-                <div id="listaPestanasContainer" class="card" style="margin-top: 20px;">
-                    <!-- Las pestañas se renderizarán aquí -->
-                    <div style="text-align: center; padding: 20px; color: var(--muted);">
-                        ⏳ Cargando pestañas...
-                    </div>
+                <div id="listaPestanasContainer">
+                            <!-- Generado por renderizarListaPestanas() -->
                 </div>
                 
-                <!-- Sección de Estadísticas -->
-                <div class="card" style="margin-top: 25px;">
-                    <h3>📊 Estadísticas de Usuarios</h3>
-                    <div class="grid-4">
-                        <div class="kpi-card" style="background: linear-gradient(135deg, #019DF4, #00B4F0);">
-                            <div class="kpi-label">Total Usuarios</div>
-                            <div class="kpi-value" id="statsTotalUsuarios">0</div>
-                        </div>
-                        <div class="kpi-card" style="background: linear-gradient(135deg, #28a745, #20c997);">
-                            <div class="kpi-label">Usuarios Activos</div>
-                            <div class="kpi-value" id="statsUsuariosActivos">0</div>
-                        </div>
-                        <div class="kpi-card" style="background: linear-gradient(135deg, #fd7e14, #ffc107);">
-                            <div class="kpi-label">Roles Activos</div>
-                            <div class="kpi-value" id="statsRolesActivos">0</div>
-                        </div>
-                        <div class="kpi-card" style="background: linear-gradient(135deg, #7b1fa2, #ab47bc);">
-                            <div class="kpi-label">Total Roles</div>
-                            <div class="kpi-value" id="statsTotalRoles">0</div>
-                        </div>
+                <!-- ====================================================== -->
+                <!-- SECCIÓN 5: SESIONES ACTIVAS                           -->
+                <!-- ====================================================== -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid var(--line);">
+                        <h3 style="margin: 0;">🔑 SESIONES ACTIVAS</h3>
+                        <button onclick="refrescarSesionesAdmin()" style="padding: 6px 16px; background: var(--accent); border: none; border-radius: 6px; color: white; cursor: pointer;">
+                            🔄 Refrescar
+                        </button>
                     </div>
-                </div>
-                <!-- Sección de Estadísticas de Sesiones -->
-                <div class="card" style="margin-top: 25px;">
-                    <h3>🔐 Estadísticas de Sesiones Activas</h3>
-                    <div class="grid-3">
-                        <div class="kpi-card" style="background: linear-gradient(135deg, #7b1fa2, #9c27b0);">
-                            <div class="kpi-label">🟢 Sesiones Activas Globales</div>
-                            <div class="kpi-value" id="totalSesionesActivas">0</div>
-                            <div class="kpi-detail">en todos los usuarios</div>
-                        </div>
-                        <div class="kpi-card" style="background: linear-gradient(135deg, #f39c12, #e67e22);">
-                            <div class="kpi-label">👥 Usuarios con Sesión Activa</div>
-                            <div class="kpi-value" id="usuariosConSesion">0</div>
-                            <div class="kpi-detail">conectados actualmente</div>
-                        </div>
-                        <div class="kpi-card" style="background: linear-gradient(135deg, #28a745, #20c997);">
-                            <div class="kpi-label">📊 Promedio Sesiones por Usuario</div>
-                            <div class="kpi-value" id="promedioSesionesUsuario">0</div>
-                            <div class="kpi-detail">sesiones activas/usuario</div>
+                    <div style="padding: 15px 20px;">
+                        <!-- Aquí se mostrarán las sesiones -->
+                        <div id="sesionesContainer" style="font-size: 13px; color: var(--muted);">
+                            <div style="text-align: center; padding: 20px;">
+                                ⏳ Cargando sesiones...
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+            <!-- ====================================================== -->
+            <!-- MODAL: NUEVO USUARIO                                   -->
+            <!-- ====================================================== -->
+
+            <div id="modalNuevoUsuario" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10002; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;">
+                <div style="background: white; border-radius: 16px; width: 100%; max-width: 500px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                    
+                    <!-- HEADER -->
+                    <div style="padding: 18px 24px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                        <strong id="modalUsuarioTitulo" style="font-size: 18px;">➕ Nuevo Usuario</strong>
+                        <button onclick="cerrarModalNuevoUsuario()" style="background: rgba(255,255,255,0.15); border: none; color: white; font-size: 22px; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">✖</button>
+                    </div>
+                    
+                    <!-- BODY -->
+                    <div style="padding: 24px; overflow-y: auto; flex: 1; background: #f8fafc;">
+                        <form id="formModalUsuario">
+                            <input type="hidden" id="modalUsuarioId" value="">
+                            
+                            <!-- Usuario -->
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #333;">
+                                    👤 Usuario <span style="color: #d93025;">*</span>
+                                </label>
+                                <input type="text" id="modalUsuarioUsername" placeholder="Ej: jperez" required
+                                    style="width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; box-sizing: border-box; background: white; transition: border-color 0.2s;">
+                            </div>
+                            
+                            <!-- Nombre Completo -->
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #333;">
+                                    📛 Nombre Completo <span style="color: #d93025;">*</span>
+                                </label>
+                                <input type="text" id="modalUsuarioNombre" placeholder="Ej: Juan Pérez Gómez" required
+                                    style="width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; box-sizing: border-box; background: white; transition: border-color 0.2s;">
+                            </div>
+                            
+                            <!-- Contraseña -->
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #333;">
+                                    🔒 Contraseña <span style="color: #d93025;">*</span>
+                                </label>
+                                <input type="password" id="modalUsuarioPassword" placeholder="Mínimo 6 caracteres" required minlength="6"
+                                    style="width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; box-sizing: border-box; background: white; transition: border-color 0.2s;">
+                            </div>
+                            
+                            <!-- Confirmar Contraseña -->
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #333;">
+                                    🔒 Confirmar Contraseña <span style="color: #d93025;">*</span>
+                                </label>
+                                <input type="password" id="modalUsuarioPasswordConfirm" placeholder="Repite la contraseña" required minlength="6"
+                                    style="width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; box-sizing: border-box; background: white; transition: border-color 0.2s;">
+                            </div>
+                            
+                            <!-- Rol -->
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #333;">
+                                    🔐 Rol <span style="color: #d93025;">*</span>
+                                </label>
+                                <select id="modalUsuarioRol" required style="width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; box-sizing: border-box; background: white; cursor: pointer; appearance: none;">
+                                    <option value="">-- Seleccionar rol --</option>
+                                    <!-- Los roles se cargan dinámicamente -->
+                                </select>
+                            </div>
+                            
+                            <!-- Estado -->
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #333;">
+                                    📊 Estado
+                                </label>
+                                <select id="modalUsuarioActivo" style="width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; box-sizing: border-box; background: white; cursor: pointer; appearance: none;">
+                                    <option value="true">✅ Activo</option>
+                                    <option value="false">❌ Inactivo</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- FOOTER -->
+                    <div style="padding: 16px 24px; background: white; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
+                        <button onclick="cerrarModalNuevoUsuario()" style="padding: 10px 24px; background: #f1f3f4; border: none; border-radius: 10px; cursor: pointer; color: #555; font-size: 14px; font-weight: 500;">Cancelar</button>
+                        <button onclick="guardarUsuarioModal()" style="padding: 10px 28px; background: linear-gradient(135deg, #28a745, #20c997); border: none; border-radius: 10px; cursor: pointer; color: white; font-size: 14px; font-weight: 600; box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);">
+                            💾 Guardar Usuario
+                        </button>
+                    </div>
+                    
+                </div>
+            </div>
+            <!-- ====================================================== -->
+            <!-- MODAL: EDITAR ROL                                      -->
+            <!-- ====================================================== -->
+            <div id="modalEditarRol" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10002; justify-content: center; align-items: center;">
+                <div style="background: white; border-radius: 16px; width: 90%; max-width: 500px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+                    <div style="padding: 15px 20px; background: linear-gradient(135deg, #7b1fa2, #9c27b0); color: white; display: flex; justify-content: space-between; align-items: center;">
+                        <strong id="modalRolTitulo" style="font-size: 16px;">🔐 Nuevo Rol</strong>
+                        <button onclick="cerrarModalRol()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                    </div>
+                    <div style="padding: 20px;">
+                        <form id="formRol">
+                            <input type="hidden" id="rolId" value="">
+                            
+                            <div style="margin-bottom: 15px;">
+                                <label style="font-size: 12px; font-weight: 600;">Código *</label>
+                                <input type="text" id="rolCodigo" placeholder="Ej: ADMIN" required
+                                    style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                            </div>
+                            
+                            <div style="margin-bottom: 15px;">
+                                <label style="font-size: 12px; font-weight: 600;">Nombre *</label>
+                                <input type="text" id="rolNombre" placeholder="Ej: Administrador" required
+                                    style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                            </div>
+                            
+                            <div style="margin-bottom: 15px;">
+                                <label style="font-size: 12px; font-weight: 600;">Estado</label>
+                                <select id="rolActivo" style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+                                    <option value="true">✅ Activo</option>
+                                    <option value="false">❌ Inactivo</option>
+                                </select>
+                            </div>
+                            
+                            <div style="margin-bottom: 15px; background: #f8f9fa; padding: 12px; border-radius: 8px;">
+                                <label style="font-size: 12px; font-weight: 600;">📋 Pestañas asignadas</label>
+                                <div id="pestanasCheckboxes" style="margin-top: 8px; max-height: 150px; overflow-y: auto;">
+                                    <!-- Generado por JavaScript -->
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0;">
+                        <button onclick="cerrarModalRol()" style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white;">Cancelar</button>
+                        <button onclick="guardarRol()" class="btn-guardar" style="padding: 8px 20px; background: #7b1fa2; border: none; border-radius: 8px; cursor: pointer; color: white;">💾 Guardar Rol</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- PESTAÑA DE ESTADO DE BASE DE DATOS -->
             <div id="tab-estadoBD" class="tab-content tab-pane">
                 <!-- Tarjeta principal con alerta de consumo -->

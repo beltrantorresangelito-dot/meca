@@ -42,6 +42,8 @@
     let datosAgrupadosActualesGlobal = [];
     let auditoresExcluidos = []; 
     let todosLosAuditores = []; 
+    let configuracionAudios = null;
+    let procesandoAudios = false;
     let datosPreprocesados = {
         porFecha: {},        // Datos agregados por fecha (DD/MM/YYYY)
         porSemana: {},       // Datos agregados por semana
@@ -112,29 +114,60 @@
 // ======================================================
 // CONFIGURACIÓN DE LA API - AUTO DETECCIÓN DE IP
 // ======================================================
-
+ 
 /**
- * Obtiene la URL base de la API automáticamente
- */
-function obtenerURLBaseAPI(puerto = 5000) {
-    const hostname = window.location.hostname;
-    
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return `http://localhost:${puerto}`;
-    }
-    
-    const esIP = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
-    if (esIP) {
-        return `http://${hostname}:${puerto}`;
-    }
-    
-    return `http://${hostname}:${puerto}`;
-}
 
-// 🔴 IMPORTANTE: Usar `const` y verificar que estén definidas
+* Obtiene la URL base de la API automáticamente
+
+* - Si es localhost (desarrollo) → usa localhost
+
+* - Si es una IP de red → usa esa misma IP
+
+* - Puerto fijo: 5000 (Python) o 8080 (Node.js)
+
+*/
+
+function obtenerURLBaseAPI(puerto = 5000) {
+
+    // Obtener el hostname actual (localhost o IP)
+
+    const hostname = window.location.hostname;
+
+    // Si es localhost o 127.0.0.1, mantenerlo
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+
+        return `http://localhost:${puerto}`;
+
+    }
+
+    // Si es una IP (como 10.4.240.68), usar esa misma IP
+
+    const esIP = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+
+    if (esIP) {
+
+        return `http://${hostname}:${puerto}`;
+
+    }
+
+    // Si es un dominio, usar el dominio
+
+    return `http://${hostname}:${puerto}`;
+
+}
+ 
+// Configurar URLs para diferentes servicios
+
 const API_URL_PYTHON = obtenerURLBaseAPI(5000);  // Python (reportes)
 const API_URL_NODE = obtenerURLBaseAPI(8080);    // Node.js (principal)
+const API_URL_TRANSCRIPCION = obtenerURLBaseAPI(5001);  
+// 🔴🔴🔴 FORZAR EN WINDOW PARA QUE TODAS LAS FUNCIONES LA VEAN 🔴🔴🔴
 
+window.API_URL_PYTHON = API_URL_PYTHON;
+window.API_URL_NODE = API_URL_NODE;
+window.API_URL_TRANSCRIPCION = API_URL_TRANSCRIPCION;
+ 
 console.log('🌐 Configuración de API:');
 console.log(`   📡 Python (reportes): ${API_URL_PYTHON}`);
 console.log(`   📡 Node.js (principal): ${API_URL_NODE}`);
@@ -180,7 +213,7 @@ async function verificarSesionSupervisor() {
         console.log('✅ [SUPERVISOR] Usuario restaurado:', usuarioActual.nombre_completo);
         console.log('✅ [SUPERVISOR] Rol:', usuarioActual.rol);
         
-        // Verificar que el rol sea válido para supervisor (no AUDITOR)
+        // ✅ Verificar que NO sea AUDITOR
         if (usuarioActual.rol === 'AUDITOR') {
             console.log('⚠️ [SUPERVISOR] Auditor no puede acceder al sistema de supervisión');
             window.location.href = '/auditor';
@@ -1101,6 +1134,12 @@ async function actualizarEstadisticasSesiones() {
     } catch (error) {
         console.error('Error actualizando estadísticas de sesiones:', error);
     }
+    const totalSesionesElem = document.getElementById('kpiTotalSesiones');
+    if (totalSesionesElem) {
+        // Obtener el total de sesiones activas desde tu función
+        const total = document.getElementById('totalSesionesActivas')?.textContent || '0';
+        totalSesionesElem.textContent = total;
+    }
 }
 
 // Modificar cargarUsuarios para también actualizar estadísticas de sesiones
@@ -1155,6 +1194,272 @@ actualizarTablaUsuarios = function() {
     // Agregar botones de sesiones después de cargar la tabla
     setTimeout(agregarBotonSesionesEnTabla, 100);
 };
+
+// ======================================================
+// NUEVAS FUNCIONES - GESTIÓN DE USUARIOS
+// ======================================================
+
+// ======================================================
+// 1. ACTUALIZAR KPIs - ESTADÍSTICAS RÁPIDAS
+// ======================================================
+
+function actualizarKPIsAdministracion() {
+    console.log('📊 Actualizando KPIs de administración...');
+    
+    // Usuarios
+    const usuarios = window.usuariosGlobales || [];
+    const totalUsuarios = usuarios.length;
+    const activos = usuarios.filter(u => u.activo === true || u.activo === 'true' || u.activo === 1).length;
+    const inactivos = totalUsuarios - activos;
+    
+    const kpiTotalUsuarios = document.getElementById('kpiTotalUsuarios');
+    const kpiUsuariosActivos = document.getElementById('kpiUsuariosActivos');
+    const kpiUsuariosInactivos = document.getElementById('kpiUsuariosInactivos');
+    
+    if (kpiTotalUsuarios) kpiTotalUsuarios.textContent = totalUsuarios;
+    if (kpiUsuariosActivos) kpiUsuariosActivos.textContent = activos;
+    if (kpiUsuariosInactivos) kpiUsuariosInactivos.textContent = inactivos;
+    
+    // Roles
+    const roles = rolesGlobales || [];
+    const kpiTotalRoles = document.getElementById('kpiTotalRoles');
+    if (kpiTotalRoles) kpiTotalRoles.textContent = roles.length;
+    
+    // Pestañas
+    const pestanas = window.pestanasDisponiblesGlobal || [];
+    const kpiTotalPestanas = document.getElementById('kpiTotalPestanas');
+    if (kpiTotalPestanas) kpiTotalPestanas.textContent = pestanas.length;
+    
+    // Sesiones - reutilizar función existente
+    if (typeof actualizarEstadisticasSesiones === 'function') {
+        actualizarEstadisticasSesiones();
+    }
+    
+    console.log(`✅ KPIs actualizados: ${totalUsuarios} usuarios, ${roles.length} roles, ${pestanas.length} pestañas`);
+}
+
+
+// ======================================================
+// 2. REFRESCAR SESIONES EN LA TABLA ADMIN
+// ======================================================
+
+async function refrescarSesionesAdmin() {
+    console.log('🔄 Refrescando sesiones...');
+    
+    const container = document.getElementById('sesionesContainer');
+    if (!container) return;
+    
+    container.innerHTML = '<div style="text-align: center; padding: 20px;">⏳ Cargando sesiones...</div>';
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('/api/sesiones/activas', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al obtener sesiones');
+        }
+        
+        const data = await response.json();
+        const sesiones = data.sesiones || [];
+        
+        if (sesiones.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: var(--muted);">
+                    🔑 No hay sesiones activas
+                </div>
+            `;
+            return;
+        }
+        
+        let html = `
+            <div class="table-container" style="max-height: 300px; overflow-y: auto;">
+                <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f8f9fa; position: sticky; top: 0;">
+                            <th style="padding: 8px; text-align: center;">Usuario</th>
+                            <th style="padding: 8px; text-align: center;">IP</th>
+                            <th style="padding: 8px; text-align: center;">Dispositivo</th>
+                            <th style="padding: 8px; text-align: center;">Inicio</th>
+                            <th style="padding: 8px; text-align: center;">Duración</th>
+                            <th style="padding: 8px; text-align: center;">Estado</th>
+                            <th style="padding: 8px; text-align: center;">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        for (const sesion of sesiones) {
+            const nombreUsuario = sesion.nombre_completo || sesion.usuario || 'Desconocido';
+            const fechaInicio = sesion.fecha_inicio ? new Date(sesion.fecha_inicio).toLocaleString('es-ES') : '-';
+            
+            // Calcular duración
+            let duracion = '-';
+            if (sesion.fecha_inicio) {
+                const inicio = new Date(sesion.fecha_inicio);
+                const ahora = new Date();
+                const diffMs = ahora - inicio;
+                const diffHoras = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMinutos = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                duracion = diffHoras > 0 ? `${diffHoras}h ${diffMinutos}m` : `${diffMinutos}m`;
+            }
+            
+            const estadoBadge = sesion.estado === 'activa' 
+                ? '<span style="color: #28a745;">🟢 Activa</span>'
+                : `<span style="color: #6c757d;">${sesion.estado}</span>`;
+            
+            const dispositivo = sesion.dispositivo || sesion.user_agent || '-';
+            const dispositivoCorto = dispositivo.length > 30 ? dispositivo.substring(0, 27) + '...' : dispositivo;
+            
+            html += `
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 8px; text-align: center;"><strong>${escapeHtml(nombreUsuario)}</strong></td>
+                    <td style="padding: 8px; text-align: center; font-family: monospace; font-size: 11px;">${escapeHtml(sesion.ip_address || '-')}</td>
+                    <td style="padding: 8px; text-align: center; font-size: 11px;" title="${escapeHtml(dispositivo)}">${escapeHtml(dispositivoCorto)}</td>
+                    <td style="padding: 8px; text-align: center; font-size: 11px;">${fechaInicio}</td>
+                    <td style="padding: 8px; text-align: center; font-size: 11px; font-weight: bold;">${duracion}</td>
+                    <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
+                    <td style="padding: 8px; text-align: center;">
+                        <button onclick="cerrarSesionEspecifica('${sesion.session_token}', '${escapeHtml(nombreUsuario)}')" 
+                                style="background: #d93025; padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;">
+                            🔒 Cerrar
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top: 10px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between;">
+                <span>🔑 Total: ${sesiones.length} sesiones activas</span>
+                <span>👥 Usuarios conectados: ${new Set(sesiones.map(s => s.usuario_id)).size}</span>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        
+        // Actualizar KPI de sesiones
+        const kpiTotalSesiones = document.getElementById('kpiTotalSesiones');
+        if (kpiTotalSesiones) kpiTotalSesiones.textContent = sesiones.length;
+        
+        console.log(`✅ ${sesiones.length} sesiones activas mostradas`);
+        
+    } catch (error) {
+        console.error('Error refrescando sesiones:', error);
+        container.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: var(--danger);">
+                ❌ Error al cargar sesiones: ${error.message}
+            </div>
+        `;
+    }
+}
+
+
+// ======================================================
+// 3. CERRAR TODAS LAS SESIONES DE UN USUARIO
+// ======================================================
+
+async function cerrarTodasSesionesUsuario() {
+    if (!usuarioSesionesSeleccionado) {
+        alert('⚠️ No hay usuario seleccionado');
+        return;
+    }
+    
+    if (!confirm(`⚠️ ¿CERRAR TODAS LAS SESIONES ACTIVAS de ${usuarioSesionesSeleccionado.nombre}?\n\nEste usuario será desconectado de TODOS sus dispositivos.\n\n¿Está seguro?`)) {
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`/api/sesiones/cerrar-todas/${usuarioSesionesSeleccionado.id}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al cerrar sesiones');
+        }
+        
+        alert(`✅ Se cerraron todas las sesiones de ${usuarioSesionesSeleccionado.nombre}`);
+        
+        // Refrescar
+        await refrescarSesionesAdmin();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al cerrar sesiones: ' + error.message);
+    }
+}
+
+
+// ======================================================
+// 4. EXPORTAR ROLES A CSV
+// ======================================================
+
+function exportarRolesCSV() {
+    const roles = rolesGlobales || [];
+    const usuarios = window.usuariosGlobales || [];
+    const pestanas = window.pestanasDisponiblesGlobal || [];
+    const permisos = window.permisosPestanasGlobal || [];
+    
+    if (roles.length === 0) {
+        alert('⚠️ No hay roles para exportar');
+        return;
+    }
+    
+    // Crear mapa de permisos
+    const permisosMap = {};
+    permisos.forEach(p => {
+        if (!permisosMap[p.rol_id]) permisosMap[p.rol_id] = [];
+        permisosMap[p.rol_id].push(p.pestana_codigo);
+    });
+    
+    // Headers
+    const headers = ['ID', 'Código', 'Nombre', 'Pestañas', 'Usuarios Asignados', 'Estado'];
+    const rows = [];
+    
+    for (const r of roles) {
+        const pestañasDelRol = permisosMap[r.id] || [];
+        const cantUsuarios = usuarios.filter(u => u.rol_id === r.id).length;
+        const estado = r.activo ? 'Activo' : 'Inactivo';
+        
+        rows.push([
+            r.id,
+            `"${r.codigo}"`,
+            `"${r.nombre}"`,
+            `"${pestañasDelRol.join(', ')}"`,
+            cantUsuarios,
+            estado
+        ]);
+    }
+    
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `roles_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    alert(`✅ Exportados ${roles.length} roles`);
+}
+
+
+// ======================================================
+// 5. EXPOSICIÓN GLOBAL
+// ======================================================
+
+window.actualizarKPIsAdministracion = actualizarKPIsAdministracion;
+window.refrescarSesionesAdmin = refrescarSesionesAdmin;
+window.cerrarTodasSesionesUsuario = cerrarTodasSesionesUsuario;
+window.exportarRolesCSV = exportarRolesCSV;
+
+console.log('✅ Gestión de Usuarios - Funciones adicionales cargadas');
 
 function mostrarModalCambioPasswordPrimerLogin(usuarioId, usuarioNombre) {
     const modal = document.getElementById('modalPrimerLogin');
@@ -1558,10 +1863,24 @@ function mostrarPestanasFallback(tabsContainer) {
     }
 }
 
+// ======================================================
+// showTab - VERSIÓN UNIFICADA
+// ======================================================
+
 async function showTab(tabName, event) {
     console.log(`🔄 showTab: Cambiando a pestaña ${tabName}`);
 
-    // Cambiar pestañas visibles
+    // ======================================================
+    // ✅ VERIFICAR ROL ANTES DE CARGAR LA PESTAÑA
+    // ======================================================
+    const rolValido = await verificarRolActivo(false);
+    if (!rolValido) {
+        return;
+    }
+
+    // ======================================================
+    // CAMBIAR PESTAÑAS VISIBLES
+    // ======================================================
     document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
     document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
 
@@ -1587,39 +1906,32 @@ async function showTab(tabName, event) {
         if (tabName === 'gestionEscuchas') {
             console.log('🎧 Inicializando pestaña Escuchas');
             
-            // 🔴 PASO 1: Asegurar que las funciones existan
             if (typeof inicializarGestionEscuchas === 'function') {
                 await inicializarGestionEscuchas();
             }
-            
-            // 🔴 PASO 2: Cargar historial de lotes
             if (typeof cargarHistorialLotes === 'function') {
                 await cargarHistorialLotes();
             }
-            
-            // 🔴 PASO 3: 🔴 FORZAR REFRESCO DE MONITOREO
             if (typeof refrescarMonitoreoEscuchas === 'function') {
-                console.log('🔄 Forzando refresco de monitoreo de escuchas...');
                 await refrescarMonitoreoEscuchas();
-            } else {
-                console.warn('⚠️ refrescarMonitoreoEscuchas no está disponible');
             }
-            
-            // 🔴 PASO 4: Actualizar select de auditores
             if (typeof cargarSelectAuditoresFiltro === 'function') {
                 await cargarSelectAuditoresFiltro();
             }
-            
-            // 🔴 PASO 5: Inicializar filtro de lote
             if (typeof inicializarFiltroLoteEscuchas === 'function') {
                 inicializarFiltroLoteEscuchas();
             }
             
-            return; // Salir para evitar duplicar acciones
+            // 🔴 NUEVO: Cargar configuración de audios
+            if (typeof cargarConfiguracionAudios === 'function') {
+                await cargarConfiguracionAudios();
+            }
+            
+            return;
         }
 
         // ======================================================
-        // RESTO DE PESTAÑAS (igual que antes)
+        // RESTO DE PESTAÑAS
         // ======================================================
         if (tabName === 'gestionPDA') {
             if (typeof cargarDatosPDA === 'function') await cargarDatosPDA();
@@ -1633,6 +1945,17 @@ async function showTab(tabName, event) {
         if (tabName === 'gestionUsuarios') {
             if (typeof cargarUsuarios === 'function') await cargarUsuarios();
             if (typeof cargarRoles === 'function') await cargarRoles();
+            if (typeof cargarPestanasDisponiblesGlobal === 'function') await cargarPestanasDisponiblesGlobal();
+            if (typeof cargarPermisosPestanasGlobal === 'function') await cargarPermisosPestanasGlobal();
+            
+            setTimeout(() => {
+                if (typeof actualizarKPIsAdministracion === 'function') {
+                    actualizarKPIsAdministracion();
+                }
+                if (typeof renderizarListaPestanas === 'function') {
+                    renderizarListaPestanas();
+                }
+            }, 300);
         }
 
         if (tabName === 'gestionPersonas') {
@@ -1659,18 +1982,15 @@ async function showTab(tabName, event) {
         }
 
         if (tabName === 'historialAgente') {
-            // 🔴 🔴 🔴 FORZAR CARGA DE PDA ANTES QUE NADA
             console.log('🔄 Forzando carga de PDA para Avance Gestores...');
             if (typeof cargarDatosPDA === 'function') {
                 await cargarDatosPDA();
                 console.log('✅ PDA cargados:', window.datosPDA?.length || 0);
             }
-            // 1. Funciones de historial
             if (typeof cargarSelectAgentesHistorial === 'function') cargarSelectAgentesHistorial();
             if (typeof cargarLideresEnSelectRanking === 'function') await cargarLideresEnSelectRanking();
             if (typeof inicializarBuscadorGestores === 'function') inicializarBuscadorGestores();
             
-            // 2. Ocultar resumen inicial
             const resumenAgente = document.getElementById('resumenAgente');
             const historialContainer = document.getElementById('historialContainer');
             const btnExportar = document.getElementById('btnExportarHistorial');
@@ -1678,7 +1998,6 @@ async function showTab(tabName, event) {
             if (historialContainer) historialContainer.style.display = 'none';
             if (btnExportar) btnExportar.style.display = 'none';
             
-            // 3. CARGAR MESES
             if (typeof cargarMesesParaSelectorQ4 === 'function') {
                 await cargarMesesParaSelectorQ4();
                 console.log('✅ Meses Q4 cargados');
@@ -1688,10 +2007,8 @@ async function showTab(tabName, event) {
                 console.log('✅ Meses Q3 cargados');
             }
             
-            // 4. ESPERAR RENDERIZADO
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            // 5. CARGAR AGENTES Q4 (FORZAR SIEMPRE)
             if (typeof cargarAgentesQ4PorMes === 'function') {
                 await cargarAgentesQ4PorMes();
                 console.log('✅ Agentes Q4 cargados');
@@ -1701,7 +2018,6 @@ async function showTab(tabName, event) {
                 console.log('✅ Agentes Q3 cargados');
             }
             
-            // 6. Evolución de cuartiles
             setTimeout(() => {
                 if (typeof cargarEvolucionCuartilesPorGestor === 'function') {
                     cargarEvolucionCuartilesPorGestor();
@@ -1716,6 +2032,27 @@ async function showTab(tabName, event) {
             if (typeof cargarCriteriosCuartilesTabla === 'function') {
                 await cargarCriteriosCuartilesTabla();
             }
+        }
+
+        if (tabName === 'gestionUsuarios') {
+            if (typeof cargarUsuarios === 'function') await cargarUsuarios();
+            if (typeof cargarRoles === 'function') await cargarRoles();
+            if (typeof cargarPestanasDisponiblesGlobal === 'function') await cargarPestanasDisponiblesGlobal();
+            if (typeof cargarPermisosPestanasGlobal === 'function') await cargarPermisosPestanasGlobal();
+            
+            // 🔴 NUEVO: Cargar redirecciones
+            if (typeof cargarRolesConRedirect === 'function') {
+                setTimeout(() => cargarRolesConRedirect(), 300);
+            }
+            
+            setTimeout(() => {
+                if (typeof actualizarKPIsAdministracion === 'function') {
+                    actualizarKPIsAdministracion();
+                }
+                if (typeof renderizarListaPestanas === 'function') {
+                    renderizarListaPestanas();
+                }
+            }, 300);
         }
 
         if (tabName === 'estadoBD') {
@@ -1767,12 +2104,6 @@ async function showTab(tabName, event) {
         }
 
         if (tabName === 'transcripcion') {
-            if (typeof cargarTranscripciones === 'function') {
-                cargarTranscripciones();
-            }
-        }
-
-        if (tabName === 'transcripcion') {
             if (typeof cargarTareasProgramadas === 'function') {
                 setTimeout(cargarTareasProgramadas, 300);
             }
@@ -1781,7 +2112,9 @@ async function showTab(tabName, event) {
             }
         }
 
-        // Si es la pestaña de reportes, cargar datos
+        // ======================================================
+        // PESTAÑA: Reportes Automáticos (reportesAuto)
+        // ======================================================
         if (tabName === 'reportespda' || tabName === 'reportesAuto') {
             console.log('📊 Cargando datos de reportes...');
             setTimeout(() => {
@@ -1794,11 +2127,11 @@ async function showTab(tabName, event) {
             }, 300);
         }
 
-
     } catch (error) {
         console.error(`❌ Error en acciones de pestaña ${tabName}:`, error);
     }
 }
+
 
 const accionesPestanas = {
     'reportes': async () => {
@@ -2244,15 +2577,16 @@ function inicializarBuscadorGestores() {
         return;
     }
 
-    // Cargar lista completa de gestores
-    cargarListaAgentesParaBusqueda();
+    
 
     // ======================================================
     // EVENTO: AL HACER CLIC/FOCUS - Mostrar lista completa
     // ======================================================
     input.addEventListener('focus', function () {
         console.log('📌 Focus - Mostrando lista completa de gestores');
-        mostrarListaCompletaGestores();
+        // Cargar lista completa de gestores
+        cargarListaAgentesParaBusqueda();
+        //mostrarListaCompletaGestores();
         dropdownVisible = true;
     });
 
@@ -3639,10 +3973,16 @@ function agregarBotonRefreshPDA() {
 // ======================================================
 
 // ======5.1. Evaluaciones==========
+// ======================================================
+// GENERAR REPORTES - VERSIÓN UNIFICADA
+// ======================================================
+
 async function generarReportes() {
     console.log('📊 generarReportes - Iniciando...');
 
-    // 🔴 PASO 1: Asegurar que tenemos evaluaciones cargadas
+    // ======================================================
+    // PASO 1: Asegurar que tenemos evaluaciones cargadas
+    // ======================================================
     let evaluaciones = window.evaluacionesGlobales;
     
     if (!evaluaciones || evaluaciones.length === 0) {
@@ -3651,7 +3991,9 @@ async function generarReportes() {
         window.evaluacionesGlobales = evaluaciones;
     }
     
-    // 🔴 PASO 2: Validación robusta
+    // ======================================================
+    // PASO 2: Validación robusta
+    // ======================================================
     if (!evaluaciones || evaluaciones.length === 0) {
         console.log('⚠️ No hay evaluaciones para generar reportes');
         const sinDatosDiv = document.getElementById('reportesSinDatos');
@@ -3662,7 +4004,6 @@ async function generarReportes() {
         return;
     }
 
-    // 🔴 PASO 3: Diagnóstico (pero sin causar error)
     console.log(`📊 Evaluaciones obtenidas: ${evaluaciones.length}`);
     if (evaluaciones.length > 0 && evaluaciones[0]) {
         console.log('📊 Primera evaluación (debug):', {
@@ -3677,13 +4018,17 @@ async function generarReportes() {
         return;
     }
 
-    // 🔴 PASO 4: Resto del código original (sin cambios)
+    // ======================================================
+    // PASO 3: Mostrar contenedores
+    // ======================================================
     const sinDatosDiv = document.getElementById('reportesSinDatos');
     const conDatosDiv = document.getElementById('reportesConDatos');
     if (sinDatosDiv) sinDatosDiv.style.display = 'none';
     if (conDatosDiv) conDatosDiv.style.display = 'block';
 
-    // Calcular estadísticas
+    // ======================================================
+    // PASO 4: Calcular estadísticas
+    // ======================================================
     const totalEval = evaluaciones.length;
     const promedioGeneral = Math.round(evaluaciones.reduce((sum, e) => sum + (e.notaFinal || 0), 0) / totalEval);
 
@@ -3705,7 +4050,9 @@ async function generarReportes() {
     evaluaciones.forEach(e => { if (e.agente) gestoresUnicos.add(e.agente); });
     const totalGestores = gestoresUnicos.size;
 
-    // Actualizar KPI principales
+    // ======================================================
+    // PASO 5: Actualizar KPI principales
+    // ======================================================
     const kpiTotalEval = document.getElementById('kpiTotalEval');
     const kpiPromedio = document.getElementById('kpiPromedio');
     const kpiConECUF = document.getElementById('kpiConECUF');
@@ -3737,7 +4084,9 @@ async function generarReportes() {
     if (kpiConECUFDetalle) kpiConECUFDetalle.textContent = `${conECUF} de ${totalEval} llamadas`;
     if (kpiConECNDetalle) kpiConECNDetalle.textContent = `${conECN} de ${totalEval} llamadas`;
 
-    // Promedios por motivo
+    // ======================================================
+    // PASO 6: Promedios por motivo
+    // ======================================================
     const promedioRawENC = (evaluaciones.reduce((sum, e) => sum + (e.totalENC || 0), 0) / totalEval).toFixed(1);
     const promedioRawECUF = (evaluaciones.reduce((sum, e) => sum + (e.totalECUF || 0), 0) / totalEval).toFixed(1);
     const promedioRawECN = (evaluaciones.reduce((sum, e) => sum + (e.totalECN || 0), 0) / totalEval).toFixed(1);
@@ -3766,7 +4115,9 @@ async function generarReportes() {
     if (kpiPromedioECN) kpiPromedioECN.textContent = pctECN + '%';
     if (kpiPromedioECNDetalle) kpiPromedioECNDetalle.textContent = detalleECN;
 
-    // Porcentaje de quiebres
+    // ======================================================
+    // PASO 7: Porcentaje de quiebres
+    // ======================================================
     const quiebresCount = evaluaciones.filter(e => (e.notaFinal || 0) < 85).length;
     const pctQuiebres = totalEval > 0 ? Math.round((quiebresCount / totalEval) * 100) : 0;
     const kpiPorcentajeQuiebres = document.getElementById('kpiPorcentajeQuiebres');
@@ -3774,7 +4125,9 @@ async function generarReportes() {
     if (kpiPorcentajeQuiebres) kpiPorcentajeQuiebres.textContent = pctQuiebres + '%';
     if (kpiPorcentajeQuiebresDetalle) kpiPorcentajeQuiebresDetalle.textContent = quiebresCount + ' de ' + totalEval + ' evaluaciones';
 
-    // Ranking de agentes
+    // ======================================================
+    // PASO 8: Ranking de agentes
+    // ======================================================
     const ranking = await construirRankingAgentes(evaluaciones);
     const cobertura = calcularCobertura(evaluaciones, ranking);
     const coberturaElem = document.getElementById('kpiCobertura');
@@ -3813,6 +4166,9 @@ async function generarReportes() {
     if (kpiQ3) kpiQ3.textContent = pctQ3 + '%';
     if (kpiQ3Detalle) kpiQ3Detalle.textContent = `${q3} agentes`;
 
+    // ======================================================
+    // PASO 9: PDA y productividad
+    // ======================================================
     const eficacia = calcularEficaciaPDA();
     const eficaciaElem = document.getElementById('kpiEficaciaPDA');
     const eficaciaDetalle = document.getElementById('kpiEficaciaDetalle');
@@ -3829,7 +4185,9 @@ async function generarReportes() {
     if (prodElem) prodElem.textContent = productividad.porAuditor;
     if (capElem) capElem.textContent = productividad.capacidadTotal;
 
-    // Actualizar tabla ranking
+    // ======================================================
+    // PASO 10: Tablas y gráficos
+    // ======================================================
     await actualizarTablaRanking(ranking);
 
     // Obtener top submotivos para alertas
@@ -3848,7 +4206,9 @@ async function generarReportes() {
             : `<div style="padding:12px; border-radius:10px; background:#f8f9fa;">Sin alertas aún.</div>`;
     }
 
-    // Generar todos los gráficos
+    // ======================================================
+    // PASO 11: Generar gráficos
+    // ======================================================
     generarGraficosReportes(evaluaciones);
     generarGraficoGestionLlamadas(evaluaciones);
 
@@ -3863,10 +4223,22 @@ async function generarReportes() {
     generarEvolutivoCuartiles(evaluaciones, null, 'mes');
     generarGraficoComparativaAgrupado(evaluaciones);
     await renderizarEvolutivoConDatosFiltrados(evaluaciones);
-   const evaluacionesParaTabla = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
-   await generarTablaEvolutivaIndicadores(evaluacionesParaTabla);    
+    const evaluacionesParaTabla = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
+    await generarTablaEvolutivaIndicadores(evaluacionesParaTabla);
+
+    // ======================================================
+    // ✅ PASO 12: CALCULAR FRENTES DE IMPACTO
+    // ======================================================
+    calcularFrentesImpacto();
+
+    // ======================================================
+    // ✅ PASO 13: RESETEAR RANKING COMPLETO
+    // ======================================================
+    resetearRankingCompleto();
+
     console.log('✅ Reportes generados correctamente');
 }
+
 
 function resetearKPIs() {
     const elementos = [
@@ -4047,31 +4419,23 @@ function actualizarCardPorcentajeQuiebres(evaluaciones) {
     if (detalleElem) detalleElem.textContent = quiebres + ' de ' + total + ' evaluaciones';
 }
 
-// ======================================================
-// ACTUALIZAR KPIs CON FILTRO - VERSIÓN DINÁMICA
-// ======================================================
 async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
     console.log('📊 actualizarKPIsConFiltro - VERSIÓN DINÁMICA POR PERÍODO');
     console.log('   Evaluaciones:', evaluacionesFiltradas?.length || 0);
-    
     if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
         resetearKPIs();
         return;
     }
-    
     const totalEval = evaluacionesFiltradas.length;
-    
     // ======================================================
     // 1. AGRUPAR POR PERÍODO (MES) Y CALCULAR PESOS POR PERÍODO
     // ======================================================
     const periodo = 'mes';
     const datosAgrupados = agruparEvaluacionesPorPeriodoConPesos(evaluacionesFiltradas, periodo);
-    
     if (datosAgrupados.length === 0) {
         resetearKPIs();
         return;
     }
-    
     // ======================================================
     // 2. CALCULAR PROMEDIOS PONDERADOS POR PERÍODO
     // ======================================================
@@ -4082,38 +4446,31 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
     let sumaECNPonderada = 0;
     let totalQuiebres = 0;
     let totalConENC = 0, totalConECUF = 0, totalConECN = 0;
-    
     // Para matriz info
     let countMatrizAntigua = 0;
     let countMatrizNueva = 0;
-    
     for (const grupo of datosAgrupados) {
         const count = grupo.count || 0;
         const pesos = grupo.pesos || { ENC: 30, ECUF: 30, ECN: 40 };
-        
         // Calcular promedios del grupo (RAW)
         const promNota = count > 0 ? grupo.sumaNotas / count : 0;
         const promENC = count > 0 ? grupo.sumENC / count : 0;
         const promECUF = count > 0 ? grupo.sumECUF / count : 0;
         const promECN = count > 0 ? grupo.sumECN / count : 0;
-        
         // Calcular porcentajes del grupo con sus pesos
         const pctENC = Math.min((promENC / pesos.ENC) * 100, 100);
         const pctECUF = Math.min((promECUF / pesos.ECUF) * 100, 100);
         const pctECN = Math.min((promECN / pesos.ECN) * 100, 100);
-        
         // Ponderar por la cantidad de evaluaciones del grupo
         totalEvaluaciones += count;
         sumaNotasPonderada += promNota * count;
         sumaENCPonderada += pctENC * count;
         sumaECUFPonderada += pctECUF * count;
         sumaECNPonderada += pctECN * count;
-        
         // Contar quiebres del grupo (nota < 85%)
         for (const e of grupo.evaluaciones) {
             if ((e.notaFinal || 0) < 85) totalQuiebres++;
         }
-        
         // Contar motivos bajos según la matriz del período
         for (const e of grupo.evaluaciones) {
             const fecha = obtenerFechaEvaluacion(e);
@@ -4130,7 +4487,6 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
             }
         }
     }
-    
     // ======================================================
     // 3. CALCULAR PROMEDIOS FINALES
     // ======================================================
@@ -4139,11 +4495,9 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
     const promedioECUF = totalEvaluaciones > 0 ? Math.round(sumaECUFPonderada / totalEvaluaciones) : 0;
     const promedioECN = totalEvaluaciones > 0 ? Math.round(sumaECNPonderada / totalEvaluaciones) : 0;
     const pctQuiebres = totalEvaluaciones > 0 ? Math.round((totalQuiebres / totalEvaluaciones) * 100) : 0;
-    
     const pctConENC = totalEvaluaciones > 0 ? Math.round((totalConENC / totalEvaluaciones) * 100) : 0;
     const pctConECUF = totalEvaluaciones > 0 ? Math.round((totalConECUF / totalEvaluaciones) * 100) : 0;
     const pctConECN = totalEvaluaciones > 0 ? Math.round((totalConECN / totalEvaluaciones) * 100) : 0;
-    
     // ======================================================
     // 4. ACTUALIZAR KPIs
     // ======================================================
@@ -4151,7 +4505,6 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
     const kpiPromedio = document.getElementById('kpiPromedio');
     if (kpiTotalEval) kpiTotalEval.textContent = totalEvaluaciones;
     if (kpiPromedio) kpiPromedio.textContent = promedioGeneral + '%';
-    
     // KPIs de motivos bajos
     const kpiConENC = document.getElementById('kpiConENC');
     const kpiConECUF = document.getElementById('kpiConECUF');
@@ -4159,14 +4512,12 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
     const kpiConENCDetalle = document.getElementById('kpiConENCDetalle');
     const kpiConECUFDetalle = document.getElementById('kpiConECUFDetalle');
     const kpiConECNDetalle = document.getElementById('kpiConECNDetalle');
-    
     if (kpiConENC) kpiConENC.textContent = pctConENC + '%';
     if (kpiConECUF) kpiConECUF.textContent = pctConECUF + '%';
     if (kpiConECN) kpiConECN.textContent = pctConECN + '%';
     if (kpiConENCDetalle) kpiConENCDetalle.textContent = `${totalConENC} de ${totalEvaluaciones} llamadas`;
     if (kpiConECUFDetalle) kpiConECUFDetalle.textContent = `${totalConECUF} de ${totalEvaluaciones} llamadas`;
     if (kpiConECNDetalle) kpiConECNDetalle.textContent = `${totalConECN} de ${totalEvaluaciones} llamadas`;
-    
     // Promedios de motivos
     const kpiPromedioENC = document.getElementById('kpiPromedioENC');
     const kpiPromedioECUF = document.getElementById('kpiPromedioECUF');
@@ -4174,46 +4525,38 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
     const kpiPromedioENCDetalle = document.getElementById('kpiPromedioENCDetalle');
     const kpiPromedioECUFDetalle = document.getElementById('kpiPromedioECUFDetalle');
     const kpiPromedioECNDetalle = document.getElementById('kpiPromedioECNDetalle');
-    
     if (kpiPromedioENC) kpiPromedioENC.textContent = promedioENC + '%';
     if (kpiPromedioECUF) kpiPromedioECUF.textContent = promedioECUF + '%';
     if (kpiPromedioECN) kpiPromedioECN.textContent = promedioECN + '%';
     if (kpiPromedioENCDetalle) kpiPromedioENCDetalle.textContent = `${(sumaENCPonderada / totalEvaluaciones).toFixed(1)}%`;
     if (kpiPromedioECUFDetalle) kpiPromedioECUFDetalle.textContent = `${(sumaECUFPonderada / totalEvaluaciones).toFixed(1)}%`;
     if (kpiPromedioECNDetalle) kpiPromedioECNDetalle.textContent = `${(sumaECNPonderada / totalEvaluaciones).toFixed(1)}%`;
-    
     // Porcentaje de quiebres
     const kpiPorcentajeQuiebres = document.getElementById('kpiPorcentajeQuiebres');
     const kpiPorcentajeQuiebresDetalle = document.getElementById('kpiPorcentajeQuiebresDetalle');
     if (kpiPorcentajeQuiebres) kpiPorcentajeQuiebres.textContent = pctQuiebres + '%';
     if (kpiPorcentajeQuiebresDetalle) kpiPorcentajeQuiebresDetalle.textContent = `${totalQuiebres} de ${totalEvaluaciones} evaluaciones`;
-    
     // Total Gestores
     const gestoresUnicos = new Set();
     evaluacionesFiltradas.forEach(e => { if (e.agente) gestoresUnicos.add(e.agente); });
     const totalGestores = gestoresUnicos.size;
-    
     const kpiTotalGestores = document.getElementById('kpiTotalGestores');
     const kpiTotalGestoresDetalle = document.getElementById('kpiTotalGestoresDetalle');
     if (kpiTotalGestores) kpiTotalGestores.textContent = totalGestores;
     if (kpiTotalGestoresDetalle) kpiTotalGestoresDetalle.textContent = totalGestores === 1 ? '1 gestor único' : `${totalGestores} gestores únicos`;
-    
     // ======================================================
     // 5. RANKING Y CUARTILES
     // ======================================================
     const ranking = await construirRankingAgentes(evaluacionesFiltradas);
     const totalAgentes = ranking.length || 0;
-    
     const q1 = ranking.filter(a => a.cuartil === 'Q1').length || 0;
     const q2 = ranking.filter(a => a.cuartil === 'Q2').length || 0;
     const q3 = ranking.filter(a => a.cuartil === 'Q3').length || 0;
     const q4 = ranking.filter(a => a.cuartil === 'Q4').length || 0;
-    
     const pctQ1 = totalAgentes > 0 ? Math.round((q1 / totalAgentes) * 100) : 0;
     const pctQ2 = totalAgentes > 0 ? Math.round((q2 / totalAgentes) * 100) : 0;
     const pctQ3 = totalAgentes > 0 ? Math.round((q3 / totalAgentes) * 100) : 0;
     const pctQ4 = totalAgentes > 0 ? Math.round((q4 / totalAgentes) * 100) : 0;
-    
     const kpiPorcentajeQ1 = document.getElementById('kpiPorcentajeQ1');
     const kpiPorcentajeQ2 = document.getElementById('kpiPorcentajeQ2');
     const kpiPorcentajeQ3 = document.getElementById('kpiPorcentajeQ3');
@@ -4222,7 +4565,6 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
     const kpiPorcentajeQ2Detalle = document.getElementById('kpiPorcentajeQ2Detalle');
     const kpiPorcentajeQ3Detalle = document.getElementById('kpiPorcentajeQ3Detalle');
     const kpiTasaQuiebreDetalle = document.getElementById('kpiTasaQuiebreDetalle');
-    
     if (kpiPorcentajeQ1) kpiPorcentajeQ1.textContent = pctQ1 + '%';
     if (kpiPorcentajeQ2) kpiPorcentajeQ2.textContent = pctQ2 + '%';
     if (kpiPorcentajeQ3) kpiPorcentajeQ3.textContent = pctQ3 + '%';
@@ -4231,7 +4573,6 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
     if (kpiPorcentajeQ2Detalle) kpiPorcentajeQ2Detalle.textContent = `${q2} gestores`;
     if (kpiPorcentajeQ3Detalle) kpiPorcentajeQ3Detalle.textContent = `${q3} gestores`;
     if (kpiTasaQuiebreDetalle) kpiTasaQuiebreDetalle.textContent = `${q4} gestores`;
-    
     // ======================================================
     // 6. PRODUCTIVIDAD
     // ======================================================
@@ -4240,27 +4581,24 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
     const kpiCapacidadTotal = document.getElementById('kpiCapacidadTotal');
     if (kpiProductividad) kpiProductividad.textContent = productividad.porAuditor;
     if (kpiCapacidadTotal) kpiCapacidadTotal.textContent = productividad.capacidadTotal;
-    
     // ======================================================
     // 7. MATRIZ INFO
     // ======================================================
     const matrizInfo = document.getElementById('kpiMatrizInfo');
     const matrizNombre = document.getElementById('kpiMatrizNombre');
-    
     if (matrizInfo && matrizNombre) {
         const totalConMatriz = countMatrizAntigua + countMatrizNueva;
         if (totalConMatriz > 0) {
             const pctAntigua = Math.round((countMatrizAntigua / totalConMatriz) * 100);
             const pctNueva = Math.round((countMatrizNueva / totalConMatriz) * 100);
-            
             if (countMatrizAntigua > 0 && countMatrizNueva > 0) {
                 matrizNombre.textContent = `⚠️ Mezcla de matrices`;
                 matrizInfo.innerHTML = `
                     📊 <span id="kpiMatrizNombre" style="color: #f39c12;">⚠️ Mezcla de matrices</span>
-                    <span style="font-size: 11px; color: var(--muted); margin-left: 10px;">
+<span style="font-size: 11px; color: var(--muted); margin-left: 10px;">
                         (${countMatrizAntigua} eval - 30/30/40 = ${pctAntigua}% | 
                         ${countMatrizNueva} eval - 15/15/70 = ${pctNueva}%)
-                    </span>
+</span>
                 `;
             } else if (countMatrizAntigua > 0) {
                 matrizNombre.textContent = MATRIZ_ANTIGUA.nombre;
@@ -4271,182 +4609,7 @@ async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
             }
         }
     }
-    
     console.log(`✅ KPIs actualizados - ${totalEvaluaciones} evaluaciones, ${datosAgrupados.length} períodos`);
-}
-
-// ======================================================
-// AGRUPAR EVALUACIONES POR PERÍODO CON PESOS DINÁMICOS
-// ======================================================
-function agruparEvaluacionesPorPeriodoConPesos(evaluaciones, periodo) {
-    if (!evaluaciones || evaluaciones.length === 0) return [];
-    
-    if (periodo === 'todos') {
-        periodo = 'mes';
-    }
-    
-    console.log(`📊 agruparEvaluacionesPorPeriodoConPesos: ${evaluaciones.length} evaluaciones, período: ${periodo}`);
-    
-    const agrupado = {};
-    
-    for (const e of evaluaciones) {
-        const fecha = obtenerFechaEvaluacion(e);
-        if (!fecha) continue;
-        
-        let clave = '';
-        switch (periodo) {
-            case 'dia':
-                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
-                break;
-            case 'semana':
-                const semana = getWeekNumber(fecha);
-                clave = `${fecha.getFullYear()}-S${semana}`;
-                break;
-            case 'mes':
-                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-                break;
-            case 'trimestre':
-                const trimestre = Math.floor(fecha.getMonth() / 3) + 1;
-                clave = `${fecha.getFullYear()}-T${trimestre}`;
-                break;
-            case 'anio':
-                clave = `${fecha.getFullYear()}`;
-                break;
-            default:
-                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-        }
-        
-        if (!agrupado[clave]) {
-            agrupado[clave] = {
-                clave: clave,
-                evaluaciones: [],
-                count: 0,
-                sumaNotas: 0,
-                sumENC: 0,
-                sumECUF: 0,
-                sumECN: 0,
-                quiebres: 0,
-                // 🔴 NUEVO: Pesos del período
-                pesos: null,
-                // Para porcentajes
-                sumaPctENC: 0,
-                sumaPctECUF: 0,
-                sumaPctECN: 0,
-                countPesos: 0
-            };
-        }
-        
-        const item = agrupado[clave];
-        item.evaluaciones.push(e);
-        item.count++;
-        item.sumaNotas += e.notaFinal || 0;
-        item.sumENC += e.totalENC || 0;
-        item.sumECUF += e.totalECUF || 0;
-        item.sumECN += e.totalECN || 0;
-        if ((e.notaFinal || 0) < 85) item.quiebres++;
-        
-        // 🔴 DETERMINAR PESOS DEL PERÍODO (usar la primera evaluación)
-        if (!item.pesos) {
-            const fechaEval = obtenerFechaEvaluacion(e);
-            if (fechaEval) {
-                const matriz = getMatrizByFecha(fechaEval);
-                item.pesos = matriz.pesos;
-            } else {
-                item.pesos = { ENC: 30, ECUF: 30, ECN: 40 };
-            }
-        }
-        
-        // 🔴 CALCULAR PORCENTAJE DE ESTA EVALUACIÓN CON SU MATRIZ
-        const fechaEval = obtenerFechaEvaluacion(e);
-        if (fechaEval) {
-            const matriz = getMatrizByFecha(fechaEval);
-            const pesos = matriz.pesos;
-            
-            const enc = parseFloat(e.totalENC || e.total_enc || 0);
-            const ecuf = parseFloat(e.totalECUF || e.total_ecuf || 0);
-            const ecn = parseFloat(e.totalECN || e.total_ecn || 0);
-            
-            // Porcentaje individual de esta evaluación
-            const pctENC = Math.min((enc / pesos.ENC) * 100, 100);
-            const pctECUF = Math.min((ecuf / pesos.ECUF) * 100, 100);
-            const pctECN = Math.min((ecn / pesos.ECN) * 100, 100);
-            
-            // Acumular porcentajes
-            item.sumaPctENC += pctENC;
-            item.sumaPctECUF += pctECUF;
-            item.sumaPctECN += pctECN;
-            item.countPesos++;
-        }
-    }
-    
-    // Convertir a array y ordenar
-    let resultados = Object.values(agrupado);
-    resultados.sort((a, b) => a.clave.localeCompare(b.clave));
-    
-    // Formatear etiquetas y calcular promedios
-    const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    
-    resultados = resultados.map(item => {
-        let label = '';
-        switch (periodo) {
-            case 'dia':
-                const [anioD, mesD, diaD] = item.clave.split('-');
-                label = `${diaD}/${mesD}`;
-                break;
-            case 'semana':
-                const [anioS, semana] = item.clave.split('-S');
-                label = `Sem ${semana} (${anioS})`;
-                break;
-            case 'mes':
-                const [anioM, mesM] = item.clave.split('-');
-                label = `${mesesNombres[parseInt(mesM) - 1]} ${anioM}`;
-                break;
-            case 'trimestre':
-                const [anioT, trim] = item.clave.split('-T');
-                label = `T${trim} ${anioT}`;
-                break;
-            case 'anio':
-                label = item.clave;
-                break;
-            default:
-                label = item.clave;
-        }
-        
-        const count = item.count || 0;
-        
-        const promedioNota = count > 0 ? (item.sumaNotas / count) : 0;
-        const promedioENC = count > 0 ? (item.sumENC / count) : 0;
-        const promedioECUF = count > 0 ? (item.sumECUF / count) : 0;
-        const promedioECN = count > 0 ? (item.sumECN / count) : 0;
-        const porcentajeQuiebres = count > 0 ? (item.quiebres / count) * 100 : 0;
-        
-        // 🔴 PROMEDIOS DE PORCENTAJES
-        const promedioENCPct = item.countPesos > 0 ? (item.sumaPctENC / item.countPesos) : 0;
-        const promedioECUFPct = item.countPesos > 0 ? (item.sumaPctECUF / item.countPesos) : 0;
-        const promedioECNPct = item.countPesos > 0 ? (item.sumaPctECN / item.countPesos) : 0;
-        
-        return {
-            ...item,
-            label: label,
-            promedioNota: Math.round(promedioNota * 10) / 10,
-            promedioENC: Math.round(promedioENC * 10) / 10,
-            promedioECUF: Math.round(promedioECUF * 10) / 10,
-            promedioECN: Math.round(promedioECN * 10) / 10,
-            porcentajeQuiebres: Math.round(porcentajeQuiebres * 10) / 10,
-            // 🔴 NUEVOS CAMPOS CON PORCENTAJES
-            promedioENCPct: Math.round(promedioENCPct * 10) / 10,
-            promedioECUFPct: Math.round(promedioECUFPct * 10) / 10,
-            promedioECNPct: Math.round(promedioECNPct * 10) / 10
-        };
-    });
-    
-    console.log(`✅ Datos agrupados: ${resultados.length} períodos con pesos dinámicos`);
-    if (resultados.length > 0) {
-        console.log(`   Ejemplo: ${resultados[0].label} - ENC: ${resultados[0].promedioENC} pts (${resultados[0].promedioENCPct}%)`);
-        console.log(`   Pesos del período: ENC=${resultados[0].pesos?.ENC}, ECUF=${resultados[0].pesos?.ECUF}, ECN=${resultados[0].pesos?.ECN}`);
-    }
-    
-    return resultados;
 }
 
 function actualizarCardsPromedioMotivosAgrupados(datosAgrupados) {
@@ -7273,13 +7436,13 @@ async function generarGraficoComparativaAgrupado(evaluacionesFiltradas, periodo)
 async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, periodoParam = null) {
     console.log('📊 renderizarEvolutivoConDatosFiltrados - FUNCIÓN UNIFICADA');
     console.log(`   periodoParam recibido: ${periodoParam}`);
-
+ 
     const canvas = document.getElementById('chartEvolutivoFrentes');
     if (!canvas) {
         console.error('❌ Canvas chartEvolutivoFrentes no encontrado');
         return;
     }
-
+ 
     // Obtener evaluaciones
     let evaluacionesFiltradas;
     if (evaluacionesParam !== null) {
@@ -7287,7 +7450,7 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
     } else {
         evaluacionesFiltradas = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
     }
-
+ 
     // Destruir gráfico existente
     if (window.chartEvolutivo && typeof window.chartEvolutivo.destroy === 'function') {
         try {
@@ -7295,7 +7458,7 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
         } catch (e) {}
         window.chartEvolutivo = null;
     }
-
+ 
     if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
@@ -7309,10 +7472,9 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
         }
         return;
     }
-
+ 
     // Determinar período
     let periodo = periodoParam || filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
-    
     if (periodo === 'rango') {
         const tipoRango = document.getElementById('filtroRangoTipo')?.value;
         if (tipoRango === 'mes') periodo = 'mes';
@@ -7321,7 +7483,6 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
         else if (tipoRango === 'dia') periodo = 'dia';
         else periodo = 'mes';
     }
-    
     if (periodo === 'multiples') {
         const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
         if (tipoMultiples === 'mes') periodo = 'mes';
@@ -7330,21 +7491,18 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
         else if (tipoMultiples === 'dia') periodo = 'dia';
         else periodo = 'mes';
     }
-    
     if (periodo === 'todos') {
         periodo = 'mes';
     }
-
+ 
     console.log(`   Período FINAL para agrupar: ${periodo}`);
-
+ 
     // 🔴 FUNCIÓN INTERNA: Agrupar con pesos por período
     function agruparConPesosPorPeriodo(evalData, periodo) {
         const agrupado = {};
-        
         for (const e of evalData) {
             const fecha = obtenerFechaEvaluacion(e);
             if (!fecha) continue;
-            
             // Obtener clave del período
             let clave = '';
             if (periodo === 'mes') {
@@ -7357,7 +7515,6 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
             } else {
                 clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
             }
-            
             if (!agrupado[clave]) {
                 agrupado[clave] = {
                     clave: clave,
@@ -7370,35 +7527,29 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
                     pesos: null
                 };
             }
-            
             const item = agrupado[clave];
             item.evaluaciones.push(e);
             item.sumENC += e.totalENC || 0;
             item.sumECUF += e.totalECUF || 0;
             item.sumECN += e.totalECN || 0;
             item.count++;
-            
             // Determinar pesos del período (usar la primera evaluación)
             if (!item.pesos) {
                 const pesosEval = obtenerPesosPorEvaluacion(e);
                 item.pesos = pesosEval;
             }
         }
-        
         // Calcular promedios y porcentajes
         const resultados = Object.values(agrupado).map(item => {
             const count = item.count || 0;
             const pesos = item.pesos || { ENC: 30, ECUF: 30, ECN: 40 };
-            
             const promENC = count > 0 ? item.sumENC / count : 0;
             const promECUF = count > 0 ? item.sumECUF / count : 0;
             const promECN = count > 0 ? item.sumECN / count : 0;
-            
             // Calcular porcentajes con los pesos del período
             const pctENC = Math.round((promENC / pesos.ENC) * 100);
             const pctECUF = Math.round((promECUF / pesos.ECUF) * 100);
             const pctECN = Math.round((promECN / pesos.ECN) * 100);
-            
             return {
                 ...item,
                 promedioENC: promENC,
@@ -7411,13 +7562,11 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
                 label: formatearLabelPeriodo(item.clave, periodo)
             };
         });
-        
         return resultados.sort((a, b) => a.clave.localeCompare(b.clave));
     }
-
+ 
     function formatearLabelPeriodo(clave, periodo) {
         const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-        
         if (periodo === 'mes') {
             const [anio, mes] = clave.split('-');
             return `${meses[parseInt(mes) - 1]} ${anio}`;
@@ -7429,10 +7578,10 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
         }
         return clave;
     }
-
+ 
     // 🔴 USAR LA FUNCIÓN CORREGIDA con pesos por período
     const datosAgrupados = agruparConPesosPorPeriodo(evaluacionesFiltradas, periodo);
-
+ 
     if (datosAgrupados.length === 0) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
@@ -7446,51 +7595,50 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
         }
         return;
     }
-
+ 
     const labels = datosAgrupados.map(item => item.label);
-    
     // 🔴 USAR LOS PORCENTAJES CORRECTOS (ya calculados con los pesos del período)
     const dataCliente = datosAgrupados.map(item => Math.min(item.pctENC, 100));
     const dataNegocio = datosAgrupados.map(item => Math.min(item.pctECUF, 100));
     const dataProceso = datosAgrupados.map(item => Math.min(item.pctECN, 100));
-
+ 
     // Calcular escala dinámica
     const todosValores = [...dataCliente, ...dataNegocio, ...dataProceso];
     const minValor = Math.min(...todosValores);
     const maxValor = Math.max(...todosValores);
     let yMin = Math.max(0, minValor - 5);
     let yMax = Math.min(100, maxValor + 5);
-
+ 
     if (yMax - yMin < 15) {
         const centro = (yMin + yMax) / 2;
         yMin = Math.max(0, centro - 10);
         yMax = Math.min(100, centro + 10);
     }
-
+ 
     let stepSize = 5;
     const rango = yMax - yMin;
     if (rango <= 10) stepSize = 2;
     else if (rango <= 20) stepSize = 5;
     else if (rango <= 40) stepSize = 10;
     else stepSize = 20;
-
+ 
     const lineaMeta85 = new Array(datosAgrupados.length).fill(85);
     const lineaMeta90 = new Array(datosAgrupados.length).fill(90);
-
+ 
     let xTitle = 'Período';
     if (periodo === 'dia') xTitle = 'Fecha (Día/Mes)';
     else if (periodo === 'semana') xTitle = 'Semana';
     else if (periodo === 'mes') xTitle = 'Mes';
     else if (periodo === 'trimestre') xTitle = 'Trimestre';
     else if (periodo === 'anio') xTitle = 'Año';
-
+ 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
+ 
     canvas.width = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+ 
     window.chartEvolutivo = new Chart(ctx, {
         type: 'line',
         data: {
@@ -7693,7 +7841,7 @@ async function renderizarEvolutivoConDatosFiltrados(evaluacionesParam = null, pe
             }
         }
     });
-
+ 
     console.log(`✅ Gráfico Evolutivo corregido - ${datosAgrupados.length} períodos, ${evaluacionesFiltradas.length} evaluaciones`);
     console.log(`   Período usado: ${periodo}`);
 }
@@ -14258,6 +14406,11 @@ function calcularNotaPorcentaje(evaluacion, pesos) {
     return (pctENC + pctECUF + pctECN) / 3;
 }
 
+function obtenerPesosPorEvaluacion(evaluacion) {
+    const fecha = obtenerFechaEvaluacion(evaluacion);
+    const matriz = getMatrizByFecha(fecha);
+    return matriz.pesos;
+}
 
 // Devuelve los pesos aplicables al conjunto filtrado (si todas las evaluaciones comparten matriz),
 // o valores por defecto si no hay matriz dominante.
@@ -14527,24 +14680,36 @@ function invalidarCacheCuartiles() {
 // CARGAR PESTAÑAS DISPONIBLES (GLOBAL)
 // ======================================================
 async function cargarPestanasDisponiblesGlobal() {
-    const token = localStorage.getItem('meca_token');
+    console.log('📡 Cargando pestañas disponibles globales...');
     
     try {
-        const response = await fetch('/api/pestanas', {
-            headers: { 'Authorization': `Bearer ${token}` }
+        const token = localStorage.getItem('meca_token');
+        
+        // 🔴 USAR /api/pestanas/todas PARA OBTENER TODAS
+        const response = await fetch('/api/pestanas/todas', {
+            headers: { 
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
         });
         
-        if (response.ok) {
-            window.pestanasDisponiblesGlobal = await response.json();
-            console.log(`✅ Cargadas ${window.pestanasDisponiblesGlobal.length} pestañas disponibles`);
-        } else {
+        if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
         }
+        
+        const pestanas = await response.json();
+        window.pestanasDisponiblesGlobal = pestanas;
+        
+        console.log(`✅ ${pestanas.length} pestañas disponibles (TODAS) cargadas:`, pestanas.map(p => p.codigo));
+        // Debería mostrar: ['misEscuchas', 'evaluacion', 'historial', 'incidencias', 'reportes', ...]
+        
+        return pestanas;
+        
     } catch (error) {
-        console.error('Error cargando pestañas:', error);
+        console.error('❌ Error cargando pestañas:', error);
         window.pestanasDisponiblesGlobal = [];
+        return [];
     }
-    return window.pestanasDisponiblesGlobal;
 }
 
 // ======================================================
@@ -15010,7 +15175,7 @@ if (document.readyState === 'loading') {
         const token = localStorage.getItem('meca_token');
         let todosLosReportes = [];
         try {
-            const reportesResponse = await fetch('http://localhost:5000/api/reportes/listar', {
+            const reportesResponse = await fetch(`${API_URL_PYTHON}/api/reportes/listar`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const reportesData = await reportesResponse.json();
@@ -15148,12 +15313,7 @@ if (document.readyState === 'loading') {
 
   
 
-// SOBREESCRIBIR función generarReportes para incluir frentes =============
-    const originalGenerarReportes = generarReportes;
-    generarReportes = function () {
-        if (originalGenerarReportes) originalGenerarReportes();
-        calcularFrentesImpacto();
-    };
+
     
 let indicadoresEvolutivosExpandido = {
     volumen: false,
@@ -16228,9 +16388,6 @@ function getCuartilHTML(cuartil) {
         ${c.texto}
     </span>`;
 }
-
-// Exponer globalmente
-window.getCuartilHTML = getCuartilHTML;
 
     // ========== 4.2 Calcular períodos disponibles (CORREGIDO) ==========
 function calcularPeriodosRango(evaluaciones, periodo, cantidad) {
@@ -18079,43 +18236,74 @@ async function verEvolucionCiclos(agente) {
     // ===== FIN FUNCIÓN: calcularCuartilIndividual ===========================
     
     // ===== 39. INICIO FUNCIÓN: cargarHistorialEvaluaciones ==================
-    function cargarHistorialEvaluaciones() {
-        const tbody = document.getElementById('tablaHistorial');
-        if (!tbody) return;
+    // ======================================================
+// CARGAR HISTORIAL DE EVALUACIONES - VERSIÓN UNIFICADA
+// ======================================================
 
-        const evaluaciones = window.evaluacionesGlobales || [];
+function cargarHistorialEvaluaciones() {
+    const tbody = document.getElementById('tablaHistorial');
+    if (!tbody) return;
 
-        if (evaluaciones.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 50px;">No hay evaluaciones registradas</td></tr>';
-            return;
+    // ✅ Obtener evaluaciones desde la variable global
+    const evaluaciones = window.evaluacionesGlobales || [];
+
+    if (evaluaciones.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 50px;">No hay evaluaciones registradas</td></tr>';
+        // Actualizar contadores
+        const mostrandoCount = document.getElementById('mostrandoHistorialCount');
+        const totalCount = document.getElementById('totalHistorialCount');
+        if (mostrandoCount) mostrandoCount.textContent = '0';
+        if (totalCount) totalCount.textContent = '0';
+        return;
+    }
+
+    // ✅ Ordenar por timestamp (más reciente primero)
+    evaluaciones.sort((a, b) => b.timestamp - a.timestamp);
+
+    // ✅ Guardar en historialFiltrado para otras funciones
+    historialFiltrado = [...evaluaciones];
+
+    let html = '';
+    evaluaciones.forEach((eval, index) => {
+        let notaColor = '';
+        if (eval.notaFinal >= 90) notaColor = 'var(--ok)';
+        else if (eval.notaFinal >= 85) notaColor = 'var(--warning)';
+        else notaColor = 'var(--danger)';
+
+        // Obtener fecha correctamente
+        let fecha = eval.fechaOriginal || eval.fecha || '';
+        if (fecha) {
+            fecha = mostrarFechaSinT(fecha);
         }
 
-        evaluaciones.sort((a, b) => b.timestamp - a.timestamp);
+        html += `<tr>
+            <td style="padding: 8px; text-align: center;">${index + 1}</td>
+            <td style="padding: 8px;">${fecha}</td>
+            <td style="padding: 8px;">${escapeHtml(eval.agente || '')}</td>
+            <td style="padding: 8px;">${escapeHtml(eval.evaluador || '')}</td>
+            <td style="padding: 8px;">${escapeHtml(eval.idLlamada || '')}</td>
+            <td style="padding: 8px; font-weight: bold; color: ${notaColor};">${eval.notaFinal}%</td>
+            <td style="padding: 8px;"><span class="badge" style="background: ${notaColor};">${eval.rango || ''}</span></td>
+            <td style="padding: 8px; text-align: center;">
+                <button onclick="verDetalleEvaluacion(${eval.id})" style="padding: 4px 8px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer;">👁️</button>
+                <button onclick="eliminarEvaluacion(${eval.id})" style="padding: 4px 8px; background: #fee; color: var(--danger); border: none; border-radius: 4px; cursor: pointer;">🗑️</button>
+            </td>
+        </tr>`;
+    });
 
-        let html = '';
-        evaluaciones.forEach((eval, index) => {
-            let notaColor = '';
-            if (eval.notaFinal >= 90) notaColor = 'var(--ok)';
-            else if (eval.notaFinal >= 85) notaColor = 'var(--warning)';
-            else notaColor = 'var(--danger)';
+    tbody.innerHTML = html;
 
-            html += `<tr>
-                <td style="padding: 8px; text-align: center;">${index + 1}</td>
-                <td style="padding: 8px;">${mostrarFechaSinT(eval.fechaOriginal || eval.fecha || '')}</td>
-                <td style="padding: 8px;">${escapeHtml(eval.agente || '')}</td>
-                <td style="padding: 8px;">${escapeHtml(eval.evaluador || '')}</td>
-                <td style="padding: 8px;">${eval.idLlamada || ''}</td>
-                <td style="padding: 8px; font-weight: bold; color: ${notaColor};">${eval.notaFinal}%</td>
-                <td style="padding: 8px;"><span class="badge" style="background: ${notaColor};">${eval.rango || ''}</span></td>
-                <td style="padding: 8px; text-align: center;">
-                    <button onclick="verDetalleEvaluacion(${eval.id})" style="padding: 4px 8px; background: var(--accent); color: white;">👁️</button>
-                    <button onclick="eliminarEvaluacion(${eval.id})" style="padding: 4px 8px; background: #fee; color: var(--danger);">🗑️</button>
-                </td>
-            </tr>`;
-        });
+    // ✅ Actualizar contadores
+    const mostrandoCount = document.getElementById('mostrandoHistorialCount');
+    const totalCount = document.getElementById('totalHistorialCount');
+    if (mostrandoCount) mostrandoCount.textContent = evaluaciones.length;
+    if (totalCount) totalCount.textContent = evaluaciones.length;
 
-        tbody.innerHTML = html;
-    }
+    console.log(`✅ Historial cargado: ${evaluaciones.length} evaluaciones`);
+}
+
+
+
     // ===== FIN FUNCIÓN: cargarHistorialEvaluaciones =========================
 
     // ===== 40. INICIO FUNCIÓN: verDetalleEvaluacion =========================
@@ -19045,7 +19233,6 @@ if (containerCapacitacion) {
             const totalAcciones = accionesPDA.length;
             const avance = totalAcciones > 0 ? Math.round((completadas / totalAcciones) * 100) : 0;
             
-            // 🔴 MOSTRAR SUBTEXTO SEGÚN ESTADO
             let subtexto = '';
             let botonAccion = '';
             
@@ -19097,6 +19284,15 @@ if (containerCapacitacion) {
                         </div>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                             ${botonAccion}
+                            
+                            <!-- ✅ NUEVO: Botón Ver Reporte -->
+                            ${pda.ruta_archivo ? `
+                            <button onclick="verReportePDA('${escapeHtml(pda.ruta_archivo)}')" 
+                                    style="background: #019DF4; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
+                                📄 Ver Reporte
+                            </button>
+                            ` : ''}
+                            
                             <button onclick="verHistorialPDA(${pda.id})" 
                                     style="background: #6c757d; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
                                 📋 Historial
@@ -26051,28 +26247,64 @@ function generarDocumentoHTML(data) {
     // ===== FIN FUNCIÓN: excelSerialToDate ==================================
     
     // ===== 6. INICIO FUNCIÓN: obtenerAuditoresActivos ====================
+  
+
     async function obtenerAuditoresActivos() {
         const db = getDB();
-        if (!db) return [];
+        if (!db) {
+            console.error('❌ Base de datos no disponible');
+            return [];
+        }
 
         try {
+            // 1. Obtener el ID del rol AUDITOR
+            const { data: roles, error: rolesError } = await db
+                .from('roles')
+                .select('id')
+                .eq('codigo', 'AUDITOR')
+                .limit(1);
+
+            if (rolesError) {
+                console.error('Error obteniendo rol AUDITOR:', rolesError);
+                return [];
+            }
+
+            if (!roles || roles.length === 0) {
+                console.warn('⚠️ Rol AUDITOR no encontrado');
+                return [];
+            }
+
+            const auditorRolId = roles[0].id;
+            console.log(`✅ Rol AUDITOR ID: ${auditorRolId}`);
+
+            // 2. Obtener usuarios con ese rol
             const { data, error } = await db
                 .from('usuarios')
-                .select('usuario, nombre_completo')
-                .eq('activo', true)
-                .eq('rol', 'AUDITOR');
+                .select('id, usuario, nombre_completo, activo')
+                .eq('rol_id', auditorRolId)
+                .eq('activo', true);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error obteniendo auditores:', error);
+                return [];
+            }
 
-            return (data || []).map(u => ({
+            const auditores = (data || []).map(u => ({
+                id: u.id,
                 usuario: u.usuario,
-                nombre: u.nombre_completo || u.usuario
+                nombre: u.nombre_completo || u.usuario,
+                nombre_completo: u.nombre_completo
             }));
+
+            console.log(`✅ ${auditores.length} auditores activos encontrados`);
+            return auditores;
+
         } catch (error) {
-            console.error('Error obteniendo auditores:', error);
+            console.error('Error en obtenerAuditoresActivos:', error);
             return [];
         }
     }
+
     async function obtenerCargaActualAuditores(auditores) {
         const db = getDB();
         if (!db) return {};
@@ -26700,6 +26932,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     // ===== FIN FUNCIÓN: mostrarResumenEstadisticoMonitoreo =====
     
     // ===== 16. INICIO FUNCIÓN: actualizarTablaMonitoreo ===================
+
     function actualizarTablaMonitoreo(asignaciones) {
         const tbody = document.getElementById('tablaMonitoreoEscuchas');
         if (!tbody) return;
@@ -26718,7 +26951,6 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
             if (aEsIncidencia && !bEsIncidencia) return -1;
             if (!aEsIncidencia && bEsIncidencia) return 1;
 
-            // Luego por estado (pendiente primero)
             const estadoOrder = { 'pendiente': 1, 'en_proceso': 2, 'gestionado': 3 };
             return (estadoOrder[a.estado] || 4) - (estadoOrder[b.estado] || 4);
         });
@@ -26786,11 +27018,28 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                 reasignacionInfo = `<div style="font-size: 9px; color: var(--accent); margin-top: 2px;">🔄 Reasignado: ${formatearFechaPeru(asig.fecha_reasignacion)}</div>`;
             }
 
-            // 🔴 NUEVO: Mostrar a qué lote pertenece (solo si hay múltiples lotes)
+            // Mostrar a qué lote pertenece
             let loteInfo = '';
             if (asig.tarea_id) {
                 loteInfo = `<div style="font-size: 9px; color: var(--muted); margin-top: 2px;">📦 Lote ID: ${asig.tarea_id}</div>`;
             }
+
+            // ✅ FECHA DE GESTIÓN - CORREGIDO
+            let fechaGestionDisplay = '';
+            if (asig.fecha_gestion) {
+                fechaGestionDisplay = formatearFechaPeru(asig.fecha_gestion);
+            } else if (asig.estado === 'gestionado' || asig.estado === 'completado') {
+                fechaGestionDisplay = '✅ Gestionado';
+            } else if (asig.estado === 'en_proceso') {
+                fechaGestionDisplay = '🔄 En proceso';
+            } else if (esIncidencia) {
+                fechaGestionDisplay = '⚠️ Incidencia';
+            } else {
+                fechaGestionDisplay = '⏳ Pendiente';
+            }
+
+            // ✅ FECHA DE ASIGNACIÓN
+            let fechaAsignacionDisplay = asig.fecha_asignacion ? formatearFechaPeru(asig.fecha_asignacion) : '-';
 
             html += `
                 <tr ${estadoClase}>
@@ -26807,8 +27056,10 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                         ${escapeHtml((asig.motivos || '-').substring(0, 30))}${(asig.motivos || '').length > 30 ? '...' : ''}
                     </td>
                     <td style="padding: 8px;">${estadoBadge}</td>
-                    <td style="padding: 8px; white-space: nowrap;">${formatearFechaPeru(asig.fecha_asignacion)}</td>
-                    <td style="padding: 8px; white-space: nowrap;">${formatearFechaPeru(asig.fecha_gestion)}</td>
+                    <td style="padding: 8px; white-space: nowrap;">${fechaAsignacionDisplay}</td>
+                    <td style="padding: 8px; white-space: nowrap; font-weight: ${fechaGestionDisplay.includes('Pendiente') || fechaGestionDisplay.includes('En proceso') ? 'normal' : 'bold'};">
+                        ${fechaGestionDisplay}
+                    </td>
                     <td style="padding: 8px; text-align: center;">${acciones}</td>
                 </tr>
             `;
@@ -26819,6 +27070,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
         const pendientes = asignaciones.filter(a => a.estado === 'pendiente').length;
         const enProceso = asignaciones.filter(a => a.estado === 'en_proceso').length;
         const gestionados = asignaciones.filter(a => a.estado === 'gestionado').length;
+        const incidencias = asignaciones.filter(a => a.audio_disponible === false && a.motivo_incidencia).length;
 
         html += `
             <tr style="background: #f8f9fa; font-weight: bold;">
@@ -26826,7 +27078,8 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     📊 Resumen: ${total} tickets totales | 
                     ⏳ ${pendientes} pendientes | 
                     🔄 ${enProceso} en proceso | 
-                    ✅ ${gestionados} gestionados
+                    ✅ ${gestionados} gestionados |
+                    ⚠️ ${incidencias} incidencias
                 </td>
             </tr>
         `;
@@ -27174,8 +27427,12 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
 
         const valorActual = select.value;
         select.innerHTML = '<option value="">Todos los auditores</option>';
-        auditores.forEach(auditor => {
-            select.innerHTML += `<option value="${escapeHtml(auditor.usuario)}" ${valorActual === auditor.usuario ? 'selected' : ''}>${escapeHtml(auditor.nombre)}</option>`;
+        
+        // ✅ Usar los datos correctos
+        const auditoresLista = auditores || [];
+        auditoresLista.forEach(auditor => {
+            const nombreMostrar = auditor.nombre || auditor.nombre_completo || auditor.usuario;
+            select.innerHTML += `<option value="${escapeHtml(auditor.usuario)}" ${valorActual === auditor.usuario ? 'selected' : ''}>${escapeHtml(nombreMostrar)}</option>`;
         });
     }
     // ===== FIN FUNCIÓN: cargarSelectAuditoresFiltro ========================
@@ -27248,23 +27505,50 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
         }
 
         try {
-            // Obtener auditores disponibles (excluyendo al actual)
+            // ✅ OBTENER EL ID DEL ROL AUDITOR
+            const { data: roles, error: rolesError } = await db
+                .from('roles')
+                .select('id')
+                .eq('codigo', 'AUDITOR')
+                .limit(1);
+
+            if (rolesError) {
+                console.error('Error obteniendo rol AUDITOR:', rolesError);
+                throw new Error('Error al obtener rol AUDITOR');
+            }
+
+            if (!roles || roles.length === 0) {
+                console.error('❌ Rol AUDITOR no encontrado');
+                alert('❌ Rol AUDITOR no encontrado en el sistema');
+                return;
+            }
+
+            const auditorRolId = roles[0].id;
+            console.log(`✅ Rol AUDITOR ID: ${auditorRolId}`);
+
+            // ✅ Obtener auditores disponibles (excluyendo al actual)
             const { data, error } = await db
                 .from('usuarios')
                 .select('usuario, nombre_completo')
+                .eq('rol_id', auditorRolId)  // ← USAR rol_id
                 .eq('activo', true)
-                .eq('rol', 'AUDITOR')
                 .neq('usuario', auditorOrigen)
                 .order('usuario', { ascending: true });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error obteniendo auditores:', error);
+                throw new Error(error.message);
+            }
 
-            // Filtrar auditores excluidos si existe la variable global
+            // Filtrar auditores excluidos
             let auditoresDisponibles = data || [];
             if (typeof auditoresExcluidosGlobal !== 'undefined' && auditoresExcluidosGlobal) {
                 auditoresDisponibles = auditoresDisponibles.filter(a => !auditoresExcluidosGlobal.includes(a.usuario));
             }
 
+            console.log(`✅ ${auditoresDisponibles.length} auditores disponibles`);
+
+            // Llenar el select de nuevo auditor
             const select = document.getElementById('selectNuevoAuditor');
             if (select) {
                 select.innerHTML = '<option value="">-- Seleccionar auditor --</option>';
@@ -27272,6 +27556,10 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     const nombreMostrar = a.nombre_completo || a.usuario;
                     select.innerHTML += `<option value="${escapeHtml(a.usuario)}">${escapeHtml(nombreMostrar)} (${escapeHtml(a.usuario)})</option>`;
                 });
+
+                if (auditoresDisponibles.length === 0) {
+                    select.innerHTML += '<option value="" disabled>⚠️ No hay auditores disponibles</option>';
+                }
             }
 
             // Mostrar información del ticket
@@ -27382,17 +27670,42 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
         }
 
         try {
-            // Obtener auditores activos
+            // ✅ CORREGIDO: Obtener auditores activos usando rol_id
+            // Primero obtener el ID del rol AUDITOR
+            const { data: roles, error: rolesError } = await db
+                .from('roles')
+                .select('id, codigo, nombre')
+                .eq('codigo', 'AUDITOR');
+
+            if (rolesError) {
+                console.error('Error obteniendo rol AUDITOR:', rolesError);
+                throw new Error('Error al obtener rol AUDITOR');
+            }
+
+            if (!roles || roles.length === 0) {
+                console.error('❌ Rol AUDITOR no encontrado');
+                alert('❌ Rol AUDITOR no encontrado en el sistema');
+                return;
+            }
+
+            const auditorRolId = roles[0].id;
+            console.log(`✅ Rol AUDITOR ID: ${auditorRolId}`);
+
+            // Obtener usuarios con rol AUDITOR
             const { data, error } = await db
                 .from('usuarios')
                 .select('usuario, nombre_completo')
+                .eq('rol_id', auditorRolId)
                 .eq('activo', true)
-                .eq('rol', 'AUDITOR')
                 .order('usuario', { ascending: true });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error obteniendo auditores:', error);
+                throw new Error(error.message);
+            }
 
             const auditores = data || [];
+            console.log(`✅ ${auditores.length} auditores encontrados`);
 
             // Llenar select de auditor origen
             const selectOrigen = document.getElementById('selectAuditorOrigen');
@@ -27421,8 +27734,19 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
             document.getElementById('btnConfirmarReasignacionMasiva').disabled = true;
 
             // Agregar event listeners para calcular resumen
-            selectOrigen.addEventListener('change', calcularResumenReasignacionMasiva);
-            document.getElementById('selectEstadoReasignar').addEventListener('change', calcularResumenReasignacionMasiva);
+            if (selectOrigen) {
+                // Remover listeners anteriores
+                const nuevoSelectOrigen = selectOrigen.cloneNode(true);
+                selectOrigen.parentNode.replaceChild(nuevoSelectOrigen, selectOrigen);
+                document.getElementById('selectAuditorOrigen').addEventListener('change', calcularResumenReasignacionMasiva);
+            }
+
+            const estadoSelect = document.getElementById('selectEstadoReasignar');
+            if (estadoSelect) {
+                const nuevoEstadoSelect = estadoSelect.cloneNode(true);
+                estadoSelect.parentNode.replaceChild(nuevoEstadoSelect, estadoSelect);
+                document.getElementById('selectEstadoReasignar').addEventListener('change', calcularResumenReasignacionMasiva);
+            }
 
             document.getElementById('modalReasignarMasiva').style.display = 'flex';
 
@@ -27450,6 +27774,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
         if (!db) return;
 
         try {
+            // ✅ CORREGIDO: Consultar asignaciones sin usar la columna 'rol'
             let query = db
                 .from('asignaciones_escucha')
                 .select('id, ticket, gestor_auditado, estado')
@@ -27463,7 +27788,10 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
 
             const { data, error } = await query;
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error obteniendo tickets:', error);
+                throw error;
+            }
 
             const tickets = data || [];
             const countPendientes = tickets.filter(t => t.estado === 'pendiente').length;
@@ -27480,12 +27808,16 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                 return;
             }
 
-            // Obtener nombre del auditor
-            const { data: auditorData } = await db
+            // Obtener nombre del auditor desde la tabla usuarios
+            const { data: auditorData, error: auditorError } = await db
                 .from('usuarios')
                 .select('nombre_completo')
                 .eq('usuario', auditorOrigen)
-                .single();
+                .maybeSingle();
+
+            if (auditorError) {
+                console.warn('Error obteniendo nombre del auditor:', auditorError);
+            }
 
             const nombreAuditor = auditorData?.nombre_completo || auditorOrigen;
 
@@ -27966,21 +28298,44 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
         }
 
         try {
-            // 🔴 CAMBIO: Usar API en lugar de PostgreSQL directo
+            // ✅ Verificar que la función existe
+            if (typeof API.getTicketsPorLote !== 'function') {
+                console.warn('⚠️ API.getTicketsPorLote no está definida');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--danger);">
+                        ❌ Función no disponible. Contacte al administrador.
+                    <\/td><\/tr>`;
+                }
+                return;
+            }
+
             const tickets = await API.getTicketsPorLote(loteId);
             
+            // ✅ VALIDAR QUE SEA UN ARRAY
+            if (!tickets || !Array.isArray(tickets)) {
+                console.warn('⚠️ La respuesta no es un array:', tickets);
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--warning);">
+                        ⚠️ No se pudieron cargar los tickets del lote.
+                    <\/td><\/tr>`;
+                }
+                return;
+            }
+
             // Buscar información del lote para mostrar contexto
             const lote = window.lotesHistorialGlobal?.find(l => l.id === loteId);
 
             // Mostrar estos tickets en la tabla de monitoreo
-            mostrarTicketsConContextoLote(tickets || [], lote);
+            mostrarTicketsConContextoLote(tickets, lote);
 
-            console.log(`✅ ${tickets?.length || 0} tickets cargados del lote ${loteId}`);
+            console.log(`✅ ${tickets.length} tickets cargados del lote ${loteId}`);
 
         } catch (error) {
-            console.error('Error cargando tickets:', error);
+            console.error('❌ Error cargando tickets:', error);
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--danger);">❌ Error: ${error.message}<\/td><\/tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--danger); padding: 40px;">
+                    ❌ Error al cargar tickets: ${error.message}
+                <\/td><\/tr>`;
             }
         }
     }
@@ -28419,56 +28774,76 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
 
     // ===== 41. INICIO FUNCIÓN: cargarSelectExclusionAuditores =============
     async function cargarSelectExclusionAuditores() {
-        console.log('🔄 Cargando select de auditores para exclusión...');
+    console.log('🔄 Cargando select de auditores para exclusión...');
 
-        const db = getDB();
-        if (!db) {
-            console.error('❌ Base de datos no disponible');
+    const db = getDB();
+    if (!db) {
+        console.error('❌ Base de datos no disponible');
+        return;
+    }
+
+    try {
+        // ✅ OBTENER TODOS LOS USUARIOS CON ROL AUDITOR
+        // 🔴 Asegúrate de que el rol_id sea correcto (puede ser 1, 2, 3, etc.)
+        const { data, error } = await db
+            .from('usuarios')
+            .select('id, usuario, nombre_completo, activo, rol_id')
+            .eq('activo', true);
+
+        if (error) {
+            console.error('Error obteniendo auditores:', error);
             return;
         }
 
-        try {
-            // Obtener todos los auditores activos
-            const { data, error } = await db
-                .from('usuarios')
-                .select('usuario, nombre_completo')
-                .eq('activo', true)
-                .eq('rol', 'AUDITOR')
-                .order('usuario', { ascending: true });
+        // ✅ FILTRAR POR ROL AUDITOR EN JAVASCRIPT (para evitar problemas de ID)
+        // Primero obtenemos los roles para saber cuál es AUDITOR
+        const { data: roles } = await db.from('roles').select('id, codigo, nombre');
+        const auditorRol = roles.find(r => r.codigo === 'AUDITOR' || r.nombre === 'Auditor');
+        
+        if (!auditorRol) {
+            console.error('❌ Rol AUDITOR no encontrado en la tabla roles');
+            return;
+        }
 
-            if (error) throw error;
+        console.log(`✅ Rol AUDITOR encontrado: ID ${auditorRol.id} - ${auditorRol.nombre}`);
 
-            todosLosAuditoresGlobal = data || [];
-            console.log(`✅ ${todosLosAuditoresGlobal.length} auditores activos encontrados`);
+        // Filtrar usuarios que tengan el rol AUDITOR
+        const auditores = (data || []).filter(u => u.rol_id === auditorRol.id);
+        
+        // Guardar en variable global
+        window.todosLosAuditoresGlobal = auditores;
+        console.log(`✅ ${window.todosLosAuditoresGlobal.length} auditores activos encontrados`);
 
-            // Filtrar los que NO están excluidos
-            const auditoresDisponibles = todosLosAuditoresGlobal.filter(a => !auditoresExcluidosGlobal.includes(a.usuario));
+        // Filtrar los que NO están excluidos
+        const auditoresDisponibles = window.todosLosAuditoresGlobal.filter(
+            a => !auditoresExcluidosGlobal.includes(a.usuario)
+        );
 
-            const select = document.getElementById('selectExcluirAuditor');
-            if (select) {
-                select.innerHTML = '<option value="">-- Seleccionar auditor --</option>';
+        const select = document.getElementById('selectExcluirAuditor');
+        if (select) {
+            select.innerHTML = '<option value="">-- Seleccionar auditor --</option>';
 
-                if (auditoresDisponibles.length === 0) {
-                    select.innerHTML += '<option value="" disabled>✅ No hay auditores disponibles para excluir</option>';
-                } else {
-                    auditoresDisponibles.forEach(a => {
-                        const nombreMostrar = a.nombre_completo || a.usuario;
-                        select.innerHTML += `<option value="${escapeHtml(a.usuario)}">${escapeHtml(nombreMostrar)} (${escapeHtml(a.usuario)})</option>`;
-                    });
-                }
-            }
-
-            // Actualizar la lista visual de excluidos
-            actualizarListaExcluidos();
-
-        } catch (error) {
-            console.error('❌ Error cargando auditores:', error);
-            const select = document.getElementById('selectExcluirAuditor');
-            if (select) {
-                select.innerHTML = '<option value="">❌ Error cargando auditores</option>';
+            if (auditoresDisponibles.length === 0) {
+                select.innerHTML += '<option value="" disabled>✅ No hay auditores disponibles para excluir</option>';
+            } else {
+                auditoresDisponibles.forEach(a => {
+                    const nombreMostrar = a.nombre_completo || a.usuario;
+                    select.innerHTML += `<option value="${escapeHtml(a.usuario)}">${escapeHtml(nombreMostrar)} (${escapeHtml(a.usuario)})</option>`;
+                });
             }
         }
+
+        // Actualizar la lista visual de excluidos
+        actualizarListaExcluidos();
+
+    } catch (error) {
+        console.error('❌ Error cargando auditores:', error);
+        const select = document.getElementById('selectExcluirAuditor');
+        if (select) {
+            select.innerHTML = '<option value="">❌ Error cargando auditores</option>';
+        }
     }
+}
     // ===== FIN FUNCIÓN: cargarSelectExclusionAuditores =====================
 
     // ===== 42. INICIO FUNCIÓN: actualizarListaExcluidos ===================
@@ -28821,30 +29196,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     }
     // ===== FIN FUNCIÓN: limpiarTodasLasEscuchas ============================
 
-    // =======================================================================
-    // 🔴 EXPONER FUNCIONES GLOBALMENTE - AGREGAR ESTO AL FINAL
-    // =======================================================================
-    window.cargarHistorialLotes = cargarHistorialLotes;
-    window.refrescarHistorialLotes = refrescarHistorialLotes;
-    window.exportarHistorialLotesCSV = exportarHistorialLotesCSV;
-    window.seleccionarLoteHistorial = seleccionarLoteHistorial;
-    window.activarLote = activarLote;
-    window.verDetalleLote = verDetalleLote;
-    window.cargarEvolucionCuartilesPorGestor = cargarEvolucionCuartilesPorGestor;
-    window.inicializarFiltrosEvolucionCuartiles = inicializarFiltrosEvolucionCuartiles;
-    window.cambiarAgrupacion = cambiarAgrupacion;
-    // Exportar funciones para uso global
-    window.generarSessionToken = generarSessionToken;
-    window.obtenerIpPublica = obtenerIpPublica;
-    window.obtenerInfoDispositivo = obtenerInfoDispositivo;
-    window.crearSesionActiva = crearSesionActiva;
-    window.registrarHistorialLogin = registrarHistorialLogin;
-    window.verificarValidezSesion = verificarValidezSesion;
-    window.actualizarUltimaActividad = actualizarUltimaActividad;            
-    window.limpiarSesionesExpiradas = limpiarSesionesExpiradas;
-    window.iniciarMonitorSesion = iniciarMonitorSesion;
-
-    // ===== FIN FUNCIÓN: EXPONER FUNCIONES ==================================
+    
 
 // =============================CIERRE BLOQUE 7==========================================    
 
@@ -30005,72 +30357,108 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
         const tbody = document.getElementById('tablaUsuarios');
         if (!tbody) return;
 
-        // 🔴 CORREGIDO: Usar window.usuariosGlobales
         const usuarios = window.usuariosGlobales || [];
-        
+        const roles = rolesGlobales || [];
+
+        // ✅ Calcular activos ANTES del bucle
+        const activos = usuarios.filter(u => u.activo === true || u.activo === 'true' || u.activo === 1).length;
+
         if (usuarios.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No hay usuarios registrados<\/td><\/tr>';
-            if (document.getElementById('totalUsuarios')) document.getElementById('totalUsuarios').textContent = '0';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">📭 No hay usuarios registrados</td></tr>';
+            if (document.getElementById('totalUsuarios')) {
+                document.getElementById('totalUsuarios').textContent = '0';
+            }
             return;
         }
 
         let html = '';
-        for (const usuario of usuarios) {
-            const usuarioId = usuario.id;
-            const activo = usuario.activo === true || usuario.activo === 'true' || usuario.activo === 1;
-            const estadoBadge = activo
-                ? '<span class="badge" style="background: var(--ok);">✅ Activo</span>'
-                : '<span class="badge" style="background: var(--danger);">❌ Inactivo</span>';
-
-            const rolNombre = usuario.rol_nombre || usuario.rol || 'Sin rol';
-            const rolCodigo = usuario.rol_codigo || '';
+        for (let i = 0; i < usuarios.length; i++) {
+            const u = usuarios[i];
             
+            // Obtener rol desde rolesGlobales
+            const rolInfo = roles.find(r => r.id === u.rol_id);
+            const rolNombre = rolInfo?.nombre || u.rol_nombre || u.rol || 'Sin rol';
+            const rolCodigo = rolInfo?.codigo || u.rol_codigo || u.rol || '';
+            const estaActivo = u.activo === true || u.activo === 'true' || u.activo === 1;
+
+            // Badge según el rol
             let rolBadge = '';
-            if (rolCodigo === 'ADMIN') {
+            if (rolCodigo === 'ADMIN' || rolCodigo === 'ADMINISTRADOR') {
                 rolBadge = '<span class="badge" style="background: #7b1fa2;">⚙️ ADMIN</span>';
-            } else if (rolCodigo === 'SUPERVISOR') {
+            } else if (rolCodigo === 'SUPERVISOR' || rolCodigo === 'SUP') {
                 rolBadge = '<span class="badge" style="background: #fd7e14;">👔 SUPERVISOR</span>';
+            } else if (rolCodigo === 'AUDITOR' || rolCodigo === 'AUD') {
+                rolBadge = '<span class="badge" style="background: #019DF4;">🎧 AUDITOR</span>';
+            } else if (rolCodigo === 'GERENTE' || rolCodigo === 'GER') {
+                rolBadge = '<span class="badge" style="background: #1a7f37;">📊 GERENTE</span>';
             } else {
-                rolBadge = `<span class="badge" style="background: #019DF4;">🎧 ${escapeHtml(rolNombre)}</span>`;
+                rolBadge = `<span class="badge" style="background: #6c757d;">${escapeHtml(rolNombre)}</span>`;
             }
 
-            const fechaRegistro = usuario.created_at
-                ? new Date(usuario.created_at).toLocaleDateString('es-ES')
-                : '-';
-            
+            // Badge de estado del usuario
+            let estadoBadge = '';
+            let accionesHtml = '';
+
+            if (estaActivo) {
+                estadoBadge = '<span class="badge" style="background: #28a745;">✅ Activo</span>';
+                accionesHtml = `
+                    <button onclick="editarUsuario(${u.id})" 
+                            style="background: var(--warning); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; margin-right: 5px;">
+                        ✏️
+                    </button>
+                    <button onclick="cambiarPasswordUsuario(${u.id})" 
+                            style="background: var(--accent); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; margin-right: 5px; color: white;">
+                        🔐
+                    </button>
+                    <button onclick="eliminarUsuario(${u.id})" 
+                            style="background: #fee; color: var(--danger); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer;">
+                        🗑️
+                    </button>
+                `;
+            } else {
+                estadoBadge = '<span class="badge" style="background: #6c757d;">⏸️ Inactivo</span>';
+                accionesHtml = `
+                    <button onclick="editarUsuario(${u.id})" 
+                            style="background: var(--warning); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; margin-right: 5px;">
+                        ✏️
+                    </button>
+                    <button onclick="reactivarUsuario(${u.id})" 
+                            style="background: #28a745; padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; color: white;">
+                        🔄 Reactivar
+                    </button>
+                `;
+            }
+
+            const fecha = u.created_at ? new Date(u.created_at).toLocaleDateString('es-ES') : '-';
+
             html += `
-                <tr style="border-bottom: 1px solid var(--line);">
-                    <td style="padding: 8px; text-align: center;">${usuarioId}</td>
-                    <td style="padding: 8px;"><strong>${escapeHtml(usuario.usuario)}</strong></td>
-                    <td style="padding: 8px;">${escapeHtml(usuario.nombre_completo || '-')}</td>
-                    <td style="padding: 8px;">${rolBadge}</td>
+                <tr style="border-bottom: 1px solid var(--line); ${estaActivo ? '' : 'opacity: 0.6;'}">
+                    <td style="padding: 8px; text-align: center;">${i + 1}</td>
+                    <td style="padding: 8px;"><strong>${escapeHtml(u.usuario)}</strong></td>
+                    <td style="padding: 8px;">${escapeHtml(u.nombre_completo || '-')}</td>
+                    <td style="padding: 8px; text-align: center;">${rolBadge}</td>
                     <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
-                    <td style="padding: 8px; text-align: center;">${fechaRegistro}</td>
+                    <td style="padding: 8px; text-align: center;">${fecha}</td>
                     <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                        <button onclick="editarUsuario(${usuarioId})" 
-                                style="background: var(--warning); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; margin-right: 5px;">
-                            ✏️
-                        </button>
-                        <button onclick="cambiarPasswordUsuario(${usuarioId})" 
-                                style="background: var(--accent); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; margin-right: 5px;">
-                            🔐
-                        </button>
-                        <button onclick="eliminarUsuario(${usuarioId})" 
-                                style="background: #fee; color: var(--danger); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer;">
-                            🗑️
-                        </button>
+                        ${accionesHtml}
                     </td>
-                </table>
+                </tr>
             `;
         }
 
         tbody.innerHTML = html;
         
+        // ✅ Actualizar contador con la variable 'activos' definida al inicio
         if (document.getElementById('totalUsuarios')) {
-            document.getElementById('totalUsuarios').textContent = usuarios.length;
+            document.getElementById('totalUsuarios').textContent = `${usuarios.length} (${activos} activos)`;
         }
         
-        console.log(`✅ Tabla actualizada con ${usuarios.length} usuarios`);
+        // ✅ Actualizar también los KPIs
+        if (typeof actualizarKPIsAdministracion === 'function') {
+            actualizarKPIsAdministracion();
+        }
+        
+        console.log(`✅ Tabla actualizada con ${usuarios.length} usuarios (${activos} activos)`);
     }
     // ===== FIN FUNCIÓN: actualizarTablaUsuarios ============================
 
@@ -30144,9 +30532,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     async function editarUsuario(id) {
         console.log('✏️ EDITANDO USUARIO - ID recibido:', id);
         
-        // 🔴 FORZAR LA ASIGNACIÓN GLOBAL INMEDIATA
         window.usuarioEnEdicion = id;
-        console.log('✅ window.usuarioEnEdicion asignado a:', window.usuarioEnEdicion);
         
         const token = localStorage.getItem('meca_token');
         
@@ -30168,6 +30554,8 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
             document.getElementById('usuarioNombreCompleto').value = usuario.nombre_completo || '';
             document.getElementById('usuarioPassword').value = '';
             document.getElementById('usuarioPasswordConfirm').value = '';
+            
+            // ✅ USAR rol_id CORRECTAMENTE
             document.getElementById('usuarioRol').value = usuario.rol_id || '';
             document.getElementById('usuarioActivo').value = usuario.activo ? 'true' : 'false';
             
@@ -30300,40 +30688,141 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     // ===== FIN FUNCIÓN: inicializarFormCambioPassword ======================
 
     // ===== 11. INICIO FUNCIÓN: eliminarUsuario ============================
+    // ======================================================
+    // ELIMINAR USUARIO (DESACTIVAR) - CON COMPARACIÓN CORREGIDA
+    // ======================================================
+
     async function eliminarUsuario(id) {
-        console.log(`🗑️ Eliminando usuario ID: ${id} (tipo: ${typeof id})`);
+        console.log(`🗑️ Desactivando usuario ID: ${id} (tipo: ${typeof id})`);
         
-        // 🔴 CORREGIDO: Comparar como string o convertir a número
-        const usuario = usuariosGlobales.find(u => String(u.id) === String(id));
+        // 🔴 CORREGIDO: Comparar como número
+        const usuario = window.usuariosGlobales?.find(u => Number(u.id) === Number(id));
         
         if (!usuario) {
-            console.log('IDs disponibles:', usuariosGlobales.map(u => ({ id: u.id, tipo: typeof u.id })));
-            alert('Usuario no encontrado');
+            console.error('❌ Usuario no encontrado en window.usuariosGlobales');
+            console.log('📊 IDs disponibles:', window.usuariosGlobales?.map(u => `${u.id}: ${u.usuario}`).join(', '));
+            alert('❌ Usuario no encontrado. Puede que ya haya sido eliminado.');
             return;
         }
 
-        if (!confirm(`⚠️ ¿Eliminar al usuario "${usuario.usuario}"?\n\nEsta acción no se puede deshacer.`)) return;
+        console.log('📊 Usuario encontrado:', usuario);
+
+        // Verificar si ya está inactivo
+        const estaActivo = usuario.activo === true || usuario.activo === 'true' || usuario.activo === 1;
+        if (!estaActivo) {
+            alert(`⚠️ El usuario "${usuario.usuario}" ya está inactivo`);
+            return;
+        }
+
+        // Mostrar mensaje de confirmación
+        const mensaje = 
+            `⚠️ ¿DESACTIVAR EL USUARIO "${usuario.usuario}"?\n\n` +
+            `📌 Nombre: ${usuario.nombre_completo || 'Sin nombre'}\n` +
+            `📌 Rol: ${usuario.rol_nombre || usuario.rol || 'Sin rol'}\n\n` +
+            `📌 Esta acción NO elimina los datos, solo los desactiva.\n` +
+            `   El usuario no podrá iniciar sesión.\n` +
+            `   Puede ser reactivado en cualquier momento.\n\n` +
+            `¿Desea continuar?`;
+
+        if (!confirm(mensaje)) return;
 
         try {
-            await API.eliminarUsuario(id);
-            alert(`✅ Usuario "${usuario.usuario}" eliminado correctamente`);
+            const token = localStorage.getItem('meca_token');
+            console.log(`📤 Enviando PUT a /api/usuarios/${id} con activo: false`);
             
-            // Recargar datos y actualizar tabla
+            const response = await fetch(`/api/usuarios/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    activo: false 
+                })
+            });
+
+            console.log('📥 Response status:', response.status);
+            const data = await response.json();
+            console.log('📥 Response data:', data);
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Error al desactivar usuario');
+            }
+
+            alert(`✅ Usuario "${usuario.usuario}" desactivado correctamente`);
+
+            // Recargar datos
             await cargarUsuarios();
             await cargarRoles();
-            
-            if (typeof actualizarEstadisticasUsuarios === 'function') {
-                actualizarEstadisticasUsuarios();
+            if (typeof actualizarKPIsAdministracion === 'function') {
+                actualizarKPIsAdministracion();
             }
-            
-            console.log('✅ Tabla de usuarios recargada');
-            
+
         } catch (error) {
-            console.error('Error eliminando usuario:', error);
-            alert('❌ Error al eliminar: ' + error.message);
+            console.error('❌ Error:', error);
+            alert('❌ Error al desactivar usuario: ' + error.message);
         }
     }
     // ===== FIN FUNCIÓN: eliminarUsuario ====================================
+
+    // ======================================================
+    // REACTIVAR USUARIO
+    // ======================================================
+
+    async function reactivarUsuario(id) {
+        console.log(`🔄 Reactivando usuario ID: ${id} (tipo: ${typeof id})`);
+        
+        // 🔴 CORREGIDO: Comparar como número
+        const usuario = window.usuariosGlobales?.find(u => Number(u.id) === Number(id));
+        
+        if (!usuario) {
+            console.error('❌ Usuario no encontrado en window.usuariosGlobales');
+            alert('❌ Usuario no encontrado');
+            return;
+        }
+
+        const estaActivo = usuario.activo === true || usuario.activo === 'true' || usuario.activo === 1;
+        
+        if (estaActivo) {
+            alert(`⚠️ El usuario "${usuario.usuario}" ya está activo`);
+            return;
+        }
+
+        if (!confirm(`✅ ¿Reactivar el usuario "${usuario.usuario}" (${usuario.nombre_completo || 'Sin nombre'})?`)) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('meca_token');
+            const response = await fetch(`/api/usuarios/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    activo: true 
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Error al reactivar usuario');
+            }
+
+            alert(`✅ Usuario "${usuario.usuario}" reactivado correctamente`);
+
+            await cargarUsuarios();
+            await cargarRoles();
+            if (typeof actualizarKPIsAdministracion === 'function') {
+                actualizarKPIsAdministracion();
+            }
+
+        } catch (error) {
+            console.error('❌ Error:', error);
+            alert('❌ Error al reactivar usuario: ' + error.message);
+        }
+    }
 
     // ===== 12. INICIO FUNCIÓN: exportarUsuariosCSV ========================
     async function exportarUsuariosCSV() {
@@ -30397,79 +30886,595 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     // ===== FIN FUNCIÓN: actualizarSelectRoles ==============================
 
     // ===== 14. INICIO FUNCIÓN: actualizarTablaRoles =======================
-    async function actualizarTablaRoles() {
+
+    function actualizarTablaRoles() {
         const tbody = document.getElementById('tablaRoles');
         if (!tbody) return;
-        
-        if (!rolesGlobales || rolesGlobales.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">No hay roles registrados<\/td><\/tr>';
+
+        const roles = rolesGlobales || [];
+        const usuarios = window.usuariosGlobales || [];
+        const pestanas = window.pestanasDisponiblesGlobal || [];
+        const permisos = window.permisosPestanasGlobal || [];
+
+        if (roles.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">📭 No hay roles registrados</td></tr>';
+            // ✅ También renderizar lista de pestañas (vacía)
+            if (typeof renderizarListaPestanas === 'function') {
+                renderizarListaPestanas();
+            }
             return;
         }
-        
-        // 🔴 USAR LAS VARIABLES GLOBALES que ya cargamos
-        const pestanasMap = {};
-        (window.pestanasDisponiblesGlobal || []).forEach(p => {
-            pestanasMap[p.codigo] = { icono: p.icono, nombre: p.nombre };
-        });
-        
+
+        // Crear mapa de permisos
         const permisosMap = {};
-        (window.permisosPestanasGlobal || []).forEach(p => {
-            if (!permisosMap[p.rol_id]) permisosMap[p.rol_id] = new Set();
-            permisosMap[p.rol_id].add(p.pestana_codigo);
+        permisos.forEach(p => {
+            if (!permisosMap[p.rol_id]) permisosMap[p.rol_id] = [];
+            permisosMap[p.rol_id].push(p.pestana_codigo);
         });
-        
+
+        const pestanasMap = {};
+        pestanas.forEach(p => {
+            pestanasMap[p.codigo] = p.icono || '📄';
+        });
+
         let html = '';
-        
-        for (const rol of rolesGlobales) {
-            const cantidadUsuarios = (usuariosGlobales?.filter(u => u.rol_id === rol.id).length || 0);
-            const estadoBadge = (rol.activo === true || rol.activo === 'true')
-                ? '<span class="badge" style="background: var(--ok);">✅ Activo</span>'
-                : '<span class="badge" style="background: var(--danger);">❌ Inactivo</span>';
-            
-            // Obtener pestañas permitidas para este rol
-            const pestanasPermitidasSet = permisosMap[rol.id] || new Set();
-            const pestanasDelRol = (window.pestanasDisponiblesGlobal || []).filter(p => pestanasPermitidasSet.has(p.codigo));
-            
+        for (let i = 0; i < roles.length; i++) {
+            const r = roles[i];
+            const cantUsuarios = usuarios.filter(u => u.rol_id === r.id).length;
+            const pestañasDelRol = permisosMap[r.id] || [];
+            const estaActivo = r.activo !== false;
+
             let pestanasHtml = '';
-            if (pestanasDelRol.length > 0) {
-                pestanasHtml = pestanasDelRol.map(p => 
-                    `<span style="font-size: 16px; cursor: help; margin: 0 2px;" title="${escapeHtml(p.nombre)} (${p.codigo})">${p.icono}</span>`
-                ).join(' ');
+            if (pestañasDelRol.length === 0) {
+                pestanasHtml = '<span style="color: #6c757d;">—</span>';
             } else {
-                pestanasHtml = '<span style="color: var(--muted); font-size: 12px;">—</span>';
+                pestanasHtml = pestañasDelRol.map(p => {
+                    const icono = pestanasMap[p] || '📄';
+                    return `<span style="font-size: 16px; margin: 0 2px;" title="${p}">${icono}</span>`;
+                }).join(' ');
             }
-            
+
+            // Badge de estado
+            let estadoBadge = '';
+            let accionesHtml = '';
+
+            if (estaActivo) {
+                estadoBadge = '<span class="badge" style="background: #28a745;">✅ Activo</span>';
+                accionesHtml = `
+                    <button onclick="editarRol(${r.id})" 
+                            style="background: #f39c12; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px;" 
+                            title="Editar rol">
+                        ✏️
+                    </button>
+                    <button onclick="administrarPestanasRol(${r.id}, '${escapeHtml(r.nombre)}')" 
+                            style="background: #019DF4; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; margin-right: 4px;" 
+                            title="Administrar pestañas">
+                        📋
+                    </button>
+                    <button onclick="eliminarRol(${r.id})" 
+                            style="background: #d93025; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white;" 
+                            title="Desactivar rol">
+                        🗑️
+                    </button>
+                `;
+            } else {
+                estadoBadge = '<span class="badge" style="background: #6c757d;">⏸️ Inactivo</span>';
+                accionesHtml = `
+                    <button onclick="editarRol(${r.id})" 
+                            style="background: #f39c12; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px;" 
+                            title="Editar rol">
+                        ✏️
+                    </button>
+                    <button onclick="reactivarRol(${r.id})" 
+                            style="background: #28a745; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white;" 
+                            title="Reactivar rol">
+                        🔄 Reactivar
+                    </button>
+                `;
+            }
+
             html += `
-                <tr style="border-bottom: 1px solid var(--line);">
-                    <td style="padding: 8px; text-align: center;">${rol.id}</td>
-                    <td style="padding: 8px;"><strong>${escapeHtml(rol.codigo)}</strong></td>
-                    <td style="padding: 8px;">${escapeHtml(rol.nombre)}</td>
-                    <td style="padding: 8px; text-align: center; white-space: nowrap;">${pestanasHtml}</td>
-                    <td style="padding: 8px; text-align: center;">
-                        <span class="badge" style="background: ${cantidadUsuarios > 0 ? '#019DF4' : '#6c757d'};">${cantidadUsuarios}</span>
+                <tr style="border-bottom: 1px solid #e0e0e0; ${estaActivo ? '' : 'opacity: 0.6;'}">
+                    <td style="padding: 10px; text-align: center;">${r.id}</td>
+                    <td style="padding: 10px;"><strong>${escapeHtml(r.codigo)}</strong></td>
+                    <td style="padding: 10px;">${escapeHtml(r.nombre)}</td>
+                    <td style="padding: 10px; text-align: center; font-size: 14px;">${pestanasHtml}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        <span class="badge" style="background: ${cantUsuarios > 0 ? '#019DF4' : '#6c757d'};">
+                            ${cantUsuarios}
+                        </span>
                     </td>
-                    <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
-                    <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                        <button onclick="administrarPestanasRol(${rol.id}, '${escapeHtml(rol.nombre)}')" 
-                                style="background: var(--accent); padding: 5px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; margin-right: 5px;"
-                                title="Administrar pestañas de este rol">
-                            📋 Pestañas
-                        </button>
-                        <button onclick="eliminarRol(${rol.id})" 
-                                style="background: var(--danger); padding: 5px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer;"
-                                title="Eliminar rol">
-                            🗑️
-                        </button>
+                    <td style="padding: 10px; text-align: center;">${estadoBadge}</td>
+                    <td style="padding: 10px; text-align: center; white-space: nowrap;">
+                        ${accionesHtml}
                     </td>
                 </tr>
             `;
         }
-        
+
         tbody.innerHTML = html;
-        console.log('✅ Tabla de roles actualizada con íconos de pestañas');
+
+        // ======================================================
+        // ✅ RENDERIZAR LISTA DE PESTAÑAS (SIEMPRE)
+        // ======================================================
+        if (typeof renderizarListaPestanas === 'function') {
+            renderizarListaPestanas();
+        }
+
+        // ======================================================
+        // ✅ ACTUALIZAR KPIs
+        // ======================================================
+        if (typeof actualizarKPIsAdministracion === 'function') {
+            actualizarKPIsAdministracion();
+        }
+
+        console.log(`✅ Tabla de roles actualizada: ${roles.length} roles`);
     }
+
+
     // ===== FIN FUNCIÓN: actualizarTablaRoles ===============================
 
+    // ======================================================
+    // MODAL - NUEVO USUARIO
+    // ======================================================
+
+    /**
+     * mostrarModalNuevoUsuario - Abre el modal para crear un nuevo usuario
+     */
+    function mostrarModalNuevoUsuario() {
+        console.log('📝 Abriendo modal de nuevo usuario...');
+        
+        // 1. Limpiar el formulario del modal
+        document.getElementById('modalUsuarioId').value = '';
+        document.getElementById('modalUsuarioUsername').value = '';
+        document.getElementById('modalUsuarioNombre').value = '';
+        document.getElementById('modalUsuarioPassword').value = '';
+        document.getElementById('modalUsuarioPasswordConfirm').value = '';
+        document.getElementById('modalUsuarioActivo').value = 'true';
+        
+        // 2. Cargar roles en el select
+        cargarRolesEnModal();
+        
+        // 3. Cambiar título
+        document.getElementById('modalUsuarioTitulo').textContent = '➕ Nuevo Usuario';
+        
+        // 4. Mostrar modal
+        document.getElementById('modalNuevoUsuario').style.display = 'flex';
+        
+        // 5. Enfocar el primer campo
+        setTimeout(() => {
+            document.getElementById('modalUsuarioUsername').focus();
+        }, 200);
+    }
+
+    /**
+     * cerrarModalNuevoUsuario - Cierra el modal de nuevo usuario
+     */
+    function cerrarModalNuevoUsuario() {
+        document.getElementById('modalNuevoUsuario').style.display = 'none';
+    }
+
+    /**
+     * cargarRolesEnModal - Carga los roles en el select del modal
+     */
+    function cargarRolesEnModal() {
+        const select = document.getElementById('modalUsuarioRol');
+        if (!select) return;
+        
+        const roles = rolesGlobales || [];
+        
+        // 🔴 IMPORTANTE: NO seleccionar ningún rol por defecto
+        // Guardar el valor actual si existe
+        const valorActual = select.value;
+        
+        select.innerHTML = '<option value="">-- Seleccionar rol --</option>';
+        
+        // Primero los roles activos, luego los inactivos
+        const rolesActivos = roles.filter(r => r.activo !== false);
+        const rolesInactivos = roles.filter(r => r.activo === false);
+        
+        for (const r of [...rolesActivos, ...rolesInactivos]) {
+            const selected = (valorActual && r.id == valorActual) ? 'selected' : '';
+            const estado = r.activo !== false ? '' : ' (Inactivo)';
+            select.innerHTML += `<option value="${r.id}" ${selected}>${escapeHtml(r.nombre)}${estado}</option>`;
+        }
+        
+        // 🔴 Si el valor actual no está en la lista, resetear a la opción vacía
+        if (valorActual && !roles.some(r => r.id == valorActual)) {
+            select.value = '';
+        }
+        
+        console.log(`✅ ${roles.length} roles cargados en el modal`);
+    }
+
+    /**
+     * guardarUsuarioModal - Guarda el usuario desde el modal
+     */
+    async function guardarUsuarioModal() {
+        console.log('📝 Guardando usuario desde modal...');
+        
+        const username = document.getElementById('modalUsuarioUsername').value.trim().toLowerCase();
+        const nombreCompleto = document.getElementById('modalUsuarioNombre').value.trim().toUpperCase();
+        const password = document.getElementById('modalUsuarioPassword').value;
+        const passwordConfirm = document.getElementById('modalUsuarioPasswordConfirm').value;
+        const rolId = document.getElementById('modalUsuarioRol').value;
+        const activo = document.getElementById('modalUsuarioActivo').value === 'true';
+        
+        // 1. Validaciones
+        if (!username || !nombreCompleto || !password || !rolId) {
+            alert('⚠️ Complete todos los campos obligatorios');
+            return;
+        }
+        
+        if (password !== passwordConfirm) {
+            alert('⚠️ Las contraseñas no coinciden');
+            return;
+        }
+        
+        if (password.length < 6) {
+            alert('⚠️ La contraseña debe tener al menos 6 caracteres');
+            return;
+        }
+        
+        // 2. Enviar al servidor
+        try {
+            const token = localStorage.getItem('meca_token');
+            const response = await fetch('/api/usuarios', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    usuario: username,
+                    nombre_completo: nombreCompleto,
+                    contrasena: password,
+                    rol_id: parseInt(rolId),
+                    activo: activo
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Error al crear usuario');
+            }
+            
+            alert(`✅ Usuario "${username}" creado correctamente`);
+            
+            // 3. Cerrar modal y recargar datos
+            cerrarModalNuevoUsuario();
+            await cargarUsuarios();
+            await cargarRoles();
+            
+            if (typeof actualizarKPIsAdministracion === 'function') {
+                actualizarKPIsAdministracion();
+            }
+            
+        } catch (error) {
+            console.error('❌ Error:', error);
+            alert('❌ Error al crear usuario: ' + error.message);
+        }
+    }
+
+    // ======================================================
+    // EDITAR ROL - ABRIR MODAL CON DATOS DEL ROL
+    // ======================================================
+
+    async function editarRol(id) {
+        console.log(`✏️ Editando rol ID: ${id}`);
+        
+        try {
+            // Obtener roles usando la función existente
+            const roles = await API.getRoles();
+            const rol = roles.find(r => r.id === id);
+            
+            if (!rol) {
+                alert('❌ Rol no encontrado');
+                return;
+            }
+            
+            // Guardar ID en edición
+            window.rolEnEdicion = id;
+            
+            // Configurar el modal
+            document.getElementById('modalRolTitulo').textContent = `✏️ Editar Rol: ${rol.nombre}`;
+            document.getElementById('rolId').value = rol.id;
+            document.getElementById('rolCodigo').value = rol.codigo;
+            document.getElementById('rolNombre').value = rol.nombre;
+            document.getElementById('rolActivo').value = rol.activo ? 'true' : 'false';
+            
+            // Cargar pestañas asignadas al rol
+            await cargarPestanasEnModalEdicion(id);
+            
+            // Mostrar modal
+            document.getElementById('modalEditarRol').style.display = 'flex';
+            
+            // Cambiar texto del botón guardar
+            const btnGuardar = document.querySelector('#modalEditarRol .btn-guardar');
+            if (btnGuardar) {
+                btnGuardar.textContent = '💾 Actualizar Rol';
+                btnGuardar.style.background = '#f39c12';
+            }
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al cargar el rol: ' + error.message);
+        }
+    }
+
+
+    // supervisor.js - Función CORREGIDA
+    async function cargarPestanasEnModalEdicion(rolId) {
+        console.log(`🔍 cargarPestanasEnModalEdicion - rolId: ${rolId}`);
+        const container = document.getElementById('pestanasCheckboxes');
+        if (!container) return;
+        
+        try {
+            // 1. Obtener TODAS las pestañas disponibles
+            if (!window.pestanasDisponiblesGlobal || window.pestanasDisponiblesGlobal.length === 0) {
+                await cargarPestanasDisponiblesGlobal();
+            }
+            
+            const pestanas = window.pestanasDisponiblesGlobal || [];
+            console.log('📋 Todas las pestañas:', pestanas.map(p => p.codigo));
+            
+            if (pestanas.length === 0) {
+                container.innerHTML = '<div style="color: var(--muted); padding: 10px;">📭 No hay pestañas disponibles</div>';
+                return;
+            }
+            
+            // 2. 🔴 OBTENER LAS PESTAÑAS ASIGNADAS AL ROL
+            const token = localStorage.getItem('meca_token');
+            const response = await fetch(`/api/rol-pestanas/${rolId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            let pestañasAsignadas = [];
+            if (response.ok) {
+                const data = await response.json();
+                pestañasAsignadas = data.map(p => p.pestana_codigo);
+                console.log(`✅ Pestañas asignadas al rol ${rolId}:`, pestañasAsignadas);
+            } else {
+                console.warn(`⚠️ No se pudo obtener pestañas del rol ${rolId}, usando fallback`);
+                // Fallback: usar window.permisosPestanasGlobal
+                const permisos = window.permisosPestanasGlobal || [];
+                pestañasAsignadas = permisos
+                    .filter(p => p.rol_id === parseInt(rolId))
+                    .map(p => p.pestana_codigo);
+                console.log('📋 Fallback - pestañas asignadas:', pestañasAsignadas);
+            }
+            
+            // 3. Generar checkboxes con las asignadas marcadas
+            let html = `
+                <div style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">
+                    Selecciona las pestañas que este rol podrá ver:
+                    <span style="margin-left: 10px; background: #e3f2fd; padding: 2px 10px; border-radius: 12px;">
+                        ${pestañasAsignadas.length} de ${pestanas.length} asignadas
+                    </span>
+                </div>
+            `;
+            
+            for (const p of pestanas) {
+                const checked = pestañasAsignadas.includes(p.codigo) ? 'checked' : '';
+                html += `
+                    <label style="display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-bottom: 1px solid #f0f0f0;">
+                        <input type="checkbox" value="${p.codigo}" ${checked} 
+                            style="width: 16px; height: 16px; cursor: pointer;">
+                        <span style="font-size: 16px;">${p.icono || '📄'}</span>
+                        <span style="font-size: 13px;">${escapeHtml(p.nombre)}</span>
+                        <span style="font-size: 10px; color: var(--muted); margin-left: auto;">${p.codigo}</span>
+                        ${checked ? '<span style="color: var(--ok); font-size: 12px;">✅</span>' : ''}
+                    </label>
+                `;
+            }
+            
+            html += `
+                <div style="font-size: 11px; color: var(--muted); margin-top: 8px; padding-top: 8px; border-top: 1px solid #e0e0e0;">
+                    📊 ${pestañasAsignadas.length} de ${pestanas.length} pestañas asignadas
+                </div>
+            `;
+            
+            container.innerHTML = html;
+            
+            // 🔴 DIAGNÓSTICO: Verificar en consola
+            console.log('📊 Checkboxes generados:');
+            document.querySelectorAll('#pestanasCheckboxes input[type="checkbox"]').forEach(cb => {
+                console.log(`   ${cb.value}: ${cb.checked ? '✅' : '⬜'}`);
+            });
+            
+        } catch (error) {
+            console.error('Error cargando pestañas:', error);
+            container.innerHTML = '<div style="color: var(--danger);">❌ Error al cargar pestañas</div>';
+        }
+    }
+
+    // ======================================================
+    // CARGAR CHECKBOXES DE PESTAÑAS (USANDO VARIABLES GLOBALES)
+    // ======================================================
+
+    function cargarPestanasCheckboxesConPermisos(rolId) {
+        const container = document.getElementById('pestanasCheckboxes');
+        if (!container) return;
+        
+        // Usar variables globales ya cargadas
+        const pestanas = window.pestanasDisponiblesGlobal || [];
+        
+        if (pestanas.length === 0) {
+            container.innerHTML = '<div style="color: var(--muted); padding: 10px;">⏳ Cargando pestañas...</div>';
+            // Intentar cargar si están vacías
+            cargarPestanasDisponiblesGlobal().then(() => {
+                cargarPestanasCheckboxesConPermisos(rolId);
+            });
+            return;
+        }
+        
+        // Obtener pestañas asignadas al rol desde los permisos globales
+        const permisos = window.permisosPestanasGlobal || [];
+        const pestañasAsignadas = permisos
+            .filter(p => p.rol_id === rolId)
+            .map(p => p.pestana_codigo);
+        
+        // Generar checkboxes
+        let html = '';
+        for (const p of pestanas) {
+            const checked = pestañasAsignadas.includes(p.codigo) ? 'checked' : '';
+            html += `
+                <label style="display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-bottom: 1px solid #f0f0f0;">
+                    <input type="checkbox" value="${p.codigo}" ${checked} 
+                        style="width: 16px; height: 16px; cursor: pointer;">
+                    <span style="font-size: 16px;">${p.icono || '📄'}</span>
+                    <span style="font-size: 13px;">${escapeHtml(p.nombre)}</span>
+                    <span style="font-size: 10px; color: var(--muted); margin-left: auto;">${p.codigo}</span>
+                </label>
+            `;
+        }
+        
+        container.innerHTML = html || '<div style="color: var(--muted);">No hay pestañas disponibles</div>';
+        
+        // Agregar contador
+        const total = pestanas.length;
+        const asignadas = pestañasAsignadas.length;
+        const info = document.createElement('div');
+        info.style.cssText = 'font-size: 11px; color: var(--muted); margin-top: 8px; padding-top: 8px; border-top: 1px solid #e0e0e0;';
+        info.textContent = `📊 ${asignadas} de ${total} pestañas asignadas`;
+        container.appendChild(info);
+    }
+    
+    // ======================================================
+    // CARGAR PESTAÑAS ASIGNADAS AL ROL
+    // ======================================================
+
+    async function cargarPestanasAsignadasAlRol(rolId) {
+        const container = document.getElementById('pestanasCheckboxes');
+        if (!container) return;
+        
+        try {
+            // Obtener todas las pestañas disponibles
+            const pestanas = await API.getPestanasSistema();
+            
+            // Obtener pestañas asignadas al rol
+            const permisos = await API.getPermisosPestanas(rolId);
+            const pestañasAsignadas = permisos.map(p => p.pestana_codigo);
+            
+            // Generar checkboxes
+            let html = '';
+            for (const p of pestanas) {
+                const checked = pestañasAsignadas.includes(p.codigo) ? 'checked' : '';
+                html += `
+                    <label style="display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer;">
+                        <input type="checkbox" value="${p.codigo}" ${checked} 
+                            style="width: 16px; height: 16px; cursor: pointer;">
+                        <span style="font-size: 16px;">${p.icono}</span>
+                        <span>${escapeHtml(p.nombre)}</span>
+                        <span style="font-size: 11px; color: var(--muted);">(${p.codigo})</span>
+                    </label>
+                `;
+            }
+            
+            container.innerHTML = html || '<div style="color: var(--muted);">No hay pestañas disponibles</div>';
+            
+        } catch (error) {
+            console.error('Error cargando pestañas:', error);
+            container.innerHTML = '<div style="color: var(--danger);">Error al cargar pestañas</div>';
+        }
+    }
+    
+    // ======================================================
+    // GUARDAR ROL (CREAR O ACTUALIZAR)
+    // ======================================================
+
+    async function guardarRol() {
+        const id = document.getElementById('rolId')?.value;
+        const codigo = document.getElementById('rolCodigo')?.value.trim().toUpperCase();
+        const nombre = document.getElementById('rolNombre')?.value.trim();
+        const activo = document.getElementById('rolActivo')?.value === 'true';
+        
+        if (!codigo || !nombre) {
+            alert('⚠️ Complete los campos obligatorios: Código y Nombre');
+            return;
+        }
+        
+        // Obtener pestañas seleccionadas
+        const pestanasSeleccionadas = [];
+        document.querySelectorAll('#pestanasCheckboxes input[type="checkbox"]:checked').forEach(cb => {
+            pestanasSeleccionadas.push(cb.value);
+        });
+        
+        try {
+            if (id) {
+                // ✅ ACTUALIZAR ROL EXISTENTE (PUT)
+                console.log(`📝 Actualizando rol ID: ${id}`);
+                
+                const response = await fetch(`/api/roles/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('meca_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        codigo,
+                        nombre,
+                        activo,
+                        pestanas: pestanasSeleccionadas
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Error al actualizar');
+                }
+                
+                const result = await response.json();
+                alert(`✅ Rol "${nombre}" actualizado correctamente`);
+                
+            } else {
+                // ✅ CREAR NUEVO ROL (POST)
+                console.log('📝 Creando nuevo rol');
+                
+                const response = await fetch('/api/roles', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('meca_token')}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        codigo,
+                        nombre,
+                        activo,
+                        pestanas: pestanasSeleccionadas
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Error al crear');
+                }
+                
+                alert(`✅ Rol "${nombre}" creado correctamente`);
+            }
+            
+            // Limpiar y cerrar modal
+            document.getElementById('formRol')?.reset();
+            document.getElementById('rolId').value = '';
+            window.rolEnEdicion = null;
+            cerrarModalRol();
+            
+            // Recargar datos
+            await cargarRoles();
+            await cargarUsuarios();
+            await cargarPestanasDisponiblesGlobal();
+            await cargarPermisosPestanasGlobal();
+            
+            if (typeof actualizarKPIsAdministracion === 'function') {
+                actualizarKPIsAdministracion();
+            }
+            
+        } catch (error) {
+            console.error('❌ Error:', error);
+            alert('❌ Error al guardar: ' + error.message);
+        }
+    }
+    
     // ===== 15. INICIO FUNCIÓN: actualizarEstadisticasRoles ================
     function actualizarEstadisticasRoles() {
         const rolesActivos = rolesGlobales.filter(r => r.activo === true || r.activo === 'true').length;
@@ -30602,48 +31607,139 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
 
     // ===== 20. INICIO FUNCIÓN: eliminarRol ================================
     async function eliminarRol(id) {
-        console.log(`🗑️ Eliminando rol ID: ${id}`);
+    console.log(`🗑️ Eliminando (lógicamente) rol ID: ${id}`);
+    
+    try {
+        // 1. Obtener información del rol
+        const roles = await API.getRoles();
+        const rol = roles.find(r => r.id === id);
         
-        const rol = rolesGlobales.find(r => r.id === id);
         if (!rol) {
-            alert('Rol no encontrado');
+            alert('❌ Rol no encontrado');
             return;
         }
-
-        const usuariosConRol = usuariosGlobales?.filter(u => u.rol_id === id).length || 0;
-
-        let mensaje = `⚠️ ¿Eliminar el rol "${rol.nombre}"?\n\n`;
-        if (usuariosConRol > 0) {
-            mensaje += `⚠️ ATENCIÓN: Hay ${usuariosConRol} usuario(s) con este rol.\n`;
-            mensaje += `Los usuarios quedarán sin rol asignado.\n\n`;
-        }
-        mensaje += `Esta acción no se puede deshacer.\n\n¿Desea continuar?`;
         
-        if (!confirm(mensaje)) return;
+        // 2. Si ya está inactivo
+        if (rol.activo === false) {
+            alert(`⚠️ El rol "${rol.nombre}" ya está inactivo`);
+            return;
+        }
+        
+        // ✅ CORREGIDO: Contar usuarios directamente desde window.usuariosGlobales
+        const usuarios = window.usuariosGlobales || [];
+        const usuariosConRol = usuarios.filter(u => u.rol_id === id);
+        const cantidadUsuarios = usuariosConRol.length;
+        
+        // 3. Mostrar mensaje de confirmación
+        let mensaje = `⚠️ ¿DESACTIVAR EL ROL "${rol.nombre}"?\n\n`;
+        mensaje += `📌 Código: ${rol.codigo}\n`;
+        
+        if (cantidadUsuarios > 0) {
+            // Mostrar los nombres de los usuarios afectados
+            const nombresUsuarios = usuariosConRol.map(u => `• ${u.usuario} (${u.nombre_completo || 'Sin nombre'})`).join('\n');
+            mensaje += `👥 Usuarios asignados: ${cantidadUsuarios}\n\n`;
+            mensaje += `Usuarios afectados:\n${nombresUsuarios}\n\n`;
+            mensaje += `⚠️ Estos usuarios conservarán el rol, pero no podrán asignarse nuevos usuarios con este rol.\n\n`;
+        } else {
+            mensaje += `\n✅ No tiene usuarios asignados.\n\n`;
+        }
+        
+        mensaje += `📌 Esta acción NO elimina los datos, solo los desactiva.\n`;
+        mensaje += `   El rol puede ser reactivado en cualquier momento.\n\n`;
+        mensaje += `¿Desea continuar?`;
+        
+        if (!confirm(mensaje)) {
+            return;
+        }
+        
+        // 4. Desactivar el rol
+        const token = localStorage.getItem('meca_token');
+        const deleteResponse = await fetch(`/api/roles/${id}/desactivar`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ activo: false })
+        });
+        
+        if (!deleteResponse.ok) {
+            const error = await deleteResponse.json();
+            throw new Error(error.error || 'Error al desactivar rol');
+        }
+        
+        alert(`✅ Rol "${rol.nombre}" desactivado correctamente`);
+        
+        // 5. Recargar datos
+        await cargarRoles();
+        await cargarUsuarios();
+        
+        if (typeof actualizarKPIsAdministracion === 'function') {
+            actualizarKPIsAdministracion();
+        }
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al desactivar rol: ' + error.message);
+    }
+}
 
+    // ===== FIN FUNCIÓN: eliminarRol ========================================
+
+    // ======================================================
+    // REACTIVAR ROL
+    // ======================================================
+
+    async function reactivarRol(id) {
+        console.log(`🔄 Reactivando rol ID: ${id}`);
+        
         try {
-            await API.eliminarRol(id);
+            const roles = await API.getRoles();
+            const rol = roles.find(r => r.id === id);
             
-            alert(`✅ Rol "${rol.nombre}" eliminado correctamente`);
+            if (!rol) {
+                alert('❌ Rol no encontrado');
+                return;
+            }
             
-            // Recargar datos
+            if (rol.activo !== false) {
+                alert(`⚠️ El rol "${rol.nombre}" ya está activo`);
+                return;
+            }
+            
+            if (!confirm(`✅ ¿Reactivar el rol "${rol.nombre}" (${rol.codigo})?`)) {
+                return;
+            }
+            
+            const token = localStorage.getItem('meca_token');
+            const response = await fetch(`/api/roles/${id}/reactivar`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ activo: true })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Error al reactivar rol');
+            }
+            
+            alert(`✅ Rol "${rol.nombre}" reactivado correctamente`);
+            
             await cargarRoles();
             await cargarUsuarios();
             
-            // Regenerar pestañas si el rol eliminado era el del usuario actual
-            if (usuarioActual && usuarioActual.rol_id === id) {
-                console.log('🔄 Rol actual eliminado, cerrando sesión...');
-                localStorage.removeItem('meca_token');
-                localStorage.removeItem('meca_usuario');
-                window.location.href = '/login';
+            if (typeof actualizarKPIsAdministracion === 'function') {
+                actualizarKPIsAdministracion();
             }
             
         } catch (error) {
-            console.error('Error eliminando rol:', error);
-            alert('❌ Error al eliminar: ' + error.message);
+            console.error('❌ Error:', error);
+            alert('❌ Error al reactivar rol: ' + error.message);
         }
     }
-    // ===== FIN FUNCIÓN: eliminarRol ========================================
 
     // ======================================================
     // ADMINISTRACIÓN DE PESTAÑAS POR ROL (MODAL)
@@ -30909,11 +32005,25 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     }
 
     
-    
-    // ===== 21. INICIO FUNCIÓN: cerrarModalRol =============================
+    // ======================================================
+    // CERRAR MODAL DE ROL
+    // ======================================================
+
     function cerrarModalRol() {
-        document.getElementById('modalEditarRol').style.display = 'none';
+        const modal = document.getElementById('modalEditarRol');
+        if (modal) modal.style.display = 'none';
+        
+        // Limpiar formulario
         document.getElementById('formRol').reset();
+        document.getElementById('rolId').value = '';
+        window.rolEnEdicion = null;
+        
+        // Restaurar botón guardar
+        const btnGuardar = document.querySelector('#modalEditarRol .btn-guardar');
+        if (btnGuardar) {
+            btnGuardar.textContent = '💾 Guardar Rol';
+            btnGuardar.style.background = '';
+        }
     }
    
     
@@ -31089,8 +32199,9 @@ async function guardarEdicionPestana(pestanaId) {
 /**
  * Elimina una pestaña del sistema
  */
+// supervisor.js - Función modificada para eliminación lógica
 async function eliminarPestana(pestanaId, pestanaCodigo) {
-    console.log(`🗑️ Eliminando pestaña: ${pestanaCodigo} (ID: ${pestanaId})`);
+    console.log(`👁️ Cambiando visibilidad de pestaña: ${pestanaCodigo} (ID: ${pestanaId})`);
     
     const db = getDB();
     if (!db) {
@@ -31099,10 +32210,10 @@ async function eliminarPestana(pestanaId, pestanaCodigo) {
     }
     
     try {
-        // Obtener el nombre de la pestaña para mostrar
+        // 1. Obtener el estado actual de la pestaña
         const { data: pestana, error: getError } = await db
             .from('pestanas_sistema')
-            .select('nombre')
+            .select('nombre, visible')
             .eq('id', pestanaId)
             .single();
         
@@ -31113,68 +32224,40 @@ async function eliminarPestana(pestanaId, pestanaCodigo) {
         }
         
         const nombrePestana = pestana.nombre;
+        const estadoActual = pestana.visible;
+        const nuevoEstado = !estadoActual;
         
-        // Contar cuántos roles tienen esta pestaña asignada
-        const { count, error: countError } = await db
-            .from('rol_pestanas')
-            .select('*', { count: 'exact', head: true })
-            .eq('pestana_codigo', pestanaCodigo);
+        // 2. Confirmar acción con información clara
+        const mensaje = estadoActual
+            ? `⚠️ ¿OCULTAR PESTAÑA "${nombrePestana}"?\n\nLa pestaña dejará de ser visible para los usuarios.\n\n¿Desea continuar?`
+            : `✅ ¿MOSTRAR PESTAÑA "${nombrePestana}"?\n\nLa pestaña volverá a ser visible para los usuarios.\n\n¿Desea continuar?`;
         
-        if (countError) throw countError;
+        if (!confirm(mensaje)) return;
         
-        let mensajeConfirmacion = `⚠️ ¿ELIMINAR PESTAÑA "${nombrePestana}"?\n\n`;
-        
-        if (count > 0) {
-            mensajeConfirmacion += `⚠️ ATENCIÓN: Esta pestaña está asignada a ${count} rol(es).\n`;
-            mensajeConfirmacion += `Al eliminarla, estos roles perderán acceso a la pestaña.\n\n`;
-        }
-        
-        mensajeConfirmacion += `Esta acción NO se puede deshacer.\n\n¿Desea continuar?`;
-        
-        if (!confirm(mensajeConfirmacion)) return;
-        
-        // Si hay roles asignados, pedir confirmación adicional
-        if (count > 0) {
-            const codigo = prompt(`Para confirmar la eliminación de la pestaña "${nombrePestana}", escribe "ELIMINAR" en mayúsculas:`);
-            if (codigo !== 'ELIMINAR') {
-                alert('❌ Operación cancelada.');
-                return;
-            }
-        }
-        
-        // 1. Eliminar las asignaciones de la pestaña en rol_pestanas
-        const { error: deleteAssignError } = await db
-            .from('rol_pestanas')
-            .delete()
-            .eq('pestana_codigo', pestanaCodigo);
-        
-        if (deleteAssignError) throw deleteAssignError;
-        
-        // 2. Eliminar la pestaña de pestanas_sistema
-        const { error: deletePestanaError } = await db
+        // 3. Actualizar el estado de visibilidad (eliminación lógica)
+        const { error: updateError } = await db
             .from('pestanas_sistema')
-            .delete()
+            .update({ 
+                visible: nuevoEstado,
+                updated_at: new Date().toISOString()
+            })
             .eq('id', pestanaId);
         
-        if (deletePestanaError) throw deletePestanaError;
+        if (updateError) throw updateError;
         
-        alert(`✅ Pestaña "${nombrePestana}" eliminada correctamente\n\nSe eliminaron ${count} asignaciones de roles.`);
+        // 4. Mostrar mensaje de éxito
+        const mensajeExito = estadoActual
+            ? `✅ Pestaña "${nombrePestana}" ocultada correctamente`
+            : `✅ Pestaña "${nombrePestana}" mostrada correctamente`;
         
-        // Recargar roles para actualizar la interfaz
-        await cargarRoles();
+        alert(mensajeExito);
         
-        // Regenerar pestañas
-        if (typeof generarTabsDinamicos === 'function') {
-            await generarTabsDinamicos();
-            const tabActual = document.querySelector('.tab-button.active')?.getAttribute('data-tab');
-            if (tabActual && typeof showTab === 'function') {
-                showTab(tabActual, null);
-            }
-        }
+        // 5. Recargar datos
+        await recargarPestanasSistema();
         
     } catch (error) {
-        console.error('Error eliminando pestaña:', error);
-        alert('❌ Error al eliminar: ' + error.message);
+        console.error('Error:', error);
+        alert('❌ Error al cambiar visibilidad: ' + error.message);
     }
 }
 
@@ -31182,121 +32265,392 @@ async function eliminarPestana(pestanaId, pestanaCodigo) {
  * Renderiza la lista de pestañas con botones de editar/eliminar
  * (Se llama desde actualizarTablaRoles)
  */
+
 async function renderizarListaPestanas() {
-    const db = getDB();
-    if (!db) return;
+    console.log('📋 Renderizando lista de pestañas del sistema...');
+    
+    const container = document.getElementById('listaPestanasContainer');
+    if (!container) return;
     
     try {
-        const { data: pestanas, error } = await db
-            .from('pestanas_sistema')
-            .select('*')
-            .order('orden', { ascending: true });
+        // 🔴 AHORA OBTIENE TODAS (visibles y ocultas)
+        const pestanas = window.pestanasDisponiblesGlobal || [];
         
-        if (error) throw error;
+        // Ordenar: primero visibles, luego ocultas
+        pestanas.sort((a, b) => {
+            if (a.visible && !b.visible) return -1;
+            if (!a.visible && b.visible) return 1;
+            return (a.orden || 0) - (b.orden || 0);
+        });
         
-        // Buscar el contenedor donde mostrar las pestañas
-        // Puede ser un div existente o crearlo dinámicamente
-        let container = document.getElementById('listaPestanasContainer');
+        const total = pestanas.length;
+        const visibles = pestanas.filter(p => p.visible).length;
+        const ocultas = total - visibles;
         
-        if (!container) {
-            // Buscar el contenedor de roles y agregar después
-            const rolesCard = document.querySelector('#tab-gestionUsuarios .card:last-child');
-            if (rolesCard) {
-                container = document.createElement('div');
-                container.id = 'listaPestanasContainer';
-                container.style.cssText = 'margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 12px; border: 1px solid #e0e0e0;';
-                
-                // Insertar después del título de roles
-                const title = rolesCard.querySelector('h3');
-                if (title) {
-                    title.after(container);
-                } else {
-                    rolesCard.appendChild(container);
-                }
-            } else {
-                console.warn('⚠️ No se encontró el contenedor de roles');
-                return;
-            }
-        }
-        
-        if (!pestanas || pestanas.length === 0) {
+        if (total === 0) {
             container.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <strong style="font-size: 14px;">📋 Pestañas del Sistema (0)</strong>
-                        <div style="font-size: 12px; color: var(--muted);">No hay pestañas registradas</div>
+                <div class="card" style="margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h3 style="margin: 0;">📋 Pestañas del Sistema (0)</h3>
+                        <button onclick="agregarNuevaPestana()" class="btn-success">➕ Nueva Pestaña</button>
                     </div>
-                    <button onclick="agregarNuevaPestana()" style="background: var(--ok); padding: 6px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
-                        ➕ Nueva Pestaña
-                    </button>
+                    <div style="text-align: center; padding: 40px; color: var(--muted);">
+                        📭 No hay pestañas registradas
+                    </div>
                 </div>
             `;
             return;
         }
         
         let html = `
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <div>
-                    <strong style="font-size: 14px;">📋 Pestañas del Sistema (${pestanas.length})</strong>
-                    <div style="font-size: 12px; color: var(--muted); margin-top: 2px;">
-                        Administra las pestañas disponibles para asignar a roles
+            <div class="card" style="margin-top: 20px; padding: 16px 20px;">
+                <!-- HEADER -->
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <h3 style="margin: 0; font-size: 16px;">📋 Pestañas del Sistema</h3>
+                        <span class="badge" style="background: #019DF4; color: white; padding: 2px 12px; border-radius: 20px; font-size: 12px;">${total} total</span>
+                        <span class="badge" style="background: #28a745; color: white; padding: 2px 12px; border-radius: 20px; font-size: 12px;">✅ ${visibles} visibles</span>
+                        ${ocultas > 0 ? `<span class="badge" style="background: #6c757d; color: white; padding: 2px 12px; border-radius: 20px; font-size: 12px;">⏸️ ${ocultas} ocultas</span>` : ''}
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <input type="text" id="buscadorPestanas" placeholder="🔍 Buscar pestaña..." 
+                               style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 13px; width: 200px;"
+                               oninput="filtrarPestanas(this.value)">
+                        <button onclick="agregarNuevaPestana()" style="background: var(--ok); padding: 6px 16px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 13px;">
+                            ➕ Nueva
+                        </button>
+                        <button onclick="recargarPestanasSistema()" style="background: var(--accent); padding: 6px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 13px;">
+                            🔄
+                        </button>
                     </div>
                 </div>
-                <button onclick="agregarNuevaPestana()" style="background: var(--ok); padding: 6px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
-                    ➕ Nueva Pestaña
-                </button>
-            </div>
-            <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px;">
-        `;
-        
-        for (const p of pestanas) {
-            const estadoColor = p.visible ? '#e8f5e9' : '#f8f9fa';
-            const estadoBorder = p.visible ? '#28a745' : '#6c757d';
-            const estadoTexto = p.visible ? '✅ Visible' : '⏸️ Oculto';
-            
-            html += `
-                <div style="background: ${estadoColor}; padding: 8px 12px; border-radius: 8px; border-left: 3px solid ${estadoBorder}; display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 20px;">${p.icono || '📄'}</span>
+                
+                <!-- TABLA CON SCROLL -->
+                <div style="border: 1px solid #e0e0e0; border-radius: 8px; overflow: auto; max-height: 400px; max-width: 100%;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 700px;">
+                        <thead style="position: sticky; top: 0; z-index: 10;">
+                            <tr style="background: #f8f9fa; border-bottom: 2px solid #e0e0e0;">
+                                <th style="padding: 10px 12px; text-align: left; width: 40px; min-width: 40px; background: #f8f9fa;">#</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 50px; min-width: 50px; background: #f8f9fa;">Icono</th>
+                                <th style="padding: 10px 12px; text-align: left; min-width: 150px; background: #f8f9fa;">Nombre</th>
+                                <th style="padding: 10px 12px; text-align: left; min-width: 150px; background: #f8f9fa;">Código</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 80px; min-width: 80px; background: #f8f9fa;">Orden</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 100px; min-width: 100px; background: #f8f9fa;">Estado</th>
+                                <th style="padding: 10px 12px; text-align: center; width: 120px; min-width: 120px; background: #f8f9fa;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaPestanasBody">
+                            ${pestanas.map((p, i) => `
+                                <tr class="fila-pestana" data-codigo="${p.codigo}" data-nombre="${p.nombre}" 
+                                    style="border-bottom: 1px solid #f0f0f0; ${!p.visible ? 'opacity: 0.6; background: #f8f8f8;' : ''}">
+                                    <td style="padding: 8px 12px; text-align: center; color: var(--muted);">${i + 1}</td>
+                                    <td style="padding: 8px 12px; text-align: center; font-size: 24px;">${p.icono || '📄'}</td>
+                                    <td style="padding: 8px 12px; font-weight: 600;">${escapeHtml(p.nombre)} ${!p.visible ? '<span style="font-size: 10px; color: #6c757d; margin-left: 8px;">(oculta)</span>' : ''}</td>
+                                    <td style="padding: 8px 12px; font-family: monospace; font-size: 12px; color: var(--muted);">${escapeHtml(p.codigo)}</td>
+                                    <td style="padding: 8px 12px; text-align: center;">${p.orden || 0}</td>
+                                    <td style="padding: 8px 12px; text-align: center;">
+                                        <span class="badge" style="background: ${p.visible ? '#28a745' : '#6c757d'}; color: white; padding: 4px 14px; border-radius: 20px; font-size: 11px; display: inline-block;">
+                                            ${p.visible ? '✅ Visible' : '⏸️ Oculto'}
+                                        </span>
+                                    </td>
+                                    <td style="padding: 8px 12px; text-align: center; white-space: nowrap;">
+                                        <button onclick="abrirModalEditarPestana(${p.id})" 
+                                                style="background: #f39c12; padding: 4px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 12px; margin-right: 4px;">
+                                            ✏️
+                                        </button>
+                                        <button onclick="eliminarPestana(${p.id}, '${escapeHtml(p.codigo)}')" 
+                                                style="background: ${p.visible ? '#d93025' : '#28a745'}; 
+                                                       padding: 4px 12px; 
+                                                       border: none; 
+                                                       border-radius: 4px; 
+                                                       cursor: pointer; 
+                                                       color: white; 
+                                                       font-size: 12px;"
+                                                title="${p.visible ? 'Ocultar pestaña' : 'Mostrar pestaña'}">
+                                            ${p.visible ? '👁️' : '🔓'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- FOOTER -->
+                <div style="margin-top: 12px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                     <div>
-                        <div style="font-size: 13px; font-weight: 600;">${escapeHtml(p.nombre)}</div>
-                        <div style="font-size: 10px; color: var(--muted);">${escapeHtml(p.codigo)}</div>
+                        📊 Mostrando <strong id="pestanasMostradas">${total}</strong> de ${total} pestañas
+                        <span style="margin-left: 15px; font-size: 11px;">
+                            💡 <span style="color: #28a745;">●</span> Visible | 
+                            <span style="color: #6c757d;">●</span> Oculto
+                        </span>
+                        ${ocultas > 0 ? `<span style="margin-left: 15px; font-size: 11px; color: #6c757d;">🔓 Click en el botón para mostrar/ocultar</span>` : ''}
                     </div>
-                    <div style="font-size: 10px; color: ${estadoBorder};">${estadoTexto}</div>
-                    <button onclick="abrirModalEditarPestana(${p.id})" 
-                            style="background: #f39c12; padding: 2px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;">
-                        ✏️
-                    </button>
-                    <button onclick="eliminarPestana(${p.id}, '${escapeHtml(p.codigo)}')" 
-                            style="background: #d93025; padding: 2px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;">
-                        🗑️
-                    </button>
+                    <div style="font-size: 11px; color: var(--muted);">
+                        🔄 Scroll vertical y horizontal para navegar
+                    </div>
                 </div>
-            `;
-        }
-        
-        html += `</div>`;
+            </div>
+        `;
         
         container.innerHTML = html;
         
+        // Guardar referencia para el filtro
+        window._pestanasData = pestanas;
+        
+        console.log(`✅ ${total} pestañas renderizadas (${visibles} visibles, ${ocultas} ocultas)`);
+        
     } catch (error) {
-        console.error('Error renderizando lista de pestañas:', error);
+        console.error('Error:', error);
+        container.innerHTML = `<div class="card" style="margin-top: 20px; color: var(--danger); padding: 20px;">❌ Error: ${error.message}</div>`;
     }
 }
 
-/**
- * Sobrescribir actualizarTablaRoles para incluir la lista de pestañas
- */
-const originalActualizarTablaRoles = actualizarTablaRoles;
-
-actualizarTablaRoles = async function() {
-    // Llamar a la función original
-    if (typeof originalActualizarTablaRoles === 'function') {
-        await originalActualizarTablaRoles();
+// supervisor.js - Función para recargar pestañas del sistema
+async function recargarPestanasSistema() {
+    console.log('🔄 Recargando pestañas del sistema...');
+    
+    // Mostrar indicador de carga en el botón
+    const btn = document.querySelector('button[onclick="recargarPestanasSistema()"]');
+    const textoOriginal = btn?.innerHTML;
+    if (btn) {
+        btn.innerHTML = '⏳';
+        btn.disabled = true;
     }
     
-    // Renderizar la lista de pestañas con botones de editar/eliminar
-    await renderizarListaPestanas();
-};
+    try {
+        // 1. Recargar pestañas desde la BD
+        await cargarPestanasDisponiblesGlobal();
+        
+        // 2. Recargar permisos
+        await cargarPermisosPestanasGlobal();
+        
+        // 3. Renderizar la lista de pestañas
+        await renderizarListaPestanas();
+        
+        // 4. Recargar roles para actualizar los checkboxes
+        await cargarRoles();
+        
+        // Mostrar mensaje de éxito
+        mostrarMensajeTemporal('✅ Pestañas recargadas correctamente', 'var(--ok)');
+        
+        console.log(`✅ Recarga completada - ${window.pestanasDisponiblesGlobal?.length || 0} pestañas disponibles`);
+        
+    } catch (error) {
+        console.error('❌ Error recargando pestañas:', error);
+        mostrarMensajeTemporal('❌ Error al recargar: ' + error.message, 'var(--danger)');
+        
+    } finally {
+        // Restaurar botón
+        if (btn) {
+            btn.innerHTML = textoOriginal || '🔄';
+            btn.disabled = false;
+        }
+    }
+}
+
+// supervisor.js - Cargar roles con redirecciones
+async function cargarRolesConRedirect() {
+    console.log('📋 Cargando roles con redirecciones...');
+    
+    const tbody = document.getElementById('tablaRedirectRoles');
+    if (!tbody) return;
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('/api/roles', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('Error al cargar roles');
+        
+        const roles = await response.json();
+        
+        if (roles.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">📭 No hay roles registrados</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        for (const rol of roles) {
+            const estadoBadge = rol.activo 
+                ? '<span class="badge" style="background: #28a745;">✅ Activo</span>'
+                : '<span class="badge" style="background: #6c757d;">⏸️ Inactivo</span>';
+            
+            const redirectUrl = rol.redirect_url || '/supervisor';
+            
+            // Determinar si la URL es válida
+            const esValida = redirectUrl.startsWith('/');
+            const urlColor = esValida ? '#28a745' : '#d93025';
+            
+            html += `
+                <tr style="border-bottom: 1px solid #f0f0f0;">
+                    <td style="padding: 8px 12px;">${rol.id}</td>
+                    <td style="padding: 8px 12px; font-weight: 600;">${escapeHtml(rol.codigo)}</td>
+                    <td style="padding: 8px 12px;">${escapeHtml(rol.nombre)}</td>
+                    <td style="padding: 8px 12px;">
+                        <input type="text" id="redirect-${rol.id}" 
+                               value="${escapeHtml(redirectUrl)}" 
+                               style="width: 100%; max-width: 200px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 12px; font-family: monospace;"
+                               placeholder="/ruta">
+                        <span style="font-size: 11px; color: ${urlColor}; margin-left: 5px;">
+                            ${esValida ? '✅' : '❌'}
+                        </span>
+                    </td>
+                    <td style="padding: 8px 12px; text-align: center;">${estadoBadge}</td>
+                    <td style="padding: 8px 12px; text-align: center;">
+                        <button onclick="actualizarRedirectRol(${rol.id})" 
+                                style="background: var(--ok); padding: 4px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 12px;">
+                            💾 Guardar
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }
+        
+        tbody.innerHTML = html;
+        console.log(`✅ ${roles.length} roles cargados con redirecciones`);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--danger);">❌ ${error.message}</td></tr>`;
+    }
+}
+
+// supervisor.js - Actualizar redirección de un rol
+async function actualizarRedirectRol(rolId) {
+    console.log(`🔄 Actualizando redirección del rol ${rolId}`);
+    
+    const input = document.getElementById(`redirect-${rolId}`);
+    if (!input) {
+        alert('❌ No se encontró el campo de redirección');
+        return;
+    }
+    
+    const redirectUrl = input.value.trim();
+    
+    if (!redirectUrl) {
+        alert('⚠️ Ingrese una URL de redirección válida');
+        input.focus();
+        return;
+    }
+    
+    if (!redirectUrl.startsWith('/')) {
+        alert('⚠️ La URL debe comenzar con / (ej: /supervisor, /auditor, /dashboard)');
+        input.focus();
+        return;
+    }
+    
+    const btn = event?.target;
+    const textoOriginal = btn?.innerHTML;
+    if (btn) {
+        btn.innerHTML = '⏳';
+        btn.disabled = true;
+    }
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`/api/roles/${rolId}/redirect`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ redirect_url: redirectUrl })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al actualizar');
+        }
+        
+        const result = await response.json();
+        alert(`✅ Redirección actualizada: ${result.rol.nombre} -> ${result.rol.redirect_url}`);
+        
+        // Actualizar el indicador de validez
+        const span = input.nextElementSibling;
+        if (span) {
+            span.textContent = '✅';
+            span.style.color = '#28a745';
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al actualizar: ' + error.message);
+        
+        // Revertir indicador
+        const span = input.nextElementSibling;
+        if (span) {
+            span.textContent = '❌';
+            span.style.color = '#d93025';
+        }
+        
+    } finally {
+        if (btn) {
+            btn.innerHTML = textoOriginal || '💾 Guardar';
+            btn.disabled = false;
+        }
+    }
+}
+
+// supervisor.js - Función para recargar la tabla de redirecciones
+async function recargarRedirectRoles() {
+    console.log('🔄 Recargando redirecciones de roles...');
+    await cargarRolesConRedirect();
+    mostrarMensajeTemporal('✅ Redirecciones recargadas', 'var(--ok)');
+}
+
+// Función auxiliar para mostrar mensajes temporales (si no existe)
+function mostrarMensajeTemporal(mensaje, color = 'var(--ok)') {
+    // Eliminar mensaje anterior si existe
+    const existing = document.querySelector('.mensaje-temporal-recarga');
+    if (existing) existing.remove();
+    
+    const div = document.createElement('div');
+    div.className = 'mensaje-temporal-recarga';
+    div.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: ${color};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        animation: slideIn 0.3s ease;
+        font-weight: 500;
+    `;
+    div.textContent = mensaje;
+    document.body.appendChild(div);
+    
+    // Eliminar después de 3 segundos
+    setTimeout(() => {
+        div.style.opacity = '0';
+        div.style.transition = 'opacity 0.3s';
+        setTimeout(() => div.remove(), 300);
+    }, 3000);
+}
+
+// supervisor.js - Función para filtrar pestañas en la tabla
+function filtrarPestanas(busqueda) {
+    const busquedaLower = busqueda.toLowerCase().trim();
+    const filas = document.querySelectorAll('.fila-pestana');
+    let mostradas = 0;
+    
+    filas.forEach(fila => {
+        const codigo = fila.dataset.codigo?.toLowerCase() || '';
+        const nombre = fila.dataset.nombre?.toLowerCase() || '';
+        const coincide = !busquedaLower || codigo.includes(busquedaLower) || nombre.includes(busquedaLower);
+        
+        fila.style.display = coincide ? '' : 'none';
+        if (coincide) mostradas++;
+    });
+    
+    const contador = document.getElementById('pestanasMostradas');
+    if (contador) contador.textContent = mostradas;
+}
+
 
 // ======================================================
 // MEJORAR agregarNuevaPestana con validaciones
@@ -37213,17 +38567,12 @@ function exportarDetalleCicloGP() {
     alert(`✅ Exportados ${rows.length} errores del Ciclo #${ciclo.numero}`);
 }
 
-// ======================================================
-// EXPORTAR GESTIÓN DE PERSONAS - VERSIÓN DINÁMICA
-// ======================================================
 function exportarGestionPersonasGP() {
     if (gestoresFiltradosGP.length === 0) {
         alert('⚠️ No hay datos para exportar');
         return;
     }
-    
     const evaluaciones = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
-    
     // ======================================================
     // HEADERS DEL CSV
     // ======================================================
@@ -37240,14 +38589,12 @@ function exportarGestionPersonasGP() {
         'Períodos con Matriz Antigua (30/30/40)',
         'Períodos con Matriz Nueva (15/15/70)'
     ];
-    
     // ======================================================
     // CONSTRUIR FILAS CON CÁLCULO DINÁMICO POR EVALUACIÓN
     // ======================================================
     const rows = gestoresFiltradosGP.map(g => {
         // Obtener evaluaciones del gestor
         const evalGestor = evaluaciones.filter(e => e.agente === g.nombre);
-        
         if (evalGestor.length === 0) {
             return [
                 `"${g.nombre}"`,
@@ -37263,7 +38610,6 @@ function exportarGestionPersonasGP() {
                 '0'
             ];
         }
-        
         // ======================================================
         // CALCULAR PORCENTAJES POR EVALUACIÓN CON SU MATRIZ
         // ======================================================
@@ -37271,36 +38617,30 @@ function exportarGestionPersonasGP() {
         let countEval = 0;
         let countMatrizAntigua = 0;
         let countMatrizNueva = 0;
-        
         for (const e of evalGestor) {
             const fecha = obtenerFechaEvaluacion(e);
             if (fecha) {
                 const matriz = getMatrizByFecha(fecha);
-                
                 // Contar qué matriz usó
                 if (matriz.nombre === MATRIZ_ANTIGUA.nombre) {
                     countMatrizAntigua++;
                 } else {
                     countMatrizNueva++;
                 }
-                
                 // Calcular porcentaje con la matriz correcta
                 const pctENC = Math.min(((e.totalENC || 0) / matriz.pesos.ENC) * 100, 100);
                 const pctECUF = Math.min(((e.totalECUF || 0) / matriz.pesos.ECUF) * 100, 100);
                 const pctECN = Math.min(((e.totalECN || 0) / matriz.pesos.ECN) * 100, 100);
-                
                 sumPctENC += pctENC;
                 sumPctECUF += pctECUF;
                 sumPctECN += pctECN;
                 countEval++;
             }
         }
-        
         // Promedios finales
         const pctENC = countEval > 0 ? Math.round(sumPctENC / countEval) : 0;
         const pctECUF = countEval > 0 ? Math.round(sumPctECUF / countEval) : 0;
         const pctECN = countEval > 0 ? Math.round(sumPctECN / countEval) : 0;
-        
         return [
             `"${g.nombre}"`,
             g.promedioGlobal,
@@ -37315,7 +38655,6 @@ function exportarGestionPersonasGP() {
             countMatrizNueva
         ];
     });
-    
     // ======================================================
     // GENERAR Y DESCARGAR CSV
     // ======================================================
@@ -37329,20 +38668,168 @@ function exportarGestionPersonasGP() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
     // ======================================================
     // MOSTRAR RESUMEN
     // ======================================================
     const totalFilas = rows.length;
     const totalConMatrizAntigua = rows.reduce((sum, row) => sum + parseInt(row[9] || 0), 0);
     const totalConMatrizNueva = rows.reduce((sum, row) => sum + parseInt(row[10] || 0), 0);
-    
     alert(`✅ Exportación completada\n\n📊 ${totalFilas} gestores exportados\n📌 Matriz antigua: ${totalConMatrizAntigua} evaluaciones\n📌 Matriz nueva: ${totalConMatrizNueva} evaluaciones`);
-    
     console.log(`✅ Exportados ${totalFilas} gestores con cálculos dinámicos por matriz`);
 }
 
-
+// ======================================================
+// AGRUPAR EVALUACIONES POR PERÍODO CON PESOS DINÁMICOS
+// ======================================================
+function agruparEvaluacionesPorPeriodoConPesos(evaluaciones, periodo) {
+    if (!evaluaciones || evaluaciones.length === 0) return [];
+    if (periodo === 'todos') {
+        periodo = 'mes';
+    }
+    console.log(`📊 agruparEvaluacionesPorPeriodoConPesos: ${evaluaciones.length} evaluaciones, período: ${periodo}`);
+    const agrupado = {};
+    for (const e of evaluaciones) {
+        const fecha = obtenerFechaEvaluacion(e);
+        if (!fecha) continue;
+        let clave = '';
+        switch (periodo) {
+            case 'dia':
+                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+                break;
+            case 'semana':
+                const semana = getWeekNumber(fecha);
+                clave = `${fecha.getFullYear()}-S${semana}`;
+                break;
+            case 'mes':
+                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+                break;
+            case 'trimestre':
+                const trimestre = Math.floor(fecha.getMonth() / 3) + 1;
+                clave = `${fecha.getFullYear()}-T${trimestre}`;
+                break;
+            case 'anio':
+                clave = `${fecha.getFullYear()}`;
+                break;
+            default:
+                clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+        }
+        if (!agrupado[clave]) {
+            agrupado[clave] = {
+                clave: clave,
+                evaluaciones: [],
+                count: 0,
+                sumaNotas: 0,
+                sumENC: 0,
+                sumECUF: 0,
+                sumECN: 0,
+                quiebres: 0,
+                // 🔴 NUEVO: Pesos del período
+                pesos: null,
+                // Para porcentajes
+                sumaPctENC: 0,
+                sumaPctECUF: 0,
+                sumaPctECN: 0,
+                countPesos: 0
+            };
+        }
+        const item = agrupado[clave];
+        item.evaluaciones.push(e);
+        item.count++;
+        item.sumaNotas += e.notaFinal || 0;
+        item.sumENC += e.totalENC || 0;
+        item.sumECUF += e.totalECUF || 0;
+        item.sumECN += e.totalECN || 0;
+        if ((e.notaFinal || 0) < 85) item.quiebres++;
+        // 🔴 DETERMINAR PESOS DEL PERÍODO (usar la primera evaluación)
+        if (!item.pesos) {
+            const fechaEval = obtenerFechaEvaluacion(e);
+            if (fechaEval) {
+                const matriz = getMatrizByFecha(fechaEval);
+                item.pesos = matriz.pesos;
+            } else {
+                item.pesos = { ENC: 30, ECUF: 30, ECN: 40 };
+            }
+        }
+        // 🔴 CALCULAR PORCENTAJE DE ESTA EVALUACIÓN CON SU MATRIZ
+        const fechaEval = obtenerFechaEvaluacion(e);
+        if (fechaEval) {
+            const matriz = getMatrizByFecha(fechaEval);
+            const pesos = matriz.pesos;
+            const enc = parseFloat(e.totalENC || e.total_enc || 0);
+            const ecuf = parseFloat(e.totalECUF || e.total_ecuf || 0);
+            const ecn = parseFloat(e.totalECN || e.total_ecn || 0);
+            // Porcentaje individual de esta evaluación
+            const pctENC = Math.min((enc / pesos.ENC) * 100, 100);
+            const pctECUF = Math.min((ecuf / pesos.ECUF) * 100, 100);
+            const pctECN = Math.min((ecn / pesos.ECN) * 100, 100);
+            // Acumular porcentajes
+            item.sumaPctENC += pctENC;
+            item.sumaPctECUF += pctECUF;
+            item.sumaPctECN += pctECN;
+            item.countPesos++;
+        }
+    }
+    // Convertir a array y ordenar
+    let resultados = Object.values(agrupado);
+    resultados.sort((a, b) => a.clave.localeCompare(b.clave));
+    // Formatear etiquetas y calcular promedios
+    const mesesNombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    resultados = resultados.map(item => {
+        let label = '';
+        switch (periodo) {
+            case 'dia':
+                const [anioD, mesD, diaD] = item.clave.split('-');
+                label = `${diaD}/${mesD}`;
+                break;
+            case 'semana':
+                const [anioS, semana] = item.clave.split('-S');
+                label = `Sem ${semana} (${anioS})`;
+                break;
+            case 'mes':
+                const [anioM, mesM] = item.clave.split('-');
+                label = `${mesesNombres[parseInt(mesM) - 1]} ${anioM}`;
+                break;
+            case 'trimestre':
+                const [anioT, trim] = item.clave.split('-T');
+                label = `T${trim} ${anioT}`;
+                break;
+            case 'anio':
+                label = item.clave;
+                break;
+            default:
+                label = item.clave;
+        }
+        const count = item.count || 0;
+        const promedioNota = count > 0 ? (item.sumaNotas / count) : 0;
+        const promedioENC = count > 0 ? (item.sumENC / count) : 0;
+        const promedioECUF = count > 0 ? (item.sumECUF / count) : 0;
+        const promedioECN = count > 0 ? (item.sumECN / count) : 0;
+        const porcentajeQuiebres = count > 0 ? (item.quiebres / count) * 100 : 0;
+        // 🔴 PROMEDIOS DE PORCENTAJES
+        const promedioENCPct = item.countPesos > 0 ? (item.sumaPctENC / item.countPesos) : 0;
+        const promedioECUFPct = item.countPesos > 0 ? (item.sumaPctECUF / item.countPesos) : 0;
+        const promedioECNPct = item.countPesos > 0 ? (item.sumaPctECN / item.countPesos) : 0;
+        return {
+            ...item,
+            label: label,
+            promedioNota: Math.round(promedioNota * 10) / 10,
+            promedioENC: Math.round(promedioENC * 10) / 10,
+            promedioECUF: Math.round(promedioECUF * 10) / 10,
+            promedioECN: Math.round(promedioECN * 10) / 10,
+            porcentajeQuiebres: Math.round(porcentajeQuiebres * 10) / 10,
+            // 🔴 NUEVOS CAMPOS CON PORCENTAJES
+            promedioENCPct: Math.round(promedioENCPct * 10) / 10,
+            promedioECUFPct: Math.round(promedioECUFPct * 10) / 10,
+            promedioECNPct: Math.round(promedioECNPct * 10) / 10
+        };
+    });
+    console.log(`✅ Datos agrupados: ${resultados.length} períodos con pesos dinámicos`);
+    if (resultados.length > 0) {
+        console.log(`   Ejemplo: ${resultados[0].label} - ENC: ${resultados[0].promedioENC} pts (${resultados[0].promedioENCPct}%)`);
+        console.log(`   Pesos del período: ENC=${resultados[0].pesos?.ENC}, ECUF=${resultados[0].pesos?.ECUF}, ECN=${resultados[0].pesos?.ECN}`);
+    }
+    return resultados;
+}
 
 async function refrescarGestionPersonasGP() {
     await cargarGestionPersonasGP();
@@ -37436,7 +38923,7 @@ async function ejecutarTareaAhora(tareaId) {
             btn.disabled = true;
         });
         
-        const response = await fetch(`http://localhost:5001/api/transcripcion/tareas/${tareaId}/ejecutar`, {
+        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/tareas/${tareaId}/ejecutar`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -37484,7 +38971,7 @@ async function verLogsTarea(tareaId) {
     try {
         const token = localStorage.getItem('meca_token');
         
-        const response = await fetch(`http://localhost:5001/api/transcripcion/logs/${tareaId}`, {
+        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/logs/${tareaId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -37607,7 +39094,7 @@ async function eliminarTarea(tareaId, nombreTarea) {
             btn.disabled = true;
         });
         
-        const response = await fetch(`http://localhost:5001/api/transcripcion/tareas/${tareaId}`, {
+        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/tareas/${tareaId}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -37646,8 +39133,6 @@ async function eliminarTarea(tareaId, nombreTarea) {
     }
 }
 
-
-// ===== FIN FUNCIÓN: showTab ============================================
 
     // ===== 2. INICIO FUNCIÓN: escapeHtml ===================================
     function escapeHtml(text) {
@@ -39622,22 +41107,9 @@ console.log('✅ Todas las funciones de guardado están definidas');
 // BLOQUE 15 – EVENTOS PRINCIPALES Y OVERRIDES (10 elementos)
 // ======================================================================================         
 
-    // ===== 1. Sobrescribir generarReportes para actualizar el ranking completo =    
-    const originalGenerarReportesRanking = window.generarReportes;
-    window.generarReportes = function () {
-        if (originalGenerarReportesRanking) originalGenerarReportesRanking();
-        resetearRankingCompleto();
-    };
-    // ===== FIN : generarReportes ===============================================
     
-    // ===== 2. Sobreescribir cargarHistorialEvaluaciones para usar filtrado =====
-    const originalCargarHistorial = cargarHistorialEvaluaciones;
-    cargarHistorialEvaluaciones = function () {
-        if (originalCargarHistorial) originalCargarHistorial();
-        historialFiltrado = JSON.parse(localStorage.getItem('evaluaciones_calidad') || '[]').sort((a, b) => b.timestamp - a.timestamp);
-        actualizarTablaHistorialFiltrada();
-    };
-    // ===== FIN : cargarHistorialEvaluaciones ===================================
+    
+    
     
     // ===== 3. MODIFICAR inicializarGestionEscuchas PARA CARGAR HISTORIAL =======
     const originalInicializarGestionEscuchas = window.inicializarGestionEscuchas || function () { }; // Guardar referencia original            
@@ -43681,7 +45153,7 @@ async function cargarTareasProgramadas() {
     
     try {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch('http://localhost:5001/api/transcripcion/tareas/todas', {
+        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/tareas/todas`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -44583,7 +46055,7 @@ async function abrirModalEditarTarea(id) {
         
         // 🔴 OBTENER DATOS DE LA TAREA
         const token = localStorage.getItem('meca_token');
-        const response = await fetch('http://localhost:5000/api/reportes/tareas', {
+        const response = await fetch(`${API_URL_PYTHON}/api/reportes/tareas`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
@@ -44782,7 +46254,7 @@ async function guardarTareaReporte() {
     
     const token = localStorage.getItem('meca_token');
     const method = id ? 'PUT' : 'POST';
-    const url = id ? `http://localhost:5000/api/reportes/tareas/${id}` : 'http://localhost:5000/api/reportes/tareas';
+    const url = id ? `${API_URL_PYTHON}/api/reportes/tareas/${id}` : `${API_URL_PYTHON}/api/reportes/tareas`;
     
     try {
         const response = await fetch(url, {
@@ -44818,7 +46290,7 @@ async function eliminarTareaReporte(id) {
     let nombre = '';
     try {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch('http://localhost:5000/api/reportes/tareas', {
+        const response = await fetch(`${API_URL_PYTHON}/api/reportes/tareas`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         const result = await response.json();
@@ -44830,7 +46302,7 @@ async function eliminarTareaReporte(id) {
     
     try {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`http://localhost:5000/api/reportes/tareas/${id}`, {
+        const response = await fetch(`${API_URL_PYTHON}/api/reportes/tareas/${id}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -44945,7 +46417,7 @@ function toggleCamposFrecuencia() {
 function abrirModalConfigurarCarpeta() {
     const token = localStorage.getItem('meca_token');
     
-    fetch('http://localhost:5000/api/reportes/config/carpeta', {
+    fetch(`${API_URL_PYTHON}/api/reportes/config/carpeta`, {
         headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(response => {
@@ -45003,7 +46475,7 @@ async function guardarCarpetaReportes() {
     
     try {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch('http://localhost:5000/api/reportes/config/carpeta', {
+        const response = await fetch(`${API_URL_PYTHON}/api/reportes/config/carpeta`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -45039,32 +46511,1653 @@ function cerrarModalCarpeta() {
     if (modal) modal.style.display = 'none';
 }
 
+// ======================================================
+// 1. FUNCIÓN: AGRUPAR PDA POR ESTADO
+// ======================================================
+
+function agruparPDAPorEstado(pdaList) {
+    if (!pdaList || pdaList.length === 0) {
+        return {
+            pendientes: [],
+            notificados: [],
+            capacitacion: [],
+            seguimiento: [],
+            completados: [],
+            escalados: []
+        };
+    }
+
+    return {
+        pendientes: pdaList.filter(p => 
+            p.estado === 'pendiente' || 
+            p.estado === 'pendiente_operaciones'
+        ),
+        notificados: pdaList.filter(p => 
+            p.estado === 'notificado' || 
+            p.estado === 'gestor_notificado'
+        ),
+        capacitacion: pdaList.filter(p => 
+            p.estado === 'enviado_capacitacion' || 
+            p.estado === 'en_capacitacion'
+        ),
+        seguimiento: pdaList.filter(p => 
+            p.estado === 'en_seguimiento' || 
+            p.estado === 'en_seguimiento_capacitacion' ||
+            p.estado === 'requiere_capacitacion'
+        ),
+        completados: pdaList.filter(p => 
+            p.estado === 'completado'
+        ),
+        escalados: pdaList.filter(p => 
+            p.estado === 'escalado' || 
+            p.estado === 'reiterativo'
+        )
+    };
+}
+
+
+// ======================================================
+// 2. FUNCIÓN AUXILIAR: OBTENER COLOR DE PROMEDIO (SÍNCRONA)
+// ======================================================
+
+function getColorPromedioSync(nota) {
+    if (!nota || isNaN(nota)) return '#6c757d';
+    
+    const notaNum = parseFloat(nota);
+    
+    // Usar cacheCuartiles si está disponible
+    if (typeof cacheCuartiles !== 'undefined' && cacheCuartiles && cacheCuartiles.length > 0) {
+        for (const c of cacheCuartiles) {
+            const inferior = parseFloat(c.limite_inferior) || 0;
+            const superior = parseFloat(c.limite_superior) || 100;
+            if (notaNum >= inferior && notaNum <= superior) {
+                return c.color_hex || '#6c757d';
+            }
+        }
+    }
+    
+    // Fallback: Q4 (rojo)
+    return '#d93025';
+}
+
+
+// ======================================================
+// 3. FUNCIÓN: GENERAR HTML DEL REPORTE CONSOLIDADO
+// ======================================================
+
+function generarHTMLConsolidado(agrupados) {
+    const total = Object.values(agrupados).reduce((sum, arr) => sum + arr.length, 0);
+    const fecha = new Date().toLocaleString('es-ES');
+    
+    let html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Reporte Consolidado PDA</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; background: #f0f2f5; }
+            .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); overflow: hidden; }
+            .header { background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; padding: 25px 35px; }
+            .header h1 { font-size: 24px; }
+            .header p { opacity: 0.9; font-size: 14px; }
+            .content { padding: 25px 35px; }
+            .section { margin-bottom: 30px; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; }
+            .section-title { background: #f8f9fa; padding: 12px 20px; font-weight: bold; font-size: 16px; border-bottom: 2px solid #019DF4; display: flex; justify-content: space-between; align-items: center; }
+            .section-body { padding: 20px; overflow-x: auto; }
+            table { width: 100%; border-collapse: collapse; font-size: 13px; }
+            th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+            th { background: #f8f9fa; font-weight: 600; }
+            .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; color: white; display: inline-block; }
+            .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+            .kpi-card { background: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; }
+            .kpi-number { font-size: 28px; font-weight: bold; }
+            .kpi-label { font-size: 12px; color: #6c757d; }
+            .footer { background: #f8f9fa; padding: 15px 30px; text-align: center; font-size: 11px; color: #888; border-top: 1px solid #e0e0e0; }
+            .riesgo-item { padding: 8px 12px; background: #fff0f0; border-radius: 8px; margin: 5px 0; border-left: 4px solid #d93025; }
+            @media print {
+                body { background: white; padding: 0; }
+                .container { box-shadow: none; border-radius: 0; }
+            }
+        </style>
+    </head>
+    <body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Reporte Consolidado de PDA</h1>
+            <p>Movistar Perú - Auditoría Calidad Cobranzas | Generado: ${fecha}</p>
+        </div>
+        <div class="content">
+    `;
+
+    // ============================================================
+    // RESUMEN EJECUTIVO
+    // ============================================================
+    const estados = [
+        { key: 'pendientes', label: '⏳ Pendientes', color: '#f39c12' },
+        { key: 'notificados', label: '📨 Notificados', color: '#019DF4' },
+        { key: 'capacitacion', label: '📚 Capacitación', color: '#7b1fa2' },
+        { key: 'seguimiento', label: '✅ Seguimiento', color: '#28a745' },
+        { key: 'completados', label: '🏆 Completados', color: '#1a7f37' },
+        { key: 'escalados', label: '🚨 Escalados', color: '#d93025' }
+    ];
+
+    html += `
+        <div class="section">
+            <div class="section-title">📈 Resumen Ejecutivo</div>
+            <div class="section-body">
+                <div class="kpi-grid">
+                    ${estados.map(e => `
+                        <div class="kpi-card">
+                            <div class="kpi-number" style="color: ${e.color};">${agrupados[e.key].length}</div>
+                            <div class="kpi-label">${e.label}</div>
+                        </div>
+                    `).join('')}
+                    <div class="kpi-card" style="background: #e3f2fd;">
+                        <div class="kpi-number" style="color: #019DF4;">${total}</div>
+                        <div class="kpi-label">📊 Total PDA</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // ============================================================
+    // SECCIONES POR ESTADO (SIN COLUMNA "📄")
+    // ============================================================
+    const configSecciones = [
+        { 
+            key: 'pendientes', 
+            titulo: '⏳ PDA Pendientes', 
+            columnas: ['Agente', 'Ciclo', 'Promedio', 'Detección', 'Acciones'] 
+        },
+        { 
+            key: 'notificados', 
+            titulo: '📨 PDA Notificados', 
+            columnas: ['Agente', 'Ciclo', 'Promedio', 'Notificación', 'Acciones'] 
+        },
+        { 
+            key: 'capacitacion', 
+            titulo: '📚 PDA en Capacitación', 
+            columnas: ['Agente', 'Ciclo', 'Promedio', 'GESCOT', 'Progreso'] 
+        },
+        { 
+            key: 'seguimiento', 
+            titulo: '✅ PDA en Seguimiento', 
+            columnas: ['Agente', 'Ciclo', 'Promedio', 'Capacitación', 'Resultado'] 
+        },
+        { 
+            key: 'completados', 
+            titulo: '🏆 PDA Completados', 
+            columnas: ['Agente', 'Ciclo', 'Promedio', 'Cierre', 'Resultado'] 
+        },
+        { 
+            key: 'escalados', 
+            titulo: '🚨 PDA Escalados', 
+            columnas: ['Agente', 'Ciclo', 'Promedio', 'Escalamiento', 'Motivo'] 
+        }
+    ];
+
+    for (const config of configSecciones) {
+        const items = agrupados[config.key] || [];
+        if (items.length === 0) continue;
+
+        html += `
+            <div class="section">
+                <div class="section-title">
+                    <span>${config.titulo}</span>
+                    <span style="font-size: 12px; font-weight: normal;">${items.length} registros</span>
+                </div>
+                <div class="section-body">
+                    <table>
+                        <thead>
+                            <tr>${config.columnas.map(c => `<th>${c}</th>`).join('')}</tr>
+                        </thead>
+                        <tbody>
+                `;
+
+        for (let i = 0; i < items.length; i++) {
+            const pda = items[i];
+            
+            const acciones = pda.acciones || [];
+            const completadas = acciones.filter(a => a.completado).length;
+            const totalAcciones = acciones.length;
+            const progreso = totalAcciones > 0 ? `${completadas}/${totalAcciones}` : '0/0';
+
+            const nombre = escapeHtml(pda.agente || 'Sin agente');
+            const ciclo = pda.ciclo_basal_numero || '#?';
+            const promedioNum = parseFloat(pda.promedio_basal) || 0;
+            const promedio = promedioNum > 0 ? `${promedioNum.toFixed(1)}%` : '-';
+            
+            // ✅ CORREGIDO: Usar getColorPromedioSync() para obtener el color correcto
+            const promedioColor = getColorPromedioSync(promedioNum);
+            
+            let fila = '';
+
+            switch (config.key) {
+                case 'pendientes':
+                    const fechaDeteccion = pda.fecha_deteccion ? formatearFechaPeru(pda.fecha_deteccion) : '-';
+                    fila = `
+                        <td><strong>${nombre}</strong></td>
+                        <td style="text-align: center;">#${ciclo}</td>
+                        <td style="text-align: center; font-weight: bold; color: ${promedioColor};">${promedio}</td>
+                        <td style="text-align: center;">${fechaDeteccion}</td>
+                        <td style="text-align: center;">${progreso}</td>
+                    `;
+                    break;
+
+                case 'notificados':
+                    const fechaNotif = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : '-';
+                    fila = `
+                        <td><strong>${nombre}</strong></td>
+                        <td style="text-align: center;">#${ciclo}</td>
+                        <td style="text-align: center; font-weight: bold; color: ${promedioColor};">${promedio}</td>
+                        <td style="text-align: center;">${fechaNotif}</td>
+                        <td style="text-align: center;">${progreso}</td>
+                    `;
+                    break;
+
+                case 'capacitacion':
+                    const gescotCap = pda.gescot_capacitacion || pda.gescot_reunion || '-';
+                    fila = `
+                        <td><strong>${nombre}</strong></td>
+                        <td style="text-align: center;">#${ciclo}</td>
+                        <td style="text-align: center; font-weight: bold; color: ${promedioColor};">${promedio}</td>
+                        <td style="text-align: center; font-family: monospace; font-size: 12px;">${escapeHtml(gescotCap)}</td>
+                        <td style="text-align: center;">${progreso}</td>
+                    `;
+                    break;
+
+                case 'seguimiento':
+                    const fechaCap = pda.fecha_capacitacion ? formatearFechaPeru(pda.fecha_capacitacion) : '-';
+                    const resultadoSeg = pda.mejora_detectada ? '✅ Mejora' : '⏳ En curso';
+                    fila = `
+                        <td><strong>${nombre}</strong></td>
+                        <td style="text-align: center;">#${ciclo}</td>
+                        <td style="text-align: center; font-weight: bold; color: ${promedioColor};">${promedio}</td>
+                        <td style="text-align: center;">${fechaCap}</td>
+                        <td style="text-align: center;">${resultadoSeg}</td>
+                    `;
+                    break;
+
+                case 'completados':
+                    const fechaCierre = pda.updated_at ? formatearFechaPeru(pda.updated_at) : '-';
+                    const resultadoFinal = pda.estado === 'completado' ? '🏆 Exitoso' : '📋 Cerrado';
+                    fila = `
+                        <td><strong>${nombre}</strong></td>
+                        <td style="text-align: center;">#${ciclo}</td>
+                        <td style="text-align: center; font-weight: bold; color: ${promedioColor};">${promedio}</td>
+                        <td style="text-align: center;">${fechaCierre}</td>
+                        <td style="text-align: center;">${resultadoFinal}</td>
+                    `;
+                    break;
+
+                case 'escalados':
+                    const fechaEsc = pda.fecha_escalamiento ? formatearFechaPeru(pda.fecha_escalamiento) : '-';
+                    const motivoEsc = pda.observaciones_escalamiento || 'Persistencia en Q4';
+                    fila = `
+                        <td><strong>${nombre}</strong></td>
+                        <td style="text-align: center;">#${ciclo}</td>
+                        <td style="text-align: center; font-weight: bold; color: ${promedioColor};">${promedio}</td>
+                        <td style="text-align: center;">${fechaEsc}</td>
+                        <td style="font-size: 12px;">${escapeHtml(motivoEsc)}</td>
+                    `;
+                    break;
+
+                default:
+                    fila = `<td colspan="${config.columnas.length}">-</td>`;
+            }
+
+            html += `<tr>${fila}</tr>`;
+        }
+
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    // ============================================================
+    // ANÁLISIS DE RIESGO
+    // ============================================================
+    const todosPDA = [
+        ...agrupados.pendientes,
+        ...agrupados.notificados,
+        ...agrupados.capacitacion,
+        ...agrupados.seguimiento,
+        ...agrupados.completados,
+        ...agrupados.escalados
+    ];
+
+    // Detectar agentes con persistencia (2+ PDA en Q4)
+    const conteoPorAgente = {};
+    for (const pda of todosPDA) {
+        const agente = pda.agente;
+        if (!agente) continue;
+        if (!conteoPorAgente[agente]) conteoPorAgente[agente] = [];
+        conteoPorAgente[agente].push(pda);
+    }
+
+    const agentesRiesgo = Object.entries(conteoPorAgente)
+        .filter(([agente, pdaList]) => pdaList.length >= 2 && pdaList.some(p => p.cuartil_basal === 'Q4'))
+        .map(([agente, pdaList]) => ({
+            agente,
+            cantidad: pdaList.length,
+            ultimoPDA: pdaList[pdaList.length - 1],
+            estados: pdaList.map(p => p.estado)
+        }))
+        .sort((a, b) => b.cantidad - a.cantidad);
+
+    if (agentesRiesgo.length > 0) {
+        html += `
+            <div class="section" style="border-left: 4px solid #d93025;">
+                <div class="section-title" style="border-bottom-color: #d93025; color: #d93025;">🔴 Análisis de Riesgo - Agentes con Persistencia</div>
+                <div class="section-body">
+                    <p style="margin-bottom: 15px; color: #6c757d;">
+                        Agentes con 2 o más PDA en Q4 que requieren atención prioritaria:
+                    </p>
+        `;
+
+        for (const riesgo of agentesRiesgo) {
+            const ultimaFecha = riesgo.ultimoPDA.fecha_deteccion ? formatearFechaPeru(riesgo.ultimoPDA.fecha_deteccion) : '-';
+            const estadosUnicos = [...new Set(riesgo.estados)].map(e => obtenerTextoEstadoPDA(e)).join(' → ');
+            
+            html += `
+                <div class="riesgo-item">
+                    <strong>${escapeHtml(riesgo.agente)}</strong>
+                    <span style="margin-left: 15px; font-size: 12px;">
+                        ${riesgo.cantidad} PDA | Último: ${ultimaFecha}
+                    </span>
+                    <span style="margin-left: 15px; font-size: 12px; background: #d93025; color: white; padding: 2px 10px; border-radius: 12px;">
+                        🚨 Escalar
+                    </span>
+                    <div style="font-size: 11px; color: #6c757d; margin-top: 4px;">
+                        Estados: ${estadosUnicos}
+                    </div>
+                </div>
+            `;
+        }
+
+        html += `
+                </div>
+            </div>
+        `;
+    }
+
+    html += `
+        </div>
+        <div class="footer">
+            Documento generado automáticamente por Sistema MECA - Movistar Perú<br>
+            © Auditoría Calidad Cobranzas - Todos los derechos reservados
+        </div>
+    </div>
+    </body>
+    </html>
+    `;
+
+    return html;
+}
+
+
+// ======================================================
+// 4. FUNCIÓN PRINCIPAL: GENERAR REPORTE CONSOLIDADO
+// ======================================================
+
+function generarReporteConsolidadoPDA() {
+    console.log('📊 Generando reporte consolidado de PDA...');
+    
+    // Validar datos
+    if (!window.datosPDA || window.datosPDA.length === 0) {
+        alert('⚠️ No hay PDA registrados para generar el reporte.');
+        return;
+    }
+    
+    try {
+        // Agrupar por estado
+        const agrupados = agruparPDAPorEstado(window.datosPDA);
+        
+        // Verificar que haya datos
+        const total = Object.values(agrupados).reduce((sum, arr) => sum + arr.length, 0);
+        if (total === 0) {
+            alert('⚠️ No hay PDA con estados válidos para el reporte.');
+            return;
+        }
+        
+        // Generar HTML (ahora es síncrono porque getColorPromedioSync es síncrono)
+        const html = generarHTMLConsolidado(agrupados);
+        
+        // Mostrar en modal (reutilizando función existente)
+        if (typeof mostrarModalDocumentoProfesional === 'function') {
+            mostrarModalDocumentoProfesional(html, null, '📊 Reporte Consolidado de PDA');
+        } else {
+            // Fallback: abrir en nueva ventana
+            const ventana = window.open('', '_blank');
+            ventana.document.write(html);
+            ventana.document.close();
+        }
+        
+        console.log(`✅ Reporte generado: ${total} PDA en ${Object.keys(agrupados).filter(k => agrupados[k].length > 0).length} estados`);
+        
+    } catch (error) {
+        console.error('❌ Error generando reporte:', error);
+        alert('❌ Error al generar el reporte: ' + error.message);
+    }
+}
+
+// ======================================================
+// FUNCIONES DE ROLES - VERSIÓN FINAL
+// ======================================================
+
+function esAdministrador() {
+    // 1. Intentar desde window.usuarioActual (ya está asignado)
+    if (window.usuarioActual && window.usuarioActual.rol) {
+        const rol = window.usuarioActual.rol.toString().toUpperCase();
+        return rol === 'ADMIN';
+    }
+    
+    // 2. Fallback a localStorage (siempre disponible)
+    try {
+        const local = localStorage.getItem('meca_usuario');
+        if (local) {
+            const parsed = JSON.parse(local);
+            if (parsed && parsed.rol) {
+                const rol = parsed.rol.toString().toUpperCase();
+                return rol === 'ADMIN';
+            }
+        }
+    } catch(e) {}
+    
+    return false;
+}
+
+function mostrarBotonesSegunRol() {
+    const admin = esAdministrador();
+    
+    const btn = document.getElementById('btnLimpiarTodosPDA');
+    if (btn) {
+        btn.style.display = admin ? 'inline-flex' : 'none';
+        btn.style.visibility = admin ? 'visible' : 'hidden';
+        console.log(`🔒 Botón Limpiar PDA: ${admin ? '✅ VISIBLE' : '❌ OCULTO'}`);
+    }
+}
+
+// Ejecutar automáticamente al cargar
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(mostrarBotonesSegunRol, 500);
+});
+
+
+// ======================================================
+// UTILIDADES - VERIFICACIÓN DE ROL ACTIVO
+// ======================================================
+
 /**
- * Muestra/oculta campos según la frecuencia seleccionada
+ * verificarRolActivo - Verifica que el rol del usuario actual siga activo
+ * @param {boolean} mostrarAlerta - Si debe mostrar alerta al usuario (default: true)
+ * @returns {boolean} true si el rol está activo, false si no
  */
+async function verificarRolActivo(mostrarAlerta = true) {
+    // Si no hay usuario, no hay nada que verificar
+    if (!usuarioActual || !usuarioActual.rol_id) {
+        return true;
+    }
+    
+    try {
+        // Asegurar que rolesGlobales esté cargado
+        if (!rolesGlobales || rolesGlobales.length === 0) {
+            await cargarRoles();
+        }
+        
+        const rolInfo = rolesGlobales.find(r => r.id === usuarioActual.rol_id);
+        
+        // Caso 1: El rol no existe (fue eliminado físicamente)
+        if (!rolInfo) {
+            console.warn('⚠️ El rol del usuario ya no existe en la BD');
+            if (mostrarAlerta) {
+                alert('⚠️ Su rol ya no existe. Contacte al administrador.');
+            }
+            // Cerrar sesión
+            localStorage.removeItem('meca_token');
+            localStorage.removeItem('meca_usuario');
+            sessionStorage.clear();
+            window.location.href = '/login';
+            return false;
+        }
+        
+        // Caso 2: El rol está desactivado
+        if (rolInfo.activo === false) {
+            console.warn('⚠️ El rol del usuario está desactivado');
+            if (mostrarAlerta) {
+                alert('⚠️ Su rol ha sido desactivado. Contacte al administrador.');
+            }
+            // Cerrar sesión
+            localStorage.removeItem('meca_token');
+            localStorage.removeItem('meca_usuario');
+            sessionStorage.clear();
+            window.location.href = '/login';
+            return false;
+        }
+        
+        // Todo bien
+        return true;
+        
+    } catch (error) {
+        console.error('Error verificando rol:', error);
+        return true; // En caso de error, permitir continuar
+    }
+}
 
+// ======================================================
+// FUNCIONES PARA PROCESAMIENTO DE AUDIOS
+// ======================================================
 
-// Exponer función globalmente
-window.toggleCamposFrecuencia = toggleCamposFrecuencia;
+// ----------------------------------------------------------------------
+// CONFIGURACIÓN DE RUTA DE AUDIOS
+// ----------------------------------------------------------------------
+
+async function cargarConfiguracionAudios() {
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/config/audios`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            configuracionAudios = result.config;
+            // Cargar en la UI
+            const rutaInput = document.getElementById('configRutaAudios');
+            const extInput = document.getElementById('configExtensiones');
+            if (rutaInput) rutaInput.value = result.config.ruta_base || '';
+            if (extInput) extInput.value = (result.config.extensiones || ['.mp3','.wav']).join(',');
+            return configuracionAudios;
+        }
+        
+        return null;
+    } catch (error) {
+        console.warn('Error cargando configuración:', error);
+        return null;
+    }
+}
+
+async function guardarConfiguracionAudios() {
+    const ruta = document.getElementById('configRutaAudios')?.value.trim();
+    const extensionesRaw = document.getElementById('configExtensiones')?.value.trim();
+    
+    if (!ruta) {
+        alert('⚠️ Ingrese una ruta de audios válida');
+        return;
+    }
+    
+    const extensiones = extensionesRaw ? extensionesRaw.split(',').map(e => e.trim()) : ['.mp3', '.wav'];
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/config/audios`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ruta_base: ruta,
+                extensiones: extensiones
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ Configuración guardada correctamente');
+            configuracionAudios = {
+                ruta_base: ruta,
+                extensiones: extensiones
+            };
+            localStorage.setItem('config_audios', JSON.stringify(configuracionAudios));
+        } else {
+            alert('❌ Error: ' + (result.error || 'No se pudo guardar'));
+        }
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+async function probarRutaAudios() {
+    const ruta = document.getElementById('configRutaAudios')?.value.trim();
+    const status = document.getElementById('configAudiosStatus');
+    
+    if (!ruta) {
+        if (status) status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese una ruta primero</span>';
+        return;
+    }
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/config/audios/probar`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ruta_base: ruta })
+        });
+        
+        const result = await response.json();
+        
+        if (status) {
+            if (result.success) {
+                status.innerHTML = `
+                    <span style="color: var(--ok);">✅ Ruta válida: ${ruta}</span>
+                    ${result.cantidad_audios !== undefined ? `<span style="margin-left: 15px;">📊 ${result.cantidad_audios} archivos de audio encontrados</span>` : ''}
+                `;
+            } else {
+                status.innerHTML = `<span style="color: var(--danger);">❌ ${result.error || 'Ruta inválida'}</span>`;
+            }
+        }
+    } catch (error) {
+        if (status) {
+            status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${error.message}</span>`;
+        }
+    }
+}
+
+// ----------------------------------------------------------------------
+// PROCESAR LOTE DE AUDIOS
+// ----------------------------------------------------------------------
+
+async function procesarAudiosDeLoteActivo() {
+    if (procesandoAudios) {
+        alert('⚠️ Ya hay un proceso de audios en ejecución');
+        return;
+    }
+    
+    // Obtener el lote activo
+    const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+    if (!loteActivo) {
+        alert('⚠️ No hay un lote activo. Cargue un archivo de escuchas primero.');
+        return;
+    }
+    
+    // 🔴 OBTENER EL VALOR DEL CHECKBOX
+    const forzarReprocesamiento = document.getElementById('forzarReprocesamiento')?.checked || false;
+    const textoReprocesamiento = forzarReprocesamiento 
+        ? '🔄 CON REPROCESAMIENTO (actualizará transcripciones existentes)' 
+        : '⏭️ SIN REPROCESAMIENTO (solo procesará audios nuevos)';
+    
+    // Mostrar opciones con el estado del reprocesamiento
+    const opciones = confirm(
+        `🎧 ¿PROCESAR AUDIOS DEL LOTE ACTIVO?\n\n` +
+        `📦 Lote: ${loteActivo.nombre_archivo || 'Lote activo'}\n` +
+        `📊 Tickets: ${loteActivo.total || 0}\n` +
+        `🔄 ${textoReprocesamiento}\n\n` +
+        `✅ ¿Desea analizar con Ollama?\n` +
+        `   (Si cancela, solo se transcribirá y podrá analizar después)`
+    );
+    
+    if (!opciones) {
+        // Preguntar si quiere solo transcripción
+        const soloTranscribir = confirm(
+            `📝 ¿Solo transcribir sin analizar?\n\n` +
+            `Los audios se transcribirán pero no se analizarán con IA.\n` +
+            `Luego puede analizarlos desde la bandeja del auditor.\n\n` +
+            `🔄 ${textoReprocesamiento}`
+        );
+        if (!soloTranscribir) return;
+        await procesarAudiosDeLote(loteActivo.id, { 
+            analizar: false,
+            forzar_reprocesamiento: forzarReprocesamiento  // 🔴 PASAR EL PARÁMETRO
+        });
+    } else {
+        await procesarAudiosDeLote(loteActivo.id, { 
+            analizar: true,
+            forzar_reprocesamiento: forzarReprocesamiento  // 🔴 PASAR EL PARÁMETRO
+        });
+    }
+}
+
+// ============================================================
+// MONITOREO DE PROGRESO EN VIVO
+// ============================================================
+
+let monitorProgresoInterval = null;
+
+function iniciarMonitorProgreso() {
+    if (monitorProgresoInterval) {
+        clearInterval(monitorProgresoInterval);
+    }
+    
+    // Resetear acumulador
+    progresoAcumulado = {
+        total: 0,
+        exitosos: 0,
+        transcritos: 0,
+        analizados: 0,
+        reprocesados: 0,
+        omitidos: 0,
+        errores: 0,
+        porcentaje: 0,
+        ultimoTicket: ''
+    };
+    
+    console.log('🔄 Iniciando monitor de progreso...');
+    
+    // Primera actualización inmediata
+    actualizarProgresoLive();
+    
+    // Luego cada 2 segundos
+    monitorProgresoInterval = setInterval(actualizarProgresoLive, 2000);
+}
+
+let progresoAcumulado = {
+    total: 0,
+    exitosos: 0,
+    transcritos: 0,
+    analizados: 0,
+    reprocesados: 0,
+    omitidos: 0,
+    errores: 0,
+    porcentaje: 0,
+    ultimoTicket: ''
+};
+
+function actualizarProgresoLive() {
+    const token = localStorage.getItem('meca_token');
+    
+    fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/progreso`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data) return;
+        
+        console.log('📊 Progreso recibido:', {
+            porcentaje: data.porcentaje,
+            total: data.total,
+            exitosos: data.exitosos,
+            transcritos: data.transcritos,
+            errores: data.errores,
+            ticket: data.ticket_actual
+        });
+        
+        // ============================================================
+        // 1. ACTUALIZAR VALORES ACUMULADOS (SOLO SI SON MAYORES)
+        // ============================================================
+        if (data.total > progresoAcumulado.total) {
+            progresoAcumulado.total = data.total;
+        }
+        if (data.exitosos > progresoAcumulado.exitosos) {
+            progresoAcumulado.exitosos = data.exitosos;
+        }
+        if (data.transcritos > progresoAcumulado.transcritos) {
+            progresoAcumulado.transcritos = data.transcritos;
+        }
+        if (data.analizados > progresoAcumulado.analizados) {
+            progresoAcumulado.analizados = data.analizados;
+        }
+        if (data.reprocesados > progresoAcumulado.reprocesados) {
+            progresoAcumulado.reprocesados = data.reprocesados;
+        }
+        if (data.omitidos > progresoAcumulado.omitidos) {
+            progresoAcumulado.omitidos = data.omitidos;
+        }
+        if (data.errores > progresoAcumulado.errores) {
+            progresoAcumulado.errores = data.errores;
+        }
+        if (data.porcentaje > progresoAcumulado.porcentaje) {
+            progresoAcumulado.porcentaje = data.porcentaje;
+        }
+        if (data.ticket_actual && data.ticket_actual !== progresoAcumulado.ultimoTicket) {
+            progresoAcumulado.ultimoTicket = data.ticket_actual;
+        }
+        
+        // ============================================================
+        // 2. ACTUALIZAR BARRA DE PROGRESO
+        // ============================================================
+        const fill = document.getElementById('progressFill');
+        const percent = document.getElementById('progressPercent');
+        if (fill) fill.style.width = `${progresoAcumulado.porcentaje || 0}%`;
+        if (percent) percent.textContent = `${progresoAcumulado.porcentaje || 0}%`;
+        
+        // ============================================================
+        // 3. ACTUALIZAR CONTADORES PRINCIPALES
+        // ============================================================
+        const total = document.getElementById('progressTotal');
+        const exitosos = document.getElementById('progressExitosos');
+        const transcritos = document.getElementById('progressTranscritos');
+        const analizados = document.getElementById('progressAnalizados');
+        const reprocesados = document.getElementById('progressReprocesados');
+        const omitidos = document.getElementById('progressOmitidos');
+        const errores = document.getElementById('progressErrores');
+        const ticketNombre = document.getElementById('progressTicketNombre');
+        
+        if (total) total.textContent = progresoAcumulado.total;
+        if (exitosos) exitosos.textContent = progresoAcumulado.exitosos;
+        if (transcritos) transcritos.textContent = progresoAcumulado.transcritos;
+        if (analizados) analizados.textContent = progresoAcumulado.analizados;
+        if (reprocesados) reprocesados.textContent = progresoAcumulado.reprocesados;
+        if (omitidos) omitidos.textContent = progresoAcumulado.omitidos;
+        if (errores) errores.textContent = progresoAcumulado.errores;
+        if (ticketNombre) ticketNombre.textContent = progresoAcumulado.ultimoTicket || '-';
+        
+        // ============================================================
+        // 4. ACTUALIZAR LOGS (SOLO AGREGAR NUEVOS)
+        // ============================================================
+        const logsContainer = document.getElementById('progressLogs');
+        if (logsContainer && data.logs) {
+            // Obtener logs actuales
+            const logsActuales = logsContainer.innerText;
+            const logsMostrar = data.logs.slice(-30);
+            
+            // Solo actualizar si hay cambios
+            const nuevoHtml = logsMostrar.map(log => {
+                let color = '#333';
+                if (log.includes('✅')) color = '#28a745';
+                else if (log.includes('❌')) color = '#d93025';
+                else if (log.includes('🔄')) color = '#f39c12';
+                else if (log.includes('⏭️')) color = '#6c757d';
+                else if (log.includes('📝')) color = '#019DF4';
+                else if (log.includes('🧠')) color = '#7b1fa2';
+                else if (log.includes('⚠️')) color = '#f39c12';
+                return `<div style="padding: 2px 0; border-bottom: 1px solid #f0f0f0; color: ${color};">${log}</div>`;
+            }).join('');
+            
+            if (logsContainer.innerHTML !== nuevoHtml) {
+                logsContainer.innerHTML = nuevoHtml;
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            }
+        }
+        
+        // ============================================================
+        // 5. ACTUALIZAR ESTADO DE TICKETS
+        // ============================================================
+        const estadoContainer = document.getElementById('progressEstadoTickets');
+        if (estadoContainer && data.estado_tickets) {
+            const tickets = Object.entries(data.estado_tickets);
+            if (tickets.length > 0) {
+                let html = '<div style="font-size: 11px; border-top: 1px solid #e0e0e0; padding-top: 8px;">';
+                html += '<strong>📋 Estado por ticket:</strong><br>';
+                for (const [ticket, estado] of tickets.slice(-10)) {  // Últimos 10
+                    const icono = estado.icono || '•';
+                    const texto = estado.estado || 'Pendiente';
+                    const bgColor = estado.ya_existia ? '#f0f0f0' : 'transparent';
+                    html += `<div style="padding: 2px 4px; border-bottom: 1px solid #f0f0f0; font-size: 11px; background: ${bgColor};">
+                        ${icono} ${ticket}: ${texto}
+                    </div>`;
+                }
+                if (tickets.length > 10) {
+                    html += `<div style="font-size: 10px; color: var(--muted); padding-top: 4px;">... y ${tickets.length - 10} más</div>`;
+                }
+                html += '</div>';
+                estadoContainer.innerHTML = html;
+            }
+        }
+        
+        // ============================================================
+        // 6. ACTUALIZAR ÍCONO Y TÍTULO
+        // ============================================================
+        const icon = document.getElementById('progressIcon');
+        const title = document.getElementById('progressTitle');
+        
+        if (icon && title) {
+            if (data.en_ejecucion) {
+                icon.textContent = '🔄';
+                title.textContent = `Procesando audios... (${progresoAcumulado.porcentaje || 0}%)`;
+            } else if (progresoAcumulado.errores > 0 && progresoAcumulado.porcentaje < 100) {
+                icon.textContent = '⚠️';
+                title.textContent = '⚠️ Proceso con errores';
+            } else if (progresoAcumulado.porcentaje >= 100) {
+                icon.textContent = '✅';
+                title.textContent = '✅ Proceso completado';
+            }
+        }
+        
+        // ============================================================
+        // 7. SI TERMINÓ, MOSTRAR BOTÓN CERRAR
+        // ============================================================
+        if (!data.en_ejecucion && data.porcentaje >= 100) {
+            const btn = document.getElementById('btnCerrarProgreso');
+            if (btn) {
+                btn.style.display = 'inline-block';
+            }
+            if (monitorProgresoInterval) {
+                clearInterval(monitorProgresoInterval);
+                monitorProgresoInterval = null;
+            }
+            
+            // Actualizar título final
+            const titleFinal = document.getElementById('progressTitle');
+            if (titleFinal) {
+                const totalProcesados = progresoAcumulado.total || 0;
+                const totalErrores = progresoAcumulado.errores || 0;
+                const totalExitosos = progresoAcumulado.exitosos || 0;
+                titleFinal.textContent = `✅ Proceso completado: ${totalExitosos} exitosos, ${totalErrores} errores`;
+            }
+        }
+        
+    })
+    .catch(error => {
+        console.error('Error obteniendo progreso:', error);
+    });
+}
+
+function cerrarMonitorProgreso() {
+    // 1. Detener el intervalo de monitoreo
+    if (monitorProgresoInterval) {
+        clearInterval(monitorProgresoInterval);
+        monitorProgresoInterval = null;
+    }
+    
+    // 2. Eliminar el modal de progreso
+    const div = document.getElementById('audioProgress');
+    if (div) {
+        div.remove();
+    }
+    
+    // 3. Resetear el acumulador de progreso
+    progresoAcumulado = {
+        total: 0,
+        exitosos: 0,
+        transcritos: 0,
+        analizados: 0,
+        reprocesados: 0,
+        omitidos: 0,
+        errores: 0,
+        porcentaje: 0,
+        ultimoTicket: ''
+    };
+    
+    // 4. Limpiar progreso en el servidor
+    const token = localStorage.getItem('meca_token');
+    fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/progreso/limpiar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+    }).catch(() => {});
+    
+    console.log('✅ Monitor de progreso cerrado');
+}
+
+async function procesarAudiosDeLote(loteId, opciones = {}) {
+    if (procesandoAudios) {
+        alert('⚠️ Ya hay un proceso de audios en ejecución');
+        return;
+    }
+    
+    console.log(`🎧 Procesando audios del lote ${loteId}`);
+    console.log(`   🔄 Forzar reprocesamiento: ${opciones.forzar_reprocesamiento || false}`);
+    procesandoAudios = true;
+    
+    const db = getDB();
+    if (!db) {
+        alert('❌ Base de datos no disponible');
+        procesandoAudios = false;
+        return;
+    }
+    
+    try {
+        // 1. Obtener tickets del lote
+        const { data: tickets, error } = await db
+            .from('asignaciones_escucha')
+            .select('id, ticket, peticion, motivo_call, gestor_auditado')
+            .eq('tarea_id', loteId);
+        
+        if (error) throw error;
+        
+        if (!tickets || tickets.length === 0) {
+            alert('⚠️ No hay tickets en este lote');
+            procesandoAudios = false;
+            return;
+        }
+        
+        // 2. Verificar configuración de ruta
+        if (!configuracionAudios) {
+            await cargarConfiguracionAudios();
+        }
+        
+        if (!configuracionAudios || !configuracionAudios.ruta_base) {
+            alert('⚠️ No hay configuración de ruta de audios. Configure la ruta primero.');
+            procesandoAudios = false;
+            return;
+        }
+        
+        // 3. VERIFICAR DISPONIBILIDAD DE AUDIOS PRIMERO
+        const ticketIds = tickets.map(t => t.id);
+        
+        // ============================================================
+        // MOSTRAR LOADING CON PROGRESO SIMULADO
+        // ============================================================
+        const totalTickets = tickets.length;
+        const tiempoEstimadoPorAudio = 10; // segundos por audio
+        const tiempoTotalEstimado = totalTickets * tiempoEstimadoPorAudio;
+        
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'verificandoAudios';
+        loadingDiv.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 100049;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            padding: 20px;
+        `;
+        
+        loadingDiv.innerHTML = `
+            <div style="background: white; border-radius: 16px; padding: 30px; max-width: 450px; text-align: center; width: 100%;">
+                <div style="font-size: 40px; margin-bottom: 15px;">🔍</div>
+                <h3 style="margin: 0 0 5px 0;">Verificando disponibilidad de audios...</h3>
+                <div style="font-size: 13px; color: var(--muted); margin-bottom: 15px;">
+                    ${totalTickets} tickets | ~${tiempoTotalEstimado}s estimado
+                </div>
+                <div style="margin-top: 15px; width: 100%; background: #e9ecef; border-radius: 10px; height: 12px; overflow: hidden;">
+                    <div id="verificandoProgress" style="width: 0%; height: 100%; background: linear-gradient(90deg, #019DF4, #00B4F0); border-radius: 10px; transition: width 0.3s;"></div>
+                </div>
+                <div id="verificandoText" style="margin-top: 10px; font-size: 13px; color: var(--muted);">Iniciando verificación...</div>
+                <div style="margin-top: 5px; font-size: 12px; color: var(--muted);">
+                    <span id="verificandoCount">0</span> de <span id="verificandoTotal">${totalTickets}</span> audios verificados
+                </div>
+            </div>
+        `;
+        document.body.appendChild(loadingDiv);
+        
+        // ============================================================
+        // INICIAR PROGRESO SIMULADO
+        // ============================================================
+        let progresoSimulado = 0;
+        let audioVerificados = 0;
+        let progresoActivo = true;
+        
+        const incrementoPorAudio = totalTickets > 0 ? (100 / totalTickets) : 0;
+        
+        const intervaloProgreso = setInterval(() => {
+            if (!progresoActivo) return;
+            
+            if (audioVerificados < totalTickets) {
+                audioVerificados++;
+                progresoSimulado = Math.min(progresoSimulado + incrementoPorAudio, 98);
+                
+                const progressBar = document.getElementById('verificandoProgress');
+                const textEl = document.getElementById('verificandoText');
+                const countEl = document.getElementById('verificandoCount');
+                
+                if (progressBar) progressBar.style.width = `${progresoSimulado}%`;
+                if (countEl) countEl.textContent = audioVerificados;
+                if (textEl) {
+                    const porcentaje = Math.round(progresoSimulado);
+                    textEl.textContent = `Verificando audio ${audioVerificados} de ${totalTickets} (${porcentaje}%)...`;
+                }
+            }
+        }, 1500);
+        
+        // ============================================================
+        // EJECUTAR VERIFICACIÓN REAL
+        // ============================================================
+        let verifyResult;
+        try {
+            const token = localStorage.getItem('meca_token');
+            const verifyResponse = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/verificar-audios`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ticket_ids: ticketIds,
+                    ruta_audios: configuracionAudios.ruta_base
+                })
+            });
+            
+            // 🔴 DETENER PROGRESO SIMULADO
+            progresoActivo = false;
+            clearInterval(intervaloProgreso);
+            
+            // Actualizar al 100%
+            const progressBar = document.getElementById('verificandoProgress');
+            const textEl = document.getElementById('verificandoText');
+            if (progressBar) progressBar.style.width = '100%';
+            if (textEl) textEl.textContent = '✅ Verificación completada!';
+            
+            // Esperar medio segundo para que se vea el 100%
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Remover loading
+            loadingDiv.remove();
+            
+            verifyResult = await verifyResponse.json();
+            
+            if (!verifyResult.success) {
+                throw new Error(verifyResult.error || 'Error en verificación');
+            }
+            
+        } catch (error) {
+            // 🔴 En caso de error, detener progreso y mostrar error
+            progresoActivo = false;
+            clearInterval(intervaloProgreso);
+            
+            const textEl = document.getElementById('verificandoText');
+            if (textEl) {
+                textEl.textContent = `❌ Error: ${error.message}`;
+                textEl.style.color = '#d93025';
+            }
+            
+            // Esperar 2 segundos antes de cerrar
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            loadingDiv.remove();
+            
+            throw error;
+        }
+        
+        // 5. Mostrar resumen de disponibilidad
+        const total = verifyResult.total || 0;
+        const encontrados = verifyResult.encontrados || 0;
+        const noEncontrados = verifyResult.no_encontrados || 0;
+        const yaTranscritos = verifyResult.ya_transcritos || 0;
+        const nuevos = verifyResult.nuevos || 0;
+        const archivosUnicos = verifyResult.archivos_unicos || 0;
+        
+        // Obtener listas detalladas
+        let sinAudioList = '';
+        let yaTranscritosList = '';
+        
+        const sinAudio = (verifyResult.resultados || []).filter(r => r.audio_encontrado === false);
+        const yaTranscritosItems = (verifyResult.resultados || []).filter(r => r.audio_encontrado === true && r.ya_transcrito === true);
+        
+        if (sinAudio.length > 0) {
+            sinAudioList = sinAudio.slice(0, 10).map(r => 
+                `   • ${r.ticket_psi} (${r.motivo_call || 'sin motivo'})`
+            ).join('\n');
+            if (sinAudio.length > 10) {
+                sinAudioList += `\n   ... y ${sinAudio.length - 10} más`;
+            }
+        }
+        
+        if (yaTranscritosItems.length > 0) {
+            yaTranscritosList = yaTranscritosItems.slice(0, 10).map(r => 
+                `   • ${r.ticket_psi} (${r.motivo_call || 'sin motivo'})`
+            ).join('\n');
+            if (yaTranscritosItems.length > 10) {
+                yaTranscritosList += `\n   ... y ${yaTranscritosItems.length - 10} más`;
+            }
+        }
+        
+        // Obtener el valor del checkbox
+        const forzarReprocesamiento = document.getElementById('forzarReprocesamiento')?.checked || false;
+        const textoReprocesamiento = forzarReprocesamiento ? '🔄 CON REPROCESAMIENTO' : '⏭️ SIN REPROCESAMIENTO (solo nuevos)';
+        
+        // Construir mensaje completo
+        const mensaje = 
+            `🔍 VERIFICACIÓN DE AUDIOS\n\n` +
+            `📊 Total tickets: ${total}\n` +
+            `✅ Audio encontrado: ${encontrados}\n` +
+            `📁 Archivos únicos: ${archivosUnicos}\n` +
+            `⏭️ YA TRANSCRITOS: ${yaTranscritos}\n` +
+            `🆕 NUEVOS (sin transcripción): ${nuevos}\n` +
+            `❌ Audio NO encontrado: ${noEncontrados}\n` +
+            `📁 Ruta: ${configuracionAudios.ruta_base}\n` +
+            `🔄 ${textoReprocesamiento}\n\n` +
+            `${yaTranscritosList ? `⏭️ Tickets YA TRANSCRITOS:\n${yaTranscritosList}\n\n` : ''}` +
+            `${sinAudioList ? `❌ Tickets SIN audio:\n${sinAudioList}\n\n` : ''}` +
+            `¿Desea procesar los ${nuevos} tickets NUEVOS con audio disponible?\n` +
+            `${opciones.analizar ? '🧠 Con análisis de Ollama' : '📝 Solo transcripción'}`;
+        
+        if (!confirm(mensaje)) {
+            procesandoAudios = false;
+            return;
+        }
+        
+        // Obtener solo los IDs nuevos
+        const ticketIdsConAudio = verifyResult.ticket_ids_con_audio || [];
+        
+        if (ticketIdsConAudio.length === 0) {
+            alert(`✅ NO HAY TICKETS NUEVOS PARA PROCESAR\n\n` +
+                `📊 Total tickets: ${total}\n` +
+                `⏭️ Ya transcritos: ${yaTranscritos}\n` +
+                `❌ Sin audio: ${noEncontrados}\n\n` +
+                `Todos los tickets ya fueron procesados o no tienen audio.`);
+            procesandoAudios = false;
+            return;
+        }
+        
+        // 6. Crear modal de progreso
+        const progressDiv = crearModalProgreso();
+        document.body.appendChild(progressDiv);
+        
+        // Iniciar monitor de progreso
+        iniciarMonitorProgreso();
+        
+        // 7. Procesar solo los tickets nuevos
+        const token = localStorage.getItem('meca_token');
+        const processResponse = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/procesar-lote`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ticket_ids: ticketIdsConAudio,
+                analizar_con_ollama: opciones.analizar || false,
+                ruta_audios: configuracionAudios.ruta_base,
+                modelo_whisper: 'small',
+                modelo_ollama: 'llama3.2:3b',
+                modo: 'manual',
+                forzar_reprocesamiento: forzarReprocesamiento
+            })
+        });
+        
+        if (!processResponse.ok) {
+            throw new Error(`HTTP ${processResponse.status}`);
+        }
+        
+        const processResult = await processResponse.json();
+        
+        if (!processResult.success) {
+            throw new Error(processResult.error || 'Error al procesar');
+        }
+        
+        // 8. Mostrar resultados con estadísticas mejoradas
+        mostrarResultadosProgresoAudioConEstadisticas(processResult, tickets);
+        
+        // 9. Recargar datos
+        setTimeout(() => {
+            if (typeof refrescarMonitoreoEscuchas === 'function') {
+                refrescarMonitoreoEscuchas();
+            }
+            if (typeof cargarHistorialLotes === 'function') {
+                cargarHistorialLotes();
+            }
+            if (typeof cargarTranscripciones === 'function') {
+                cargarTranscripciones();
+            }
+        }, 2000);
+        
+        procesandoAudios = false;
+        
+    } catch (error) {
+        console.error('Error procesando audios:', error);
+        
+        // Intentar cerrar el loading si existe
+        const loadingDiv = document.getElementById('verificandoAudios');
+        if (loadingDiv) loadingDiv.remove();
+        
+        const progressText = document.getElementById('audioProgressText');
+        if (progressText) {
+            progressText.innerHTML = `❌ Error: ${error.message}`;
+            progressText.style.color = '#d93025';
+        }
+        
+        alert(`❌ Error al procesar: ${error.message}`);
+        procesandoAudios = false;
+    }
+}
+
+function mostrarResultadosProgresoAudioConEstadisticas(result, tickets) {
+    const logsDiv = document.getElementById('audioProgressLogs');
+    const resumenDiv = document.getElementById('audioProgressResumen');
+    const progressFill = document.getElementById('audioProgressFill');
+    const progressText = document.getElementById('audioProgressText');
+    const progressPercent = document.getElementById('audioProgressPercent');
+    
+    // Actualizar barra
+    progressFill.style.width = '100%';
+    progressPercent.textContent = '100%';
+    progressText.textContent = '✅ Procesamiento completado';
+    progressText.style.color = '#28a745';
+    
+    // Mostrar logs detallados
+    const ticketMap = {};
+    tickets.forEach(t => { ticketMap[t.id] = t; });
+    
+    let html = '<div style="border-top: 2px solid #e0e0e0; padding-top: 10px;">';
+    html += '<strong>📊 DETALLE POR TICKET:</strong><br>';
+    
+    for (const r of (result.resultados || [])) {
+        const ticket = ticketMap[r.ticket_id];
+        const ident = ticket ? (ticket.peticion || ticket.motivo_call || ticket.ticket) : 'N/A';
+        let icono = '';
+        let color = '';
+        let mensaje = '';
+        let estadoExtra = '';
+        
+        // 🔴 DETECTAR SI FUE REPROCESADO O NUEVO
+        if (r.ya_existia && result.reprocesados > 0) {
+            estadoExtra = '🔄 REPROCESADO';
+        } else if (r.ya_existia) {
+            estadoExtra = '⏭️ OMITIDO';
+        }
+        
+        if (r.audio_encontrado && r.transcripcion_estado === 'analizado') {
+            icono = '✅';
+            color = '#28a745';
+            mensaje = `Audio encontrado y analizado ${estadoExtra}`;
+        } else if (r.audio_encontrado && r.transcripcion_estado === 'transcrito') {
+            icono = '📝';
+            color = '#f39c12';
+            mensaje = `Audio encontrado y transcrito ${estadoExtra}`;
+        } else if (r.audio_encontrado === false) {
+            icono = '❌';
+            color = '#d93025';
+            mensaje = `No se encontró audio para "${ident}"`;
+        } else {
+            icono = '⚠️';
+            color = '#d93025';
+            mensaje = r.error || 'Error desconocido';
+        }
+        
+        html += `<div style="color: ${color}; padding: 3px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px;">
+            ${icono} <strong>${ticket ? ticket.ticket : r.ticket_id}</strong> 
+            (${ident}) → ${mensaje}
+        </div>`;
+    }
+    html += '</div>';
+    
+    if (logsDiv) logsDiv.innerHTML += html;
+    
+    // Resumen estadístico mejorado
+    const total = result.total || 0;
+    const nuevos = result.nuevos || 0;
+    const reprocesados = result.reprocesados || 0;
+    const omitidos = result.omitidos || 0;
+    const exitosos = result.exitosos || 0;
+    const transcritos = result.transcritos || 0;
+    const analizados = result.analizados || 0;
+    const errores = result.errores || 0;
+    
+    if (resumenDiv) {
+        resumenDiv.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 10px;">
+                <div style="background: #e8f5e9; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #28a745;">${nuevos}</div>
+                    <div style="font-size: 11px; color: var(--muted);">✅ Nuevos</div>
+                </div>
+                <div style="background: #fff8e0; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #f39c12;">${reprocesados}</div>
+                    <div style="font-size: 11px; color: var(--muted);">🔄 Reprocesados</div>
+                </div>
+                <div style="background: #e9ecef; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #6c757d;">${omitidos}</div>
+                    <div style="font-size: 11px; color: var(--muted);">⏭️ Omitidos</div>
+                </div>
+                <div style="background: #e3f2fd; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #7b1fa2;">${analizados}</div>
+                    <div style="font-size: 11px; color: var(--muted);">🧠 Analizados</div>
+                </div>
+                <div style="background: #fff0f0; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #d93025;">${errores}</div>
+                    <div style="font-size: 11px; color: var(--muted);">❌ Errores</div>
+                </div>
+            </div>
+            <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; text-align: center; font-size: 13px;">
+                📊 Total procesados: ${total} | 
+                📝 Transcritos: ${transcritos} | 
+                ${reprocesados > 0 ? '🔄 ' + reprocesados + ' reprocesados | ' : ''}
+                ${omitidos > 0 ? '⏭️ ' + omitidos + ' omitidos | ' : ''}
+                ✅ ${exitosos} exitosos
+            </div>
+            <button onclick="document.getElementById('audioProgress').remove()" 
+                    style="margin-top: 15px; padding: 10px 20px; background: #28a745; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 14px; width: 100%; font-weight: bold;">
+                ✅ Cerrar
+            </button>
+        `;
+    }
+}
+
+// ======================================================
+// CREAR MODAL DE PROGRESO (AGREGAR EN supervisor.js)
+// ======================================================
+
+function crearModalProgreso() {
+    // Eliminar modal existente si hay
+    const existing = document.getElementById('audioProgress');
+    if (existing) {
+        existing.remove();
+    }
+    
+    const div = document.createElement('div');
+    div.id = 'audioProgress';
+    div.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.85);
+        z-index: 100050;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        padding: 20px;
+        box-sizing: border-box;
+    `;
+    div.innerHTML = `
+        <div style="background: white; border-radius: 16px; padding: 30px; max-width: 750px; width: 95%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <h3 style="margin-top: 0; color: #019DF4; display: flex; align-items: center; gap: 10px;">
+                <span id="progressIcon">🔄</span>
+                <span id="progressTitle">Procesando audios...</span>
+            </h3>
+            
+            <div style="margin: 15px 0;">
+                <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 5px;">
+                    <span id="progressLabel">Progreso</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div style="width: 100%; background: #e9ecef; border-radius: 10px; height: 20px; overflow: hidden;">
+                    <div id="progressFill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #019DF4, #00B4F0); border-radius: 10px; transition: width 0.5s;"></div>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 15px;">
+                <div style="background: #e3f2fd; border-radius: 8px; padding: 8px; text-align: center;">
+                    <div id="progressTotal" style="font-size: 18px; font-weight: bold; color: #019DF4;">0</div>
+                    <div style="font-size: 10px; color: var(--muted);">Total</div>
+                </div>
+                <div style="background: #e8f5e9; border-radius: 8px; padding: 8px; text-align: center;">
+                    <div id="progressExitosos" style="font-size: 18px; font-weight: bold; color: #28a745;">0</div>
+                    <div style="font-size: 10px; color: var(--muted);">✅ Éxitos</div>
+                </div>
+                <div style="background: #fff8e0; border-radius: 8px; padding: 8px; text-align: center;">
+                    <div id="progressTranscritos" style="font-size: 18px; font-weight: bold; color: #f39c12;">0</div>
+                    <div style="font-size: 10px; color: var(--muted);">📝 Transc.</div>
+                </div>
+                <div style="background: #f3e5f5; border-radius: 8px; padding: 8px; text-align: center;">
+                    <div id="progressReprocesados" style="font-size: 18px; font-weight: bold; color: #7b1fa2;">0</div>
+                    <div style="font-size: 10px; color: var(--muted);">🔄 Repro.</div>
+                </div>
+                <div style="background: #e9ecef; border-radius: 8px; padding: 8px; text-align: center;">
+                    <div id="progressOmitidos" style="font-size: 18px; font-weight: bold; color: #6c757d;">0</div>
+                    <div style="font-size: 10px; color: var(--muted);">⏭️ Omit.</div>
+                </div>
+                <div style="background: #fff0f0; border-radius: 8px; padding: 8px; text-align: center;">
+                    <div id="progressErrores" style="font-size: 18px; font-weight: bold; color: #d93025;">0</div>
+                    <div style="font-size: 10px; color: var(--muted);">❌ Error</div>
+                </div>
+            </div>
+            
+            <div id="progressTicketActual" style="font-size: 13px; color: var(--muted); margin-bottom: 10px; padding: 8px; background: #f0f7ff; border-radius: 8px;">
+                📌 Procesando TICKET: <span id="progressTicketNombre">-</span>
+            </div>
+            
+            <div id="progressEstadoTickets" style="margin-bottom: 10px; max-height: 100px; overflow-y: auto;"></div>
+            
+            <div style="background: #f8f9fa; border-radius: 8px; padding: 10px; max-height: 150px; overflow-y: auto; font-size: 12px; font-family: monospace;">
+                <div id="progressLogs"></div>
+            </div>
+            
+            <div style="margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button id="btnCerrarProgreso" onclick="cerrarMonitorProgreso()" 
+                        style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 13px; display: none;">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(div);
+    console.log('✅ Modal de progreso creado');
+    return div;
+}
+
+function mostrarResultadosProgresoAudio(result, tickets) {
+    const logsDiv = document.getElementById('audioProgressLogs');
+    const resumenDiv = document.getElementById('audioProgressResumen');
+    const progressFill = document.getElementById('audioProgressFill');
+    const progressText = document.getElementById('audioProgressText');
+    const progressPercent = document.getElementById('audioProgressPercent');
+    
+    // Actualizar barra
+    progressFill.style.width = '100%';
+    progressPercent.textContent = '100%';
+    progressText.textContent = '✅ Procesamiento completado';
+    progressText.style.color = '#28a745';
+    
+    // Mostrar logs detallados
+    const ticketMap = {};
+    tickets.forEach(t => { ticketMap[t.id] = t; });
+    
+    let html = '<div style="border-top: 2px solid #e0e0e0; padding-top: 10px;">';
+    html += '<strong>📊 DETALLE POR TICKET:</strong><br>';
+    
+    let encontradosReales = 0;
+    let falsosPositivos = 0;
+    
+    for (const r of (result.resultados || [])) {
+        const ticket = ticketMap[r.ticket_id];
+        const ident = ticket ? (ticket.peticion || ticket.motivo_call || ticket.ticket) : 'N/A';
+        let icono = '';
+        let color = '';
+        let mensaje = '';
+        let rutaInfo = '';
+        
+        if (r.audio_encontrado && r.transcripcion_estado === 'analizado') {
+            icono = '✅';
+            color = '#28a745';
+            mensaje = `Audio encontrado y analizado`;
+            rutaInfo = `📍 ${r.audio_path || 'Ruta desconocida'}`;
+            encontradosReales++;
+        } else if (r.audio_encontrado && r.transcripcion_estado === 'transcrito') {
+            icono = '📝';
+            color = '#f39c12';
+            mensaje = `Audio encontrado y transcrito`;
+            rutaInfo = `📍 ${r.audio_path || 'Ruta desconocida'}`;
+            encontradosReales++;
+        } else if (r.audio_encontrado && r.transcripcion_estado === 'pendiente') {
+            // 🔴 CASO SOSPECHOSO: Dice que encontró pero no transcribió
+            icono = '⚠️';
+            color = '#f39c12';
+            mensaje = `⚠️ POSIBLE FALSO POSITIVO: Dice que encontró pero no transcribió`;
+            rutaInfo = `📍 ${r.audio_path || 'Ruta desconocida'}`;
+            falsosPositivos++;
+        } else if (r.audio_encontrado === false) {
+            icono = '❌';
+            color = '#d93025';
+            mensaje = `No se encontró audio para "${ident}"`;
+            const rutaBase = configuracionAudios?.ruta_base || 'No configurada';
+            rutaInfo = `🔍 Buscado en: ${rutaBase}`;
+        } else {
+            icono = '⚠️';
+            color = '#d93025';
+            mensaje = r.error || 'Error desconocido';
+        }
+        
+        html += `<div style="color: ${color}; padding: 3px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px;">
+            ${icono} <strong>${ticket ? ticket.ticket : r.ticket_id}</strong> 
+            (${ident}) → ${mensaje}
+            ${rutaInfo ? `<br><span style="font-size: 10px; color: var(--muted); margin-left: 20px;">${rutaInfo}</span>` : ''}
+        </div>`;
+    }
+    html += '</div>';
+    
+    if (logsDiv) logsDiv.innerHTML += html;
+    
+    // Resumen estadístico - 🔴 INCLUYENDO FALSOS POSITIVOS
+    const total = result.total || 0;
+    const exitosos = result.exitosos || 0;
+    const transcritos = result.transcritos || 0;
+    const analizados = result.analizados || 0;
+    const errores = result.errores || 0;
+    
+    if (resumenDiv) {
+        resumenDiv.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;">
+                <div style="background: #e8f5e9; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #28a745;">${exitosos}</div>
+                    <div style="font-size: 11px; color: var(--muted);">✅ Audio encontrado</div>
+                </div>
+                <div style="background: #fff8e0; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #f39c12;">${transcritos}</div>
+                    <div style="font-size: 11px; color: var(--muted);">📝 Transcritos</div>
+                </div>
+                <div style="background: #e3f2fd; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #7b1fa2;">${analizados}</div>
+                    <div style="font-size: 11px; color: var(--muted);">🧠 Analizados con IA</div>
+                </div>
+                <div style="background: #fff0f0; border-radius: 8px; padding: 10px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #d93025;">${errores}</div>
+                    <div style="font-size: 11px; color: var(--muted);">❌ Errores / Sin audio</div>
+                </div>
+            </div>
+            ${falsosPositivos > 0 ? `
+            <div style="margin-top: 10px; padding: 10px; background: #fff8e0; border-radius: 8px; border-left: 4px solid #f39c12;">
+                ⚠️ <strong>Posibles falsos positivos:</strong> ${falsosPositivos} ticket(s) reportaron audio encontrado pero no se transcribieron.
+                <br>Verifique que los archivos sean audios válidos y tengan la extensión correcta.
+            </div>
+            ` : ''}
+            <button onclick="document.getElementById('audioProgress').remove()" 
+                    style="margin-top: 15px; padding: 10px 20px; background: #28a745; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 14px; width: 100%; font-weight: bold;">
+                ✅ Cerrar
+            </button>
+        `;
+    }
+}
+
+// ----------------------------------------------------------------------
+// ANALIZAR TRANSCRIPCIÓN DE UNA ESCUCHA (DESDE SUPERVISOR)
+// ----------------------------------------------------------------------
+
+async function analizarTranscripcionEscucha(escuchaId) {
+    if (!confirm('🧠 ¿Analizar esta transcripción con Ollama?')) return;
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`http://localhost:5001/api/transcripcion/analizar/${escuchaId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`✅ Análisis completado\n\n📊 Calificación: ${result.analisis?.calificacion || 0}%`);
+            // Recargar datos
+            refrescarMonitoreoEscuchas();
+            cargarHistorialLotes();
+        } else {
+            alert(`❌ Error: ${result.error || 'No se pudo analizar'}`);
+        }
+    } catch (error) {
+        alert(`❌ Error: ${error.message}`);
+    }
+}
+
 
 // =============================================
 // INICIALIZAR AL CARGAR LA PESTAÑA
 // =============================================
-
-// Sobrescribir showTab para cargar reportes al abrir la pestaña
-const originalShowTab = window.showTab || function() {};
-
-window.showTab = function(tabName, event) {
-    // Llamar a la función original
-    if (typeof originalShowTab === 'function') {
-        originalShowTab(tabName, event);
-    }
-    
-    // Si es la pestaña de reportes automáticos, cargar estado
-    if (tabName === 'reportesAuto') {
-        setTimeout(cargarEstadoReportes, 300);
-    }
-};
 
 // Cargar estado al iniciar si la pestaña está visible
 document.addEventListener('DOMContentLoaded', function() {
@@ -45075,6 +48168,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 500);
 });
+
+
 
 // ======================================================
 // FUNCIÓN PARA ACTUALIZAR HEADER CON DATOS DEL USUARIO
@@ -45159,3 +48254,72 @@ window.addEventListener('load', function() {
 });
 
 console.log('✅ Sistema de actualización de header de supervisor registrado');
+
+
+// =======================================================================
+// EXPONER FUNCIONES GLOBALMENTE - AGREGAR ESTO AL FINAL
+// =======================================================================
+
+// ======================================================
+// 1. FUNCIONES DE NAVEGACIÓN Y UI PRINCIPAL
+// ======================================================
+window.showTab = showTab;
+window.cambiarAgrupacion = cambiarAgrupacion;
+window.getCuartilHTML = getCuartilHTML;
+window.toggleCamposFrecuencia = toggleCamposFrecuencia;
+
+// ======================================================
+// 2. FUNCIONES DE SESIÓN Y AUTENTICACIÓN
+// ======================================================
+window.generarSessionToken = generarSessionToken;
+window.obtenerIpPublica = obtenerIpPublica;
+window.obtenerInfoDispositivo = obtenerInfoDispositivo;
+window.crearSesionActiva = crearSesionActiva;
+window.registrarHistorialLogin = registrarHistorialLogin;
+window.verificarValidezSesion = verificarValidezSesion;
+window.actualizarUltimaActividad = actualizarUltimaActividad;
+window.limpiarSesionesExpiradas = limpiarSesionesExpiradas;
+window.iniciarMonitorSesion = iniciarMonitorSesion;
+
+// ======================================================
+// 3. FUNCIONES DE ROLES Y PERMISOS
+// ======================================================
+window.esAdministrador = esAdministrador;
+window.mostrarBotonesSegunRol = mostrarBotonesSegunRol;
+window.actualizarTablaRoles = actualizarTablaRoles;
+window.reactivarUsuario = reactivarUsuario;
+window.eliminarUsuario = eliminarUsuario;
+
+// ======================================================
+// 4. FUNCIONES DE USUARIOS (CRUD)
+// ======================================================
+window.mostrarModalNuevoUsuario = mostrarModalNuevoUsuario;
+window.cerrarModalNuevoUsuario = cerrarModalNuevoUsuario;
+window.guardarUsuarioModal = guardarUsuarioModal;
+window.cargarRolesEnModal = cargarRolesEnModal;
+window.cargarHistorialEvaluaciones = cargarHistorialEvaluaciones;
+
+// ======================================================
+// 5. FUNCIONES DE REPORTES Y PDA
+// ======================================================
+window.generarReportes = generarReportes;
+window.generarReporteConsolidadoPDA = generarReporteConsolidadoPDA;
+window.generarHTMLConsolidado = generarHTMLConsolidado;
+window.agruparPDAPorEstado = agruparPDAPorEstado;
+window.verReportePDA = verReportePDA;
+
+// ======================================================
+// 6. FUNCIONES DE EVOLUCIÓN Y CUARTILES
+// ======================================================
+window.cargarEvolucionCuartilesPorGestor = cargarEvolucionCuartilesPorGestor;
+window.inicializarFiltrosEvolucionCuartiles = inicializarFiltrosEvolucionCuartiles;
+
+// ======================================================
+// 7. FUNCIONES DE ESCUCHAS Y LOTES
+// ======================================================
+window.cargarHistorialLotes = cargarHistorialLotes;
+window.refrescarHistorialLotes = refrescarHistorialLotes;
+window.exportarHistorialLotesCSV = exportarHistorialLotesCSV;
+window.seleccionarLoteHistorial = seleccionarLoteHistorial;
+window.activarLote = activarLote;
+window.verDetalleLote = verDetalleLote;

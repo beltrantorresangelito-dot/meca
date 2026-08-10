@@ -197,7 +197,7 @@ async function verificarSesionAuditor() {
     }
     
     try {
-        // Decodificar token manualmente para obtener el rol
+        // Decodificar token
         const parts = token.split('.');
         if (parts.length !== 3) {
             throw new Error('Token inválido');
@@ -207,52 +207,32 @@ async function verificarSesionAuditor() {
         const payloadJson = atob(base64);
         const payload = JSON.parse(payloadJson);
         
-        // 🔴 CORREGIDO: Obtener nombre_completo desde localStorage o BD
+        // Obtener nombre completo
         let nombreCompleto = payload.nombre_completo || payload.nombre || null;
         
-        // Si el nombre no viene en el token, buscar en localStorage
         if (!nombreCompleto || nombreCompleto === 'undefined') {
             try {
                 const usuarioGuardadoObj = JSON.parse(usuarioGuardado);
                 nombreCompleto = usuarioGuardadoObj.nombre_completo || null;
-                console.log('📋 nombre_completo obtenido desde localStorage:', nombreCompleto);
-            } catch (e) {
-                console.warn('Error parseando usuarioGuardado:', e);
-            }
+            } catch (e) {}
         }
         
-        // 🔴 FALLBACK: Si aún no hay nombre, consultar BD
-        if (!nombreCompleto || nombreCompleto === 'undefined' || nombreCompleto === 'null') {
-            console.log('🔍 Buscando nombre_completo en BD...');
-            const db = getDB();
-            if (db) {
-                const { data: usuario, error } = await db
-                    .from('usuarios')
-                    .select('nombre_completo')
-                    .eq('id', payload.id)
-                    .single();
-                
-                if (!error && usuario && usuario.nombre_completo) {
-                    nombreCompleto = usuario.nombre_completo;
-                    console.log('📋 nombre_completo obtenido desde BD:', nombreCompleto);
-                }
-            }
-        }
-        
-        // 🔴 ULTIMO FALLBACK: Usar el nombre de usuario
-        if (!nombreCompleto || nombreCompleto === 'undefined' || nombreCompleto === 'null') {
+        if (!nombreCompleto || nombreCompleto === 'undefined') {
             nombreCompleto = payload.usuario;
-            console.warn('⚠️ Usando usuario como fallback:', nombreCompleto);
         }
+        
+        // ✅ USAR rol_codigo en lugar de rol
+        const rolUsuario = payload.rol_codigo || payload.rol || 'AUDITOR';
         
         usuarioActual = {
             id: payload.id,
             usuario: payload.usuario,
-            nombre_completo: nombreCompleto,  // ✅ AHORA TIENE EL VALOR CORRECTO
-            rol: payload.rol
+            nombre_completo: nombreCompleto,
+            rol: rolUsuario
         };
         
         console.log('✅ [AUDITOR] Usuario restaurado:', usuarioActual.nombre_completo);
+        console.log('✅ [AUDITOR] Rol:', usuarioActual.rol);
         
         if (usuarioActual.rol !== 'AUDITOR') {
             console.log('⚠️ [AUDITOR] Rol incorrecto:', usuarioActual.rol);
@@ -260,7 +240,7 @@ async function verificarSesionAuditor() {
             return false;
         }
         
-        // Guardar en localStorage con el nombre correcto
+        // Guardar en localStorage
         localStorage.setItem('meca_usuario', JSON.stringify({
             id: usuarioActual.id,
             usuario: usuarioActual.usuario,
@@ -268,7 +248,12 @@ async function verificarSesionAuditor() {
             rol: usuarioActual.rol
         }));
         
+        // ✅ MOSTRAR INTERFAZ Y GENERAR PESTAÑAS
         mostrarInterfazAuditor();
+        
+        // ✅ 🔴 NUEVO: Generar pestañas dinámicas para el auditor
+        await generarTabsAuditor();
+        
         return true;
         
     } catch (error) {
@@ -277,6 +262,177 @@ async function verificarSesionAuditor() {
         localStorage.removeItem('meca_usuario');
         window.location.href = '/login';
         return false;
+    }
+}
+
+
+// ======================================================
+// FUNCIÓN: generarTabsAuditor()
+// ======================================================
+// 📌 PROPÓSITO: Generar las pestañas del auditor dinámicamente
+// 📌 FUENTE: API /api/pestanas (filtra por rol usando el token)
+// 📌 ESTRUCTURA: Mis Escuchas, Evaluación, Historial, Incidencias
+// ======================================================
+
+async function generarTabsAuditor() {
+    console.log('🔧 Generando pestañas para auditor...');
+    
+    const tabsContainer = document.getElementById('tabsHeaderContainer');
+    if (!tabsContainer) {
+        console.error('❌ No se encontró el contenedor de pestañas');
+        return;
+    }
+    
+    // Limpiar pestañas existentes
+    tabsContainer.innerHTML = '';
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        
+        if (!token) {
+            console.error('❌ No hay token');
+            // Fallback: mostrar pestañas básicas
+            mostrarPestanasAuditorFallback(tabsContainer);
+            return;
+        }
+        
+        // 🔴 Obtener pestañas desde la API (filtradas por rol)
+        const response = await fetch('/api/pestanas', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const pestanas = await response.json();
+        console.log('📋 Pestañas para auditor:', pestanas);
+        
+        // Si no hay pestañas desde la API, usar fallback
+        if (pestanas.length === 0) {
+            console.warn('⚠️ No hay pestañas para el rol auditor, usando fallback');
+            mostrarPestanasAuditorFallback(tabsContainer);
+            return;
+        }
+        
+        // Crear botones para cada pestaña
+        pestanas.forEach(pestana => {
+            const button = document.createElement('button');
+            button.className = 'tab-button';
+            button.innerHTML = `${pestana.icono || '📄'} ${pestana.nombre}`;
+            button.setAttribute('data-tab', pestana.codigo);
+            
+            // Asignar evento click - usar la función showTab que ya existe en auditor.js
+            button.onclick = (event) => {
+                // Usar la función showTab global (definida en auditor.js)
+                if (typeof window.showTab === 'function') {
+                    window.showTab(pestana.codigo, event);
+                } else {
+                    // Fallback: cambiar pestañas manualmente
+                    cambiarPestanaManual(pestana.codigo);
+                }
+            };
+            
+            tabsContainer.appendChild(button);
+        });
+        
+        // Activar la primera pestaña por defecto
+        const primerBoton = tabsContainer.querySelector('.tab-button');
+        if (primerBoton) {
+            primerBoton.classList.add('active');
+            const primeraPestana = primerBoton.getAttribute('data-tab');
+            if (primeraPestana && typeof window.showTab === 'function') {
+                window.showTab(primeraPestana, null);
+            } else if (primeraPestana) {
+                cambiarPestanaManual(primeraPestana);
+            }
+        }
+        
+        console.log(`✅ Generadas ${tabsContainer.children.length} pestañas para auditor`);
+        
+    } catch (error) {
+        console.error('❌ Error generando pestañas para auditor:', error);
+        mostrarPestanasAuditorFallback(tabsContainer);
+    }
+}
+
+// ======================================================
+// FUNCIÓN: mostrarPestanasAuditorFallback()
+// ======================================================
+// 📌 PROPÓSITO: Mostrar pestañas por defecto si la API falla
+// ======================================================
+
+function mostrarPestanasAuditorFallback(tabsContainer) {
+    console.log('📋 Usando pestañas fallback para auditor');
+    
+    // Pestañas predefinidas para el auditor
+    const pestanasPorDefecto = [
+        { codigo: 'misEscuchas', nombre: '🎧 Mis Escuchas', icono: '🎧' },
+        { codigo: 'evaluacion', nombre: '📝 Evaluación de Calidad', icono: '📝' },
+        { codigo: 'historial', nombre: '📋 Historial de Evaluaciones', icono: '📋' },
+        { codigo: 'incidencias', nombre: '⚠️ Incidencias', icono: '⚠️' }
+    ];
+    
+    pestanasPorDefecto.forEach(pestana => {
+        const button = document.createElement('button');
+        button.className = 'tab-button';
+        button.innerHTML = `${pestana.icono} ${pestana.nombre}`;
+        button.setAttribute('data-tab', pestana.codigo);
+        
+        button.onclick = (event) => {
+            if (typeof window.showTab === 'function') {
+                window.showTab(pestana.codigo, event);
+            } else {
+                cambiarPestanaManual(pestana.codigo);
+            }
+        };
+        
+        tabsContainer.appendChild(button);
+    });
+    
+    // Activar primera pestaña
+    const primerBoton = tabsContainer.querySelector('.tab-button');
+    if (primerBoton) {
+        primerBoton.classList.add('active');
+        const primeraPestana = primerBoton.getAttribute('data-tab');
+        if (primeraPestana && typeof window.showTab === 'function') {
+            window.showTab(primeraPestana, null);
+        }
+    }
+}
+
+// ======================================================
+// FUNCIÓN: cambiarPestanaManual()
+// ======================================================
+// 📌 PROPÓSITO: Cambiar pestañas manualmente (fallback)
+// ======================================================
+
+function cambiarPestanaManual(tabName) {
+    console.log(`🔄 Cambiando a pestaña: ${tabName} (manual)`);
+    
+    // Ocultar todas las pestañas
+    document.querySelectorAll('.tab-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+    
+    // Desactivar todos los botones
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    // Mostrar la pestaña seleccionada
+    const targetPane = document.getElementById(`tab-${tabName}`);
+    if (targetPane) {
+        targetPane.classList.add('active');
+    }
+    
+    // Activar el botón correspondiente
+    const btn = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
+    if (btn) {
+        btn.classList.add('active');
     }
 }
 
@@ -302,6 +458,8 @@ async function verificarSesionAuditor() {
 //    3. Configura campos específicos de auditor (oculta selector de evaluador)
 //    4. 🔴 CORREGIDO: Verifica y corrige nombre_completo si es "undefined"
 // ======================================================
+
+
 
 function mostrarInterfazAuditor() {
     console.log('👤 Mostrando interfaz para auditor:', usuarioActual?.nombre_completo);
@@ -5794,21 +5952,20 @@ async function continuarGestionEscucha(id) {
 
 function cargarDatosEscuchaEnFormulario(escucha) {
     // ======================================================
-    // 3a. TICKET PSI
+    // 1. CAMPOS BÁSICOS (código existente)
     // ======================================================
     const ticketPSI = document.getElementById('evalTicketPSI');
+    const agenteInput = document.getElementById('evalAgenteInput');
+    const agenteHidden = document.getElementById('evalAgente');
+    const idLlamada = document.getElementById('evalIdLlamada');
+    const fechaDescarga = document.getElementById('evalFechaDescargaAudio');
+    
     if (ticketPSI) {
         ticketPSI.value = escucha.ticket;
         ticketPSI.readOnly = true;
         ticketPSI.disabled = true;
         ticketPSI.style.backgroundColor = '#f0f0f0';
     }
-
-    // ======================================================
-    // 3b. GESTOR AUDITADO (AGENTE)
-    // ======================================================
-    const agenteInput = document.getElementById('evalAgenteInput');
-    const agenteHidden = document.getElementById('evalAgente');
     
     if (agenteInput) {
         agenteInput.value = escucha.gestor_auditado || '';
@@ -5819,29 +5976,21 @@ function cargarDatosEscuchaEnFormulario(escucha) {
     if (agenteHidden) {
         agenteHidden.value = escucha.gestor_auditado || '';
     }
-
-    // ======================================================
-    // 3c. ID LLAMADA (motivo_call)
-    // ======================================================
-    const idLlamada = document.getElementById('evalIdLlamada');
+    
     if (idLlamada) {
         idLlamada.value = escucha.motivo_call || '';
         idLlamada.readOnly = true;
         idLlamada.disabled = true;
         idLlamada.style.backgroundColor = '#f0f0f0';
     }
-
-    // ======================================================
-    // 3d. FECHA DESCARGA AUDIO (CORREGIDO ZONA HORARIA)
-    // ======================================================
-    const fechaDescarga = document.getElementById('evalFechaDescargaAudio');
+    
+    // Fecha descarga (código existente)
     if (fechaDescarga) {
         if (escucha.fecha_descarga) {
             try {
                 let fechaStr = escucha.fecha_descarga;
                 let anio, mes, dia, horas, minutos;
-
-                // Parsear diferentes formatos
+                
                 if (fechaStr.includes('T')) {
                     const [fechaParte, horaParte] = fechaStr.split('T');
                     [anio, mes, dia] = fechaParte.split('-');
@@ -5865,9 +6014,8 @@ function cargarDatosEscuchaEnFormulario(escucha) {
                     horas = '00';
                     minutos = '00';
                 }
-
+                
                 if (anio && mes && dia) {
-                    // Crear fecha UTC
                     const fechaUTC = new Date(Date.UTC(
                         parseInt(anio),
                         parseInt(mes) - 1,
@@ -5875,14 +6023,14 @@ function cargarDatosEscuchaEnFormulario(escucha) {
                         parseInt(horas) || 0,
                         parseInt(minutos) || 0
                     ));
-
+                    
                     if (!isNaN(fechaUTC.getTime())) {
                         const diaFormateado = String(fechaUTC.getUTCDate()).padStart(2, '0');
                         const mesFormateado = String(fechaUTC.getUTCMonth() + 1).padStart(2, '0');
                         const anioFormateado = fechaUTC.getUTCFullYear();
                         const horasFormateadas = String(fechaUTC.getUTCHours()).padStart(2, '0');
                         const minutosFormateados = String(fechaUTC.getUTCMinutes()).padStart(2, '0');
-
+                        
                         fechaDescarga.value = `${diaFormateado}/${mesFormateado}/${anioFormateado} ${horasFormateadas}:${minutosFormateados}`;
                     } else {
                         fechaDescarga.value = escucha.fecha_descarga;
@@ -5901,15 +6049,15 @@ function cargarDatosEscuchaEnFormulario(escucha) {
         fechaDescarga.disabled = true;
         fechaDescarga.style.backgroundColor = '#f0f0f0';
     }
-
+    
     // ======================================================
-    // 3e. DATOS PSI (Motivos, Submotivos, Subnivel, Petición)
+    // 2. DATOS PSI (código existente)
     // ======================================================
     const psiMotivos = document.getElementById('psiMotivos');
     const psiSubmotivos = document.getElementById('psiSubmotivos');
     const psiSubnivel = document.getElementById('psiSubnivel');
     const psiPeticion = document.getElementById('psiPeticion');
-
+    
     if (psiMotivos) {
         psiMotivos.value = escucha.motivos || '';
         psiMotivos.style.backgroundColor = '#f0f0f0';
@@ -5926,17 +6074,14 @@ function cargarDatosEscuchaEnFormulario(escucha) {
         psiPeticion.value = escucha.peticion || '';
         psiPeticion.style.backgroundColor = '#f0f0f0';
     }
-
-    // ======================================================
-    // 3f. MOSTRAR SECCIÓN DE DATOS PSI
-    // ======================================================
+    
     const seccionPSI = document.getElementById('seccionDatosPSI');
     if (seccionPSI) {
         seccionPSI.style.display = 'block';
     }
-
+    
     // ======================================================
-    // 3g. FECHA DE EVALUACIÓN (actual)
+    // 3. FECHA DE EVALUACIÓN (código existente)
     // ======================================================
     const fechaInput = document.getElementById('evalFecha');
     if (fechaInput) {
@@ -5944,9 +6089,9 @@ function cargarDatosEscuchaEnFormulario(escucha) {
         fechaInput.disabled = false;
         fechaInput.style.backgroundColor = '#fcfdfe';
     }
-
+    
     // ======================================================
-    // 3h. LIMPIAR SELECTS (PERO NO HABILITAR)
+    // 4. LIMPIAR SELECTS (código existente)
     // ======================================================
     const selects = document.querySelectorAll('.cumple-select');
     selects.forEach(select => {
@@ -5954,19 +6099,13 @@ function cargarDatosEscuchaEnFormulario(escucha) {
         select.disabled = true;
         select.style.backgroundColor = '#f0f0f0';
     });
-
-    // ======================================================
-    // 3i. LIMPIAR PESOS
-    // ======================================================
+    
     const pesos = document.querySelectorAll('.peso-indicador');
     pesos.forEach(peso => {
         peso.textContent = '0%';
         peso.style.color = '';
     });
-
-    // ======================================================
-    // 3j. RESETEAR RESULTADOS
-    // ======================================================
+    
     const resultados = [
         'resultadoENC', 'resultadoECUF', 'resultadoECN',
         'resultadoFrenteCliente', 'resultadoFrenteNegocio', 'resultadoFrenteProceso'
@@ -5975,8 +6114,220 @@ function cargarDatosEscuchaEnFormulario(escucha) {
         const el = document.getElementById(id);
         if (el) el.textContent = '0%';
     });
+    
+    // ======================================================
+    // 🔴 NUEVO: MOSTRAR TRANSCRIPCIÓN
+    // ======================================================
+    const transcripcionContainer = document.getElementById('transcripcionContainer');
+    const transcripcionText = document.getElementById('transcripcionText');
+    const transcripcionStatus = document.getElementById('transcripcionStatus');
+    const btnAnalizarTranscripcion = document.getElementById('btnAnalizarTranscripcion');
+    const analisisOllamaContainer = document.getElementById('analisisOllamaContainer');
+    
+    if (transcripcionContainer) {
+        const tieneTranscripcion = escucha.transcripcion && escucha.transcripcion.length > 0;
+        
+        if (tieneTranscripcion) {
+            transcripcionContainer.style.display = 'block';
+            
+            if (transcripcionText) {
+                const texto = escucha.transcripcion;
+                if (texto.length > 400) {
+                    transcripcionText.innerHTML = `
+                        ${escapeHtml(texto.substring(0, 400))}...
+                        <span style="color: var(--accent); cursor: pointer; font-weight: bold;" 
+                              onclick="expandirTranscripcion(this, '${escapeHtml(texto).replace(/'/g, "\\'")}')">
+                            [ver más]
+                        </span>
+                    `;
+                } else {
+                    transcripcionText.textContent = texto;
+                }
+            }
+            
+            if (transcripcionStatus) {
+                const estado = escucha.transcripcion_estado || 'transcrito';
+                const estadoLabels = {
+                    'transcrito': '📝 Transcrito (pendiente de análisis)',
+                    'analizado': '🧠 Analizado con IA',
+                    'error': '❌ Error en transcripción',
+                    'pendiente': '⏳ Pendiente',
+                    'audio_no_disponible': '⚠️ Audio no disponible'
+                };
+                const estadoColor = {
+                    'transcrito': '#f39c12',
+                    'analizado': '#28a745',
+                    'error': '#d93025',
+                    'pendiente': '#019DF4',
+                    'audio_no_disponible': '#d93025'
+                };
+                transcripcionStatus.innerHTML = `
+                    <span style="color: ${estadoColor[estado] || '#6c757d'}; font-weight: bold;">
+                        ${estadoLabels[estado] || estado}
+                    </span>
+                `;
+            }
+            
+            // Botón de análisis solo si está transcrito
+            if (btnAnalizarTranscripcion) {
+                btnAnalizarTranscripcion.style.display = 
+                    (escucha.transcripcion_estado === 'transcrito') ? 'inline-flex' : 'none';
+                if (escucha.transcripcion_estado === 'transcrito') {
+                    btnAnalizarTranscripcion.onclick = () => analizarTranscripcionDesdeEscucha(escucha.id);
+                }
+            }
+            
+            // Mostrar análisis si existe
+            if (escucha.analisis_ollama && analisisOllamaContainer) {
+                mostrarAnalisisOllamaEnAuditor(escucha.analisis_ollama);
+            } else if (analisisOllamaContainer) {
+                analisisOllamaContainer.style.display = 'none';
+            }
+            
+        } else {
+            transcripcionContainer.style.display = 'none';
+            if (analisisOllamaContainer) {
+                analisisOllamaContainer.style.display = 'none';
+            }
+        }
+    }
+    
+    console.log('✅ Datos de escucha cargados (incluyendo transcripción)');
+}
 
-    console.log('✅ Datos de escucha cargados (incluyendo fecha descarga y datos PSI)');
+// ======================================================
+// NUEVAS FUNCIONES PARA TRANSCRIPCIÓN EN AUDITOR
+// ======================================================
+
+function expandirTranscripcion(element, textoCompleto) {
+    const container = element.parentElement;
+    container.innerHTML = textoCompleto;
+}
+
+function mostrarAnalisisOllamaEnAuditor(analisis) {
+    const container = document.getElementById('analisisOllamaContainer');
+    if (!container) return;
+    
+    if (!analisis) {
+        container.style.display = 'none';
+        return;
+    }
+    
+    container.style.display = 'block';
+    
+    let analisisData = analisis;
+    if (typeof analisis === 'string') {
+        try {
+            analisisData = JSON.parse(analisis);
+        } catch (e) {
+            analisisData = { error: 'Error al parsear análisis' };
+        }
+    }
+    
+    const html = `
+        <div style="background: #f8f9fa; border-radius: 8px; padding: 15px; margin-top: 10px; border-left: 4px solid #7b1fa2;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <strong style="color: #7b1fa2;">🧠 Análisis con IA</strong>
+                <span style="background: ${analisisData.calificacion >= 90 ? '#28a745' : (analisisData.calificacion >= 70 ? '#f39c12' : '#d93025')}; 
+                       color: white; padding: 2px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+                    ${analisisData.calificacion || 0}%
+                </span>
+            </div>
+            
+            ${analisisData.justificacion ? `
+                <div style="font-size: 13px; margin-bottom: 10px; background: white; padding: 8px 12px; border-radius: 6px;">
+                    <strong>📝 Justificación:</strong><br>
+                    ${escapeHtml(analisisData.justificacion)}
+                </div>
+            ` : ''}
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <div style="background: white; padding: 8px 12px; border-radius: 6px;">
+                    <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">✅ Protocolos cumplidos</div>
+                    ${analisisData.protocolos_cumplidos && analisisData.protocolos_cumplidos.length > 0 ? 
+                        analisisData.protocolos_cumplidos.map(p => 
+                            `<div style="font-size: 12px; color: #28a745;">✓ ${escapeHtml(p)}</div>`
+                        ).join('') : 
+                        '<div style="font-size: 12px; color: var(--muted);">Ninguno</div>'
+                    }
+                </div>
+                <div style="background: white; padding: 8px 12px; border-radius: 6px;">
+                    <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">❌ Protocolos incumplidos</div>
+                    ${analisisData.protocolos_incumplidos && analisisData.protocolos_incumplidos.length > 0 ? 
+                        analisisData.protocolos_incumplidos.map(p => 
+                            `<div style="font-size: 12px; color: #d93025;">✗ ${escapeHtml(p)}</div>`
+                        ).join('') : 
+                        '<div style="font-size: 12px; color: var(--muted);">Ninguno</div>'
+                    }
+                </div>
+            </div>
+            
+            ${analisisData.recomendaciones && analisisData.recomendaciones.length > 0 ? `
+                <div style="font-size: 13px; background: #fff8e0; padding: 10px; border-radius: 8px; margin-top: 10px;">
+                    <strong>💡 Recomendaciones:</strong>
+                    <ul style="margin: 5px 0 0 20px; font-size: 12px;">
+                        ${analisisData.recomendaciones.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+            
+            <div style="margin-top: 10px; font-size: 11px; color: var(--muted); text-align: center;">
+                ⚡ Este análisis es orientativo y no reemplaza la evaluación humana
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+async function analizarTranscripcionDesdeEscucha(escuchaId) {
+    if (!confirm('🧠 ¿Analizar esta transcripción con Ollama?\n\nEsto puede tomar unos segundos.')) return;
+    
+    // Mostrar indicador
+    const btn = document.getElementById('btnAnalizarTranscripcion');
+    const textoOriginal = btn?.innerHTML;
+    if (btn) {
+        btn.innerHTML = '⏳ Analizando...';
+        btn.disabled = true;
+    }
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch(`http://localhost:5001/api/transcripcion/analizar/${escuchaId}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`✅ Análisis completado\n\n📊 Calificación: ${result.analisis?.calificacion || 0}%`);
+            // Recargar la escucha
+            const db = getDB();
+            if (db) {
+                const { data: escucha } = await db
+                    .from('asignaciones_escucha')
+                    .select('*')
+                    .eq('id', escuchaId)
+                    .single();
+                if (escucha) {
+                    cargarDatosEscuchaEnFormulario(escucha);
+                }
+            }
+        } else {
+            alert(`❌ Error: ${result.error || 'No se pudo analizar'}`);
+        }
+    } catch (error) {
+        alert(`❌ Error: ${error.message}`);
+    } finally {
+        if (btn) {
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
+        }
+    }
 }
 
 // ======================================================

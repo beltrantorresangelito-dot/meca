@@ -29,11 +29,22 @@ function hashSHA256(texto) {
 // Validar credenciales
 async function procesarLogin(usuario, contrasena) {
     try {
-        // 1. Buscar usuario
-        const result = await pool.query(
-            'SELECT id, usuario, nombre_completo, contrasena, rol, activo, primer_login FROM usuarios WHERE usuario = $1',
-            [usuario]
-        );
+        const result = await pool.query(`
+            SELECT 
+                u.id, 
+                u.usuario, 
+                u.nombre_completo, 
+                u.contrasena, 
+                u.rol_id, 
+                u.activo as usuario_activo, 
+                u.primer_login,
+                r.activo as rol_activo,
+                r.nombre as rol_nombre,
+                r.codigo as rol_codigo
+            FROM usuarios u
+            LEFT JOIN roles r ON u.rol_id = r.id
+            WHERE u.usuario = $1
+        `, [usuario]);
 
         const usuarioData = result.rows[0];
 
@@ -41,18 +52,29 @@ async function procesarLogin(usuario, contrasena) {
             return { success: false, error: 'Usuario no encontrado' };
         }
 
-        if (!usuarioData.activo) {
+        if (!usuarioData.usuario_activo) {
             return { success: false, error: 'Usuario desactivado' };
         }
 
-        // 2. Verificar contraseña (hash SHA-256)
-        const hashIngresado = hashSHA256(contrasena);
+        if (usuarioData.rol_activo === false) {
+            return { 
+                success: false, 
+                error: 'El rol asignado a este usuario está desactivado' 
+            };
+        }
 
+        if (!usuarioData.rol_id) {
+            return { 
+                success: false, 
+                error: 'Usuario sin rol asignado' 
+            };
+        }
+
+        const hashIngresado = hashSHA256(contrasena);
         if (usuarioData.contrasena !== hashIngresado) {
             return { success: false, error: 'Contraseña incorrecta' };
         }
 
-        // 3. Verificar primer login
         if (usuarioData.primer_login === true) {
             return {
                 success: false,
@@ -61,18 +83,21 @@ async function procesarLogin(usuario, contrasena) {
                     id: usuarioData.id,
                     usuario: usuarioData.usuario,
                     nombre_completo: usuarioData.nombre_completo,
-                    rol: usuarioData.rol
+                    rol_id: usuarioData.rol_id,
+                    rol_codigo: usuarioData.rol_codigo,
+                    rol_nombre: usuarioData.rol_nombre
                 }
             };
         }
 
-        // 4. Generar token JWT (simple, sin librería externa)
         const payload = {
             id: usuarioData.id,
             usuario: usuarioData.usuario,
             nombre_completo: usuarioData.nombre_completo,
-            rol: usuarioData.rol,
-            exp: Math.floor(Date.now() / 1000) + (8 * 60 * 60) // 8 horas
+            rol_id: usuarioData.rol_id,
+            rol_codigo: usuarioData.rol_codigo,
+            rol_nombre: usuarioData.rol_nombre,
+            exp: Math.floor(Date.now() / 1000) + (8 * 60 * 60)
         };
 
         const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
@@ -80,7 +105,6 @@ async function procesarLogin(usuario, contrasena) {
         const signature = Buffer.from('firma-simple').toString('base64url');
         const token = `${header}.${payloadEncoded}.${signature}`;
 
-        // 5. Actualizar último login (no bloqueante)
         pool.query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1', [usuarioData.id]).catch(err => {
             console.log('No se pudo actualizar ultimo_login:', err.message);
         });
@@ -92,7 +116,10 @@ async function procesarLogin(usuario, contrasena) {
                 id: usuarioData.id,
                 usuario: usuarioData.usuario,
                 nombre_completo: usuarioData.nombre_completo,
-                rol: usuarioData.rol
+                rol_id: usuarioData.rol_id,
+                rol: usuarioData.rol_codigo,        // ← Para compatibilidad
+                rol_codigo: usuarioData.rol_codigo,
+                rol_nombre: usuarioData.rol_nombre
             }
         };
 
@@ -107,6 +134,9 @@ function registrarRuta(metodo, ruta, manejador) {
     if (!routes[ruta]) routes[ruta] = {};
     routes[ruta][metodo] = manejador;
 }
+
+
+
 
 // ======================================================
 // BLOQUE 0: Servir archivos estáticos y vistas
@@ -284,23 +314,117 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         }
 
         try {
+            // Decodificar token
             const parts = token.split('.');
             const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-            const rol = payload.rol;
+            const rolCodigo = payload.rol_codigo || payload.rol || 'AUDITOR';
+
+            console.log(`🔍 Buscando redirección para rol: ${rolCodigo}`);
+
+            // ✅ CONSULTAR LA BD PARA OBTENER LA URL DE REDIRECCIÓN
+            const result = await pool.query(
+                `SELECT redirect_url, nombre, activo 
+                FROM roles 
+                WHERE codigo = $1 AND activo = true`,
+                [rolCodigo]
+            );
 
             let redirectUrl = '/login';
-            if (rol === 'AUDITOR') redirectUrl = '/auditor';
-            else if (rol === 'ADMIN' || rol === 'SUPERVISOR' || rol === 'GERENCIA') redirectUrl = '/supervisor';
+            let rolNombre = rolCodigo;
 
-            console.log(`Redireccion: ${rol} -> ${redirectUrl}`);
+            if (result.rows.length > 0) {
+                const rol = result.rows[0];
+                rolNombre = rol.nombre || rolCodigo;
+                
+                // 🔴 USAR LA URL CONFIGURADA EN LA BD
+                if (rol.redirect_url) {
+                    redirectUrl = rol.redirect_url;
+                    console.log(`✅ Redirección encontrada en BD: ${rolNombre} -> ${redirectUrl}`);
+                } else {
+                    // 🔴 FALLBACK: Si no tiene redirect_url configurado
+                    console.warn(`⚠️ Rol ${rolCodigo} sin redirect_url, usando fallback`);
+                    redirectUrl = rolCodigo === 'AUDITOR' ? '/auditor' : '/supervisor';
+                }
+            } else {
+                // 🔴 ROL NO ENCONTRADO EN BD
+                console.warn(`⚠️ Rol ${rolCodigo} no encontrado en BD, usando fallback`);
+                redirectUrl = rolCodigo === 'AUDITOR' ? '/auditor' : '/supervisor';
+            }
+
+            console.log(`✅ Redirección final: ${rolNombre} -> ${redirectUrl}`);
 
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ redirectUrl }));
+            respuesta.end(JSON.stringify({ 
+                redirectUrl,
+                rol: rolCodigo,
+                rolNombre: rolNombre
+            }));
 
         } catch (error) {
+            console.error('❌ Error en redirect:', error);
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token invalido' }));
+            respuesta.end(JSON.stringify({ error: 'Token inválido' }));
         }
+        return;
+    }
+
+    // server.js - Endpoint para actualizar redirect_url de un rol
+    if (ruta.match(/^\/api\/roles\/\d+\/redirect$/) && metodo === 'PUT') {
+        console.log('[API] PUT /api/roles/:id/redirect');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        const rolId = parseInt(ruta.split('/')[3]);
+        
+        let body = '';
+        peticion.on('data', chunk => body += chunk);
+        peticion.on('end', async () => {
+            try {
+                const { redirect_url } = JSON.parse(body);
+                
+                if (!redirect_url) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'redirect_url es requerido' }));
+                    return;
+                }
+                
+                // Validar formato de URL
+                if (!redirect_url.startsWith('/')) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'redirect_url debe comenzar con /' }));
+                    return;
+                }
+                
+                const result = await pool.query(
+                    'UPDATE roles SET redirect_url = $1, updated_at = NOW() WHERE id = $2 RETURNING id, codigo, nombre, redirect_url',
+                    [redirect_url, rolId]
+                );
+                
+                if (result.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
+                    return;
+                }
+                
+                console.log(`✅ Redirección actualizada para ${result.rows[0].nombre}: ${redirect_url}`);
+                
+                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ 
+                    success: true, 
+                    rol: result.rows[0]
+                }));
+                
+            } catch (error) {
+                console.error('Error:', error);
+                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: error.message }));
+            }
+        });
         return;
     }
 
@@ -1430,9 +1554,7 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     if (ruta === '/api/usuarios/auditores-activos' && metodo === 'GET') {
         console.log('[API] GET /api/usuarios/auditores-activos');
         
-        // Verificar token
         const token = peticion.headers['authorization']?.split(' ')[1];
-        
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
@@ -1440,22 +1562,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
         }
         
         try {
-            // Decodificar token para validar
-            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-            
-            if (payload.exp * 1000 < Date.now()) {
-                respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'Token expirado' }));
-                return;
-            }
-            
-            // 🔴 CONSULTA SIN LA COLUMNA 'email' (no existe en la tabla)
-            const result = await pool.query(
-                `SELECT id, usuario, nombre_completo, activo, ultimo_login, created_at
-                FROM usuarios 
-                WHERE rol = 'AUDITOR' AND activo = true 
-                ORDER BY nombre_completo`
-            );
+            // ✅ USAR rol_id EN LUGAR DE rol
+            const result = await pool.query(`
+                SELECT u.id, u.usuario, u.nombre_completo, u.activo, u.ultimo_login, u.created_at
+                FROM usuarios u
+                INNER JOIN roles r ON u.rol_id = r.id
+                WHERE r.codigo = 'AUDITOR' AND u.activo = true
+                ORDER BY u.nombre_completo
+            `);
             
             console.log(`✅ ${result.rows.length} auditores activos encontrados`);
             
@@ -1464,13 +1578,8 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
             
         } catch (error) {
             console.error('❌ Error en auditores-activos:', error);
-            console.error('Detalle:', error.message);
-            
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
-                error: 'Error interno del servidor',
-                details: error.message 
-            }));
+            respuesta.end(JSON.stringify({ error: error.message }));
         }
         return;
     }
@@ -1489,6 +1598,7 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
         }
         
         try {
+            // ✅ Usar JOIN para obtener el nombre del rol
             const result = await pool.query(`
                 SELECT 
                     u.id, 
@@ -1497,6 +1607,7 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     u.activo, 
                     u.created_at,
                     u.ultimo_login,
+                    u.rol_id,
                     r.id as rol_id,
                     r.codigo as rol_codigo,
                     r.nombre as rol_nombre
@@ -1535,6 +1646,8 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
             try {
                 const { usuario, nombre_completo, contrasena, rol_id, activo } = JSON.parse(body);
                 
+                console.log('📝 Creando usuario:', { usuario, nombre_completo, rol_id, activo });
+                
                 // Validaciones básicas
                 if (!usuario || !nombre_completo || !contrasena || !rol_id) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1550,6 +1663,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     return;
                 }
                 
+                // Verificar que el rol existe
+                const rolCheck = await pool.query('SELECT id FROM roles WHERE id = $1', [rol_id]);
+                if (rolCheck.rows.length === 0) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'El rol seleccionado no existe' }));
+                    return;
+                }
+                
                 // Hashear contraseña
                 const hashPassword = crypto.createHash('sha256').update(contrasena).digest('hex');
                 
@@ -1557,24 +1678,101 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 const maxId = await pool.query('SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM usuarios');
                 const nuevoId = maxId.rows[0].next_id;
                 
-                // Insertar usuario
+                // ✅ Insertar SOLO con rol_id (sin campo 'rol')
                 const result = await pool.query(`
-                    INSERT INTO usuarios (id, usuario, nombre_completo, contrasena, rol_id, activo, created_at, updated_at)
+                    INSERT INTO usuarios (
+                        id, 
+                        usuario, 
+                        nombre_completo, 
+                        contrasena, 
+                        rol_id, 
+                        activo, 
+                        created_at, 
+                        updated_at
+                    )
                     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-                    RETURNING id, usuario, nombre_completo, activo
+                    RETURNING id, usuario, nombre_completo, rol_id, activo
                 `, [nuevoId, usuario, nombre_completo, hashPassword, rol_id, activo]);
                 
-                console.log(`✅ Usuario creado: ${usuario} (ID: ${nuevoId})`);
+                console.log(`✅ Usuario creado: ${usuario} (ID: ${nuevoId}) con rol_id: ${rol_id}`);
                 
                 respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true, usuario: result.rows[0] }));
+                respuesta.end(JSON.stringify({ 
+                    success: true, 
+                    usuario: result.rows[0] 
+                }));
                 
             } catch (error) {
-                console.error('Error creando usuario:', error);
+                console.error('❌ Error creando usuario:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: error.message }));
             }
         });
+        return;
+    }
+
+    // server.js - Endpoint para obtener TODAS las pestañas (sin filtrar por rol)
+    if (ruta === '/api/pestanas/todas' && metodo === 'GET') {
+        console.log('[API] GET /api/pestanas/todas');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        try {
+            // 🔴 AHORA DEVUELVE TODAS (visibles y ocultas) PARA ADMIN
+            const result = await pool.query(
+                'SELECT * FROM pestanas_sistema ORDER BY orden, id'
+                // ❌ SIN filtro WHERE visible = true
+            );
+            
+            console.log(`✅ ${result.rows.length} pestañas totales (${result.rows.filter(p => p.visible).length} visibles, ${result.rows.filter(p => !p.visible).length} ocultas)`);
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows));
+            
+        } catch (error) {
+            console.error('Error:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+        return;
+    }
+
+    // ======================================================
+    // API - OBTENER PESTAÑAS DE UN ROL ESPECÍFICO
+    // ======================================================
+    if (ruta.match(/^\/api\/rol-pestanas\/\d+$/) && metodo === 'GET') {
+        console.log('[API] GET /api/rol-pestanas/:rolId');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        const rolId = parseInt(ruta.split('/').pop());
+        
+        try {
+            const result = await pool.query(
+                'SELECT pestana_codigo FROM rol_pestanas WHERE rol_id = $1',
+                [rolId]
+            );
+            
+            console.log(`✅ ${result.rows.length} pestañas asignadas al rol ${rolId}`);
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows));
+            
+        } catch (error) {
+            console.error('Error:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
         return;
     }
 
@@ -1610,6 +1808,102 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
         return;
     }
 
+
+
+    // ======================================================
+    // API - ROLES - Actualizar rol (PUT) - NUEVO
+    // ======================================================
+    if (ruta.match(/^\/api\/roles\/\d+$/) && metodo === 'PUT') {
+        console.log('[API] PUT /api/roles/:id');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        const id = parseInt(ruta.split('/').pop());
+        
+        let body = '';
+        peticion.on('data', chunk => body += chunk);
+        peticion.on('end', async () => {
+            try {
+                const { codigo, nombre, activo, pestanas } = JSON.parse(body);
+                
+                // 1. Validar datos
+                if (!codigo || !nombre) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Código y nombre son requeridos' }));
+                    return;
+                }
+                
+                // 2. Verificar que el rol existe
+                const check = await pool.query('SELECT id FROM roles WHERE id = $1', [id]);
+                if (check.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
+                    return;
+                }
+                
+                // 3. Verificar que no exista otro rol con el mismo código
+                const duplicado = await pool.query(
+                    'SELECT id FROM roles WHERE codigo = $1 AND id != $2',
+                    [codigo.toUpperCase(), id]
+                );
+                if (duplicado.rows.length > 0) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: `Ya existe un rol con el código "${codigo}"` }));
+                    return;
+                }
+                
+                // 4. Actualizar el rol
+                const result = await pool.query(`
+                    UPDATE roles 
+                    SET codigo = $1,
+                        nombre = $2,
+                        activo = $3,
+                        updated_at = NOW()
+                    WHERE id = $4
+                    RETURNING id, codigo, nombre, activo, created_at, updated_at
+                `, [codigo.toUpperCase(), nombre, activo !== false, id]);
+                
+                const rolActualizado = result.rows[0];
+                
+                // 5. Si se enviaron pestañas, actualizar permisos
+                if (pestanas && Array.isArray(pestanas)) {
+                    // 5a. Eliminar permisos existentes
+                    await pool.query('DELETE FROM rol_pestanas WHERE rol_id = $1', [id]);
+                    
+                    // 5b. Insertar nuevos permisos
+                    if (pestanas.length > 0) {
+                        const values = pestanas.map(codigo => `(${id}, '${codigo}')`).join(', ');
+                        await pool.query(
+                            `INSERT INTO rol_pestanas (rol_id, pestana_codigo) VALUES ${values}`
+                        );
+                    }
+                    
+                    console.log(`   ✅ ${pestanas.length} pestañas asignadas al rol ${id}`);
+                }
+                
+                console.log(`✅ Rol "${nombre}" actualizado (ID: ${id})`);
+                
+                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ 
+                    success: true, 
+                    rol: rolActualizado,
+                    message: 'Rol actualizado correctamente'
+                }));
+                
+            } catch (error) {
+                console.error('❌ Error actualizando rol:', error);
+                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: error.message }));
+            }
+        });
+        return;
+    }
+    
     // ======================================================
     // API - USUARIOS - Eliminar usuario (DELETE)
     // ======================================================
@@ -1762,6 +2056,132 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 
             } catch (error) {
                 console.error('Error creando rol:', error);
+                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: error.message }));
+            }
+        });
+        return;
+    }
+
+    // ======================================================
+    // API - ROLES - Desactivar rol (PUT)
+    // ======================================================
+    if (ruta.match(/^\/api\/roles\/\d+\/desactivar$/) && metodo === 'PUT') {
+        console.log('[API] PUT /api/roles/:id/desactivar');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        const id = parseInt(ruta.split('/')[3]);
+        
+        let body = '';
+        peticion.on('data', chunk => body += chunk);
+        peticion.on('end', async () => {
+            try {
+                const { activo } = JSON.parse(body);
+                
+                // Verificar que el rol existe
+                const check = await pool.query('SELECT id, nombre FROM roles WHERE id = $1', [id]);
+                if (check.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
+                    return;
+                }
+                
+                const rolNombre = check.rows[0].nombre;
+                
+                // Actualizar el estado
+                const result = await pool.query(`
+                    UPDATE roles 
+                    SET activo = $1, 
+                        updated_at = NOW()
+                    WHERE id = $2
+                    RETURNING id, codigo, nombre, activo, updated_at
+                `, [activo, id]);
+                
+                const estadoTexto = activo ? 'reactivado' : 'desactivado';
+                console.log(`✅ Rol "${rolNombre}" ${estadoTexto} (ID: ${id})`);
+                
+                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ 
+                    success: true, 
+                    rol: result.rows[0],
+                    message: `Rol "${rolNombre}" ${estadoTexto} correctamente`
+                }));
+                
+            } catch (error) {
+                console.error('❌ Error desactivando rol:', error);
+                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: error.message }));
+            }
+        });
+        return;
+    }
+
+    // ======================================================
+    // API - ROLES - Reactivar rol (PUT)
+    // ======================================================
+    if (ruta.match(/^\/api\/roles\/\d+\/reactivar$/) && metodo === 'PUT') {
+        console.log('[API] PUT /api/roles/:id/reactivar');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        const id = parseInt(ruta.split('/')[3]);
+        
+        let body = '';
+        peticion.on('data', chunk => body += chunk);
+        peticion.on('end', async () => {
+            try {
+                const { activo } = JSON.parse(body);
+                
+                // Verificar que el rol existe
+                const check = await pool.query('SELECT id, nombre FROM roles WHERE id = $1', [id]);
+                if (check.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
+                    return;
+                }
+                
+                const rolNombre = check.rows[0].nombre;
+                
+                // Si ya está activo, notificar
+                if (check.rows[0].activo === true) {
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ 
+                        error: `El rol "${rolNombre}" ya está activo` 
+                    }));
+                    return;
+                }
+                
+                // Reactivar el rol
+                const result = await pool.query(`
+                    UPDATE roles 
+                    SET activo = true, 
+                        updated_at = NOW()
+                    WHERE id = $1
+                    RETURNING id, codigo, nombre, activo, updated_at
+                `, [id]);
+                
+                console.log(`✅ Rol "${rolNombre}" reactivado (ID: ${id})`);
+                
+                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ 
+                    success: true, 
+                    rol: result.rows[0],
+                    message: `Rol "${rolNombre}" reactivado correctamente`
+                }));
+                
+            } catch (error) {
+                console.error('❌ Error reactivando rol:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: error.message }));
             }
@@ -2876,14 +3296,13 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
             try {
                 const { usuario, nombre_completo, rol_id, activo, contrasena } = JSON.parse(body);
                 
-                console.log(`📝 Actualizando usuario ID ${id}:`, { usuario, nombre_completo, rol_id, activo, tienePassword: !!contrasena });
+                console.log(`📝 Actualizando usuario ID ${id}:`, { usuario, nombre_completo, rol_id, activo });
                 
                 // Construir la consulta dinámicamente
                 const updates = [];
                 const values = [];
                 let idx = 1;
                 
-                // 🔴 INCLUIR EL CAMPO usuario
                 if (usuario !== undefined) {
                     updates.push(`usuario = $${idx++}`);
                     values.push(usuario);
@@ -2894,7 +3313,15 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     values.push(nombre_completo);
                 }
                 
+                // ✅ Actualizar SOLO rol_id (sin campo 'rol')
                 if (rol_id !== undefined) {
+                    // Verificar que el rol existe
+                    const rolCheck = await pool.query('SELECT id FROM roles WHERE id = $1', [rol_id]);
+                    if (rolCheck.rows.length === 0) {
+                        respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                        respuesta.end(JSON.stringify({ error: 'El rol seleccionado no existe' }));
+                        return;
+                    }
                     updates.push(`rol_id = $${idx++}`);
                     values.push(rol_id);
                 }
@@ -2927,7 +3354,7 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     return;
                 }
                 
-                console.log(`✅ Usuario ID ${id} actualizado. Campos modificados: ${updates.filter(u => u !== 'updated_at = NOW()').join(', ')}`);
+                console.log(`✅ Usuario ID ${id} actualizado`);
                 
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: true, message: 'Usuario actualizado' }));
@@ -4697,7 +5124,8 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     }
 
     // ======================================================
-    // API - ROLES - Eliminar rol (DELETE)
+    // API - ROLES - Eliminar rol físicamente (DELETE)
+    // SOLO PARA ADMINISTRADORES, CON VALIDACIÓN
     // ======================================================
     if (ruta.match(/^\/api\/roles\/\d+$/) && metodo === 'DELETE') {
         console.log('[API] DELETE /api/roles/:id');
@@ -4712,7 +5140,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
         const id = parseInt(ruta.split('/').pop());
         
         try {
-            // Verificar si el rol existe
+            // 1. Verificar que el rol existe
             const check = await pool.query('SELECT id, nombre FROM roles WHERE id = $1', [id]);
             if (check.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
@@ -4722,19 +5150,35 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
             
             const rolNombre = check.rows[0].nombre;
             
-            // Eliminar permisos de pestañas asociados
+            // 2. Verificar si tiene usuarios asignados
+            const usuarios = await pool.query('SELECT COUNT(*) as total FROM usuarios WHERE rol_id = $1', [id]);
+            const cantidadUsuarios = parseInt(usuarios.rows[0].total);
+            
+            if (cantidadUsuarios > 0) {
+                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ 
+                    error: `El rol "${rolNombre}" tiene ${cantidadUsuarios} usuario(s) asignado(s). No se puede eliminar.`,
+                    usuarios_asignados: cantidadUsuarios
+                }));
+                return;
+            }
+            
+            // 3. Eliminar permisos de pestañas
             await pool.query('DELETE FROM rol_pestanas WHERE rol_id = $1', [id]);
             
-            // Eliminar el rol
+            // 4. Eliminar el rol
             await pool.query('DELETE FROM roles WHERE id = $1', [id]);
             
-            console.log(`✅ Rol "${rolNombre}" (ID: ${id}) eliminado`);
+            console.log(`✅ Rol "${rolNombre}" eliminado físicamente (ID: ${id})`);
             
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: true, message: 'Rol eliminado' }));
+            respuesta.end(JSON.stringify({ 
+                success: true, 
+                message: `Rol "${rolNombre}" eliminado correctamente`
+            }));
             
         } catch (error) {
-            console.error('Error eliminando rol:', error);
+            console.error('❌ Error eliminando rol:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: error.message }));
         }
@@ -5930,6 +6374,8 @@ if (ruta === '/api/reglas-evaluacion' && metodo === 'POST') {
     return;
 }
 
+
+
 // PUT - Actualizar regla
 if (ruta.match(/^\/api\/reglas-evaluacion\/\d+$/) && metodo === 'PUT') {
     console.log('[API] PUT /api/reglas-evaluacion/:id');
@@ -6361,25 +6807,91 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
     }
 
     // ======================================================
-// server.js - ENDPOINT PARA ENVIAR CORREO
-// ======================================================
-
-// Instalar dependencias (ejecutar en terminal):
-// npm install nodemailer
-
-// Agregar al inicio de server.js:
-const nodemailer = require('nodemailer');
-
-// Configurar transporte de correo
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: false,
-    auth: {
-        user: process.env.SMTP_USER || 'tu-correo@gmail.com',
-        pass: process.env.SMTP_PASS || 'tu-contraseña'
+    // API - ESCUCHAS - Obtener tickets por lote
+    // ======================================================
+    if (ruta.match(/^\/api\/escuchas\/lotes\/\d+\/tickets$/) && metodo === 'GET') {
+        console.log('[API] GET /api/escuchas/lotes/:id/tickets');
+        
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+        
+        // Extraer el ID de la URL: /api/escuchas/lotes/1784149854379/tickets
+        const parts = ruta.split('/');
+        // parts = ['', 'api', 'escuchas', 'lotes', '1784149854379', 'tickets']
+        const loteId = parts[4]; // El ID está en la posición 4
+        
+        try {
+            // 1. Verificar que el lote existe
+            const check = await pool.query(
+                'SELECT id, nombre_archivo FROM tareas_escucha WHERE id = $1',
+                [loteId]
+            );
+            
+            if (check.rows.length === 0) {
+                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'Lote no encontrado' }));
+                return;
+            }
+            
+            // 2. Obtener los tickets del lote
+            const result = await pool.query(
+                `SELECT 
+                    id, 
+                    ticket, 
+                    auditor_asignado, 
+                    supervisor_responsable, 
+                    gestor_auditado,
+                    motivos, 
+                    submotivos,
+                    estado, 
+                    fecha_asignacion, 
+                    fecha_gestion,
+                    audio_disponible,
+                    motivo_incidencia,
+                    tarea_id
+                FROM asignaciones_escucha 
+                WHERE tarea_id = $1 
+                ORDER BY id DESC`,
+                [loteId]
+            );
+            
+            console.log(`✅ ${result.rows.length} tickets encontrados para lote ${loteId}`);
+            
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows));
+            
+        } catch (error) {
+            console.error('❌ Error obteniendo tickets:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+        return;
     }
-});
+
+    // ======================================================
+    // server.js - ENDPOINT PARA ENVIAR CORREO
+    // ======================================================
+
+        // Instalar dependencias (ejecutar en terminal):
+        // npm install nodemailer
+
+        // Agregar al inicio de server.js:
+        const nodemailer = require('nodemailer');
+
+        // Configurar transporte de correo
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT) || 587,
+            secure: false,
+            auth: {
+                user: process.env.SMTP_USER || 'tu-correo@gmail.com',
+                pass: process.env.SMTP_PASS || 'tu-contraseña'
+            }
+        });
 
     
     // ======================================================

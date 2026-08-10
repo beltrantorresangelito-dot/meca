@@ -155,7 +155,7 @@
             <!-- ====================================================================== -->
             <!-- 7b.1. ENCABEZADO DE PESTAÑAS                                           -->
             <!-- ====================================================================== -->
-            <div class="tabs-header">
+            <div class="tabs-header" id="tabsHeaderContainer">
                 <button class="tab-button active" onclick="showTab('misEscuchas', event)">🎧 Mis Escuchas</button>
                 <button class="tab-button" onclick="showTab('incidencias', event)">
                     ⚠️ Incidencias
@@ -170,7 +170,7 @@
             <!-- ====================================================================== -->
             <!-- 📌 Pestaña principal del auditor: muestra escuchas asignadas           -->
             <!-- ====================================================================== -->
-            <div id="tab-misEscuchas" class="tab-content tab-pane active">
+            <div id="tab-misEscuchas" class="tab-pane">
 
                 <!-- Tarjetas de resumen (KPIs) -->
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px;">
@@ -299,12 +299,19 @@
             <!-- ====================================================================== -->
             <!-- 📌 Formulario para realizar evaluaciones de calidad                    -->
             <!-- ====================================================================== -->
-            <div id="tab-evaluacion" class="tab-content tab-pane">
+            <div id="tab-evaluacion" class="tab-pane">
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h3 style="color: var(--accent);">📝 Formulario de Evaluación - Calidad de Cobranza</h3>
                         <div style="display: flex; gap: 10px;">
-                            <button id="btnAuditar" onclick="iniciarAuditoria()" class="secondary" style="background: var(--ok); color: white;">🎯 Auditar</button>
+                            <button id="btnAuditar" onclick="iniciarAuditoria()" disabled 
+                                    style="display: inline-flex; align-items: center; gap: 6px; 
+                                        background: var(--accent); padding: 10px 24px; 
+                                        border: none; border-radius: 8px; color: white; 
+                                        cursor: not-allowed; font-weight: bold; 
+                                        opacity: 0.5;">
+                                ▶️ Auditar
+                            </button>
                             <button id="btnFinalizar" onclick="finalizarAuditoria()" class="secondary" style="display: none;">⏱️ Finalizar y Guardar</button>
                             <button id="btnCancelarGestion" onclick="cancelarGestionActual()" class="secondary danger" style="display: none;">❌ Cancelar Gestión</button>
                         </div>
@@ -354,6 +361,32 @@
                         <div style="text-align: center; padding: 40px;">⏳ Cargando estructura de evaluación...</div>
                     </div>
 
+                    <!-- ====================================================== -->
+                    <!-- TRANSCRIPCIÓN DEL AUDIO -->
+                    <!-- ====================================================== -->
+                    <div id="transcripcionContainer" style="display: none; margin-top: 20px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden;">
+                        <div style="background: linear-gradient(135deg, #f8f9fa, #e9ecef); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line);">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 18px;">📄</span>
+                                <strong>Transcripción del Audio</strong>
+                                <span id="transcripcionStatus" style="font-size: 12px; margin-left: 10px;"></span>
+                            </div>
+                            <button id="btnAnalizarTranscripcion" 
+                                    onclick="analizarTranscripcionDesdeEscucha(window.idEscuchaGestionando)" 
+                                    style="display: none; background: #7b1fa2; padding: 6px 16px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;">
+                                🧠 Analizar con IA
+                            </button>
+                        </div>
+                        <div style="padding: 20px; max-height: 300px; overflow-y: auto; background: #fafafa;">
+                            <div id="transcripcionText" style="font-size: 14px; line-height: 1.8; white-space: pre-wrap; font-family: inherit;"></div>
+                        </div>
+                    </div>
+
+                    <!-- ====================================================== -->
+                    <!-- ANÁLISIS DE OLLAMA -->
+                    <!-- ====================================================== -->
+                    <div id="analisisOllamaContainer" style="display: none; margin-top: 15px;"></div>
+
                     <!-- NOTA FINAL GLOBAL -->
                     <div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #019DF4, #00B4F0); border-radius: 12px; text-align: center;">
                         <strong style="color: white; font-size: 18px;">🎯 NOTA FINAL: <span id="notaFinalGlobal">0%</span></strong>
@@ -366,7 +399,7 @@
             <!-- ====================================================================== -->
             <!-- 📌 Muestra todas las evaluaciones realizadas por el auditor            -->
             <!-- ====================================================================== -->
-            <div id="tab-historial" class="tab-content tab-pane">
+            <div id="tab-historial" class="tab-pane">
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                         <h3 style="color: var(--accent);">📋 Historial de Evaluaciones</h3>

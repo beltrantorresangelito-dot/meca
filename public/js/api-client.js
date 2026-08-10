@@ -41,99 +41,109 @@ const API = (function() {
     // Módulo: Autenticación (AUTH)
     // ======================================================
 
-    /**
-     * login - Inicia sesión con usuario y contraseña
-     * @param {string} usuario - Nombre de usuario
-     * @param {string} contrasena - Contraseña (texto plano)
-     * @returns {Object} { success, token, usuario }
-     */
-    async function login(usuario, contrasena) {
-        console.log('🔐 Intentando iniciar sesión...');
+    // En api-client.js - login() - Versión simplificada
+async function login(usuario, contrasena) {
+    console.log('🔐 Intentando iniciar sesión...');
 
-        if (!usuario || !contrasena) {
-            if (typeof window.mostrarErrorLogin === 'function') {
-                window.mostrarErrorLogin('⚠️ Complete ambos campos');
-            } else {
-                mostrarErrorLogin('⚠️ Complete ambos campos');
-            }
-            return { success: false, error: 'Complete ambos campos' }; // ✅ RETURN CON OBJETO
-        }
+    if (!usuario || !contrasena) {
+        mostrarErrorLogin('⚠️ Complete ambos campos');
+        return { success: false, error: 'Complete ambos campos' };
+    }
 
-        const btn = document.querySelector('#loginForm button[type="submit"]');
-        const textoOriginal = btn.innerHTML;
+    const btn = document.querySelector('#loginForm button[type="submit"]');
+    const textoOriginal = btn?.innerHTML || 'Iniciar sesión';
+    
+    if (btn) {
         btn.innerHTML = '⏳ Verificando...';
         btn.disabled = true;
+    }
 
-        try {
-            const resultado = await loginConAPI(usuario, contrasena);
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario, contrasena })
+        });
+        
+        const data = await response.json();
+        console.log('📊 Respuesta del login:', data);
 
-            if (resultado.success && resultado.token) {
-                // Guardar token
-                localStorage.setItem('meca_token', resultado.token);
-                
-                // Asegurar que usuario tenga nombre_completo
-                if (resultado.usuario && !resultado.usuario.nombre_completo) {
-                    const db = getDB();
-                    if (db) {
-                        const { data: userData, error } = await db
-                            .from('usuarios')
-                            .select('nombre_completo')
-                            .eq('id', resultado.usuario.id)
-                            .single();
-                        
-                        if (!error && userData && userData.nombre_completo) {
-                            resultado.usuario.nombre_completo = userData.nombre_completo;
-                        }
+        if (data.success && data.token) {
+            // ✅ Guardar token
+            localStorage.setItem('meca_token', data.token);
+            
+            // ✅ Guardar usuario
+            const usuarioData = {
+                id: data.usuario.id,
+                usuario: data.usuario.usuario,
+                nombre_completo: data.usuario.nombre_completo || usuario,
+                rol_id: data.usuario.rol_id,
+                rol: data.usuario.rol || data.usuario.rol_codigo || 'AUDITOR'
+            };
+            localStorage.setItem('meca_usuario', JSON.stringify(usuarioData));
+            window.usuarioActual = usuarioData;
+            usuarioActual = usuarioData;
+            
+            console.log('✅ Login exitoso');
+            console.log('   Usuario:', usuarioData.usuario);
+            console.log('   Rol:', usuarioData.rol);
+            
+            // ✅ REDIRECCIÓN USANDO EL ENDPOINT DEL SERVIDOR
+            console.log('🔄 Solicitando redirección al servidor...');
+            
+            try {
+                const redirectResponse = await fetch('/api/auth/redirect', {
+                    headers: {
+                        'Authorization': `Bearer ${data.token}`
                     }
-                }
+                });
                 
-                // Guardar usuario
-                localStorage.setItem('meca_usuario', JSON.stringify(resultado.usuario));
-                
-                // Establecer usuarioActual
-                window.usuarioActual = resultado.usuario;
-                console.log('✅ Login exitoso, nombre_completo:', window.usuarioActual?.nombre_completo);
-                
-                // Redirigir según rol
-                if (window.usuarioActual.rol === 'AUDITOR') {
-                    window.location.href = '/auditor';
+                if (redirectResponse.ok) {
+                    const redirectData = await redirectResponse.json();
+                    console.log(`🔄 Redirigiendo a ${redirectData.redirectUrl}`);
+                    if (btn) {
+                        btn.innerHTML = textoOriginal;
+                        btn.disabled = false;
+                    }
+                    window.location.href = redirectData.redirectUrl;
+                    return data;
                 } else {
-                    window.location.href = '/supervisor';
+                    console.warn('⚠️ Endpoint de redirección falló, usando fallback');
                 }
-                
-                // ✅ RETURN - Login exitoso
-                return resultado;
-                
-            } else {
-                // ✅ Usar la función global para errores
-                const errorMsg = resultado.error || 'Credenciales incorrectas';
-                if (typeof window.mostrarErrorLogin === 'function') {
-                    window.mostrarErrorLogin(errorMsg);
-                } else {
-                    mostrarErrorLogin(errorMsg);
-                }
+            } catch (redirectError) {
+                console.warn('⚠️ Error en redirección:', redirectError.message);
+            }
+            
+            // ✅ FALLBACK: Redirección manual
+            const redirectUrl = usuarioData.rol === 'AUDITOR' ? '/auditor' : '/supervisor';
+            console.log(`🔄 Fallback: redirigiendo a ${redirectUrl}`);
+            if (btn) {
                 btn.innerHTML = textoOriginal;
                 btn.disabled = false;
-                
-                // ✅ RETURN - Login fallido (devuelve el resultado con error)
-                return resultado;
             }
+            window.location.href = redirectUrl;
+            return data;
             
-        } catch (error) {
-            console.error('Error en login:', error);
-            // ✅ Usar la función global para errores
-            if (typeof window.mostrarErrorLogin === 'function') {
-                window.mostrarErrorLogin('Error al iniciar sesión: ' + error.message);
-            } else {
-                mostrarErrorLogin('Error al iniciar sesión: ' + error.message);
+        } else {
+            const errorMsg = data.error || 'Credenciales incorrectas';
+            mostrarErrorLogin(errorMsg);
+            if (btn) {
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
             }
+            return data;
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en login:', error);
+        mostrarErrorLogin('Error al iniciar sesión: ' + error.message);
+        if (btn) {
             btn.innerHTML = textoOriginal;
             btn.disabled = false;
-            
-            // ✅ RETURN - Error inesperado
-            return { success: false, error: error.message };
         }
+        return { success: false, error: error.message };
     }
+}
     
     // ======================================================
     // FUNCIONES DE UTILIDAD - API CLIENT
@@ -184,7 +194,9 @@ const API = (function() {
      * @param {string} contrasena - Contraseña
      * @returns {Object} Respuesta del servidor
      */
-    async function loginConAPI(usuario, contrasena) {
+    // En api-client.js - loginConAPI()
+async function loginConAPI(usuario, contrasena) {
+    try {
         const response = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -194,51 +206,41 @@ const API = (function() {
         const data = await response.json();
         
         if (data.success && data.usuario) {
-            // 🔴 CORREGIDO: Asegurar que nombre_completo esté presente
-            let nombreCompleto = data.usuario.nombre || data.usuario.nombre_completo || usuario;
+            // ✅ Asegurar que todos los campos estén presentes
+            let nombreCompleto = data.usuario.nombre_completo || data.usuario.nombre || usuario;
+            let rol = data.usuario.rol || data.usuario.rol_codigo || 'AUDITOR';
             
-            // Si el nombre_completo no viene de la API, obtenerlo de BD
-            if (!nombreCompleto || nombreCompleto === 'undefined' || nombreCompleto === 'null') {
-                console.log('🔍 nombre_completo no vino de la API, buscando en BD...');
-                const db = getDB();
-                if (db) {
-                    const { data: userData, error } = await db
-                        .from('usuarios')
-                        .select('nombre_completo')
-                        .eq('usuario', usuario)
-                        .single();
-                    
-                    if (!error && userData && userData.nombre_completo) {
-                        nombreCompleto = userData.nombre_completo;
-                        console.log('📋 nombre_completo obtenido desde BD:', nombreCompleto);
-                    }
-                }
-            }
-            
-            // Actualizar el objeto usuario con el nombre correcto
-            data.usuario.nombre_completo = nombreCompleto;
-            
-            // Guardar en localStorage
-            localStorage.setItem('meca_usuario', JSON.stringify({
+            const usuarioData = {
                 id: data.usuario.id,
                 usuario: data.usuario.usuario,
                 nombre_completo: nombreCompleto,
-                rol: data.usuario.rol
-            }));
-            
-            // Actualizar usuarioActual
-            usuarioActual = {
-                id: data.usuario.id,
-                usuario: data.usuario.usuario,
-                nombre_completo: nombreCompleto,
-                rol: data.usuario.rol
+                rol_id: data.usuario.rol_id,
+                rol: rol,
+                rol_codigo: data.usuario.rol_codigo || rol,
+                rol_nombre: data.usuario.rol_nombre
             };
             
-            console.log('✅ usuarioActual guardado con nombre_completo:', nombreCompleto);
+            console.log('📝 Guardando usuario:', usuarioData);
+            
+            // ✅ Guardar en localStorage
+            localStorage.setItem('meca_usuario', JSON.stringify(usuarioData));
+            
+            // ✅ ASIGNAR usuarioActual GLOBALMENTE
+            window.usuarioActual = usuarioData;
+            usuarioActual = usuarioData;
+            
+            console.log('✅ usuarioActual asignado:', window.usuarioActual);
         }
         
+        // ✅ SIEMPRE devolver los datos
         return data;
+        
+    } catch (error) {
+        console.error('❌ Error en loginConAPI:', error);
+        return { success: false, error: error.message };
     }
+}
+
     
     // ======================================================
     // Módulo: Auditor - Escuchas
@@ -1334,8 +1336,27 @@ const API = (function() {
      * @returns {Array} Tickets del lote
      */
     async function getTicketsPorLote(loteId) {
-        const response = await fetch(`/api/escuchas/lotes/${loteId}/tickets`);
-        return await response.json();
+        const token = localStorage.getItem('meca_token');
+        
+        try {
+            const response = await fetch(`/api/escuchas/lotes/${loteId}/tickets`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (!response.ok) {
+                console.warn(`⚠️ Error ${response.status} al obtener tickets del lote ${loteId}`);
+                // ✅ DEVOLVER UN ARRAY VACÍO EN VEZ DE LANZAR ERROR
+                return [];
+            }
+            
+            const data = await response.json();
+            return Array.isArray(data) ? data : [];
+            
+        } catch (error) {
+            console.error('Error obteniendo tickets:', error);
+            // ✅ DEVOLVER UN ARRAY VACÍO EN VEZ DE LANZAR ERROR
+            return [];
+        }
     }
 
     /**
