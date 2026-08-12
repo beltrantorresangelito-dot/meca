@@ -14923,6 +14923,12 @@ function inicializarEventoAgentes() {
     console.log('✅ [INIT] Evento change registrado correctamente');
 }
 
+// Ejecutar cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarEventoAgentes);
+} else {
+    inicializarEventoAgentes();
+}
 
 // ========================================================================================
 // BLOQUE 1: CONEXIÓN BD, LOGIN, SESIÓN Y ACTUALIZACIONES (13 funciones)
@@ -18800,7 +18806,106 @@ async function cargarMesesParaSelectorQ4() {
             await actualizarTablaRanking(ranking);
         }
 
-        
+        // Event listener para el buscador (búsqueda en tiempo real)
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM cargado - Inicializando componentes...');
+            
+            // 1. Configurar buscador del ranking
+            const buscador = document.getElementById('buscadorAgenteRanking');
+            if (buscador) {
+                buscador.addEventListener('input', function() {
+                    filtrarRankingPorBusqueda();
+                });
+                console.log('✅ Buscador ranking configurado');
+            }
+            
+            // 2. Inicializar formulario de agentes (para editar/actualizar)
+            if (typeof inicializarFormularioAgentes === 'function') {
+                inicializarFormularioAgentes();
+                console.log('✅ Formulario de agentes inicializado');
+            } else {
+                console.warn('⚠️ inicializarFormularioAgentes no está definida');
+            }
+            
+            // 3. Inicializar buscador de gestores (si existe)
+            if (typeof inicializarBuscadorGestores === 'function') {
+                inicializarBuscadorGestores();
+                console.log('✅ Buscador de gestores inicializado');
+            }
+            
+            // 4. Configurar selector de agrupación (si existe)
+            const selectAgrupacion = document.getElementById('selectAgrupacion');
+            if (selectAgrupacion) {
+                selectAgrupacion.addEventListener('change', function() {
+                    if (typeof cambiarAgrupacion === 'function') {
+                        cambiarAgrupacion();
+                    }
+                });
+                console.log('✅ Selector de agrupación configurado');
+            }
+
+            // Inicializar formulario de usuarios
+            if (typeof inicializarFormularioUsuarios === 'function') {
+                inicializarFormularioUsuarios();
+            }
+            
+            // Inicializar formulario de agentes
+            if (typeof inicializarFormularioAgentes === 'function') {
+                inicializarFormularioAgentes();
+            }
+            
+            // Inicializar formulario de cambio de password
+        const formPassword = document.getElementById('formCambiarPassword');
+        if (formPassword) {
+            formPassword.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const nuevaPassword = document.getElementById('nuevaPassword').value;
+                const confirmarPassword = document.getElementById('confirmarPassword').value;
+                
+                if (!nuevaPassword || !confirmarPassword) {
+                    alert('⚠️ Complete ambos campos');
+                    return;
+                }
+                
+                if (nuevaPassword !== confirmarPassword) {
+                    alert('⚠️ Las contraseñas no coinciden');
+                    return;
+                }
+                
+                if (nuevaPassword.length < 6) {
+                    alert('⚠️ La contraseña debe tener al menos 6 caracteres');
+                    return;
+                }
+                
+                const token = localStorage.getItem('meca_token');
+                
+                try {
+                    const response = await fetch(`/api/usuarios/${window.usuarioPasswordId}/password`, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ password: nuevaPassword })
+                    });
+                    
+                    if (response.ok) {
+                        alert('✅ Contraseña actualizada correctamente');
+                        cerrarModalPassword();
+                        location.reload();
+                    } else {
+                        const error = await response.json();
+                        alert('❌ Error: ' + (error.error || 'No se pudo actualizar'));
+                    }
+                } catch (error) {
+                    alert('❌ Error: ' + error.message);
+                }
+            });
+        }
+
+            console.log('🚀 Inicialización completada');
+        });
 
 // =============================CIERRE BLOQUE 4==========================================
 
@@ -40929,7 +41034,10 @@ console.log('✅ Todas las funciones de guardado están definidas');
             }
         }
     }
-        
+        // Ejecutar después de cargar la página
+        document.addEventListener('DOMContentLoaded', function () {
+            setTimeout(agregarBotonLimpiarPDA, 500);
+        });
     
     async function cargarDatosYMostrarUI() {
         console.log('📂 Cargando datos del sistema...');
@@ -43605,7 +43713,13 @@ function agregarEstilosMatriz() {
     document.head.appendChild(style);
 }
 
-
+// Inicializar al cargar
+document.addEventListener('DOMContentLoaded', () => {
+    agregarEstilosMatriz();
+    if (document.getElementById('matrizTreeContainer')) {
+        cargarMatrizCompleta();
+    }
+});
     
     // ======================================================
     // INICIALIZACIÓN - SUPERVISOR
@@ -43666,9 +43780,69 @@ function agregarEstilosMatriz() {
         console.log('✅ Sistema de supervisión inicializado');
     };
 
+    // ===== 7. INICIALIZAR EVENTO DEL FORMULARIO DE LOGIN ======================
+    document.addEventListener('DOMContentLoaded', function () {
+        
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            // Remover event listeners anteriores si existen
+            const nuevoForm = loginForm.cloneNode(true);
+            loginForm.parentNode.replaceChild(nuevoForm, loginForm);
+
+            const formFinal = document.getElementById('loginForm');
+            formFinal.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                console.log('🔐 Intentando iniciar sesión...');
+
+                const usuario = document.getElementById('loginUsuario').value.trim();
+                const contrasena = document.getElementById('loginPassword').value;
+
+                if (!usuario || !contrasena) {
+                    mostrarErrorLogin('⚠️ Complete ambos campos');
+                    return;
+                }
+
+                // Mostrar loading en el botón
+                const btn = this.querySelector('button[type="submit"]');
+                const textoOriginal = btn.innerHTML;
+                btn.innerHTML = '⏳ Verificando...';
+                btn.disabled = true;
+
+                try {
+                    const exito = await procesarLogin(usuario, contrasena);
+
+                    if (exito) {
+                        console.log('✅ Login exitoso, recargando página...');
+                        // Recargar la página para que window.onload muestre el contenido
+                        location.reload();
+                    } else {
+                        console.log('❌ Login fallido');
+                        btn.innerHTML = textoOriginal;
+                        btn.disabled = false;
+                    }
+                } catch (error) {
+                    console.error('Error en login:', error);
+                    mostrarErrorLogin('Error al iniciar sesión');
+                    btn.innerHTML = textoOriginal;
+                    btn.disabled = false;
+                }
+            });
+
+            console.log('✅ Event listener del formulario de login configurado');
+        } else {
+            console.error('❌ No se encontró el formulario de login');
+        }
+    });
     // ===== FIN : FORMULARIO DE LOGIN ==========================================
 
-  
+    // ===== 8. Ejecutar al cargar la página ====================================
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(agregarBotonRefreshPDA, 500);
+    });
+    // ===== FIN : Ejecutar al cargar la página =================================
+
     // ===== 9. SUBMIT DEL FORMULARIO DE PDA (CORREGIDO) ========================
     const formPDA = document.getElementById('formPDA');
     if (formPDA) {
@@ -46995,6 +47169,11 @@ function mostrarBotonesSegunRol() {
     }
 }
 
+// Ejecutar automáticamente al cargar
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(mostrarBotonesSegunRol, 500);
+});
+
 
 // ======================================================
 // UTILIDADES - VERIFICACIÓN DE ROL ACTIVO
@@ -48374,307 +48553,25 @@ async function cargarSelectGestoresRegistro() {
 // 4. INICIALIZAR REGISTRO DE VOZ AL CARGAR
 // ======================================================
 function inicializarRegistroVoz() {
-    console.log('🎤 Inicializando registro de voz...');
-    // Cargar gestores para el buscador
-    cargarGestoresParaRegistro();
-    // Inicializar el buscador
-    inicializarBuscadorGestoresRegistro();
-    // Cargar lista de gestores ya registrados
+    cargarSelectGestoresRegistro();
     cargarGestoresRegistrados();
-    
     console.log('✅ Registro de voz inicializado');
 }
 
-// ======================================================
-// BUSCADOR DE GESTORES PARA REGISTRO DE VOZ
-// ======================================================
+// =============================================
+// INICIALIZAR AL CARGAR LA PESTAÑA
+// =============================================
 
-let gestoresRegistroLista = [];
-let timeoutBusquedaGestorRegistro = null;
+// Cargar estado al iniciar si la pestaña está visible
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        const tabReportesAuto = document.getElementById('tab-reportesAuto');
+        if (tabReportesAuto && tabReportesAuto.classList.contains('active')) {
+            cargarEstadoReportes();
+        }
+    }, 500);
+});
 
-// ======================================================
-// 1. CARGAR LISTA DE GESTORES PARA EL BUSCADOR
-// ======================================================
-async function cargarGestoresParaRegistro() {
-    console.log('📋 Cargando gestores para registro de voz...');
-    
-    try {
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/agentes', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const agentes = await response.json();
-        
-        if (!agentes || agentes.length === 0) {
-            gestoresRegistroLista = [];
-            console.warn('⚠️ No hay gestores disponibles');
-            return;
-        }
-        
-        // Ordenar alfabéticamente
-        gestoresRegistroLista = agentes
-            .map(a => a.nombre || a.usuario || 'Sin nombre')
-            .filter(n => n && n !== 'Sin nombre')
-            .sort((a, b) => a.localeCompare(b));
-        
-        console.log(`✅ ${gestoresRegistroLista.length} gestores cargados para registro`);
-        
-    } catch (error) {
-        console.error('Error cargando gestores:', error);
-        gestoresRegistroLista = [];
-    }
-}
-
-// ======================================================
-// 2. INICIALIZAR BUSCADOR DE GESTORES PARA REGISTRO (COMPLETO)
-// ======================================================
-function inicializarBuscadorGestoresRegistro() {
-    console.log('🔧 Inicializando buscador de gestores para registro...');
-    
-    const input = document.getElementById('buscarGestorRegistro');
-    const dropdown = document.getElementById('gestorRegistroDropdown');
-    const hiddenInput = document.getElementById('selectGestorRegistro');
-    
-    if (!input || !dropdown) {
-        console.warn('⚠️ Elementos del buscador no encontrados');
-        return;
-    }
-    
-    // ======================================================
-    // EVENTO: FOCUS - Mostrar lista completa
-    // ======================================================
-    input.addEventListener('focus', function() {
-        console.log('📌 Focus - Mostrando lista de gestores');
-        
-        // Si ya hay un gestor seleccionado, mantenerlo
-        if (hiddenInput && hiddenInput.value) {
-            this.value = hiddenInput.value;
-        }
-        
-        // Si la lista está vacía, cargarla
-        if (gestoresRegistroLista.length === 0) {
-            cargarGestoresParaRegistro().then(() => {
-                mostrarSugerenciasRegistro(gestoresRegistroLista, '');
-            });
-        } else {
-            mostrarSugerenciasRegistro(gestoresRegistroLista, '');
-        }
-    });
-    
-    // ======================================================
-    // EVENTO: INPUT - Filtrar en tiempo real
-    // ======================================================
-    input.addEventListener('input', function(e) {
-        const busqueda = this.value.trim();
-        
-        if (timeoutBusquedaGestorRegistro) {
-            clearTimeout(timeoutBusquedaGestorRegistro);
-        }
-        
-        timeoutBusquedaGestorRegistro = setTimeout(() => {
-            let filtrados = gestoresRegistroLista;
-            
-            if (busqueda.length > 0) {
-                const busquedaLower = busqueda.toLowerCase()
-                    .normalize("NFD")
-                    .replace(/[\u0300-\u036f]/g, "");
-                
-                filtrados = gestoresRegistroLista.filter(gestor => {
-                    const nombreNormalizado = gestor.toLowerCase()
-                        .normalize("NFD")
-                        .replace(/[\u0300-\u036f]/g, "");
-                    return nombreNormalizado.includes(busquedaLower);
-                });
-            }
-            
-            mostrarSugerenciasRegistro(filtrados, busqueda);
-        }, 200);
-    });
-    
-    // ======================================================
-    // EVENTO: BLUR - Perder foco
-    // ======================================================
-    input.addEventListener('blur', function() {
-        setTimeout(() => {
-            if (dropdown) {
-                dropdown.classList.remove('show');
-                dropdown.style.display = 'none';
-            }
-            // Si no hay gestor seleccionado pero hay texto, limpiar
-            if (hiddenInput && !hiddenInput.value && this.value) {
-                this.value = '';
-            }
-        }, 150);
-    });
-    
-    // ======================================================
-    // EVENTO: CERRAR AL HACER CLIC FUERA
-    // ======================================================
-    document.addEventListener('click', function(e) {
-        const container = document.getElementById('gestor-registro-container');
-        if (container && dropdown && !container.contains(e.target)) {
-            dropdown.classList.remove('show');
-            dropdown.style.display = 'none';
-        }
-    });
-    
-    // ======================================================
-    // EVENTO: CERRAR CON ESCAPE
-    // ======================================================
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && dropdown) {
-            dropdown.classList.remove('show');
-            dropdown.style.display = 'none';
-        }
-    });
-    
-    // ======================================================
-    // EVENTO: TECLA ENTER - Seleccionar primer elemento
-    // ======================================================
-    input.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && dropdown.classList.contains('show')) {
-            e.preventDefault();
-            const primerItem = dropdown.querySelector('.select-buscador-option');
-            if (primerItem) {
-                primerItem.click();
-            }
-        }
-    });
-    
-    // ======================================================
-    // EVENTO: FLECHAS PARA NAVEGACIÓN
-    // ======================================================
-    let selectedIndex = -1;
-    
-    input.addEventListener('keydown', function(e) {
-        const items = dropdown.querySelectorAll('.select-buscador-option');
-        if (items.length === 0) return;
-        
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-            actualizarSeleccionRegistro(items, selectedIndex);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            selectedIndex = Math.max(selectedIndex - 1, -1);
-            actualizarSeleccionRegistro(items, selectedIndex);
-            if (selectedIndex === -1) {
-                input.value = '';
-            }
-        }
-    });
-    
-    // ======================================================
-    // FUNCIÓN: Actualizar selección con flechas
-    // ======================================================
-    function actualizarSeleccionRegistro(items, index) {
-        items.forEach((item, i) => {
-            if (i === index) {
-                item.classList.add('selected');
-                const nombre = item.getAttribute('data-value');
-                if (nombre && index !== -1) {
-                    input.value = nombre;
-                    if (hiddenInput) hiddenInput.value = nombre;
-                }
-                item.scrollIntoView({ block: 'nearest' });
-            } else {
-                item.classList.remove('selected');
-            }
-        });
-    }
-    
-    // ======================================================
-    // FUNCIÓN: Mostrar sugerencias
-    // ======================================================
-    function mostrarSugerenciasRegistro(gestores, busqueda) {
-        if (!dropdown) return;
-        
-        if (gestores.length === 0) {
-            dropdown.innerHTML = `
-                <div class="select-buscador-empty">
-                    ${busqueda ? `❌ No se encontraron resultados para "${escapeHtml(busqueda)}"` : '📭 No hay gestores disponibles'}
-                </div>
-            `;
-            dropdown.classList.add('show');
-            dropdown.style.display = 'block';
-            return;
-        }
-        
-        const resaltarCoincidencia = (texto, busqueda) => {
-            if (!busqueda || busqueda === '') return escapeHtml(texto);
-            const busquedaLower = busqueda.toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "");
-            const textoNormalizado = texto.toLowerCase()
-                .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, "");
-            
-            if (!textoNormalizado.includes(busquedaLower)) return escapeHtml(texto);
-            
-            let regex;
-            try {
-                regex = new RegExp(`(${busqueda.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-            } catch (e) {
-                return escapeHtml(texto);
-            }
-            return escapeHtml(texto).replace(regex, '<span class="sugerencia-resaltado">$1</span>');
-        };
-        
-        let html = `<div class="select-buscador-resultados">🔍 ${gestores.length} resultado${gestores.length !== 1 ? 's' : ''}</div>`;
-        
-        const mostrar = gestores.slice(0, 15);
-        mostrar.forEach(gestor => {
-            html += `
-                <div class="select-buscador-option" 
-                     data-value="${escapeHtml(gestor)}"
-                     onclick="seleccionarGestorRegistro('${escapeHtml(gestor).replace(/'/g, "\\'")}')">
-                    <span>👤 ${resaltarCoincidencia(gestor, busqueda)}</span>
-                </div>
-            `;
-        });
-        
-        if (gestores.length > 15) {
-            html += `<div class="select-buscador-mas">... y ${gestores.length - 15} más</div>`;
-        }
-        
-        dropdown.innerHTML = html;
-        dropdown.classList.add('show');
-        dropdown.style.display = 'block';
-    }
-    
-    // ======================================================
-    // FUNCIÓN: Seleccionar gestor
-    // ======================================================
-    window.seleccionarGestorRegistro = function(gestor) {
-        const input = document.getElementById('buscarGestorRegistro');
-        const hiddenInput = document.getElementById('selectGestorRegistro');
-        const dropdown = document.getElementById('gestorRegistroDropdown');
-        
-        if (input) {
-            input.value = gestor;
-            input.blur(); // 🔴 FORZAR BLUR PARA CERRAR DROPDOWN
-        }
-        if (hiddenInput) hiddenInput.value = gestor;
-        if (dropdown) {
-            dropdown.classList.remove('show');
-            dropdown.style.display = 'none';
-        }
-        
-        console.log(`✅ Gestor seleccionado para registro: ${gestor}`);
-    };
-    
-    // Cargar gestores al iniciar
-    if (gestoresRegistroLista.length === 0) {
-        cargarGestoresParaRegistro();
-    }
-    
-    console.log('✅ Buscador de gestores para registro inicializado');
-}
 
 
 // ======================================================
@@ -48838,238 +48735,3 @@ window.registrarVozGestor = registrarVozGestor;
 window.cargarGestoresRegistrados = cargarGestoresRegistrados;
 window.cargarSelectGestoresRegistro = cargarSelectGestoresRegistro;
 window.inicializarRegistroVoz = inicializarRegistroVoz;
-
-
-// ======================================================
-// 🔴 PUNTO DE ENTRADA ÚNICO - INICIALIZACIÓN COMPLETA
-// ======================================================
-// 📌 Esta es la ÚNICA función que se ejecuta al cargar la página.
-// 📌 Todas las inicializaciones se llaman desde aquí en orden.
-// ======================================================
-
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 [DOMContentLoaded] Inicializando sistema de supervisión...');
-
-    // ======================================================
-    // 1. INICIALIZAR EVENTO DE CARGA DE AGENTES (Excel)
-    // ======================================================
-    if (typeof inicializarEventoAgentes === 'function') {
-        inicializarEventoAgentes();
-        console.log('✅ Evento de carga de agentes inicializado');
-    }
-
-    // ======================================================
-    // 2. CONFIGURAR BUSCADOR DEL RANKING
-    // ======================================================
-    const buscador = document.getElementById('buscadorAgenteRanking');
-    if (buscador) {
-        buscador.addEventListener('input', function() {
-            if (typeof filtrarRankingPorBusqueda === 'function') {
-                filtrarRankingPorBusqueda();
-            }
-        });
-        console.log('✅ Buscador ranking configurado');
-    }
-
-    // ======================================================
-    // 3. INICIALIZAR FORMULARIOS
-    // ======================================================
-    if (typeof inicializarFormularioAgentes === 'function') {
-        inicializarFormularioAgentes();
-        console.log('✅ Formulario de agentes inicializado');
-    }
-
-    if (typeof inicializarFormularioUsuarios === 'function') {
-        inicializarFormularioUsuarios();
-        console.log('✅ Formulario de usuarios inicializado');
-    }
-
-    // ======================================================
-    // 4. INICIALIZAR BUSCADOR DE GESTORES
-    // ======================================================
-    if (typeof inicializarBuscadorGestores === 'function') {
-        inicializarBuscadorGestores();
-        console.log('✅ Buscador de gestores inicializado');
-    }
-
-    // ======================================================
-    // 5. CONFIGURAR SELECTOR DE AGRUPACIÓN
-    // ======================================================
-    const selectAgrupacion = document.getElementById('selectAgrupacion');
-    if (selectAgrupacion) {
-        selectAgrupacion.addEventListener('change', function() {
-            if (typeof cambiarAgrupacion === 'function') {
-                cambiarAgrupacion();
-            }
-        });
-        console.log('✅ Selector de agrupación configurado');
-    }
-
-    // ======================================================
-    // 6. FORMULARIO DE CAMBIO DE CONTRASEÑA
-    // ======================================================
-    const formPassword = document.getElementById('formCambiarPassword');
-    if (formPassword) {
-        formPassword.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const nuevaPassword = document.getElementById('nuevaPassword').value;
-            const confirmarPassword = document.getElementById('confirmarPassword').value;
-            
-            if (!nuevaPassword || !confirmarPassword) {
-                alert('⚠️ Complete ambos campos');
-                return;
-            }
-            
-            if (nuevaPassword !== confirmarPassword) {
-                alert('⚠️ Las contraseñas no coinciden');
-                return;
-            }
-            
-            if (nuevaPassword.length < 6) {
-                alert('⚠️ La contraseña debe tener al menos 6 caracteres');
-                return;
-            }
-            
-            const token = localStorage.getItem('meca_token');
-            
-            try {
-                const response = await fetch(`/api/usuarios/${window.usuarioPasswordId}/password`, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ password: nuevaPassword })
-                });
-                
-                if (response.ok) {
-                    alert('✅ Contraseña actualizada correctamente');
-                    if (typeof cerrarModalPassword === 'function') {
-                        cerrarModalPassword();
-                    }
-                    location.reload();
-                } else {
-                    const error = await response.json();
-                    alert('❌ Error: ' + (error.error || 'No se pudo actualizar'));
-                }
-            } catch (error) {
-                alert('❌ Error: ' + error.message);
-            }
-        });
-        console.log('✅ Formulario cambio de contraseña configurado');
-    }
-
-    // ======================================================
-    // 7. FORMULARIO DE LOGIN
-    // ======================================================
-    const loginForm = document.getElementById('loginForm');
-    if (loginForm) {
-        // Remover event listeners anteriores si existen
-        const nuevoForm = loginForm.cloneNode(true);
-        loginForm.parentNode.replaceChild(nuevoForm, loginForm);
-
-        const formFinal = document.getElementById('loginForm');
-        formFinal.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-
-            console.log('🔐 Intentando iniciar sesión...');
-
-            const usuario = document.getElementById('loginUsuario').value.trim();
-            const contrasena = document.getElementById('loginPassword').value;
-
-            if (!usuario || !contrasena) {
-                if (typeof mostrarErrorLogin === 'function') {
-                    mostrarErrorLogin('⚠️ Complete ambos campos');
-                }
-                return;
-            }
-
-            const btn = this.querySelector('button[type="submit"]');
-            const textoOriginal = btn.innerHTML;
-            btn.innerHTML = '⏳ Verificando...';
-            btn.disabled = true;
-
-            try {
-                const exito = await procesarLogin(usuario, contrasena);
-                if (exito) {
-                    console.log('✅ Login exitoso, recargando página...');
-                    location.reload();
-                } else {
-                    console.log('❌ Login fallido');
-                    btn.innerHTML = textoOriginal;
-                    btn.disabled = false;
-                }
-            } catch (error) {
-                console.error('Error en login:', error);
-                if (typeof mostrarErrorLogin === 'function') {
-                    mostrarErrorLogin('Error al iniciar sesión');
-                }
-                btn.innerHTML = textoOriginal;
-                btn.disabled = false;
-            }
-        });
-        console.log('✅ Event listener del formulario de login configurado');
-    }
-
-    // ======================================================
-    // 8. AGREGAR BOTONES (con retrasos para asegurar DOM)
-    // ======================================================
-    setTimeout(() => {
-        if (typeof agregarBotonLimpiarPDA === 'function') {
-            agregarBotonLimpiarPDA();
-            console.log('✅ Botón de limpieza PDA agregado');
-        }
-        if (typeof agregarBotonRefreshPDA === 'function') {
-            agregarBotonRefreshPDA();
-            console.log('✅ Botón refresh PDA agregado');
-        }
-        if (typeof mostrarBotonesSegunRol === 'function') {
-            mostrarBotonesSegunRol();
-            console.log('✅ Botones según rol actualizados');
-        }
-    }, 500);
-
-    // ======================================================
-    // 9. INICIALIZAR MATRIZ
-    // ======================================================
-    setTimeout(() => {
-        if (typeof agregarEstilosMatriz === 'function') {
-            agregarEstilosMatriz();
-        }
-        if (document.getElementById('matrizTreeContainer')) {
-            if (typeof cargarMatrizCompleta === 'function') {
-                cargarMatrizCompleta();
-                console.log('✅ Matriz inicializada');
-            }
-        }
-    }, 300);
-
-    // ======================================================
-    // 10. 🔴 NUEVO: INICIALIZAR REGISTRO DE VOZ DE GESTORES
-    // ======================================================
-    setTimeout(() => {
-        if (typeof inicializarRegistroVoz === 'function') {
-            inicializarRegistroVoz();
-            console.log('✅ Registro de voz inicializado');
-        } else {
-            console.warn('⚠️ inicializarRegistroVoz no está definida');
-        }
-    }, 800);
-
-    // ======================================================
-    // 11. CARGAR ESTADO DE REPORTES (si la pestaña está activa)
-    // ======================================================
-    setTimeout(() => {
-        const tabReportesAuto = document.getElementById('tab-reportesAuto');
-        if (tabReportesAuto && tabReportesAuto.classList.contains('active')) {
-            if (typeof cargarEstadoReportes === 'function') {
-                cargarEstadoReportes();
-                console.log('✅ Estado de reportes cargado');
-            }
-        }
-    }, 600);
-
-    console.log('✅ [DOMContentLoaded] Sistema de supervisión inicializado completamente');
-});

@@ -167,6 +167,11 @@ let estadoAtributos = {
     }
 };
 
+
+let panelTranscripcionAbierto = false;
+let transcripcionActual = '';
+let segmentosTranscripcion = [];
+
 // ======================================================
 // BLOQUE 2: VERIFICACIÓN DE SESIÓN (AUDITOR)
 // ======================================================
@@ -6116,34 +6121,22 @@ function cargarDatosEscuchaEnFormulario(escucha) {
     });
     
     // ======================================================
-    // 🔴 NUEVO: MOSTRAR TRANSCRIPCIÓN
+    // 🔴 NUEVO: MOSTRAR TRANSCRIPCIÓN MEJORADA
     // ======================================================
     const transcripcionContainer = document.getElementById('transcripcionContainer');
     const transcripcionText = document.getElementById('transcripcionText');
     const transcripcionStatus = document.getElementById('transcripcionStatus');
     const btnAnalizarTranscripcion = document.getElementById('btnAnalizarTranscripcion');
     const analisisOllamaContainer = document.getElementById('analisisOllamaContainer');
-    
+
     if (transcripcionContainer) {
         const tieneTranscripcion = escucha.transcripcion && escucha.transcripcion.length > 0;
         
         if (tieneTranscripcion) {
             transcripcionContainer.style.display = 'block';
             
-            if (transcripcionText) {
-                const texto = escucha.transcripcion;
-                if (texto.length > 400) {
-                    transcripcionText.innerHTML = `
-                        ${escapeHtml(texto.substring(0, 400))}...
-                        <span style="color: var(--accent); cursor: pointer; font-weight: bold;" 
-                              onclick="expandirTranscripcion(this, '${escapeHtml(texto).replace(/'/g, "\\'")}')">
-                            [ver más]
-                        </span>
-                    `;
-                } else {
-                    transcripcionText.textContent = texto;
-                }
-            }
+            // 🔴 USAR EL RENDERIZADOR MEJORADO
+            renderizarTranscripcionMejorada(escucha.transcripcion, 'transcripcionText');
             
             if (transcripcionStatus) {
                 const estado = escucha.transcripcion_estado || 'transcrito';
@@ -6193,6 +6186,388 @@ function cargarDatosEscuchaEnFormulario(escucha) {
     }
     
     console.log('✅ Datos de escucha cargados (incluyendo transcripción)');
+}
+
+// ======================================================
+// FUNCIÓN: renderizarTranscripcionMejorada()
+// ======================================================
+// 📌 PROPÓSITO: Renderizar la transcripción con formato tipo chat
+// 📌 PARÁMETROS: 
+//    - transcripcion (string) - Texto de la transcripción
+//    - containerId (string) - ID del contenedor donde renderizar
+// 📌 FORMATO: 
+//    - [CLIENTE] → color azul, alineado a la izquierda
+//    - [GESTOR] → color verde, alineado a la derecha
+//    - Timestamps mostrados de forma compacta
+// ======================================================
+
+function renderizarTranscripcionMejorada(transcripcion, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.warn(`⚠️ Contenedor ${containerId} no encontrado`);
+        return;
+    }
+
+    if (!transcripcion || transcripcion.trim().length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: var(--muted);">
+                📭 No hay transcripción disponible para esta escucha.
+            </div>
+        `;
+        return;
+    }
+
+    // ======================================================
+    // 1. LIMPIAR Y DIVIDIR LA TRANSCRIPCIÓN EN LÍNEAS
+    // ======================================================
+    const lineas = transcripcion.split('\n').filter(linea => linea.trim() !== '');
+
+    if (lineas.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: var(--muted);">
+                📭 La transcripción está vacía.
+            </div>
+        `;
+        return;
+    }
+
+    // ======================================================
+    // 2. EXPRESIONES REGULARES PARA PARSEAR
+    // ======================================================
+    const patronTimestamp = /^\[(\d{2}:\d{2}.\d{3}\s*-->\s*\d{2}:\d{2}.\d{3})\]\s*/;
+    const patronHablante = /^\[(CLIENTE|GESTOR)\]\s*/i;
+    const patronHablanteConTimestamp = /^\[(CLIENTE|GESTOR)\]\s*\[(\d{2}:\d{2}.\d{3}\s*-->\s*\d{2}:\d{2}.\d{3})\]\s*/i;
+
+    // ======================================================
+    // 3. PROCESAR CADA LÍNEA
+    // ======================================================
+    let html = '';
+    let hablanteAnterior = '';
+
+    for (const linea of lineas) {
+        let texto = linea;
+        let hablante = null;
+        let timestamp = null;
+
+        // Intentar extraer [HABLANTE] [timestamp] texto
+        let match = texto.match(patronHablanteConTimestamp);
+        if (match) {
+            hablante = match[1].toUpperCase();
+            timestamp = match[2];
+            texto = texto.replace(match[0], '').trim();
+        } else {
+            // Intentar extraer solo [HABLANTE]
+            match = texto.match(patronHablante);
+            if (match) {
+                hablante = match[1].toUpperCase();
+                texto = texto.replace(match[0], '').trim();
+            }
+
+            // Intentar extraer solo timestamp
+            match = texto.match(patronTimestamp);
+            if (match) {
+                timestamp = match[1];
+                texto = texto.replace(match[0], '').trim();
+            }
+        }
+
+        // Si no se detectó hablante, usar el anterior o 'GESTOR' por defecto
+        if (!hablante) {
+            if (hablanteAnterior) {
+                hablante = hablanteAnterior;
+            } else {
+                // Intentar detectar por palabras clave en el texto
+                const textoLower = texto.toLowerCase();
+                if (textoLower.includes('movistar') || textoLower.includes('atender') || textoLower.includes('servicio')) {
+                    hablante = 'GESTOR';
+                } else if (textoLower.includes('yo') || textoLower.includes('mi') || textoLower.includes('tengo')) {
+                    hablante = 'CLIENTE';
+                } else {
+                    hablante = 'GESTOR'; // Default
+                }
+            }
+        }
+
+        // Guardar hablante para la siguiente línea
+        hablanteAnterior = hablante;
+
+        // ======================================================
+        // 4. GENERAR HTML SEGÚN HABLANTE
+        // ======================================================
+        const esCliente = hablante === 'CLIENTE';
+        const esGestor = hablante === 'GESTOR';
+
+        // Configuración de estilo
+        const colorFondo = esCliente ? '#e3f2fd' : '#e8f5e9';
+        const colorBorde = esCliente ? '#019DF4' : '#28a745';
+        const avatar = esCliente ? '👤' : '👨‍💼';
+        const nombre = esCliente ? 'Cliente' : 'Gestor';
+        const alineacion = esCliente ? 'flex-start' : 'flex-end';
+        const margenTexto = esCliente ? 'left' : 'right';
+
+        // Formatear timestamp para mostrar (solo tiempo de inicio)
+        let timestampDisplay = '';
+        if (timestamp) {
+            const partes = timestamp.split('-->');
+            if (partes.length === 2) {
+                const inicio = partes[0].trim();
+                timestampDisplay = `<span style="font-size: 10px; color: var(--muted); margin-${margenTexto}: 8px;">${inicio}</span>`;
+            }
+        }
+
+        // ======================================================
+        // 5. CONSTRUIR EL HTML DEL MENSAJE
+        // ======================================================
+        html += `
+            <div style="
+                display: flex;
+                flex-direction: column;
+                align-items: ${alineacion};
+                margin-bottom: 12px;
+            ">
+                <div style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-bottom: 3px;
+                    align-self: ${alineacion};
+                ">
+                    <span style="font-size: 13px; font-weight: 600; color: ${colorBorde};">
+                        ${avatar} ${nombre}
+                    </span>
+                    ${timestampDisplay}
+                </div>
+                <div style="
+                    max-width: 75%;
+                    background: ${colorFondo};
+                    border-left: 4px solid ${colorBorde};
+                    padding: 10px 14px;
+                    border-radius: 12px;
+                    border-top-${esCliente ? 'left' : 'right'}-radius: 4px;
+                    font-size: 14px;
+                    line-height: 1.6;
+                    word-wrap: break-word;
+                    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+                ">
+                    ${escapeHtml(texto)}
+                </div>
+            </div>
+        `;
+    }
+
+    // ======================================================
+    // 6. AGREGAR CONTROLES DE ACCIÓN
+    // ======================================================
+    const totalLineas = lineas.length;
+
+    // Contar mensajes por hablante
+    const countCliente = lineas.filter(l => l.toUpperCase().includes('[CLIENTE]')).length;
+    const countGestor = lineas.filter(l => l.toUpperCase().includes('[GESTOR]')).length;
+
+    const htmlFinal = `
+        <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 12px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+            <div style="display: flex; gap: 15px; font-size: 12px;">
+                <span>📊 Total: <strong>${totalLineas}</strong> intervenciones</span>
+                <span style="color: #019DF4;">👤 Cliente: <strong>${countCliente}</strong></span>
+                <span style="color: #28a745;">👨‍💼 Gestor: <strong>${countGestor}</strong></span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button onclick="copiarTranscripcion('${containerId}')" 
+                        style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; cursor: pointer; color: white; font-size: 12px;">
+                    📋 Copiar
+                </button>
+                <button onclick="expandirTranscripcionCompleta('${containerId}')" 
+                        style="background: #6c757d; padding: 4px 12px; border: none; border-radius: 6px; cursor: pointer; color: white; font-size: 12px;">
+                    📄 Ver completa
+                </button>
+            </div>
+        </div>
+        <div id="${containerId}-mensajes" style="max-height: 500px; overflow-y: auto; padding-right: 8px;">
+            ${html}
+        </div>
+        <div style="margin-top: 10px; font-size: 11px; color: var(--muted); text-align: center;">
+            💡 Los mensajes del <strong style="color: #019DF4;">Cliente</strong> están en azul, 
+            los del <strong style="color: #28a745;">Gestor</strong> en verde.
+        </div>
+    `;
+
+    container.innerHTML = htmlFinal;
+}
+
+// ======================================================
+// FUNCIÓN: copiarTranscripcion()
+// ======================================================
+// 📌 PROPÓSITO: Copiar la transcripción al portapapeles
+// ======================================================
+
+function copiarTranscripcion(containerId) {
+    const mensajesContainer = document.getElementById(`${containerId}-mensajes`);
+    if (!mensajesContainer) return;
+
+    // Extraer solo el texto de los mensajes (sin emojis ni formato)
+    const mensajes = mensajesContainer.querySelectorAll('div[style*="background:"]');
+    let texto = '';
+    mensajes.forEach(msg => {
+        const textContent = msg.textContent.trim();
+        if (textContent) {
+            texto += textContent + '\n';
+        }
+    });
+
+    if (texto) {
+        navigator.clipboard.writeText(texto)
+            .then(() => {
+                mostrarMensajeTemporal('✅ Transcripción copiada al portapapeles', 'var(--ok)');
+            })
+            .catch(() => {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = texto;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                mostrarMensajeTemporal('✅ Transcripción copiada al portapapeles', 'var(--ok)');
+            });
+    }
+}
+
+// ======================================================
+// FUNCIÓN: expandirTranscripcionCompleta()
+// ======================================================
+// 📌 PROPÓSITO: Mostrar la transcripción completa en un modal
+// ======================================================
+
+function expandirTranscripcionCompleta(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    // Buscar el div de mensajes
+    const mensajesContainer = document.getElementById(`${containerId}-mensajes`);
+    if (!mensajesContainer) return;
+
+    // Extraer el texto completo
+    const mensajes = mensajesContainer.querySelectorAll('div[style*="background:"]');
+    let textoCompleto = '';
+    mensajes.forEach(msg => {
+        const textContent = msg.textContent.trim();
+        if (textContent) {
+            textoCompleto += textContent + '\n';
+        }
+    });
+
+    if (!textoCompleto) {
+        alert('⚠️ No hay transcripción para mostrar');
+        return;
+    }
+
+    // Crear modal
+    const modal = document.createElement('div');
+    modal.id = 'modalTranscripcionCompleta';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 100060;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: white;
+            border-radius: 16px;
+            width: 95%;
+            max-width: 900px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        ">
+            <div style="
+                padding: 15px 20px;
+                background: linear-gradient(135deg, #019DF4, #00B4F0);
+                color: white;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-shrink: 0;
+            ">
+                <strong style="font-size: 16px;">📄 Transcripción Completa</strong>
+                <button onclick="cerrarModalTranscripcionCompleta()" 
+                        style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">
+                    ✖
+                </button>
+            </div>
+            <div style="
+                padding: 20px;
+                overflow-y: auto;
+                flex: 1;
+                background: #f8fafc;
+                font-family: monospace;
+                font-size: 14px;
+                line-height: 1.8;
+                white-space: pre-wrap;
+            ">
+                ${escapeHtml(textoCompleto)}
+            </div>
+            <div style="
+                padding: 15px 20px;
+                background: #f8f9fa;
+                display: flex;
+                justify-content: flex-end;
+                gap: 10px;
+                border-top: 1px solid #e0e0e0;
+                flex-shrink: 0;
+            ">
+                <button onclick="copiarTranscripcionCompleta()" 
+                        style="background: var(--accent); padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                    📋 Copiar
+                </button>
+                <button onclick="cerrarModalTranscripcionCompleta()" 
+                        style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Guardar el texto para la función de copiar
+    window._transcripcionCompletaTexto = textoCompleto;
+}
+
+// ======================================================
+// FUNCIÓN: cerrarModalTranscripcionCompleta()
+// ======================================================
+
+function cerrarModalTranscripcionCompleta() {
+    const modal = document.getElementById('modalTranscripcionCompleta');
+    if (modal) modal.remove();
+    window._transcripcionCompletaTexto = null;
+}
+
+// ======================================================
+// FUNCIÓN: copiarTranscripcionCompleta()
+// ======================================================
+
+function copiarTranscripcionCompleta() {
+    if (window._transcripcionCompletaTexto) {
+        navigator.clipboard.writeText(window._transcripcionCompletaTexto)
+            .then(() => {
+                mostrarMensajeTemporal('✅ Transcripción copiada al portapapeles', 'var(--ok)');
+            })
+            .catch(() => {
+                alert('📋 Copia manual:\n\n' + window._transcripcionCompletaTexto);
+            });
+    }
 }
 
 // ======================================================
@@ -9402,3 +9777,364 @@ window.addEventListener('load', function() {
 window.actualizarHeaderConUsuario = actualizarHeaderConUsuario;
 
 console.log('✅ Sistema de actualización de header registrado');
+
+// ======================================================
+// 1. TOGGLE PANEL DE TRANSCRIPCIÓN
+// ======================================================
+
+function togglePanelTranscripcion() {
+    const panel = document.getElementById('panelTranscripcion');
+    const wrapper = document.getElementById('evaluacionDinamicaWrapper');
+    const btnFlotante = document.getElementById('btnFlotanteTranscripcion');
+    const btnAbrir = document.getElementById('btnAbrirPanelTranscripcion');
+    
+    if (!panel) return;
+    
+    panelTranscripcionAbierto = !panelTranscripcionAbierto;
+    
+    if (panelTranscripcionAbierto) {
+        // ABRIR PANEL
+        panel.className = 'abierto';
+        if (wrapper) wrapper.style.gap = '16px';
+        if (btnFlotante) btnFlotante.style.display = 'none';
+        if (btnAbrir) btnAbrir.textContent = '✕ Cerrar panel';
+        
+        // Renderizar burbujas si hay transcripción
+        if (segmentosTranscripcion.length > 0) {
+            renderizarTranscripcionChat(segmentosTranscripcion);
+        } else if (transcripcionActual) {
+            // Si hay transcripción pero no segmentos, parsearla
+            const segmentos = parsearTranscripcion(transcripcionActual);
+            if (segmentos.length > 0) {
+                segmentosTranscripcion = segmentos;
+                renderizarTranscripcionChat(segmentos);
+            }
+        }
+        
+        // Guardar preferencia
+        localStorage.setItem('panel_transcripcion_abierto', 'true');
+        
+    } else {
+        // CERRAR PANEL
+        panel.className = 'cerrado';
+        if (wrapper) wrapper.style.gap = '0';
+        if (btnFlotante) btnFlotante.style.display = 'flex';
+        if (btnAbrir) btnAbrir.textContent = '📖 Ver en panel';
+        
+        // Guardar preferencia
+        localStorage.setItem('panel_transcripcion_abierto', 'false');
+    }
+}
+
+// ======================================================
+// 2. CERRAR PANEL (función auxiliar)
+// ======================================================
+
+function cerrarPanelTranscripcion() {
+    if (panelTranscripcionAbierto) {
+        togglePanelTranscripcion();
+    }
+}
+
+// ======================================================
+// 3. RENDERIZAR TRANSCRIPCIÓN EN FORMATO CHAT
+// ======================================================
+
+function renderizarTranscripcionChat(segmentos) {
+    const body = document.getElementById('panelTranscripcionBody');
+    const badge = document.getElementById('panelTranscripcionBadge');
+    const badgeFlotante = document.getElementById('btnFlotanteBadge');
+    
+    if (!body) return;
+    
+    if (!segmentos || segmentos.length === 0) {
+        body.innerHTML = `
+            <div class="panel-vacio">
+                <div class="icono">💬</div>
+                <div class="titulo">Sin conversación</div>
+                <div class="subtitulo">No hay mensajes para mostrar</div>
+            </div>
+        `;
+        if (badge) badge.textContent = '0 mensajes';
+        if (badgeFlotante) badgeFlotante.textContent = '0';
+        return;
+    }
+    
+    let html = '';
+    let countCliente = 0;
+    let countGestor = 0;
+    
+    for (const seg of segmentos) {
+        const speaker = seg.speaker || 'DESCONOCIDO';
+        const texto = seg.text || '';
+        const timestamp = seg.timestamp || '';
+        
+        // Determinar si es CLIENTE o GESTOR
+        const esCliente = speaker.toUpperCase().includes('CLIENTE');
+        const esGestor = speaker.toUpperCase().includes('GESTOR');
+        
+        if (esCliente) countCliente++;
+        else if (esGestor) countGestor++;
+        
+        // Limpiar texto (eliminar timestamps duplicados)
+        let textoLimpio = texto;
+        // Eliminar patrones como [00:00.000 --> 00:02.500]
+        textoLimpio = textoLimpio.replace(/\[\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}\.\d{3}\]\s*/g, '');
+        // Eliminar etiquetas [CLIENTE] o [GESTOR] si están en el texto
+        textoLimpio = textoLimpio.replace(/\[(CLIENTE|GESTOR)\]\s*/gi, '');
+        textoLimpio = textoLimpio.trim();
+        
+        if (!textoLimpio) continue;
+        
+        // Formatear timestamp para mostrar (solo inicio)
+        let timestampDisplay = '';
+        if (timestamp) {
+            const partes = timestamp.split('-->');
+            if (partes.length >= 1) {
+                timestampDisplay = partes[0].trim();
+            }
+        }
+        
+        if (esCliente) {
+            html += `
+                <div class="mensaje-cliente">
+                    <div class="meta">
+                        <span class="nombre">👤 Cliente</span>
+                        ${timestampDisplay ? `<span class="tiempo">${timestampDisplay}</span>` : ''}
+                    </div>
+                    <div class="burbuja">${escapeHtml(textoLimpio)}</div>
+                </div>
+            `;
+        } else if (esGestor) {
+            html += `
+                <div class="mensaje-gestor">
+                    <div class="meta">
+                        ${timestampDisplay ? `<span class="tiempo">${timestampDisplay}</span>` : ''}
+                        <span class="nombre">👨‍💼 Gestor</span>
+                    </div>
+                    <div class="burbuja">${escapeHtml(textoLimpio)}</div>
+                </div>
+            `;
+        } else {
+            // Speaker desconocido o sin identificar
+            html += `
+                <div class="mensaje-sistema">
+                    <div class="burbuja">🔊 ${escapeHtml(textoLimpio)}</div>
+                </div>
+            `;
+        }
+    }
+    
+    // Si no se generó nada, mostrar mensaje
+    if (!html) {
+        body.innerHTML = `
+            <div class="panel-vacio">
+                <div class="icono">📝</div>
+                <div class="titulo">Sin mensajes procesados</div>
+                <div class="subtitulo">La transcripción no contiene mensajes identificables</div>
+            </div>
+        `;
+    } else {
+        body.innerHTML = html;
+        // Scroll al último mensaje
+        body.scrollTop = body.scrollHeight;
+    }
+    
+    // Actualizar badges
+    const total = segmentos.length;
+    if (badge) badge.textContent = `${total} mensajes`;
+    if (badgeFlotante) badgeFlotante.textContent = total;
+}
+
+// ======================================================
+// 4. PARSEAR TRANSCRIPCIÓN A SEGMENTOS
+// ======================================================
+
+function parsearTranscripcion(transcripcion) {
+    if (!transcripcion) return [];
+    
+    const lineas = transcripcion.split('\n').filter(linea => linea.trim() !== '');
+    const segmentos = [];
+    
+    // Patrón para detectar líneas con formato: [HABLANTE] [timestamp] texto
+    const patronCompleto = /^\[(CLIENTE|GESTOR)\]\s*\[(\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}\.\d{3})\]\s*(.*)$/i;
+    // Patrón para líneas con solo hablante: [HABLANTE] texto
+    const patronHablante = /^\[(CLIENTE|GESTOR)\]\s*(.*)$/i;
+    // Patrón para líneas con solo timestamp: [timestamp] texto
+    const patronTimestamp = /^\[(\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}\.\d{3})\]\s*(.*)$/;
+    
+    let speakerActual = 'DESCONOCIDO';
+    
+    for (const linea of lineas) {
+        let texto = linea.trim();
+        let speaker = null;
+        let timestamp = null;
+        let contenido = texto;
+        
+        // Intentar coincidencia con patrón completo
+        let match = texto.match(patronCompleto);
+        if (match) {
+            speaker = match[1];
+            timestamp = match[2];
+            contenido = match[3].trim();
+        } else {
+            // Intentar coincidencia con solo hablante
+            match = texto.match(patronHablante);
+            if (match) {
+                speaker = match[1];
+                contenido = match[2].trim();
+            } else {
+                // Intentar coincidencia con solo timestamp
+                match = texto.match(patronTimestamp);
+                if (match) {
+                    timestamp = match[1];
+                    contenido = match[2].trim();
+                    // Mantener el speaker actual si no cambia
+                    speaker = speakerActual;
+                } else {
+                    // Sin patrón, usar el speaker actual
+                    speaker = speakerActual;
+                    contenido = texto;
+                }
+            }
+        }
+        
+        // Actualizar speaker actual si se detectó uno
+        if (speaker) speakerActual = speaker;
+        
+        // Limpiar contenido: eliminar timestamps dentro del texto
+        contenido = contenido.replace(/\[\d{2}:\d{2}\.\d{3}\s*-->\s*\d{2}:\d{2}\.\d{3}\]\s*/g, '');
+        contenido = contenido.trim();
+        
+        if (contenido) {
+            segmentos.push({
+                speaker: speaker || speakerActual || 'DESCONOCIDO',
+                timestamp: timestamp || '',
+                text: contenido
+            });
+        }
+    }
+    
+    return segmentos;
+}
+
+// ======================================================
+// 5. COPIAR TRANSCRIPCIÓN DEL PANEL
+// ======================================================
+
+function copiarTranscripcionPanel() {
+    const body = document.getElementById('panelTranscripcionBody');
+    if (!body) return;
+    
+    // Extraer solo el texto de las burbujas
+    const burbujas = body.querySelectorAll('.burbuja');
+    let texto = '';
+    burbujas.forEach(b => {
+        const textoLimpio = b.textContent.trim();
+        if (textoLimpio) {
+            texto += textoLimpio + '\n';
+        }
+    });
+    
+    if (!texto) {
+        alert('⚠️ No hay texto para copiar');
+        return;
+    }
+    
+    navigator.clipboard.writeText(texto.trim())
+        .then(() => {
+            mostrarMensajeTemporal('✅ Transcripción copiada al portapapeles', 'var(--ok)');
+        })
+        .catch(() => {
+            // Fallback
+            const textarea = document.createElement('textarea');
+            textarea.value = texto.trim();
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            mostrarMensajeTemporal('✅ Transcripción copiada al portapapeles', 'var(--ok)');
+        });
+}
+
+// ======================================================
+// 6. CARGAR PREFERENCIA DEL PANEL
+// ======================================================
+
+function cargarPreferenciaPanelTranscripcion() {
+    const preferencia = localStorage.getItem('panel_transcripcion_abierto');
+    if (preferencia === 'true') {
+        // Si la preferencia es abrir, pero solo si hay transcripción cargada
+        if (segmentosTranscripcion.length > 0 || transcripcionActual) {
+            setTimeout(() => {
+                togglePanelTranscripcion();
+            }, 300);
+        }
+    }
+}
+
+// ======================================================
+// 7. ACTUALIZAR FUNCIÓN EXISTENTE: cargarDatosEscuchaEnFormulario
+// ======================================================
+
+// Sobrescribir la función para que también renderice el panel
+const originalCargarDatosEscucha = window.cargarDatosEscuchaEnFormulario || function() {};
+
+window.cargarDatosEscuchaEnFormulario = function(escucha) {
+    // Llamar a la función original
+    if (typeof originalCargarDatosEscucha === 'function') {
+        originalCargarDatosEscucha(escucha);
+    }
+    
+    // Si hay transcripción, preparar el panel
+    if (escucha.transcripcion && escucha.transcripcion.length > 0) {
+        transcripcionActual = escucha.transcripcion;
+        segmentosTranscripcion = parsearTranscripcion(escucha.transcripcion);
+        
+        // Mostrar botones
+        const btnPanel = document.getElementById('btnAbrirPanelTranscripcion');
+        const btnFlotante = document.getElementById('btnFlotanteTranscripcion');
+        
+        if (btnPanel) btnPanel.style.display = 'inline-flex';
+        if (btnFlotante) {
+            btnFlotante.style.display = 'flex';
+            const badge = document.getElementById('btnFlotanteBadge');
+            if (badge) badge.textContent = segmentosTranscripcion.length;
+        }
+        
+        // Si hay preferencia de abrir, hacerlo
+        const preferencia = localStorage.getItem('panel_transcripcion_abierto');
+        if (preferencia === 'true' && !panelTranscripcionAbierto) {
+            setTimeout(() => {
+                togglePanelTranscripcion();
+            }, 500);
+        }
+    } else {
+        // Ocultar botones si no hay transcripción
+        const btnPanel = document.getElementById('btnAbrirPanelTranscripcion');
+        const btnFlotante = document.getElementById('btnFlotanteTranscripcion');
+        if (btnPanel) btnPanel.style.display = 'none';
+        if (btnFlotante) btnFlotante.style.display = 'none';
+        
+        // Cerrar panel si está abierto
+        if (panelTranscripcionAbierto) {
+            togglePanelTranscripcion();
+        }
+    }
+};
+
+// ======================================================
+// 8. INICIALIZAR PREFERENCIA AL CARGAR
+// ======================================================
+
+// Ejecutar cuando se carga la página (después de los otros DOMContentLoaded)
+setTimeout(() => {
+    cargarPreferenciaPanelTranscripcion();
+}, 1000);
+
+// Exponer funciones globalmente
+window.togglePanelTranscripcion = togglePanelTranscripcion;
+window.cerrarPanelTranscripcion = cerrarPanelTranscripcion;
+window.copiarTranscripcionPanel = copiarTranscripcionPanel;
+window.renderizarTranscripcionChat = renderizarTranscripcionChat;
+window.parsearTranscripcion = parsearTranscripcion;

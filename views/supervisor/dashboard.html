@@ -1403,9 +1403,8 @@
                                     <th>⚠️ Incid.</th>
                                     <th>📈 Avance</th>
                                     <th>Estado</th>
-                                    <th>Acciones</th>
-                                    <!-- 🔴 AGREGAR ESTA NUEVA COLUMNA -->
-                                    <th style="width: 50px;">🗑️</th>
+                                        <th align="center">🎧 Transcripcion</th>  <!-- ✅ NUEVA COLUMNA -->
+                                        <th align="center">⚙️ Acciones</th>  <!-- ✅ SOLO VER Y ELIMINAR -->
                                 </tr>
                             </thead>
                             <tbody id="tablaHistorialLotes">
@@ -1563,47 +1562,61 @@
                 <!-- ====================================================== -->
                 <!-- PROCESAR AUDIOS DEL LOTE -->
                 <!-- ====================================================== -->
-                <div class="card" style="margin-top: 20px;">
-                    <h3>🎧 Procesar Audios del Lote</h3>
-                    <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+                <div class="card" style="margin-top: 20px; border-left: 4px solid #7b1fa2;">
+                    <h3>🎤 Registro de Voz de Gestores</h3>
+                    <p style="color: var(--muted); font-size: 13px; margin-bottom: 15px;">
+                        Registre la voz de un gestor para que el sistema pueda identificarlo automáticamente en futuras transcripciones.
+                    </p>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div>
-                            <span style="font-size: 13px; color: var(--muted);">Buscará automáticamente los archivos de audio usando:</span>
-                            
+                            <label style="font-size: 12px; font-weight: 600;">👤 Nombre del Gestor *</label>
+                            <!-- 🔴 NUEVO: Buscador con autocompletado -->
+                            <div class="select-buscador-container" id="gestor-registro-container">
+                                <input type="text" 
+                                    id="buscarGestorRegistro" 
+                                    class="select-buscador-input" 
+                                    placeholder="Buscar gestor..." 
+                                    autocomplete="off"
+                                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px;">
+                                <input type="hidden" id="selectGestorRegistro" value="">
+                                <div id="gestorRegistroDropdown" class="select-buscador-dropdown"></div>
+                            </div>
+                            <small style="color: var(--muted);">Escriba para filtrar gestores</small>
                         </div>
-                        <button onclick="procesarAudiosDeLoteActivo()" 
-                                id="btnProcesarAudiosLote"
-                                style="background: linear-gradient(135deg, #7b1fa2, #9c27b0); 
-                                    padding: 12px 28px; 
-                                    border: none; 
-                                    border-radius: 8px; 
-                                    color: white; 
-                                    cursor: pointer; 
-                                    font-weight: bold; 
-                                    font-size: 14px;
-                                    box-shadow: 0 4px 12px rgba(123,31,162,0.3);
-                                    transition: all 0.2s;">
-                            🎧 Procesar Lote Activo
-                        </button>
-                    </div>
-                    <!-- Opciones de procesamiento de audios -->
-                    <div style="margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 1px solid #e0e0e0;">
-                        <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
-                            <!-- Checkbox para forzar reprocesamiento -->
-                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                                <input type="checkbox" id="forzarReprocesamiento" 
-                                    style="width: 18px; height: 18px; cursor: pointer;">
-                                <span style="font-size: 13px; font-weight: 500;">🔄 Reprocesar audios ya transcritos</span>
-                            </label>
-                            <span style="font-size: 11px; color: var(--muted);">
-                                ⚠️ Si está activado, reemplazará las transcripciones existentes con nuevas versiones.
-                                <br>Útil para aplicar mejoras en Whisper o en la lógica de análisis.
-                            </span>
+                        <div>
+                            <label style="font-size: 12px; font-weight: 600;">📂 Audio del gestor</label>
+                            <input type="file" id="fileAudioGestor" accept=".mp3,.wav,.m4a,.flac" style="width: 100%; padding: 8px; border-radius: 8px;">
+                            <small style="color: var(--muted);">Audio donde el gestor habla claramente</small>
                         </div>
                     </div>
-                    <div style="margin-top: 10px; font-size: 12px; color: var(--muted);">
-                        ⚡ Al procesar, el sistema buscará los audios, los transcribirá y 
-                        <span id="analisisOpcionTexto">analizará con IA</span>.
-                        <br>💡 Si ya tiene transcripciones, puede analizarlas desde la bandeja del auditor.
+                    
+                    <div style="display: flex; gap: 15px; margin-top: 15px;">
+                        <div style="flex: 1;">
+                            <label style="font-size: 12px; font-weight: 600;">⏱️ Segundo de inicio *</label>
+                            <input type="number" id="timestampRegistro" step="0.1" min="0" placeholder="Ej: 3.96" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line);">
+                            <small style="color: var(--muted);">Segundo exacto donde el gestor comienza a hablar</small>
+                        </div>
+                        <div style="flex: 1; display: flex; align-items: flex-end;">
+                            <button onclick="registrarVozGestor()" style="background: linear-gradient(135deg, #7b1fa2, #9c27b0); padding: 12px 28px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; width: 100%;">
+                                🎤 Registrar Voz
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="registroVozStatus" style="margin-top: 15px; font-size: 13px;"></div>
+                    
+                    <!-- Lista de gestores registrados -->
+                    <div style="margin-top: 20px; border-top: 1px solid var(--line); padding-top: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h4 style="margin: 0;">📋 Gestores con voz registrada</h4>
+                            <button onclick="cargarGestoresRegistrados()" style="background: var(--accent); padding: 4px 12px; font-size: 11px; border: none; border-radius: 6px; color: white; cursor: pointer;">
+                                🔄 Refrescar
+                            </button>
+                        </div>
+                        <div id="listaGestoresRegistrados" style="margin-top: 10px; max-height: 150px; overflow-y: auto;">
+                            <div style="text-align: center; padding: 20px; color: var(--muted);">Cargando gestores registrados...</div>
+                        </div>
                     </div>
                 </div>
                 
