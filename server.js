@@ -429,6 +429,124 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     }
 
     // ======================================================
+    // PROXY DE AUDIO - CONEXIÓN CON PYTHON
+    // ======================================================
+    // 📌 PROPÓSITO: Reenviar solicitudes de audio al servidor Python
+    // 📌 URL: /api/audio/reprocur/:ticketId
+    // 📌 MÉTODO: GET
+    // 📌 DESTINO: Python en puerto 5001 (configurable)
+    // ======================================================
+
+    // 1. CONFIGURACIÓN DINÁMICA (detecta entorno)
+    const PYTHON_API_URL = process.env.PYTHON_API_URL || 
+        (process.env.NODE_ENV === 'production' 
+            ? 'http://10.4.240.68:5001'  // ← IP de producción (cámbiala)
+            : 'http://localhost:5001'       // ← IP de desarrollo
+        );
+
+    console.log(`🐍 [AUDIO] Python API URL: ${PYTHON_API_URL}`);
+
+    // 2. ENDPOINT: REPRODUCIR AUDIO (PROXY) - USANDO startsWith
+    if (ruta.startsWith('/api/audio/reproducir/') && metodo === 'GET') {
+        console.log(`[API] GET /api/audio/reproducir/*`);
+        
+        // Extraer ticketId de la URL: /api/audio/reproducir/123
+        const ticketId = ruta.split('/').pop();
+        
+        if (!ticketId || isNaN(ticketId)) {
+            respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Ticket ID inválido' }));
+            return;
+        }
+        
+        try {
+            console.log(`🎧 [PROXY] Solicitando audio para ticket: ${ticketId}`);
+            console.log(`   → Python: ${PYTHON_API_URL}/api/audio/reproducir/${ticketId}`);
+            
+            // Hacer fetch al servidor Python
+            const response = await fetch(`${PYTHON_API_URL}/api/audio/reproducir/${ticketId}`);
+            
+            // Si Python devuelve error, propagarlo
+            if (!response.ok) {
+                let errorText = '';
+                try {
+                    errorText = await response.text();
+                } catch (e) {
+                    errorText = 'Sin detalles adicionales';
+                }
+                
+                console.error(`❌ [PROXY] Error desde Python: ${response.status} - ${errorText.substring(0, 200)}`);
+                
+                respuesta.writeHead(response.status, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ 
+                    error: `Error desde servidor de audio: ${response.status}`,
+                    details: errorText.substring(0, 300)
+                }));
+                return;
+            }
+            
+            // Obtener el tipo de contenido (audio/mpeg, audio/wav, etc.)
+            const contentType = response.headers.get('content-type') || 'application/octet-stream';
+            
+            // Obtener el body como buffer
+            const buffer = await response.arrayBuffer();
+            const data = Buffer.from(buffer);
+            
+            // Establecer headers para el navegador
+            respuesta.setHeader('Content-Type', contentType);
+            respuesta.setHeader('Accept-Ranges', 'bytes');
+            respuesta.setHeader('Cache-Control', 'public, max-age=86400');
+            respuesta.setHeader('Content-Length', data.length);
+            
+            // Mantener Content-Disposition si Python lo envía
+            const contentDisposition = response.headers.get('content-disposition');
+            if (contentDisposition) {
+                respuesta.setHeader('Content-Disposition', contentDisposition);
+            }
+            
+            console.log(`✅ [PROXY] Audio servido para ticket: ${ticketId} (${contentType}, ${(data.length / 1024).toFixed(1)} KB)`);
+            
+            respuesta.writeHead(200);
+            respuesta.end(data);
+            
+        } catch (error) {
+            console.error(`❌ [PROXY] Error sirviendo audio:`, error.message);
+            
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ 
+                error: 'Error al obtener el audio',
+                details: error.message 
+            }));
+        }
+        return;
+    }
+
+    // 3. ENDPOINT: VERIFICAR AUDIO (PROXY - OPCIONAL)
+    if (ruta.startsWith('/api/audio/verificar/') && metodo === 'GET') {
+        console.log(`[API] GET /api/audio/verificar/*`);
+        
+        const ticketId = ruta.split('/').pop();
+        
+        try {
+            const response = await fetch(`${PYTHON_API_URL}/api/audio/verificar/${ticketId}`);
+            const data = await response.json();
+            
+            respuesta.writeHead(response.status, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(data));
+            
+        } catch (error) {
+            console.error(`❌ [PROXY] Error verificando audio:`, error.message);
+            
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ 
+                existe: false,
+                error: error.message 
+            }));
+        }
+        return;
+    }
+
+    // ======================================================
     // API - CAMBIO DE CONTRASEÑA
     // ======================================================
     if (ruta === '/api/auth/cambiar-password' && metodo === 'POST') {

@@ -172,19 +172,6 @@ let panelTranscripcionAbierto = false;
 let transcripcionActual = '';
 let segmentosTranscripcion = [];
 
-
-// ================================================================
-// CONFIGURACIÓN DE AUDIO - URL DINÁMICA
-// ================================================================
-
-// Detectar automáticamente la URL base
-if (!window.API_URL_TRANSCRIPCION) {
-    // Usar la misma URL que el frontend (localhost:8080)
-    const baseUrl = window.location.origin; // http://localhost:8080
-    window.API_URL_TRANSCRIPCION = baseUrl;
-    console.log(`🎧 API_URL_TRANSCRIPCION configurado: ${baseUrl}`);
-}
-
 // ======================================================
 // BLOQUE 2: VERIFICACIÓN DE SESIÓN (AUDITOR)
 // ======================================================
@@ -5505,6 +5492,7 @@ function filtrarEscuchasPorEstado(estado) {
 // 📌 COLUMNAS: Ticket, Gestor, Supervisor, Motivos, Fecha, Estado, Acciones
 // 📌 ACCIONES: Gestionar, Continuar, Cancelar, Reportar Incidencia
 // ======================================================
+
 function actualizarTablaMisEscuchas(escuchas) {
     const tbody = document.getElementById('tablaMisEscuchas');
     if (!tbody) return;
@@ -5548,8 +5536,7 @@ function actualizarTablaMisEscuchas(escuchas) {
                 estadoBadge = '<span class="badge-estado badge-pendiente">⏳ Pendiente</span>';
                 acciones = `
                     <div class="acciones-container">
-                        
-                        <button class="btn-gestionar" onclick="iniciarGestionEscucha(${escucha.id})">📝 Gestionar</button>
+                        <button class="btn-gestionar" onclick="iniciarGestionEscucha(${escucha.id})">🎧 Gestionar</button>
                         <button class="btn-incidencia" onclick="abrirModalIncidencia(${escucha.id})">⚠️ Reportar</button>
                     </div>
                 `;
@@ -5559,7 +5546,6 @@ function actualizarTablaMisEscuchas(escuchas) {
                 estadoBadge = '<span class="badge-estado badge-proceso">🔄 En proceso</span>';
                 acciones = `
                     <div class="acciones-container">
-                        
                         <button class="btn-continuar" onclick="continuarGestionEscucha(${escucha.id})">✏️ Continuar</button>
                         <button class="btn-cancelar" onclick="cancelarGestionEscucha(${escucha.id})">❌ Cancelar</button>
                         <button class="btn-incidencia" onclick="abrirModalIncidencia(${escucha.id})">⚠️ Reportar</button>
@@ -5809,28 +5795,15 @@ async function iniciarGestionEscucha(id) {
         }
 
         // ======================================================
-        // 🆕 1i. CARGAR AUDIO AUTOMÁTICAMENTE
-        // ======================================================
-        if (typeof cargarAudioEnReproductor === 'function') {
-            console.log(`🎧 Cargando audio automáticamente para ticket: ${id}`);
-            // Pequeño delay para asegurar que el DOM esté listo
-            setTimeout(async () => {
-                await cargarAudioEnReproductor(id);
-            }, 300);
-        } else {
-            console.warn('⚠️ Función cargarAudioEnReproductor no disponible');
-        }
-
-        // ======================================================
-        // 1j. MOSTRAR MENSAJE DE CONFIRMACIÓN
+        // 1i. MOSTRAR MENSAJE DE CONFIRMACIÓN
         // ======================================================
         mostrarMensajeTemporal(
-            '🎧 Escucha cargada. Audio disponible para reproducción.',
+            '🎧 Escucha cargada. Presione "Auditar" para comenzar la evaluación.',
             'var(--ok)'
         );
 
         // ======================================================
-        // 1k. ELIMINAR TEMPORIZADOR SI EXISTE
+        // 1j. ELIMINAR TEMPORIZADOR SI EXISTE
         // ======================================================
         const timerElement = document.getElementById('temporizadorAuditoria');
         if (timerElement) {
@@ -5861,36 +5834,64 @@ async function iniciarGestionEscucha(id) {
 // ======================================================
 
 async function continuarGestionEscucha(id) {
-    console.log(`🔄 Continuando gestión de escucha ID: ${id}`);
-    
+    console.log('🔄 Continuando gestión de escucha ID:', id);
+
+    // ======================================================
+    // 2a. VALIDAR CONEXIÓN A BD
+    // ======================================================
+    const db = getDB();
+    if (!db) {
+        alert('❌ Base de datos no disponible');
+        return;
+    }
+
     try {
         // ======================================================
-        // 1a. BUSCAR ESCUCHA EN DATOS CARGADOS
+        // 2b. OBTENER DATOS DE LA ESCUCHA
         // ======================================================
-        const escucha = misEscuchasData.find(e => e.id == id);
-        
-        if (!escucha) {
-            throw new Error('No se encontró la escucha');
-        }
+        const { data: escucha, error } = await db
+            .from('asignaciones_escucha')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+
+        console.log('📅 Fecha descarga audio:', escucha.fecha_descarga);
 
         // ======================================================
-        // 1b. MARCAR MODO GESTIÓN DE ESCUCHA
+        // 2c. VERIFICAR SI EXISTE EVALUACIÓN PREVIA
+        // ======================================================
+        const { data: evaluacionExistente } = await db
+            .from('evaluaciones')
+            .select('*')
+            .eq('ticket_psi', escucha.ticket)
+            .maybeSingle();
+
+        // ======================================================
+        // 2d. MARCAR MODO GESTIÓN DE ESCUCHA
         // ======================================================
         window.gestionEscuchaActiva = true;
         window.idEscuchaGestionando = id;
 
         // ======================================================
-        // 1c. CARGAR DATOS EN FORMULARIO
-        // ======================================================
-        cargarDatosEscuchaEnFormulario(escucha);
-
-        // ======================================================
-        // 1d. CAMBIAR A PESTAÑA DE EVALUACIÓN
+        // 2e. CAMBIAR A PESTAÑA DE EVALUACIÓN
         // ======================================================
         showTab('evaluacion', null);
 
         // ======================================================
-        // 1e. DESHABILITAR SELECTS INICIALMENTE
+        // 2f. CARGAR DATOS EN FORMULARIO
+        // ======================================================
+        if (evaluacionExistente) {
+            console.log('📝 Evaluación existente encontrada, cargando para edición...');
+            await editarEvaluacion(evaluacionExistente.id);
+        } else {
+            console.log('🆕 No hay evaluación previa, cargando datos frescos...');
+            cargarDatosEscuchaEnFormulario(escucha);
+        }
+
+        // ======================================================
+        // 2g. DESHABILITAR SELECTS INICIALMENTE
         // ======================================================
         const selects = document.querySelectorAll('.cumple-select');
         selects.forEach(select => {
@@ -5899,7 +5900,7 @@ async function continuarGestionEscucha(id) {
         });
 
         // ======================================================
-        // 1f. HABILITAR BOTÓN AUDITAR
+        // 2h. HABILITAR BOTÓN AUDITAR
         // ======================================================
         const btnAuditar = document.getElementById('btnAuditar');
         if (btnAuditar) {
@@ -5907,11 +5908,11 @@ async function continuarGestionEscucha(id) {
             btnAuditar.style.opacity = '1';
             btnAuditar.style.cursor = 'pointer';
             btnAuditar.style.display = 'inline-flex';
-            btnAuditar.title = 'Continuar auditoría con los datos precargados';
+            btnAuditar.title = 'Iniciar auditoría con los datos precargados';
         }
 
         // ======================================================
-        // 1g. MOSTRAR BOTÓN CANCELAR
+        // 2i. MOSTRAR BOTÓN CANCELAR
         // ======================================================
         const btnCancelarGestion = document.getElementById('btnCancelarGestion');
         if (btnCancelarGestion) {
@@ -5919,28 +5920,15 @@ async function continuarGestionEscucha(id) {
         }
 
         // ======================================================
-        // 🆕 1h. CARGAR AUDIO AUTOMÁTICAMENTE
-        // ======================================================
-        if (typeof cargarAudioEnReproductor === 'function') {
-            console.log(`🎧 Cargando audio automáticamente para ticket: ${id}`);
-            // Pequeño delay para asegurar que el DOM esté listo
-            setTimeout(async () => {
-                await cargarAudioEnReproductor(id);
-            }, 300);
-        } else {
-            console.warn('⚠️ Función cargarAudioEnReproductor no disponible');
-        }
-
-        // ======================================================
-        // 1i. MOSTRAR MENSAJE DE CONFIRMACIÓN
+        // 2j. MOSTRAR MENSAJE DE CONFIRMACIÓN
         // ======================================================
         mostrarMensajeTemporal(
-            '🎧 Escucha cargada. Audio disponible para reproducción.',
+            '🎧 Escucha cargada. Presione "Auditar" para comenzar la evaluación.',
             'var(--ok)'
         );
 
         // ======================================================
-        // 1j. ELIMINAR TEMPORIZADOR SI EXISTE
+        // 2k. ELIMINAR TEMPORIZADOR SI EXISTE
         // ======================================================
         const timerElement = document.getElementById('temporizadorAuditoria');
         if (timerElement) {
@@ -5949,13 +5937,14 @@ async function continuarGestionEscucha(id) {
 
     } catch (error) {
         console.error('❌ Error al continuar gestión:', error);
-        alert('❌ Error al cargar la escucha: ' + error.message);
-        
+        alert('❌ Error al continuar la gestión: ' + error.message);
+
         // Limpiar flags en caso de error
         window.gestionEscuchaActiva = false;
         window.idEscuchaGestionando = null;
     }
 }
+
 // ======================================================
 // 3. FUNCIÓN: cargarDatosEscuchaEnFormulario()
 // ======================================================
@@ -8892,238 +8881,6 @@ function conectarEventosSelects() {
     console.log(`✅ Eventos conectados a ${selects.length} selects`);
 }
 
-// ================================================================
-// REPRODUCTOR DE AUDIO - VARIABLES GLOBALES
-// ================================================================
-
-let audioElement = null;
-let audioTicketActual = null;
-let audioVelocidad = 1;
-let audioActualizandoBarra = false;
-
-// ================================================================
-// CARGAR AUDIO EN EL REPRODUCTOR
-// ================================================================
-
-async function cargarAudioEnReproductor(ticketId) {
-    console.log(`🎧 Cargando audio para ticket: ${ticketId}`);
-    
-    const seccion = document.getElementById('seccionReproductorAudio');
-    const status = document.getElementById('audioStatus');
-    const ticketInfo = document.getElementById('audioTicketInfo');
-    
-    // Mostrar sección
-    seccion.style.display = 'block';
-    status.textContent = '⏳ Cargando audio...';
-    status.style.color = 'var(--accent)';
-    
-    try {
-        // 1. Obtener información del ticket
-        const db = getDB();
-        if (!db) throw new Error('Base de datos no disponible');
-        
-        const { data: ticket, error } = await db
-            .from('asignaciones_escucha')
-            .select('id, ticket, gestor_auditado, audio_path')
-            .eq('id', ticketId)
-            .single();
-        
-        if (error) throw error;
-        if (!ticket) throw new Error('Ticket no encontrado');
-        
-        // 2. Guardar ticket actual
-        audioTicketActual = ticket;
-        ticketInfo.textContent = `Ticket: ${ticket.ticket} | Gestor: ${ticket.gestor_auditado}`;
-        
-        // 3. Verificar si existe el archivo de audio
-        if (!ticket.audio_path) {
-            status.textContent = '⚠️ Este ticket no tiene audio asociado';
-            status.style.color = 'var(--warning)';
-            mostrarBotonReportarAudio();
-            return;
-        }
-        
-        // 4. Crear elemento de audio si no existe
-        if (!audioElement) {
-            audioElement = new Audio();
-            audioElement.addEventListener('timeupdate', actualizarBarraProgreso);
-            audioElement.addEventListener('loadedmetadata', actualizarDuracionTotal);
-            audioElement.addEventListener('ended', onAudioTerminado);
-            audioElement.addEventListener('error', onAudioError);
-        }
-        
-        // 5. Cargar el audio
-        const audioUrl = `/api/audio/reproducir/${ticketId}`;
-        audioElement.src = audioUrl;
-        audioElement.load();
-        
-        status.textContent = '✅ Audio cargado correctamente. Presione ▶️ para reproducir.';
-        status.style.color = 'var(--ok)';
-        
-        // Mostrar botón de reporte (por si acaso)
-        mostrarBotonReportarAudio();
-        
-        // Actualizar estado del botón play
-        document.getElementById('btnPlayAudio').textContent = '▶️';
-        document.getElementById('btnPlayAudio').style.background = 'var(--accent)';
-        
-        // Resetear progreso
-        document.getElementById('audioProgressFill').style.width = '0%';
-        document.getElementById('audioTiempoActual').textContent = '00:00';
-        
-    } catch (error) {
-        console.error('Error cargando audio:', error);
-        status.textContent = `❌ Error: ${error.message}`;
-        status.style.color = 'var(--danger)';
-        mostrarBotonReportarAudio();
-    }
-}
-
-// ================================================================
-// CONTROLES DE REPRODUCCIÓN
-// ================================================================
-
-function toggleReproduccionAudio() {
-    if (!audioElement || !audioElement.src) {
-        alert('⚠️ No hay audio cargado. Seleccione un ticket primero.');
-        return;
-    }
-    
-    const btn = document.getElementById('btnPlayAudio');
-    
-    if (audioElement.paused) {
-        audioElement.play();
-        btn.textContent = '⏸️';
-        btn.style.background = 'var(--danger)';
-        document.getElementById('audioStatus').textContent = '▶️ Reproduciendo...';
-        document.getElementById('audioStatus').style.color = 'var(--ok)';
-    } else {
-        audioElement.pause();
-        btn.textContent = '▶️';
-        btn.style.background = 'var(--accent)';
-        document.getElementById('audioStatus').textContent = '⏸️ Pausado';
-        document.getElementById('audioStatus').style.color = 'var(--warning)';
-    }
-}
-
-function reiniciarAudio() {
-    if (!audioElement) return;
-    audioElement.currentTime = 0;
-    document.getElementById('btnPlayAudio').textContent = '▶️';
-    document.getElementById('btnPlayAudio').style.background = 'var(--accent)';
-}
-
-function ajustarVelocidadAudio() {
-    if (!audioElement) return;
-    
-    const velocidades = [0.5, 0.75, 1, 1.25, 1.5, 2];
-    let idx = velocidades.indexOf(audioVelocidad);
-    idx = (idx + 1) % velocidades.length;
-    audioVelocidad = velocidades[idx];
-    audioElement.playbackRate = audioVelocidad;
-    
-    const btn = event?.target || document.querySelector('button[onclick="ajustarVelocidadAudio()"]');
-    if (btn) btn.textContent = `${audioVelocidad}x`;
-}
-
-function toggleMuteAudio() {
-    if (!audioElement) return;
-    audioElement.muted = !audioElement.muted;
-    const btn = event?.target || document.querySelector('button[onclick="toggleMuteAudio()"]');
-    btn.textContent = audioElement.muted ? '🔇' : '🔊';
-}
-
-// ================================================================
-// BARRA DE PROGRESO
-// ================================================================
-
-function actualizarBarraProgreso() {
-    if (!audioElement) return;
-    if (audioActualizandoBarra) return;
-    
-    const progress = (audioElement.currentTime / audioElement.duration) * 100;
-    document.getElementById('audioProgressFill').style.width = `${Math.min(progress, 100)}%`;
-    document.getElementById('audioTiempoActual').textContent = formatTime(audioElement.currentTime);
-}
-
-function actualizarDuracionTotal() {
-    if (!audioElement) return;
-    document.getElementById('audioDuracionTotal').textContent = formatTime(audioElement.duration);
-}
-
-function onAudioTerminado() {
-    document.getElementById('btnPlayAudio').textContent = '▶️';
-    document.getElementById('btnPlayAudio').style.background = 'var(--accent)';
-    document.getElementById('audioStatus').textContent = '✅ Reproducción completada';
-    document.getElementById('audioStatus').style.color = 'var(--ok)';
-}
-
-function onAudioError(e) {
-    console.error('Error de audio:', e);
-    document.getElementById('audioStatus').textContent = '❌ Error al reproducir el audio. Verifique que el archivo exista.';
-    document.getElementById('audioStatus').style.color = 'var(--danger)';
-    mostrarBotonReportarAudio();
-}
-
-function formatTime(seconds) {
-    if (!seconds || isNaN(seconds)) return '00:00';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-// ================================================================
-// FUNCIONES AUXILIARES
-// ================================================================
-
-function mostrarBotonReportarAudio() {
-    const status = document.getElementById('audioStatus');
-    if (!status.innerHTML.includes('Reportar')) {
-        status.innerHTML += `
-            <button onclick="abrirModalIncidenciaDesdeAudio()" 
-                    style="background: var(--danger); padding: 2px 12px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-left: 10px; font-size: 11px;">
-                ⚠️ Reportar incidencia
-            </button>
-        `;
-    }
-}
-
-function abrirModalIncidenciaDesdeAudio() {
-    if (!audioTicketActual) {
-        alert('⚠️ No hay ticket seleccionado');
-        return;
-    }
-    abrirModalIncidencia(audioTicketActual.id);
-}
-
-function cerrarReproductorAudio() {
-    if (audioElement) {
-        audioElement.pause();
-        audioElement.src = '';
-    }
-    document.getElementById('seccionReproductorAudio').style.display = 'none';
-    audioTicketActual = null;
-}
-
-// ================================================================
-// CLICK EN BARRA DE PROGRESO
-// ================================================================
-
-document.addEventListener('DOMContentLoaded', function() {
-    const progressBar = document.getElementById('audioProgressBar');
-    if (progressBar) {
-        progressBar.addEventListener('click', function(e) {
-            if (!audioElement || !audioElement.duration) return;
-            
-            const rect = this.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / rect.width;
-            audioElement.currentTime = x * audioElement.duration;
-            audioActualizandoBarra = true;
-            setTimeout(() => audioActualizandoBarra = false, 100);
-        });
-    }
-});
-
 // ======================================================
 // 6. FUNCIÓN: toggleFrenteDinamico()
 // ======================================================
@@ -9348,30 +9105,11 @@ function recalcularFrente(frenteCodigo) {
 function recalcularAtributoDinamico(frenteCodigo, atributoNombre) {
     console.log(`📊 Recalculando atributo: ${frenteCodigo} - ${atributoNombre}`);
     
-    // Buscar el contenedor del frente
+    // Buscar el atributo específico
     const frenteContainer = document.querySelector(`.frente-container[data-frente="${frenteCodigo}"]`);
-    if (!frenteContainer) {
-        console.warn(`⚠️ No se encontró el frente ${frenteCodigo}`);
-        return 0;
-    }
+    if (!frenteContainer) return 0;
     
-    // 🔴 CORREGIDO: Buscar el atributo SIN distinguir mayúsculas/minúsculas
-    let atributoCard = frenteContainer.querySelector(`.atributo-card[data-atributo="${atributoNombre}"]`);
-    
-    // Si no lo encuentra, buscar comparando sin distinción de mayúsculas
-    if (!atributoCard) {
-        const allCards = frenteContainer.querySelectorAll('.atributo-card');
-        for (const card of allCards) {
-            if (card.dataset.atributo.toUpperCase() === atributoNombre.toUpperCase()) {
-                atributoCard = card;
-                console.log(`   🔍 Encontrado por comparación insensible: "${card.dataset.atributo}"`);
-                // Usar el nombre real del atributo para el resto del cálculo
-                atributoNombre = card.dataset.atributo;
-                break;
-            }
-        }
-    }
-    
+    const atributoCard = frenteContainer.querySelector(`.atributo-card[data-atributo="${atributoNombre}"]`);
     if (!atributoCard) {
         console.warn(`⚠️ No se encontró el atributo ${atributoNombre}`);
         return 0;
@@ -9420,7 +9158,6 @@ function recalcularAtributoDinamico(frenteCodigo, atributoNombre) {
     
     return totalObtenido;
 }
-
 
 // ======================================================
 // 4. RECALCULAR SUBMOTIVO (DINÁMICO)

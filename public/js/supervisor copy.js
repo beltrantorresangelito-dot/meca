@@ -2104,11 +2104,22 @@ async function showTab(tabName, event) {
         }
 
         if (tabName === 'transcripcion') {
+            // Cargar tareas programadas
             if (typeof cargarTareasProgramadas === 'function') {
                 setTimeout(cargarTareasProgramadas, 300);
             }
+            
+            // Cargar transcripciones
             if (typeof cargarTranscripciones === 'function') {
                 setTimeout(cargarTranscripciones, 500);
+            }
+            
+            // 🔴 NUEVO: Cargar dashboard y trazabilidad
+            if (typeof cargarDashboardLoteActivo === 'function') {
+                setTimeout(cargarDashboardLoteActivo, 200);
+            }
+            if (typeof cargarHistorialLotes === 'function') {
+                setTimeout(cargarHistorialLotes, 400);
             }
         }
 
@@ -14923,12 +14934,6 @@ function inicializarEventoAgentes() {
     console.log('✅ [INIT] Evento change registrado correctamente');
 }
 
-// Ejecutar cuando el DOM esté listo
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', inicializarEventoAgentes);
-} else {
-    inicializarEventoAgentes();
-}
 
 // ========================================================================================
 // BLOQUE 1: CONEXIÓN BD, LOGIN, SESIÓN Y ACTUALIZACIONES (13 funciones)
@@ -18806,106 +18811,7 @@ async function cargarMesesParaSelectorQ4() {
             await actualizarTablaRanking(ranking);
         }
 
-        // Event listener para el buscador (búsqueda en tiempo real)
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 DOM cargado - Inicializando componentes...');
-            
-            // 1. Configurar buscador del ranking
-            const buscador = document.getElementById('buscadorAgenteRanking');
-            if (buscador) {
-                buscador.addEventListener('input', function() {
-                    filtrarRankingPorBusqueda();
-                });
-                console.log('✅ Buscador ranking configurado');
-            }
-            
-            // 2. Inicializar formulario de agentes (para editar/actualizar)
-            if (typeof inicializarFormularioAgentes === 'function') {
-                inicializarFormularioAgentes();
-                console.log('✅ Formulario de agentes inicializado');
-            } else {
-                console.warn('⚠️ inicializarFormularioAgentes no está definida');
-            }
-            
-            // 3. Inicializar buscador de gestores (si existe)
-            if (typeof inicializarBuscadorGestores === 'function') {
-                inicializarBuscadorGestores();
-                console.log('✅ Buscador de gestores inicializado');
-            }
-            
-            // 4. Configurar selector de agrupación (si existe)
-            const selectAgrupacion = document.getElementById('selectAgrupacion');
-            if (selectAgrupacion) {
-                selectAgrupacion.addEventListener('change', function() {
-                    if (typeof cambiarAgrupacion === 'function') {
-                        cambiarAgrupacion();
-                    }
-                });
-                console.log('✅ Selector de agrupación configurado');
-            }
-
-            // Inicializar formulario de usuarios
-            if (typeof inicializarFormularioUsuarios === 'function') {
-                inicializarFormularioUsuarios();
-            }
-            
-            // Inicializar formulario de agentes
-            if (typeof inicializarFormularioAgentes === 'function') {
-                inicializarFormularioAgentes();
-            }
-            
-            // Inicializar formulario de cambio de password
-        const formPassword = document.getElementById('formCambiarPassword');
-        if (formPassword) {
-            formPassword.addEventListener('submit', async function(e) {
-                e.preventDefault();
-                
-                const nuevaPassword = document.getElementById('nuevaPassword').value;
-                const confirmarPassword = document.getElementById('confirmarPassword').value;
-                
-                if (!nuevaPassword || !confirmarPassword) {
-                    alert('⚠️ Complete ambos campos');
-                    return;
-                }
-                
-                if (nuevaPassword !== confirmarPassword) {
-                    alert('⚠️ Las contraseñas no coinciden');
-                    return;
-                }
-                
-                if (nuevaPassword.length < 6) {
-                    alert('⚠️ La contraseña debe tener al menos 6 caracteres');
-                    return;
-                }
-                
-                const token = localStorage.getItem('meca_token');
-                
-                try {
-                    const response = await fetch(`/api/usuarios/${window.usuarioPasswordId}/password`, {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': `Bearer ${token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ password: nuevaPassword })
-                    });
-                    
-                    if (response.ok) {
-                        alert('✅ Contraseña actualizada correctamente');
-                        cerrarModalPassword();
-                        location.reload();
-                    } else {
-                        const error = await response.json();
-                        alert('❌ Error: ' + (error.error || 'No se pudo actualizar'));
-                    }
-                } catch (error) {
-                    alert('❌ Error: ' + error.message);
-                }
-            });
-        }
-
-            console.log('🚀 Inicialización completada');
-        });
+        
 
 // =============================CIERRE BLOQUE 4==========================================
 
@@ -25572,66 +25478,6 @@ function generarDocumentoHTML(data) {
     }
     
     
-    
-    
-   
-
-    async function diagnosticarTablasEscuchas() {
-        const db = getDB();
-        if (!db) {
-            console.error('❌ Base de datos no disponible');
-            return;
-        }
-
-        console.log('🔍 Diagnosticando tablas de escuchas...');
-
-        try {
-            // Verificar tabla tareas_escucha
-            const { data: tareas, error: errorTareas } = await db
-                .from('tareas_escucha')
-                .select('count', { count: 'exact', head: true });
-
-            if (errorTareas) {
-                console.error('❌ Error con tabla tareas_escucha:', errorTareas.message);
-            } else {
-                console.log('✅ Tabla tareas_escucha existe y es accesible');
-            }
-
-            // Verificar tabla asignaciones_escucha
-            const { data: asignaciones, error: errorAsignaciones } = await db
-                .from('asignaciones_escucha')
-                .select('count', { count: 'exact', head: true });
-
-            if (errorAsignaciones) {
-                console.error('❌ Error con tabla asignaciones_escucha:', errorAsignaciones.message);
-            } else {
-                console.log('✅ Tabla asignaciones_escucha existe y es accesible');
-            }
-
-            // Verificar usuarios auditores
-            const { data: auditores, error: errorAuditores } = await db
-                .from('usuarios')
-                .select('usuario, rol, activo')
-                .eq('rol', 'AUDITOR')
-                .eq('activo', true);
-
-            if (errorAuditores) {
-                console.error('❌ Error obteniendo auditores:', errorAuditores.message);
-            } else {
-                console.log(`✅ Auditores activos encontrados: ${auditores?.length || 0}`);
-                if (auditores && auditores.length > 0) {
-                    console.log('   Lista:', auditores.map(a => a.usuario).join(', '));
-                } else {
-                    console.warn('⚠️ No hay auditores activos en el sistema');
-                }
-            }
-
-        } catch (error) {
-            console.error('❌ Error en diagnóstico:', error);
-        }
-    }
-    // ===== FIN FUNCIÓN: diagnosticarTablasEscuchas =========================
-
     // ===== 2. INICIO FUNCIÓN: inicializarGestionEscuchas =================
     async function inicializarGestionEscuchas() {
         console.log('🚀 inicializarGestionEscuchas EJECUTADA');
@@ -28019,13 +27865,12 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     }
     // ===== FIN FUNCIÓN: marcarIncidenciaResuelta ===========================
 
-    // ===== 29. INICIO FUNCIÓN: cargarHistorialLotes =======================
-    
+    // ===== 29. INICIO FUNCIÓN: cargarHistorialLotes (VERSIÓN MEJORADA CON TRAZABILIDAD) =====
     let loteSeleccionadoId = null;            
     async function cargarHistorialLotes() {
-        console.log('📦 Cargando historial de lotes...');
+        console.log('📦 Cargando historial de lotes con trazabilidad...');
 
-        const tbody = document.getElementById('tablaHistorialLotes');
+        const tbody = document.getElementById('tablaLotesTranscripcion');
         if (!tbody) {
             console.error('❌ Tabla historial no encontrada');
             return;
@@ -28053,15 +27898,20 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
             if (!lotes || lotes.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 40px;">📭 No hay lotes cargados aún. Cargue su primer archivo de escuchas.</td></tr>';
                 window.lotesHistorialGlobal = [];
+                // Actualizar tabla de transcripción también
+                const tbodyTrans = document.getElementById('tablaLotesTranscripcion');
+                if (tbodyTrans) {
+                    tbodyTrans.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 30px;">📭 No hay lotes cargados</td></tr>';
+                }
                 return;
             }
 
-            // Para cada lote, obtener estadísticas de asignaciones
+            // Para cada lote, obtener estadísticas de transcripción
             const lotesConEstadisticas = [];
             for (const lote of lotes) {
                 const { data: asignaciones, error: asigError } = await db
                     .from('asignaciones_escucha')
-                    .select('estado, audio_encontrado, motivo_incidencia')
+                    .select('transcripcion_estado, audio_encontrado')
                     .eq('tarea_id', lote.id);
 
                 if (asigError) {
@@ -28069,123 +27919,74 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     lotesConEstadisticas.push({
                         ...lote,
                         total: 0,
-                        pendientes: 0,
-                        enProceso: 0,
                         gestionados: 0,
-                        incidencias: 0,
+                        pendientes: 0,
+                        errores: 0,
+                        enProceso: 0,
+                        sinAudio: 0,
                         avance: 0
                     });
                     continue;
                 }
 
                 const total = asignaciones?.length || 0;
-                const pendientes = asignaciones?.filter(a => a.estado === 'pendiente').length || 0;
-                const enProceso = asignaciones?.filter(a => a.estado === 'en_proceso').length || 0;
-                const gestionados = asignaciones?.filter(a => a.estado === 'gestionado' || a.estado === 'completado').length || 0;
-                const incidencias = asignaciones?.filter(a => a.audio_encontrado === false && a.motivo_incidencia).length || 0;
+                
+                // 🔴 TRAZABILIDAD COMPLETA POR ESTADO
+                const gestionados = asignaciones?.filter(a => 
+                    a.transcripcion_estado === 'transcrito' || 
+                    a.transcripcion_estado === 'analizado'
+                ).length || 0;
+                
+                const pendientes = asignaciones?.filter(a => 
+                    !a.transcripcion_estado || 
+                    a.transcripcion_estado === 'pendiente'
+                ).length || 0;
+                
+                const errores = asignaciones?.filter(a => 
+                    a.transcripcion_estado === 'error'
+                ).length || 0;
+                
+                const enProceso = asignaciones?.filter(a => 
+                    a.transcripcion_estado === 'en_proceso'
+                ).length || 0;
+                
+                const sinAudio = asignaciones?.filter(a => 
+                    a.transcripcion_estado === 'audio_no_disponible'
+                ).length || 0;
+                
                 const avance = total > 0 ? Math.round((gestionados / total) * 100) : 0;
 
                 lotesConEstadisticas.push({
                     ...lote,
                     total,
-                    pendientes,
-                    enProceso,
                     gestionados,
-                    incidencias,
+                    pendientes,
+                    errores,
+                    enProceso,
+                    sinAudio,
                     avance
                 });
             }
 
             window.lotesHistorialGlobal = lotesConEstadisticas;
 
-            // Generar HTML de la tabla
-            let html = '';
-            for (let i = 0; i < lotesConEstadisticas.length; i++) {
-                const lote = lotesConEstadisticas[i];
-                
-                const fechaStr = lote.fecha_carga ? new Date(lote.fecha_carga).toLocaleString('es-ES') : 'Fecha desconocida';
-                const esActivo = lote.estado === 'activo';
-                
-                let nombreArchivo = '-';
-                if (lote.nombre_archivo) {
-                    nombreArchivo = lote.nombre_archivo.split('/').pop().split('\\').pop() || lote.nombre_archivo;
-                }
+            // Actualizar ambas tablas
+            actualizarTablaHistorialLotes(lotesConEstadisticas);  // Para la pestaña Escuchas (compatibilidad)
+            actualizarTablaLotesTranscripcion(lotesConEstadisticas);  // Para la pestaña Transcripción (nuevo)
+            
+            // Actualizar dashboard del lote activo
+            await cargarDashboardLoteActivo();
 
-                const total = lote.total || 0;
-                const pendientes = lote.pendientes || 0;
-                const enProceso = lote.enProceso || 0;
-                const gestionados = lote.gestionados || 0;
-                const incidencias = lote.incidencias || 0;
-                const avance = lote.avance || 0;
-                
-                let colorBarra = '#28a745';
-                if (avance < 50) colorBarra = '#d93025';
-                else if (avance < 80) colorBarra = '#f39c12';
-
-                const rowStyle = esActivo ? 'style="background: #e8f5e9;"' : '';
-                
-                // Determinar texto y estilo del botón de procesamiento
-                const procesarTexto = esActivo ? '🔄 Reprocesar' : '🎧 Procesar';
-                const procesarColor = esActivo ? '#f39c12' : '#7b1fa2';
-
-                html += `
-                    <tr onclick="seleccionarLoteHistorial(${lote.id})" style="cursor: pointer;" ${rowStyle}>
-                        <td style="padding: 8px; text-align: center;">${i + 1}</td>
-                        <td style="padding: 8px; white-space: nowrap;">${escapeHtml(fechaStr)}</td>
-                        <td style="padding: 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(lote.nombre_archivo || '-')}">
-                            ${escapeHtml(nombreArchivo)}
-                        </td>
-                        <td style="padding: 8px; text-align: center; font-weight: bold;">${total}</td>
-                        <td style="padding: 8px; text-align: center; color: var(--warning);">${pendientes}</td>
-                        <td style="padding: 8px; text-align: center; color: var(--accent);">${enProceso}</td>
-                        <td style="padding: 8px; text-align: center; color: var(--ok);">${gestionados}</td>
-                        <td style="padding: 8px; text-align: center; ${incidencias > 0 ? 'color: var(--danger); font-weight: bold;' : 'color: var(--muted);'}">
-                            ${incidencias}
-                        </td>
-                        <td style="padding: 8px; text-align: center;">
-                            <div style="display: inline-flex; align-items: center; gap: 5px;">
-                                <div style="background: #e9ecef; border-radius: 10px; height: 6px; width: 60px;">
-                                    <div style="width: ${avance}%; height: 100%; background: ${colorBarra}; border-radius: 10px;"></div>
-                                </div>
-                                <span style="font-size: 11px;">${avance}%</span>
-                            </div>
-                        </td>
-                        <td style="padding: 8px; text-align: center;">
-                            ${esActivo ? '<span class="badge" style="background: var(--ok);">✅ Activo</span>' : '<span class="badge" style="background: var(--muted);">⏸️ Inactivo</span>'}
-                        </td>
-                        <!-- ✅ NUEVA COLUMNA: BOTÓN DE PROCESAMIENTO -->
-                        <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                            <button onclick="event.stopPropagation(); procesarLoteHistorico(${lote.id})" 
-                                    style="background: ${procesarColor}; padding: 6px 12px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
-                                ${procesarTexto}
-                            </button>
-                        </td>
-                        <!-- ✅ COLUMNA ACCIONES: SOLO VER Y ELIMINAR -->
-                        <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                            <button onclick="event.stopPropagation(); verDetalleLote(${lote.id})" 
-                                    style="background: var(--accent); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
-                                👁️ Ver tickets
-                            </button>
-                            <button onclick="event.stopPropagation(); eliminarLote(${lote.id})" 
-                                    style="background: #dc3545; color: white; padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; margin-left: 5px;">
-                                🗑️
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }
-
-            tbody.innerHTML = html;
             console.log(`✅ Historial de lotes cargado: ${lotesConEstadisticas.length} lotes`);
 
         } catch (error) {
             console.error('❌ Error cargando historial:', error);
             tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
         }
-    }
-    // ===== FIN FUNCIÓN: cargarHistorialLotes ===============================
+    }// ===== FIN FUNCIÓN: cargarHistorialLotes ===============================
     
-    // ===== 30. INICIO FUNCIÓN: actualizarTablaHistorialLotes ==============
+   
+    // ===== 30. INICIO FUNCIÓN: actualizarTablaHistorialLotes (VERSIÓN COMPATIBLE) =====
     function actualizarTablaHistorialLotes(lotes) {
         const tbody = document.getElementById('tablaHistorialLotes');
         if (!tbody) return;
@@ -28206,9 +28007,13 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
             const gestionados = lote.gestionados || 0;
             const avance = total > 0 ? Math.round((gestionados / total) * 100) : 0;
 
-            // Determinar texto y estilo del botón de procesamiento
-            const procesarTexto = esActivo ? '🔄 Reprocesar' : '🎧 Procesar';
-            const procesarColor = esActivo ? '#f39c12' : '#7b1fa2';
+            // Determinar si todos están transcritos
+            const todosTranscritos = total > 0 && gestionados >= total;
+            
+            // Determinar texto del botón según estado de los tickets
+            let procesarTexto = todosTranscritos ? '🔄 Reprocesar' : '🎧 Procesar';
+            let procesarColor = todosTranscritos ? '#f39c12' : '#7b1fa2';
+            let forzarParam = todosTranscritos;
 
             html += `
                 <tr>
@@ -28221,8 +28026,8 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     <td style="padding: 8px; text-align: center; color: var(--warning);">${lote.pendientes || 0}</td>
                     <td style="padding: 8px; text-align: center; color: var(--accent);">${lote.enProceso || 0}</td>
                     <td style="padding: 8px; text-align: center; color: var(--ok);">${gestionados}</td>
-                    <td style="padding: 8px; text-align: center; ${lote.incidencias > 0 ? 'color: var(--danger); font-weight: bold;' : 'color: var(--muted);'}">
-                        ${lote.incidencias || 0}
+                    <td style="padding: 8px; text-align: center; ${lote.errores > 0 ? 'color: var(--danger); font-weight: bold;' : 'color: var(--muted);'}">
+                        ${lote.errores || 0}
                     </td>
                     <td style="padding: 8px; text-align: center;">
                         <div style="display: inline-flex; align-items: center; gap: 5px;">
@@ -28235,14 +28040,12 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     <td style="padding: 8px; text-align: center;">
                         ${esActivo ? '<span class="badge" style="background: var(--ok);">✅ Activo</span>' : '<span class="badge" style="background: var(--muted);">⏸️ Inactivo</span>'}
                     </td>
-                    <!-- ✅ NUEVA COLUMNA: BOTÓN DE PROCESAMIENTO -->
                     <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                        <button onclick="event.stopPropagation(); procesarLoteHistorico(${lote.id})" 
+                        <button onclick="event.stopPropagation(); procesarLoteHistorico(${lote.id}, ${forzarParam})" 
                                 style="background: ${procesarColor}; padding: 6px 12px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
                             ${procesarTexto}
                         </button>
                     </td>
-                    <!-- ✅ COLUMNA ACCIONES: SOLO VER Y ELIMINAR -->
                     <td style="padding: 8px; text-align: center; white-space: nowrap;">
                         <button onclick="event.stopPropagation(); verDetalleLote(${lote.id})" 
                                 style="background: var(--accent); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
@@ -28266,6 +28069,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
      * @param {number} loteId - ID del lote
      * @param {boolean} forzar - Si es true, reprocesa aunque ya tenga transcripción
      */
+    // ===== FUNCIÓN: procesarLoteHistorico (VERSIÓN SIMPLIFICADA) =====
     async function procesarLoteHistorico(loteId, forzar = false) {
         console.log(`🎧 Procesando lote histórico ID: ${loteId} (Forzar: ${forzar})`);
         
@@ -28315,57 +28119,116 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                 return;
             }
             
-            // 4. FILTRAR TICKETS
+            // 4. FILTRAR TICKETS SEGÚN MODO
             let ticketsAProcesar;
             let ticketsYaProcesados;
             
             if (forzar) {
                 // 🔴 REPROCESAR: tomar TODOS los tickets
                 ticketsAProcesar = tickets;
-                ticketsYaProcesados = [];
+                ticketsYaProcesados = tickets.filter(t => 
+                    t.transcripcion_estado === 'transcrito' || 
+                    t.transcripcion_estado === 'analizado'
+                );
                 console.log(`🔄 Reprocesando TODOS los ${tickets.length} tickets (forzado)`);
+                
+                // Si hay tickets ya transcritos, mostrar confirmación
+                if (ticketsYaProcesados.length > 0) {
+                    const confirmar = confirm(
+                        `⚠️ ¿REPROCESAR TODOS LOS TICKETS?\n\n` +
+                        `📦 Lote: ${nombreArchivo}\n` +
+                        `📊 Total tickets: ${tickets.length}\n` +
+                        `✅ Ya transcritos/analizados: ${ticketsYaProcesados.length}\n` +
+                        `📝 Se reprocesarán TODOS los ${tickets.length} tickets.\n\n` +
+                        `⚠️ Esto forzará la transcripción nuevamente de TODOS los tickets.\n` +
+                        `   Los audios ya transcritos se volverán a procesar.\n\n` +
+                        `¿Desea continuar?`
+                    );
+                    if (!confirmar) {
+                        console.log('⏹️ Reprocesamiento cancelado por el usuario');
+                        return;
+                    }
+                } else {
+                    // No hay tickets transcritos, confirmación simple
+                    const confirmar = confirm(
+                        `⚠️ ¿REPROCESAR TODOS LOS TICKETS?\n\n` +
+                        `📦 Lote: ${nombreArchivo}\n` +
+                        `📊 Total tickets: ${tickets.length}\n\n` +
+                        `Se reprocesarán todos los tickets del lote.\n\n` +
+                        `¿Desea continuar?`
+                    );
+                    if (!confirmar) {
+                        console.log('⏹️ Reprocesamiento cancelado por el usuario');
+                        return;
+                    }
+                }
             } else {
-                // PROCESAR NORMAL: solo los que no tienen transcripción
+                // 🔴 PROCESAR NORMAL: SOLO tickets que NO están transcritos/analizados
+                // Esto incluye: pendiente, error, en_proceso, audio_no_disponible, sin_estado, etc.
                 ticketsAProcesar = tickets.filter(t => 
-                    !t.transcripcion_estado || 
-                    t.transcripcion_estado === 'pendiente' ||
-                    t.transcripcion_estado === 'audio_no_disponible'
+                    t.transcripcion_estado !== 'transcrito' && 
+                    t.transcripcion_estado !== 'analizado'
                 );
                 ticketsYaProcesados = tickets.filter(t => 
                     t.transcripcion_estado === 'transcrito' || 
                     t.transcripcion_estado === 'analizado'
                 );
+                
+                console.log(`📝 Procesando tickets NO transcritos/analizados`);
+                console.log(`   📊 Total tickets: ${tickets.length}`);
+                console.log(`   📝 A procesar: ${ticketsAProcesar.length}`);
+                console.log(`   ✅ Ya procesados: ${ticketsYaProcesados.length}`);
+                
+                // 🔴 Si no hay tickets para procesar, ofrecer reprocesar
+                if (ticketsAProcesar.length === 0) {
+                    const confirmar = confirm(
+                        `✅ Todos los ${tickets.length} tickets de este lote ya tienen transcripción.\n\n` +
+                        `📦 Lote: ${nombreArchivo}\n` +
+                        `📊 Total tickets: ${tickets.length}\n` +
+                        `✅ Procesados: ${ticketsYaProcesados.length}\n\n` +
+                        `¿Desea REPROCESAR todos los tickets?\n` +
+                        `(Esto tomará más tiempo y procesará TODOS los audios nuevamente)`
+                    );
+                    if (confirmar) {
+                        await procesarLoteHistorico(loteId, true);
+                    }
+                    return;
+                }
+                
+                // Mostrar resumen de lo que se va a procesar
+                const estados = {};
+                ticketsAProcesar.forEach(t => {
+                    const estado = t.transcripcion_estado || 'sin_estado';
+                    estados[estado] = (estados[estado] || 0) + 1;
+                });
+                
+                let resumenEstados = '';
+                const estadoNombres = {
+                    'pendiente': '⏳ Pendiente',
+                    'error': '❌ Error',
+                    'en_proceso': '🔄 En proceso',
+                    'audio_no_disponible': '🔇 Sin audio',
+                    'sin_estado': '📭 Sin estado'
+                };
+                
+                for (const [estado, count] of Object.entries(estados)) {
+                    const nombre = estadoNombres[estado] || estado;
+                    resumenEstados += `   • ${nombre}: ${count}\n`;
+                }
+                
+                const confirmar = confirm(
+                    `🎧 ¿PROCESAR TICKETS PENDIENTES?\n\n` +
+                    `📦 Lote: ${nombreArchivo}\n` +
+                    `📊 Total tickets: ${tickets.length}\n` +
+                    `📝 Tickets a procesar: ${ticketsAProcesar.length}\n` +
+                    `✅ Ya procesados: ${ticketsYaProcesados.length}\n\n` +
+                    `📋 Detalle de tickets a procesar:\n${resumenEstados}\n` +
+                    `¿Desea continuar?`
+                );
+                if (!confirmar) return;
             }
             
-            console.log(`📊 Tickets totales: ${tickets.length}`);
-            console.log(`   📝 A procesar: ${ticketsAProcesar.length}`);
-            console.log(`   ✅ Ya procesados: ${ticketsYaProcesados.length}`);
-            
-            // 5. MOSTRAR CONFIRMACIÓN
-            if (ticketsAProcesar.length === 0) {
-                alert(`✅ Todos los tickets del lote "${nombreArchivo}" ya tienen transcripción.\n\n` +
-                    `📊 Total: ${tickets.length} tickets\n` +
-                    `✅ Procesados: ${ticketsYaProcesados.length}\n\n` +
-                    `💡 Para reprocesar, use el botón "🔄 Reprocesar" con la opción de forzar.`);
-                return;
-            }
-            
-            const modoTexto = forzar ? '🔄 REPROCESAR (forzado)' : '📝 PROCESAR (solo nuevos)';
-            const mensaje = 
-                `🎧 ${modoTexto}\n\n` +
-                `📦 Lote: ${nombreArchivo}\n` +
-                `🆔 ID: ${loteId}\n` +
-                `📊 Tickets totales: ${tickets.length}\n` +
-                `📝 Tickets a procesar: ${ticketsAProcesar.length}\n` +
-                `${ticketsYaProcesados.length > 0 ? `✅ Ya procesados (se omitirán): ${ticketsYaProcesados.length}\n` : ''}` +
-                `📅 Carga: ${new Date(lote.fecha_carga).toLocaleString('es-ES')}\n` +
-                `📌 Estado: ${esActivo ? '✅ ACTIVO' : '⏸️ HISTÓRICO'}\n\n` +
-                `${forzar ? '⚠️ SE REPROCESARÁN TODOS LOS TICKETS (incluso los que ya tienen transcripción)\n\n' : ''}` +
-                `¿Desea continuar?`;
-            
-            if (!confirm(mensaje)) return;
-            
-            // 6. PREGUNTAR SI ANALIZAR CON OLLAMA
+            // 5. PREGUNTAR SI ANALIZAR CON OLLAMA
             const analizar = confirm(
                 `🧠 ¿Analizar con Ollama?\n\n` +
                 `   • Si selecciona SÍ: se evaluará calidad de la llamada\n` +
@@ -28373,13 +28236,13 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                 `¿Desea analizar?`
             );
             
-            // 7. VERIFICAR CONFIGURACIÓN DE RUTA DE AUDIOS
+            // 6. VERIFICAR CONFIGURACIÓN DE RUTA DE AUDIOS
             if (!configuracionAudios || !configuracionAudios.ruta_base) {
                 alert('⚠️ No hay configuración de ruta de audios. Configure la ruta primero.');
                 return;
             }
             
-            // 8. PROCESAR LOS TICKETS
+            // 7. PROCESAR LOS TICKETS
             procesandoAudios = true;
             
             const token = localStorage.getItem('meca_token');
@@ -28406,7 +28269,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     modelo_whisper: 'small',
                     modelo_ollama: 'llama3.2:3b',
                     modo: forzar ? 'reprocesar' : 'manual',
-                    forzar_reprocesamiento: forzar  // 🔴 CLAVE: este parámetro forza el reprocesamiento
+                    forzar_reprocesamiento: forzar
                 })
             });
             
@@ -28443,6 +28306,1026 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                 clearInterval(monitorProgresoInterval);
                 monitorProgresoInterval = null;
             }
+        }
+    }
+
+    // ================================================================
+    // NUEVAS FUNCIONES - TRAZABILIDAD DE TRANSCRIPCIÓN
+    // ================================================================
+
+    // ================================================================
+    // 1. CARGAR DASHBOARD DEL LOTE ACTIVO
+    // ================================================================
+    async function cargarDashboardLoteActivo() {
+        console.log('📊 Cargando dashboard del lote activo...');
+        
+        try {
+            // 1. Obtener lote activo
+            const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+            
+            const nombreElement = document.getElementById('loteActivoNombre');
+            if (!loteActivo) {
+                if (nombreElement) {
+                    nombreElement.textContent = '📁 No hay lote activo';
+                    nombreElement.style.background = '#6c757d';
+                }
+                // Resetear KPIs a 0
+                document.getElementById('kpiLoteTotal').textContent = '0';
+                document.getElementById('kpiLoteHecho').textContent = '0';
+                document.getElementById('kpiLotePendiente').textContent = '0';
+                document.getElementById('kpiLoteError').textContent = '0';
+                document.getElementById('kpiLoteProceso').textContent = '0';
+                document.getElementById('kpiLoteSinAudio').textContent = '0';
+                document.getElementById('loteProgresoTexto').textContent = '0%';
+                document.getElementById('loteProgresoBarra').style.width = '0%';
+                return;
+            }
+            
+            // 2. Actualizar nombre del lote
+            const nombreArchivo = loteActivo.nombre_archivo ? 
+                loteActivo.nombre_archivo.split('/').pop().split('\\').pop() : 
+                'Lote sin nombre';
+            if (nombreElement) {
+                nombreElement.textContent = `📁 ${nombreArchivo}`;
+                nombreElement.style.background = 'var(--accent)';
+            }
+            
+            // 3. Obtener tickets del lote
+            const db = getDB();
+            if (!db) return;
+            
+            const { data: tickets, error } = await db
+                .from('asignaciones_escucha')
+                .select('transcripcion_estado, audio_encontrado')
+                .eq('tarea_id', loteActivo.id);
+            
+            if (error) throw error;
+            
+            if (!tickets || tickets.length === 0) {
+                document.getElementById('kpiLoteTotal').textContent = '0';
+                document.getElementById('kpiLoteHecho').textContent = '0';
+                document.getElementById('kpiLotePendiente').textContent = '0';
+                document.getElementById('kpiLoteError').textContent = '0';
+                document.getElementById('kpiLoteProceso').textContent = '0';
+                document.getElementById('kpiLoteSinAudio').textContent = '0';
+                document.getElementById('loteProgresoTexto').textContent = '0%';
+                document.getElementById('loteProgresoBarra').style.width = '0%';
+                return;
+            }
+            
+            // 4. Calcular estadísticas
+            const total = tickets.length;
+            const analizados = tickets.filter(t => t.transcripcion_estado === 'analizado').length;
+            const transcritos = tickets.filter(t => t.transcripcion_estado === 'transcrito').length;
+            const hecho = analizados + transcritos;
+            const pendientes = tickets.filter(t => !t.transcripcion_estado || t.transcripcion_estado === 'pendiente').length;
+            const errores = tickets.filter(t => t.transcripcion_estado === 'error').length;
+            const enProceso = tickets.filter(t => t.transcripcion_estado === 'en_proceso').length;
+            const sinAudio = tickets.filter(t => t.transcripcion_estado === 'audio_no_disponible').length;
+            
+            const progreso = total > 0 ? Math.round((hecho / total) * 100) : 0;
+            
+            // 5. Actualizar KPIs
+            document.getElementById('kpiLoteTotal').textContent = total;
+            document.getElementById('kpiLoteHecho').textContent = hecho;
+            document.getElementById('kpiLotePendiente').textContent = pendientes;
+            document.getElementById('kpiLoteError').textContent = errores;
+            document.getElementById('kpiLoteProceso').textContent = enProceso;
+            document.getElementById('kpiLoteSinAudio').textContent = sinAudio;
+            
+            document.getElementById('loteProgresoTexto').textContent = `${progreso}%`;
+            document.getElementById('loteProgresoBarra').style.width = `${progreso}%`;
+            
+            // 6. Color de la barra según progreso
+            const barra = document.getElementById('loteProgresoBarra');
+            if (progreso >= 90) {
+                barra.style.background = 'linear-gradient(90deg, #28a745, #20c997)';
+            } else if (progreso >= 60) {
+                barra.style.background = 'linear-gradient(90deg, #019DF4, #28a745)';
+            } else if (progreso >= 30) {
+                barra.style.background = 'linear-gradient(90deg, #f39c12, #019DF4)';
+            } else {
+                barra.style.background = 'linear-gradient(90deg, #d93025, #f39c12)';
+            }
+            
+            console.log(`✅ Dashboard actualizado: ${total} tickets, ${progreso}% completado`);
+            
+        } catch (error) {
+            console.error('Error cargando dashboard:', error);
+        }
+    }
+
+    // ================================================================
+    // 2. ACTUALIZAR TABLA DE LOTES CON TRAZABILIDAD
+    // ================================================================
+    function actualizarTablaLotesTranscripcion(lotes) {
+        const tbody = document.getElementById('tablaLotesTranscripcion');
+        if (!tbody) return;
+        
+        if (!lotes || lotes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 30px;">📭 No hay lotes cargados</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        lotes.forEach((lote, idx) => {
+            const fecha = lote.fecha_carga ? new Date(lote.fecha_carga).toLocaleString('es-ES') : '-';
+            const nombreArchivo = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : '-';
+            const esActivo = lote.estado === 'activo';
+            
+            // Estadísticas del lote
+            const total = lote.total || 0;
+            const gestionados = lote.gestionados || 0;  // transcritos + analizados
+            const pendientes = lote.pendientes || 0;
+            const errores = lote.errores || 0;
+            const enProceso = lote.enProceso || 0;
+            const sinAudio = lote.sinAudio || 0;
+            
+            const progreso = total > 0 ? Math.round((gestionados / total) * 100) : 0;
+            
+            // Determinar si todos están transcritos
+            const todosTranscritos = total > 0 && gestionados >= total;
+            
+            // Color de progreso
+            let progresoColor = '#d93025';
+            if (progreso >= 90) progresoColor = '#28a745';
+            else if (progreso >= 60) progresoColor = '#019DF4';
+            else if (progreso >= 30) progresoColor = '#f39c12';
+            
+            // Texto del botón
+            const botonTexto = todosTranscritos ? '🔄 Reprocesar' : '🎧 Procesar';
+            const botonColor = todosTranscritos ? '#f39c12' : '#7b1fa2';
+            const forzarParam = todosTranscritos;
+            
+            html += `
+                <tr style="${esActivo ? 'background: #f0f7ff;' : ''} border-bottom: 1px solid #f0f0f0;">
+                    <td style="padding: 8px 10px; text-align: center; font-weight: bold;">${idx + 1}</td>
+                    <td style="padding: 8px 10px;">
+                        <strong>${escapeHtml(nombreArchivo)}</strong>
+                        ${esActivo ? '<span style="font-size: 10px; background: #28a745; color: white; padding: 2px 8px; border-radius: 10px; margin-left: 8px;">ACTIVO</span>' : ''}
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center; font-size: 12px;">${fecha}</td>
+                    <td style="padding: 8px 10px; text-align: center; font-weight: bold;">${total}</td>
+                    <td style="padding: 8px 10px; text-align: center; font-weight: bold; color: #28a745;">${gestionados}</td>
+                    <td style="padding: 8px 10px; text-align: center; color: #f39c12;">${pendientes}</td>
+                    <td style="padding: 8px 10px; text-align: center; color: #d93025; font-weight: ${errores > 0 ? 'bold' : 'normal'};">${errores}</td>
+                    <td style="padding: 8px 10px; text-align: center; color: #7b1fa2;">${enProceso}</td>
+                    <td style="padding: 8px 10px; text-align: center; color: #6c757d;">${sinAudio}</td>
+                    <td style="padding: 8px 10px; text-align: center;">
+                        <div style="display: flex; align-items: center; gap: 5px; justify-content: center;">
+                            <div style="background: #e9ecef; border-radius: 10px; height: 6px; width: 50px;">
+                                <div style="width: ${progreso}%; height: 100%; background: ${progresoColor}; border-radius: 10px;"></div>
+                            </div>
+                            <span style="font-size: 11px; font-weight: bold; color: ${progresoColor};">${progreso}%</span>
+                        </div>
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center;">
+                        <span class="badge" style="background: ${esActivo ? '#28a745' : '#6c757d'};">
+                            ${esActivo ? '✅ Activo' : '⏸️ Histórico'}
+                        </span>
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center; white-space: nowrap;">
+                        <button onclick="procesarLoteHistorico(${lote.id}, ${forzarParam})" 
+                                style="background: ${botonColor}; padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px; margin-bottom: 3px;">
+                            ${botonTexto}
+                        </button>
+                        <button onclick="verTicketsLote(${lote.id})" 
+                                style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px;">
+                            👁️ Ver
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tbody.innerHTML = html;
+    }
+
+    // ================================================================
+    // 3. FILTRAR LOTES EN LA TABLA DE TRANSCRIPCIÓN
+    // ================================================================
+    function filtrarLotesTranscripcion(busqueda) {
+        const tbody = document.getElementById('tablaLotesTranscripcion');
+        if (!tbody) return;
+        
+        const filas = tbody.querySelectorAll('tr');
+        const busquedaLower = busqueda.toLowerCase().trim();
+        
+        filas.forEach(fila => {
+            if (!fila.dataset.busqueda) {
+                // Guardar texto de búsqueda en el dataset
+                const texto = fila.textContent?.toLowerCase() || '';
+                fila.dataset.busqueda = texto;
+            }
+            
+            if (busquedaLower === '') {
+                fila.style.display = '';
+            } else {
+                const coincide = fila.dataset.busqueda.includes(busquedaLower);
+                fila.style.display = coincide ? '' : 'none';
+            }
+        });
+    }
+
+    // ================================================================
+    // 4. REFRESCAR HISTORIAL DE LOTES (DESDE TRANSCRIPCIÓN)
+    // ================================================================
+    async function refrescarHistorialLotesTranscripcion() {
+        console.log('🔄 Refrescando historial de lotes desde Transcripción...');
+        await cargarHistorialLotes();
+    }
+
+    // ================================================================
+    // 5. REFRESCAR DASHBOARD DEL LOTE
+    // ================================================================
+    async function refrescarDashboardLote() {
+        console.log('🔄 Refrescando dashboard del lote...');
+        await cargarDashboardLoteActivo();
+    }
+
+    // ================================================================
+    // 6. VER TICKETS DE UN LOTE (DRILL-DOWN)
+    // ================================================================
+    async function verTicketsLote(loteId) {
+        console.log(`👁️ Ver tickets del lote ${loteId}`);
+        
+        const container = document.getElementById('detalleLoteContainer');
+        const titulo = document.getElementById('detalleLoteTitulo');
+        const tbody = document.getElementById('tablaTicketsLote');
+        
+        // Mostrar container
+        container.style.display = 'block';
+        
+        // Mostrar loading
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">⏳ Cargando tickets...</td></tr>';
+        
+        try {
+            const db = getDB();
+            if (!db) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ Base de datos no disponible</td></tr>';
+                return;
+            }
+            
+            // Obtener lote
+            const lote = window.lotesHistorialGlobal?.find(l => l.id === loteId);
+            const nombreArchivo = lote?.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : `Lote #${loteId}`;
+            titulo.textContent = `📋 Tickets del Lote: ${nombreArchivo}`;
+            
+            // 🔴 OBTENER TICKETS DEL LOTE - TODOS LOS CAMPOS EN UNA SOLA CONSULTA
+            const { data: tickets, error } = await db
+                .from('asignaciones_escucha')
+                .select('id, ticket, gestor_auditado, motivo_call, transcripcion_estado, transcripcion, analisis_ollama, audio_encontrado')
+                .eq('tarea_id', loteId)
+                .order('id', { ascending: true });
+            
+            if (error) throw error;
+            
+            if (!tickets || tickets.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">📭 No hay tickets en este lote</td></tr>';
+                return;
+            }
+            
+            // 🔴 GENERAR TABLA
+            let html = '';
+            tickets.forEach((t, idx) => {
+                // Estado de transcripción
+                let estadoBadge = '';
+                let estadoColor = '';
+                switch (t.transcripcion_estado) {
+                    case 'analizado':
+                        estadoBadge = '✅ Analizado';
+                        estadoColor = '#28a745';
+                        break;
+                    case 'transcrito':
+                        estadoBadge = '📝 Transcrito';
+                        estadoColor = '#f39c12';
+                        break;
+                    case 'error':
+                        estadoBadge = '❌ Error';
+                        estadoColor = '#d93025';
+                        break;
+                    case 'en_proceso':
+                        estadoBadge = '🔄 En proceso';
+                        estadoColor = '#7b1fa2';
+                        break;
+                    case 'audio_no_disponible':
+                        estadoBadge = '🔇 Sin audio';
+                        estadoColor = '#6c757d';
+                        break;
+                    default:
+                        estadoBadge = '⏳ Pendiente';
+                        estadoColor = '#6c757d';
+                }
+                
+                // 🔴 DETERMINAR QUÉ BOTONES MOSTRAR SEGÚN EL ESTADO
+                let botonesHtml = '';
+                
+                // Si tiene transcripción (el campo transcripcion no está vacío)
+                if (t.transcripcion && t.transcripcion.trim().length > 0) {
+                    // Botón para ver transcripción (usando el ID del ticket)
+                    botonesHtml += `
+                        <button onclick="verTranscripcionTicket(${t.id})" 
+                                style="background: var(--accent); padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px; margin-right: 3px;" 
+                                title="Ver transcripción">
+                            📄
+                        </button>
+                    `;
+                    
+                    // Si tiene análisis de Ollama
+                    if (t.analisis_ollama && t.analisis_ollama.trim().length > 0) {
+                        botonesHtml += `
+                            <button onclick="verAnalisisTicket(${t.id})" 
+                                    style="background: #7b1fa2; padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px;" 
+                                    title="Ver análisis de Ollama">
+                                🧠
+                            </button>
+                        `;
+                    } else if (t.transcripcion_estado === 'transcrito') {
+                        // Si está transcrito pero no analizado
+                        botonesHtml += `
+                            <button onclick="analizarTranscripcionTicket(${t.id})" 
+                                    style="background: #f39c12; padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px;" 
+                                    title="Analizar con Ollama">
+                                🔄
+                            </button>
+                        `;
+                    }
+                } else {
+                    botonesHtml = '<span style="color: var(--muted); font-size: 10px;">-</span>';
+                }
+                
+                html += `
+                    <tr style="border-bottom: 1px solid #f0f0f0;">
+                        <td style="padding: 8px 10px; text-align: center;">${idx + 1}</td>
+                        <td style="padding: 8px 10px; font-family: monospace; font-size: 12px;">${escapeHtml(t.ticket || '-')}</td>
+                        <td style="padding: 8px 10px;">${escapeHtml(t.gestor_auditado || '-')}</td>
+                        <td style="padding: 8px 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.motivo_call || '')}">
+                            ${escapeHtml((t.motivo_call || '-').substring(0, 30))}${(t.motivo_call || '').length > 30 ? '...' : ''}
+                        </td>
+                        <td style="padding: 8px 10px; text-align: center;">
+                            <span style="background: ${estadoColor}; color: white; padding: 3px 10px; border-radius: 12px; font-size: 11px; white-space: nowrap;">
+                                ${estadoBadge}
+                            </span>
+                        </td>
+                        <td style="padding: 8px 10px; text-align: center; white-space: nowrap;">
+                            ${botonesHtml}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+            
+            // 🔴 AGREGAR SCROLL AL CONTENEDOR DE LA TABLA
+            const tablaContainer = container.querySelector('.card > div:last-child');
+            if (tablaContainer) {
+                tablaContainer.style.maxHeight = '400px';
+                tablaContainer.style.overflowY = 'auto';
+            }
+            
+            // Scroll al detalle
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+        } catch (error) {
+            console.error('Error cargando tickets:', error);
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+        }
+    }
+
+    // ================================================================
+    // VER TRANSCRIPCIÓN DE UN TICKET (DESDE LA TABLA DE LOTES)
+    // ================================================================
+    async function verTranscripcionTicket(ticketId) {
+        try {
+            const db = getDB();
+            if (!db) {
+                alert('❌ Base de datos no disponible');
+                return;
+            }
+            
+            const { data: ticket, error } = await db
+                .from('asignaciones_escucha')
+                .select('ticket, transcripcion, transcripcion_estado')
+                .eq('id', ticketId)
+                .single();
+            
+            if (error) throw error;
+            
+            if (!ticket || !ticket.transcripcion) {
+                alert('⚠️ No hay transcripción disponible para este ticket');
+                return;
+            }
+            
+            // 🔴 MOSTRAR EN MODAL EN LUGAR DE ALERT
+            const modalHtml = `
+                <div id="modalTranscripcionTicket" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100060; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                    <div style="background: white; border-radius: 16px; width: 95%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                        <!-- Header -->
+                        <div style="padding: 15px 20px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                            <div>
+                                <strong style="font-size: 16px;">📄 Transcripción</strong>
+                                <div style="font-size: 12px; opacity: 0.8; margin-top: 2px;">Ticket: ${escapeHtml(ticket.ticket || 'Sin ticket')}</div>
+                            </div>
+                            <button onclick="cerrarModalTranscripcionTicket()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                        </div>
+                        <!-- Body -->
+                        <div style="padding: 20px; overflow-y: auto; flex: 1; background: #f8fafc;">
+                            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e0e0e0;">
+                                <div style="font-weight: 600; margin-bottom: 10px; color: #333;">📝 Texto completo de la transcripción:</div>
+                                <div style="font-size: 14px; line-height: 1.8; white-space: pre-wrap; max-height: 500px; overflow-y: auto; padding: 15px; background: #fafafa; border-radius: 8px; font-family: inherit;">
+                                    ${escapeHtml(ticket.transcripcion)}
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Footer -->
+                        <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
+                            <button onclick="copiarTranscripcionTicket('${escapeHtml(ticket.transcripcion).replace(/'/g, "\\'")}')" 
+                                    style="background: var(--accent); padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                                📋 Copiar texto
+                            </button>
+                            <button onclick="cerrarModalTranscripcionTicket()" 
+                                    style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Eliminar modal existente si hay
+            const existing = document.getElementById('modalTranscripcionTicket');
+            if (existing) existing.remove();
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al cargar la transcripción: ' + error.message);
+        }
+    }
+
+    // ================================================================
+    // CERRAR MODAL DE TRANSCRIPCIÓN DE TICKET
+    // ================================================================
+    function cerrarModalTranscripcionTicket() {
+        const modal = document.getElementById('modalTranscripcionTicket');
+        if (modal) modal.remove();
+    }
+
+    // ================================================================
+    // COPIAR TRANSCRIPCIÓN DE TICKET
+    // ================================================================
+    async function copiarTranscripcionTicket(texto) {
+        try {
+            await navigator.clipboard.writeText(texto);
+            alert('✅ Transcripción copiada al portapapeles');
+        } catch (error) {
+            // Fallback
+            const textarea = document.createElement('textarea');
+            textarea.value = texto;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('✅ Transcripción copiada al portapapeles');
+        }
+    }
+
+
+    // ================================================================
+    // VER ANÁLISIS DE OLLAMA DE UN TICKET (DESDE LA TABLA DE LOTES)
+    // ================================================================
+    async function verAnalisisTicket(ticketId) {
+        try {
+            const db = getDB();
+            if (!db) {
+                alert('❌ Base de datos no disponible');
+                return;
+            }
+            
+            const { data: ticket, error } = await db
+                .from('asignaciones_escucha')
+                .select('ticket, analisis_ollama')
+                .eq('id', ticketId)
+                .single();
+            
+            if (error) throw error;
+            
+            if (!ticket || !ticket.analisis_ollama) {
+                alert('⚠️ No hay análisis de Ollama disponible para este ticket');
+                return;
+            }
+            
+            // Parsear el análisis si es JSON
+            let analisis = ticket.analisis_ollama;
+            let analisisHtml = '';
+            
+            if (typeof analisis === 'string') {
+                try {
+                    analisis = JSON.parse(analisis);
+                } catch (e) {
+                    // Si no es JSON, mostrarlo como texto
+                    analisisHtml = `<pre style="white-space: pre-wrap; font-family: inherit; font-size: 14px; line-height: 1.6;">${escapeHtml(analisis)}</pre>`;
+                }
+            }
+            
+            if (typeof analisis === 'object') {
+                // Calificación
+                const calificacion = analisis.calificacion || 0;
+                const color = calificacion >= 90 ? '#28a745' : (calificacion >= 70 ? '#f39c12' : '#d93025');
+                
+                analisisHtml = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
+                            <div style="font-size: 11px; color: #6c757d;">Calificación</div>
+                            <div style="font-size: 24px; font-weight: bold; color: ${color};">${calificacion}%</div>
+                        </div>
+                        <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
+                            <div style="font-size: 11px; color: #6c757d;">Sentimiento Cliente</div>
+                            <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">${analisis.sentimiento_cliente || 'neutral'}</div>
+                        </div>
+                        <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
+                            <div style="font-size: 11px; color: #6c757d;">Sentimiento Gestor</div>
+                            <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">${analisis.sentimiento_gestor || 'neutral'}</div>
+                        </div>
+                    </div>
+                    
+                    ${analisis.justificacion ? `
+                        <div style="background: white; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid #e0e0e0;">
+                            <div style="font-weight: 600; margin-bottom: 8px; color: #333;">📝 Justificación</div>
+                            <div style="font-size: 14px; line-height: 1.6;">${escapeHtml(analisis.justificacion)}</div>
+                        </div>
+                    ` : ''}
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div style="background: white; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0;">
+                            <div style="font-weight: 600; margin-bottom: 10px; color: #28a745;">✅ Protocolos cumplidos</div>
+                            ${analisis.protocolos_cumplidos && analisis.protocolos_cumplidos.length > 0 ? 
+                                analisis.protocolos_cumplidos.map(p => 
+                                    `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0;">✓ ${escapeHtml(p)}</div>`
+                                ).join('') : 
+                                '<div style="color: #6c757d; font-size: 13px;">No hay protocolos cumplidos</div>'
+                            }
+                        </div>
+                        <div style="background: white; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0;">
+                            <div style="font-weight: 600; margin-bottom: 10px; color: #d93025;">❌ Protocolos incumplidos</div>
+                            ${analisis.protocolos_incumplidos && analisis.protocolos_incumplidos.length > 0 ? 
+                                analisis.protocolos_incumplidos.map(p => 
+                                    `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0;">✗ ${escapeHtml(p)}</div>`
+                                ).join('') : 
+                                '<div style="color: #6c757d; font-size: 13px;">No hay protocolos incumplidos</div>'
+                            }
+                        </div>
+                    </div>
+                    
+                    ${analisis.recomendaciones && analisis.recomendaciones.length > 0 ? `
+                        <div style="background: #fff8e0; border-radius: 10px; padding: 15px; margin-top: 15px; border: 1px solid #f39c12;">
+                            <div style="font-weight: 600; margin-bottom: 8px; color: #f39c12;">💡 Recomendaciones</div>
+                            ${analisis.recomendaciones.map(r => 
+                                `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0e6d0;">• ${escapeHtml(r)}</div>`
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                `;
+            }
+            
+            // Modal
+            const modalHtml = `
+                <div id="modalAnalisisTicket" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100060; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                    <div style="background: white; border-radius: 16px; width: 95%; max-width: 750px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                        <!-- Header -->
+                        <div style="padding: 15px 20px; background: linear-gradient(135deg, #7b1fa2, #9c27b0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                            <div>
+                                <strong style="font-size: 16px;">🧠 Análisis de Ollama</strong>
+                                <div style="font-size: 12px; opacity: 0.8; margin-top: 2px;">Ticket: ${escapeHtml(ticket.ticket || 'Sin ticket')}</div>
+                            </div>
+                            <button onclick="cerrarModalAnalisisTicket()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                        </div>
+                        <!-- Body -->
+                        <div style="padding: 20px; overflow-y: auto; flex: 1; background: #f8fafc;">
+                            ${analisisHtml}
+                        </div>
+                        <!-- Footer -->
+                        <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
+                            <button onclick="copiarAnalisisTicket(${ticketId})" 
+                                    style="background: #7b1fa2; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                                📋 Copiar análisis
+                            </button>
+                            <button onclick="cerrarModalAnalisisTicket()" 
+                                    style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const existing = document.getElementById('modalAnalisisTicket');
+            if (existing) existing.remove();
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al cargar el análisis: ' + error.message);
+        }
+    }
+
+    // ================================================================
+    // CERRAR MODAL DE ANÁLISIS DE TICKET
+    // ================================================================
+    function cerrarModalAnalisisTicket() {
+        const modal = document.getElementById('modalAnalisisTicket');
+        if (modal) modal.remove();
+    }
+
+    // ================================================================
+    // COPIAR ANÁLISIS DE TICKET
+    // ================================================================
+    async function copiarAnalisisTicket(ticketId) {
+        try {
+            const db = getDB();
+            if (!db) return;
+            
+            const { data: ticket, error } = await db
+                .from('asignaciones_escucha')
+                .select('analisis_ollama')
+                .eq('id', ticketId)
+                .single();
+            
+            if (error) throw error;
+            
+            if (!ticket || !ticket.analisis_ollama) {
+                alert('⚠️ No hay análisis para copiar');
+                return;
+            }
+            
+            let texto = ticket.analisis_ollama;
+            if (typeof texto === 'string') {
+                try {
+                    const parsed = JSON.parse(texto);
+                    texto = JSON.stringify(parsed, null, 2);
+                } catch (e) {
+                    // Mantener como texto
+                }
+            } else if (typeof texto === 'object') {
+                texto = JSON.stringify(texto, null, 2);
+            }
+            
+            await navigator.clipboard.writeText(texto);
+            alert('✅ Análisis copiado al portapapeles');
+            
+        } catch (error) {
+            alert('❌ Error al copiar: ' + error.message);
+        }
+    }
+
+    // ================================================================
+    // ANALIZAR TRANSCRIPCIÓN DE UN TICKET (DESDE LA TABLA DE LOTES)
+    // ================================================================
+    async function analizarTranscripcionTicket(ticketId) {
+        if (!confirm(`🧠 ¿Analizar la transcripción de este ticket con Ollama?`)) return;
+        
+        try {
+            // Usar la función existente que ya tienes
+            await analizarTranscripcionEscucha(ticketId);
+            
+            // Recargar la tabla de tickets del lote
+            const container = document.getElementById('detalleLoteContainer');
+            if (container.style.display !== 'none') {
+                // Obtener el lote ID del título
+                const titulo = document.getElementById('detalleLoteTitulo')?.textContent || '';
+                const loteId = titulo.match(/\d+/)?.[0];
+                if (loteId) {
+                    await verTicketsLote(parseInt(loteId));
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al analizar: ' + error.message);
+        }
+    }
+    
+    // ================================================================
+    // 7. CERRAR DETALLE DE LOTE
+    // ================================================================
+    function cerrarDetalleLote() {
+        document.getElementById('detalleLoteContainer').style.display = 'none';
+    }
+
+    // ================================================================
+    // 8. PROCESAR LOTE ACTIVO (DESDE EL DASHBOARD)
+    // ================================================================
+    async function procesarLoteActivo() {
+        const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+        
+        if (!loteActivo) {
+            alert('⚠️ No hay un lote activo. Cargue un archivo de escuchas primero.');
+            return;
+        }
+        
+        // Usar la función existente con el ID del lote activo
+        await procesarLoteHistorico(loteActivo.id, false);
+    }
+
+    // ================================================================
+    // 9. VER DETALLE DEL LOTE ACTIVO
+    // ================================================================
+    async function verDetalleLoteActivo() {
+        const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+        
+        if (!loteActivo) {
+            alert('⚠️ No hay un lote activo.');
+            return;
+        }
+        
+        await verTicketsLote(loteActivo.id);
+    }
+
+    // ================================================================
+    // 10. REPROCESAR TICKET INDIVIDUAL
+    // ================================================================
+    async function reprocesarTicketIndividual(ticketId) {
+        if (!confirm(`⚠️ ¿Reprocesar el ticket ID ${ticketId}?\n\nEsto forzará la transcripción nuevamente de este ticket.`)) {
+            return;
+        }
+        
+        try {
+            const token = localStorage.getItem('meca_token');
+            const response = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/procesar-lote`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ticket_ids: [ticketId],
+                    analizar_con_ollama: true,
+                    ruta_audios: configuracionAudios?.ruta_base,
+                    modo: 'reprocesar',
+                    forzar_reprocesamiento: true
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(`✅ Ticket ${ticketId} reprocesado correctamente`);
+                // Recargar el detalle del lote activo
+                const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+                if (loteActivo) {
+                    await verTicketsLote(loteActivo.id);
+                }
+                await cargarDashboardLoteActivo();
+                await cargarHistorialLotes();
+            } else {
+                alert(`❌ Error: ${result.error || 'Error desconocido'}`);
+            }
+        } catch (error) {
+            alert(`❌ Error: ${error.message}`);
+        }
+    }
+
+    // ================================================================
+    // 11. EXPORTAR TRAZABILIDAD DE LOTES A CSV
+    // ================================================================
+    function exportarTrazabilidadLotesCSV() {
+        const lotes = window.lotesHistorialGlobal || [];
+        
+        if (lotes.length === 0) {
+            alert('⚠️ No hay lotes para exportar');
+            return;
+        }
+        
+        const headers = [
+            'ID Lote',
+            'Archivo',
+            'Fecha Carga',
+            'Total Tickets',
+            '✅ Hecho (Transcritos/Analizados)',
+            '⏳ Pendientes',
+            '❌ Errores',
+            '🔄 En Proceso',
+            '🔇 Sin Audio',
+            'Progreso (%)',
+            'Estado'
+        ];
+        
+        const rows = lotes.map(lote => {
+            const nombreArchivo = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : '-';
+            const fecha = lote.fecha_carga ? new Date(lote.fecha_carga).toLocaleString('es-ES') : '-';
+            
+            return [
+                lote.id,
+                `"${nombreArchivo}"`,
+                `"${fecha}"`,
+                lote.total || 0,
+                lote.gestionados || 0,
+                lote.pendientes || 0,
+                lote.errores || 0,
+                lote.enProceso || 0,
+                lote.sinAudio || 0,
+                lote.avance || 0,
+                lote.estado === 'activo' ? 'Activo' : 'Histórico'
+            ];
+        });
+        
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.join(','))
+        ].join('\n');
+        
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `trazabilidad_lotes_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        alert(`✅ Exportados ${lotes.length} lotes`);
+    }
+
+    // ================================================================
+    // 12. EXPORTAR DETALLE DE LOTE A CSV
+    // ================================================================
+    async function exportarDetalleLoteCSV() {
+        const titulo = document.getElementById('detalleLoteTitulo')?.textContent || '';
+        const loteId = titulo.match(/\d+/)?.[0];
+        
+        if (!loteId) {
+            alert('⚠️ No hay lote seleccionado');
+            return;
+        }
+        
+        try {
+            const db = getDB();
+            if (!db) {
+                alert('❌ Base de datos no disponible');
+                return;
+            }
+            
+            const { data: tickets, error } = await db
+                .from('asignaciones_escucha')
+                .select('id, ticket, gestor_auditado, motivo_call, transcripcion_estado, calificacion')
+                .eq('tarea_id', parseInt(loteId))
+                .order('id', { ascending: true });
+            
+            if (error) throw error;
+            
+            if (!tickets || tickets.length === 0) {
+                alert('⚠️ No hay tickets en este lote');
+                return;
+            }
+            
+            const headers = [
+                'ID Ticket',
+                'Ticket PSI',
+                'Gestor Auditado',
+                'Motivo Call',
+                'Estado Transcripción',
+                'Calificación (%)'
+            ];
+            
+            const rows = tickets.map(t => [
+                t.id,
+                `"${t.ticket || ''}"`,
+                `"${t.gestor_auditado || ''}"`,
+                `"${t.motivo_call || ''}"`,
+                t.transcripcion_estado || 'Pendiente',
+                t.calificacion || ''
+            ]);
+            
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.join(','))
+            ].join('\n');
+            
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `detalle_lote_${loteId}_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            alert(`✅ Exportados ${tickets.length} tickets del lote ${loteId}`);
+            
+        } catch (error) {
+            console.error('Error exportando detalle:', error);
+            alert(`❌ Error: ${error.message}`);
+        }
+    }
+
+    // ================================================================
+    // 13. CARGAR TRANSCRIPCIONES (VERSIÓN MEJORADA CON COLUMNA LOTE)
+    // ================================================================
+    // Esta función ya existe, solo la sobrescribimos para agregar la columna Lote
+    // Si ya tienes cargarTranscripciones(), reemplázala con esta versión
+    let transcripcionesData = [];
+    async function cargarTranscripciones() {
+        const tbody = document.getElementById('tablaTranscripciones');
+        if (!tbody) return;
+        
+        const busqueda = document.getElementById('buscarTranscripcion')?.value || '';
+        const estado = document.getElementById('filtroEstadoTranscripcion')?.value || '';
+        
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">⏳ Cargando...</td></tr>';
+        
+        try {
+            const result = await API.listarTranscripciones({ estado, limit: 50 });
+            
+            if (!result.success) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ ${result.error || 'Error desconocido'}</td></tr>`;
+                return;
+            }
+            
+            const transcripciones = result.data || [];
+            
+            if (transcripciones.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--muted);">📭 No hay transcripciones</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            for (const t of transcripciones) {
+                const fecha = t.fecha_transcripcion ? new Date(t.fecha_transcripcion).toLocaleString('es-ES') : '-';
+                
+                let estadoBadge = '';
+                if (t.estado === 'analizado') {
+                    estadoBadge = '<span class="badge" style="background: var(--ok);">✅ Analizado</span>';
+                } else if (t.estado === 'transcrito') {
+                    estadoBadge = '<span class="badge" style="background: var(--warning);">📝 Transcrito</span>';
+                } else if (t.estado === 'error') {
+                    estadoBadge = '<span class="badge" style="background: var(--danger);">❌ Error</span>';
+                } else {
+                    estadoBadge = `<span class="badge" style="background: #6c757d;">${t.estado}</span>`;
+                }
+                
+                let calificacionHtml = '-';
+                if (t.calificacion !== null && t.calificacion !== undefined) {
+                    const color = t.calificacion >= 90 ? '#28a745' : (t.calificacion >= 70 ? '#f39c12' : '#d93025');
+                    calificacionHtml = `<span style="color: ${color}; font-weight: bold;">${t.calificacion}%</span>`;
+                }
+                
+                const nombreMostrar = t.audio_nombre || 'Sin nombre';
+                
+                // Buscar el lote al que pertenece esta transcripción
+                let loteInfo = '-';
+                if (t.tarea_id) {
+                    const lote = window.lotesHistorialGlobal?.find(l => l.id === t.tarea_id);
+                    if (lote) {
+                        const nombreLote = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : `Lote #${lote.id}`;
+                        loteInfo = `<span style="font-size: 11px; color: var(--muted);" title="ID Lote: ${lote.id}">${escapeHtml(nombreLote.substring(0, 20))}${nombreLote.length > 20 ? '...' : ''}</span>`;
+                    }
+                }
+                
+                html += `
+                    <tr>
+                        <td style="padding: 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.audio_nombre || '')}">
+                            <strong>${escapeHtml(nombreMostrar)}</strong>
+                        </td>
+                        <td style="padding: 8px; text-align: center; font-size: 12px;">${fecha}</td>
+                        <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
+                        <td style="padding: 8px; text-align: center; font-size: 16px; font-weight: bold;">${calificacionHtml}</td>
+                        <td style="padding: 8px; text-align: center; font-size: 12px;">${loteInfo}</td>
+                        <td style="padding: 8px; text-align: center; white-space: nowrap;">
+                            <button onclick="verTranscripcionCompleta(${t.id})" 
+                                    style="background: #019DF4; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
+                                    title="Ver transcripción completa">
+                                📄
+                            </button>
+                            <button onclick="verAnalisisOllama(${t.id})" 
+                                    style="background: #7b1fa2; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
+                                    title="Ver análisis de Ollama">
+                                🧠
+                            </button>
+                            ${t.estado === 'transcrito' ? `
+                                <button onclick="analizarTranscripcionMECA(${t.id})" 
+                                        style="background: #f39c12; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
+                                        title="Analizar con Ollama">
+                                    🔄
+                                </button>
+                            ` : ''}
+                            <button onclick="eliminarTranscripcion(${t.id}, '${escapeHtml(t.audio_nombre || '')}')" 
+                                    style="background: #d93025; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
+                                    title="Eliminar transcripción">
+                                🗑️
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            tbody.innerHTML = html;
+            
+            // Actualizar KPIs
+            await actualizarKPIsTranscripcion();
+            
+        } catch (error) {
+            console.error('❌ Error cargando transcripciones:', error);
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
         }
     }
 
@@ -28643,9 +29526,9 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
         }
 
         html += `
-            </tbody>
-        </table>
-    `;
+                </tbody>
+            </table>
+        `;
 
         tbody.innerHTML = html;
     }
@@ -32785,7 +33668,9 @@ async function recargarRedirectRoles() {
     mostrarMensajeTemporal('✅ Redirecciones recargadas', 'var(--ok)');
 }
 
-// Función auxiliar para mostrar mensajes temporales (si no existe)
+// ======================================================
+// MOSTRAR MENSAJE TEMPORAL (UTILIDAD)
+// ======================================================
 function mostrarMensajeTemporal(mensaje, color = 'var(--ok)') {
     // Eliminar mensaje anterior si existe
     const existing = document.querySelector('.mensaje-temporal-recarga');
@@ -32805,6 +33690,8 @@ function mostrarMensajeTemporal(mensaje, color = 'var(--ok)') {
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         animation: slideIn 0.3s ease;
         font-weight: 500;
+        max-width: 400px;
+        word-break: break-word;
     `;
     div.textContent = mensaje;
     document.body.appendChild(div);
@@ -41034,10 +41921,7 @@ console.log('✅ Todas las funciones de guardado están definidas');
             }
         }
     }
-        // Ejecutar después de cargar la página
-        document.addEventListener('DOMContentLoaded', function () {
-            setTimeout(agregarBotonLimpiarPDA, 500);
-        });
+        
     
     async function cargarDatosYMostrarUI() {
         console.log('📂 Cargando datos del sistema...');
@@ -43713,13 +44597,7 @@ function agregarEstilosMatriz() {
     document.head.appendChild(style);
 }
 
-// Inicializar al cargar
-document.addEventListener('DOMContentLoaded', () => {
-    agregarEstilosMatriz();
-    if (document.getElementById('matrizTreeContainer')) {
-        cargarMatrizCompleta();
-    }
-});
+
     
     // ======================================================
     // INICIALIZACIÓN - SUPERVISOR
@@ -43780,69 +44658,9 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('✅ Sistema de supervisión inicializado');
     };
 
-    // ===== 7. INICIALIZAR EVENTO DEL FORMULARIO DE LOGIN ======================
-    document.addEventListener('DOMContentLoaded', function () {
-        
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            // Remover event listeners anteriores si existen
-            const nuevoForm = loginForm.cloneNode(true);
-            loginForm.parentNode.replaceChild(nuevoForm, loginForm);
-
-            const formFinal = document.getElementById('loginForm');
-            formFinal.addEventListener('submit', async function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-
-                console.log('🔐 Intentando iniciar sesión...');
-
-                const usuario = document.getElementById('loginUsuario').value.trim();
-                const contrasena = document.getElementById('loginPassword').value;
-
-                if (!usuario || !contrasena) {
-                    mostrarErrorLogin('⚠️ Complete ambos campos');
-                    return;
-                }
-
-                // Mostrar loading en el botón
-                const btn = this.querySelector('button[type="submit"]');
-                const textoOriginal = btn.innerHTML;
-                btn.innerHTML = '⏳ Verificando...';
-                btn.disabled = true;
-
-                try {
-                    const exito = await procesarLogin(usuario, contrasena);
-
-                    if (exito) {
-                        console.log('✅ Login exitoso, recargando página...');
-                        // Recargar la página para que window.onload muestre el contenido
-                        location.reload();
-                    } else {
-                        console.log('❌ Login fallido');
-                        btn.innerHTML = textoOriginal;
-                        btn.disabled = false;
-                    }
-                } catch (error) {
-                    console.error('Error en login:', error);
-                    mostrarErrorLogin('Error al iniciar sesión');
-                    btn.innerHTML = textoOriginal;
-                    btn.disabled = false;
-                }
-            });
-
-            console.log('✅ Event listener del formulario de login configurado');
-        } else {
-            console.error('❌ No se encontró el formulario de login');
-        }
-    });
     // ===== FIN : FORMULARIO DE LOGIN ==========================================
 
-    // ===== 8. Ejecutar al cargar la página ====================================
-    document.addEventListener('DOMContentLoaded', function () {
-        setTimeout(agregarBotonRefreshPDA, 500);
-    });
-    // ===== FIN : Ejecutar al cargar la página =================================
-
+  
     // ===== 9. SUBMIT DEL FORMULARIO DE PDA (CORREGIDO) ========================
     const formPDA = document.getElementById('formPDA');
     if (formPDA) {
@@ -44740,113 +45558,6 @@ async function inicializarReglasAdmin() {
 // MÓDULO: Transcripción - Panel MECA
 // ======================================================
 
-let transcripcionesData = [];
-
-/**
- * cargarTranscripciones - Carga la lista de transcripciones
- */
-async function cargarTranscripciones() {
-    const tbody = document.getElementById('tablaTranscripciones');
-    if (!tbody) return;
-    
-    const busqueda = document.getElementById('buscarTranscripcion')?.value || '';
-    const estado = document.getElementById('filtroEstadoTranscripcion')?.value || '';
-    
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">⏳ Cargando...</td></tr>';
-    
-    try {
-        const result = await API.listarTranscripciones({ estado, limit: 50 });
-        
-        console.log('📊 Resultado completo:', result); // 🔴 LOG PARA DEPURACIÓN
-        
-        if (!result.success) {
-            console.error('❌ Error en la respuesta:', result);
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ ${result.error || 'Error desconocido'}</td></tr>`;
-            return;
-        }
-        
-        // 🔴 VERIFICAR LA ESTRUCTURA DE LOS DATOS
-        const transcripciones = result.data || [];
-        console.log('📊 Transcripciones:', transcripciones);
-        
-        if (transcripciones.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--muted);">📭 No hay transcripciones</td></tr>';
-            return;
-        }
-        
-        let html = '';
-        for (const t of transcripciones) {
-            const fecha = t.fecha_transcripcion ? new Date(t.fecha_transcripcion).toLocaleString('es-ES') : '-';
-            
-            let estadoBadge = '';
-            if (t.estado === 'analizado') {
-                estadoBadge = '<span class="badge" style="background: var(--ok);">✅ Analizado</span>';
-            } else if (t.estado === 'transcrito') {
-                estadoBadge = '<span class="badge" style="background: var(--warning);">📝 Transcrito</span>';
-            } else if (t.estado === 'error') {
-                estadoBadge = '<span class="badge" style="background: var(--danger);">❌ Error</span>';
-            } else {
-                estadoBadge = `<span class="badge" style="background: #6c757d;">${t.estado}</span>`;
-            }
-            
-            let calificacionHtml = '-';
-            if (t.calificacion !== null && t.calificacion !== undefined) {
-                const color = t.calificacion >= 90 ? '#28a745' : (t.calificacion >= 70 ? '#f39c12' : '#d93025');
-                calificacionHtml = `<span style="color: ${color}; font-weight: bold;">${t.calificacion}%</span>`;
-            }
-            
-            const nombreMostrar = t.audio_nombre || 'Sin nombre';
-            
-            html += `
-                <tr>
-                    <td style="padding: 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.audio_nombre || '')}">
-                        <strong>${escapeHtml(nombreMostrar)}</strong>
-                    </td>
-                    <td style="padding: 8px; text-align: center; font-size: 12px;">${fecha}</td>
-                    <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
-                    <td style="padding: 8px; text-align: center; font-size: 16px; font-weight: bold;">${calificacionHtml}</td>
-                    <td style="padding: 8px; text-align: center; font-size: 12px;">${escapeHtml(t.nombre_tarea || '-')}</td>
-                    <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                        <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center;">
-                            <button onclick="verTranscripcionCompleta(${t.id})" 
-                                    style="background: #019DF4; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
-                                    title="Ver transcripción completa">
-                                📄
-                            </button>
-                            <button onclick="verAnalisisOllama(${t.id})" 
-                                    style="background: #7b1fa2; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
-                                    title="Ver análisis de Ollama">
-                                🧠
-                            </button>
-                            ${t.estado === 'transcrito' ? `
-                                <button onclick="analizarTranscripcionMECA(${t.id})" 
-                                        style="background: #f39c12; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
-                                        title="Analizar con Ollama">
-                                    🔄
-                                </button>
-                            ` : ''}
-                            <button onclick="eliminarTranscripcion(${t.id}, '${escapeHtml(t.audio_nombre || '')}')" 
-                                    style="background: #d93025; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
-                                    title="Eliminar transcripción">
-                                🗑️
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }
-        
-        tbody.innerHTML = html;
-        
-        // Actualizar KPIs
-        await actualizarKPIsTranscripcion();
-        
-    } catch (error) {
-        console.error('❌ Error cargando transcripciones:', error);
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
-    }
-}
-
 // ======================================================
 // 1. VER TRANSCRIPCIÓN COMPLETA
 // ======================================================
@@ -45185,10 +45896,9 @@ async function analizarTranscripcionMECA(id) {
     }
 }
 
-
-/**
- * actualizarKPIsTranscripcion - Actualiza los KPIs del dashboard
- */
+// ======================================================
+// ACTUALIZAR KPIs DE TRANSCRIPCIÓN (NULL SAFE)
+// ======================================================
 async function actualizarKPIsTranscripcion() {
     try {
         const result = await API.obtenerEstadisticasTranscripcion();
@@ -45196,13 +45906,23 @@ async function actualizarKPIsTranscripcion() {
         if (!result.success) return;
         
         const data = result.data;
-        document.getElementById('kpiTotalTranscripciones').textContent = data.total || 0;
-        document.getElementById('kpiHoyTranscripciones').textContent = data.hoy || 0;
-        document.getElementById('kpiCalificadasTranscripciones').textContent = data.calificadas || 0;
-        document.getElementById('kpiPromedioTranscripciones').textContent = (data.promedio || 0) + '%';
+        
+        // 🔴 VERIFICAR QUE CADA ELEMENTO EXISTA ANTES DE ASIGNAR
+        const totalElem = document.getElementById('kpiTotalTranscripciones');
+        if (totalElem) totalElem.textContent = data.total || 0;
+        
+        const hoyElem = document.getElementById('kpiHoyTranscripciones');
+        if (hoyElem) hoyElem.textContent = data.hoy || 0;
+        
+        const calificadasElem = document.getElementById('kpiCalificadasTranscripciones');
+        if (calificadasElem) calificadasElem.textContent = data.calificadas || 0;
+        
+        const promedioElem = document.getElementById('kpiPromedioTranscripciones');
+        if (promedioElem) promedioElem.textContent = (data.promedio || 0) + '%';
         
     } catch (error) {
-        console.error('Error actualizando KPIs:', error);
+        console.warn('Error actualizando KPIs:', error.message);
+        // No mostrar alerta, solo warning en consola
     }
 }
 
@@ -47169,11 +47889,6 @@ function mostrarBotonesSegunRol() {
     }
 }
 
-// Ejecutar automáticamente al cargar
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(mostrarBotonesSegunRol, 500);
-});
-
 
 // ======================================================
 // UTILIDADES - VERIFICACIÓN DE ROL ACTIVO
@@ -47273,16 +47988,47 @@ async function cargarConfiguracionAudios() {
     }
 }
 
+// ======================================================
+// GUARDAR CONFIGURACIÓN DE AUDIOS (CORREGIDA)
+// ======================================================
 async function guardarConfiguracionAudios() {
     const ruta = document.getElementById('configRutaAudios')?.value.trim();
     const extensionesRaw = document.getElementById('configExtensiones')?.value.trim();
+    const status = document.getElementById('configAudiosStatus');
     
+    // 🔴 VALIDACIÓN MEJORADA
     if (!ruta) {
-        alert('⚠️ Ingrese una ruta de audios válida');
+        if (status) {
+            status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese una ruta de audios válida</span>';
+        }
         return;
     }
     
-    const extensiones = extensionesRaw ? extensionesRaw.split(',').map(e => e.trim()) : ['.mp3', '.wav'];
+    // Normalizar la ruta (reemplazar \ con / o mantener según sistema)
+    const rutaNormalizada = ruta.replace(/\\/g, '/');
+    
+    // Validar que la ruta tenga al menos una letra de unidad o sea una ruta UNC
+    if (!rutaNormalizada.match(/^[A-Za-z]:\//) && !rutaNormalizada.match(/^\/\//)) {
+        if (status) {
+            status.innerHTML = '<span style="color: var(--danger);">⚠️ Formato de ruta inválido. Use: C:/ruta/o //servidor/ruta</span>';
+        }
+        return;
+    }
+    
+    const extensiones = extensionesRaw ? extensionesRaw.split(',').map(e => e.trim()) : ['.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg'];
+    
+    // Validar extensiones
+    const extensionesValidas = extensiones.filter(e => e.startsWith('.'));
+    if (extensionesValidas.length === 0) {
+        if (status) {
+            status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese al menos una extensión válida (ej: .mp3,.wav)</span>';
+        }
+        return;
+    }
+    
+    if (status) {
+        status.innerHTML = '<span style="color: var(--accent);">⏳ Guardando configuración...</span>';
+    }
     
     try {
         const token = localStorage.getItem('meca_token');
@@ -47293,35 +48039,56 @@ async function guardarConfiguracionAudios() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                ruta_base: ruta,
-                extensiones: extensiones
+                ruta_base: rutaNormalizada,
+                extensiones: extensionesValidas
             })
         });
         
         const result = await response.json();
         
         if (result.success) {
-            alert('✅ Configuración guardada correctamente');
+            if (status) {
+                status.innerHTML = `<span style="color: var(--ok);">✅ Configuración guardada: ${rutaNormalizada}</span>`;
+            }
+            // Actualizar variable global
             configuracionAudios = {
-                ruta_base: ruta,
-                extensiones: extensiones
+                ruta_base: rutaNormalizada,
+                extensiones: extensionesValidas
             };
             localStorage.setItem('config_audios', JSON.stringify(configuracionAudios));
+            mostrarMensajeTemporal('✅ Configuración guardada correctamente', 'var(--ok)');
         } else {
-            alert('❌ Error: ' + (result.error || 'No se pudo guardar'));
+            if (status) {
+                status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${result.error || 'No se pudo guardar'}</span>`;
+            }
         }
     } catch (error) {
-        alert('❌ Error: ' + error.message);
+        console.error('Error guardando configuración:', error);
+        if (status) {
+            status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${error.message}</span>`;
+        }
     }
 }
 
+// ======================================================
+// PROBAR RUTA DE AUDIOS (CORREGIDA)
+// ======================================================
 async function probarRutaAudios() {
     const ruta = document.getElementById('configRutaAudios')?.value.trim();
     const status = document.getElementById('configAudiosStatus');
     
     if (!ruta) {
-        if (status) status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese una ruta primero</span>';
+        if (status) {
+            status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese una ruta primero</span>';
+        }
         return;
+    }
+    
+    // Normalizar ruta
+    const rutaNormalizada = ruta.replace(/\\/g, '/');
+    
+    if (status) {
+        status.innerHTML = '<span style="color: var(--accent);">🔍 Verificando ruta...</span>';
     }
     
     try {
@@ -47332,22 +48099,26 @@ async function probarRutaAudios() {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ ruta_base: ruta })
+            body: JSON.stringify({ ruta_base: rutaNormalizada })
         });
         
         const result = await response.json();
         
         if (status) {
             if (result.success) {
+                const cantidad = result.cantidad_audios !== undefined ? result.cantidad_audios : '?';
                 status.innerHTML = `
-                    <span style="color: var(--ok);">✅ Ruta válida: ${ruta}</span>
-                    ${result.cantidad_audios !== undefined ? `<span style="margin-left: 15px;">📊 ${result.cantidad_audios} archivos de audio encontrados</span>` : ''}
+                    <span style="color: var(--ok);">✅ Ruta válida: ${rutaNormalizada}</span>
+                    <span style="margin-left: 15px; font-size: 12px;">📊 ${cantidad} archivos de audio encontrados</span>
                 `;
+                // Mostrar mensaje temporal también
+                mostrarMensajeTemporal(`✅ Ruta válida: ${cantidad} archivos encontrados`, 'var(--ok)');
             } else {
-                status.innerHTML = `<span style="color: var(--danger);">❌ ${result.error || 'Ruta inválida'}</span>`;
+                status.innerHTML = `<span style="color: var(--danger);">❌ ${result.error || 'Ruta inválida o inaccesible'}</span>`;
             }
         }
     } catch (error) {
+        console.error('Error probando ruta:', error);
         if (status) {
             status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${error.message}</span>`;
         }
@@ -48553,25 +49324,307 @@ async function cargarSelectGestoresRegistro() {
 // 4. INICIALIZAR REGISTRO DE VOZ AL CARGAR
 // ======================================================
 function inicializarRegistroVoz() {
-    cargarSelectGestoresRegistro();
+    console.log('🎤 Inicializando registro de voz...');
+    // Cargar gestores para el buscador
+    cargarGestoresParaRegistro();
+    // Inicializar el buscador
+    inicializarBuscadorGestoresRegistro();
+    // Cargar lista de gestores ya registrados
     cargarGestoresRegistrados();
+    
     console.log('✅ Registro de voz inicializado');
 }
 
-// =============================================
-// INICIALIZAR AL CARGAR LA PESTAÑA
-// =============================================
+// ======================================================
+// BUSCADOR DE GESTORES PARA REGISTRO DE VOZ
+// ======================================================
 
-// Cargar estado al iniciar si la pestaña está visible
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-        const tabReportesAuto = document.getElementById('tab-reportesAuto');
-        if (tabReportesAuto && tabReportesAuto.classList.contains('active')) {
-            cargarEstadoReportes();
+let gestoresRegistroLista = [];
+let timeoutBusquedaGestorRegistro = null;
+
+// ======================================================
+// 1. CARGAR LISTA DE GESTORES PARA EL BUSCADOR
+// ======================================================
+async function cargarGestoresParaRegistro() {
+    console.log('📋 Cargando gestores para registro de voz...');
+    
+    try {
+        const token = localStorage.getItem('meca_token');
+        const response = await fetch('/api/agentes', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
-    }, 500);
-});
+        
+        const agentes = await response.json();
+        
+        if (!agentes || agentes.length === 0) {
+            gestoresRegistroLista = [];
+            console.warn('⚠️ No hay gestores disponibles');
+            return;
+        }
+        
+        // Ordenar alfabéticamente
+        gestoresRegistroLista = agentes
+            .map(a => a.nombre || a.usuario || 'Sin nombre')
+            .filter(n => n && n !== 'Sin nombre')
+            .sort((a, b) => a.localeCompare(b));
+        
+        console.log(`✅ ${gestoresRegistroLista.length} gestores cargados para registro`);
+        
+    } catch (error) {
+        console.error('Error cargando gestores:', error);
+        gestoresRegistroLista = [];
+    }
+}
 
+// ======================================================
+// 2. INICIALIZAR BUSCADOR DE GESTORES PARA REGISTRO (COMPLETO)
+// ======================================================
+function inicializarBuscadorGestoresRegistro() {
+    console.log('🔧 Inicializando buscador de gestores para registro...');
+    
+    const input = document.getElementById('buscarGestorRegistro');
+    const dropdown = document.getElementById('gestorRegistroDropdown');
+    const hiddenInput = document.getElementById('selectGestorRegistro');
+    
+    if (!input || !dropdown) {
+        console.warn('⚠️ Elementos del buscador no encontrados');
+        return;
+    }
+    
+    // ======================================================
+    // EVENTO: FOCUS - Mostrar lista completa
+    // ======================================================
+    input.addEventListener('focus', function() {
+        console.log('📌 Focus - Mostrando lista de gestores');
+        
+        // Si ya hay un gestor seleccionado, mantenerlo
+        if (hiddenInput && hiddenInput.value) {
+            this.value = hiddenInput.value;
+        }
+        
+        // Si la lista está vacía, cargarla
+        if (gestoresRegistroLista.length === 0) {
+            cargarGestoresParaRegistro().then(() => {
+                mostrarSugerenciasRegistro(gestoresRegistroLista, '');
+            });
+        } else {
+            mostrarSugerenciasRegistro(gestoresRegistroLista, '');
+        }
+    });
+    
+    // ======================================================
+    // EVENTO: INPUT - Filtrar en tiempo real
+    // ======================================================
+    input.addEventListener('input', function(e) {
+        const busqueda = this.value.trim();
+        
+        if (timeoutBusquedaGestorRegistro) {
+            clearTimeout(timeoutBusquedaGestorRegistro);
+        }
+        
+        timeoutBusquedaGestorRegistro = setTimeout(() => {
+            let filtrados = gestoresRegistroLista;
+            
+            if (busqueda.length > 0) {
+                const busquedaLower = busqueda.toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "");
+                
+                filtrados = gestoresRegistroLista.filter(gestor => {
+                    const nombreNormalizado = gestor.toLowerCase()
+                        .normalize("NFD")
+                        .replace(/[\u0300-\u036f]/g, "");
+                    return nombreNormalizado.includes(busquedaLower);
+                });
+            }
+            
+            mostrarSugerenciasRegistro(filtrados, busqueda);
+        }, 200);
+    });
+    
+    // ======================================================
+    // EVENTO: BLUR - Perder foco
+    // ======================================================
+    input.addEventListener('blur', function() {
+        setTimeout(() => {
+            if (dropdown) {
+                dropdown.classList.remove('show');
+                dropdown.style.display = 'none';
+            }
+            // Si no hay gestor seleccionado pero hay texto, limpiar
+            if (hiddenInput && !hiddenInput.value && this.value) {
+                this.value = '';
+            }
+        }, 150);
+    });
+    
+    // ======================================================
+    // EVENTO: CERRAR AL HACER CLIC FUERA
+    // ======================================================
+    document.addEventListener('click', function(e) {
+        const container = document.getElementById('gestor-registro-container');
+        if (container && dropdown && !container.contains(e.target)) {
+            dropdown.classList.remove('show');
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    // ======================================================
+    // EVENTO: CERRAR CON ESCAPE
+    // ======================================================
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && dropdown) {
+            dropdown.classList.remove('show');
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    // ======================================================
+    // EVENTO: TECLA ENTER - Seleccionar primer elemento
+    // ======================================================
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && dropdown.classList.contains('show')) {
+            e.preventDefault();
+            const primerItem = dropdown.querySelector('.select-buscador-option');
+            if (primerItem) {
+                primerItem.click();
+            }
+        }
+    });
+    
+    // ======================================================
+    // EVENTO: FLECHAS PARA NAVEGACIÓN
+    // ======================================================
+    let selectedIndex = -1;
+    
+    input.addEventListener('keydown', function(e) {
+        const items = dropdown.querySelectorAll('.select-buscador-option');
+        if (items.length === 0) return;
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+            actualizarSeleccionRegistro(items, selectedIndex);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, -1);
+            actualizarSeleccionRegistro(items, selectedIndex);
+            if (selectedIndex === -1) {
+                input.value = '';
+            }
+        }
+    });
+    
+    // ======================================================
+    // FUNCIÓN: Actualizar selección con flechas
+    // ======================================================
+    function actualizarSeleccionRegistro(items, index) {
+        items.forEach((item, i) => {
+            if (i === index) {
+                item.classList.add('selected');
+                const nombre = item.getAttribute('data-value');
+                if (nombre && index !== -1) {
+                    input.value = nombre;
+                    if (hiddenInput) hiddenInput.value = nombre;
+                }
+                item.scrollIntoView({ block: 'nearest' });
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    }
+    
+    // ======================================================
+    // FUNCIÓN: Mostrar sugerencias
+    // ======================================================
+    function mostrarSugerenciasRegistro(gestores, busqueda) {
+        if (!dropdown) return;
+        
+        if (gestores.length === 0) {
+            dropdown.innerHTML = `
+                <div class="select-buscador-empty">
+                    ${busqueda ? `❌ No se encontraron resultados para "${escapeHtml(busqueda)}"` : '📭 No hay gestores disponibles'}
+                </div>
+            `;
+            dropdown.classList.add('show');
+            dropdown.style.display = 'block';
+            return;
+        }
+        
+        const resaltarCoincidencia = (texto, busqueda) => {
+            if (!busqueda || busqueda === '') return escapeHtml(texto);
+            const busquedaLower = busqueda.toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+            const textoNormalizado = texto.toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "");
+            
+            if (!textoNormalizado.includes(busquedaLower)) return escapeHtml(texto);
+            
+            let regex;
+            try {
+                regex = new RegExp(`(${busqueda.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            } catch (e) {
+                return escapeHtml(texto);
+            }
+            return escapeHtml(texto).replace(regex, '<span class="sugerencia-resaltado">$1</span>');
+        };
+        
+        let html = `<div class="select-buscador-resultados">🔍 ${gestores.length} resultado${gestores.length !== 1 ? 's' : ''}</div>`;
+        
+        const mostrar = gestores.slice(0, 15);
+        mostrar.forEach(gestor => {
+            html += `
+                <div class="select-buscador-option" 
+                     data-value="${escapeHtml(gestor)}"
+                     onclick="seleccionarGestorRegistro('${escapeHtml(gestor).replace(/'/g, "\\'")}')">
+                    <span>👤 ${resaltarCoincidencia(gestor, busqueda)}</span>
+                </div>
+            `;
+        });
+        
+        if (gestores.length > 15) {
+            html += `<div class="select-buscador-mas">... y ${gestores.length - 15} más</div>`;
+        }
+        
+        dropdown.innerHTML = html;
+        dropdown.classList.add('show');
+        dropdown.style.display = 'block';
+    }
+    
+    // ======================================================
+    // FUNCIÓN: Seleccionar gestor
+    // ======================================================
+    window.seleccionarGestorRegistro = function(gestor) {
+        const input = document.getElementById('buscarGestorRegistro');
+        const hiddenInput = document.getElementById('selectGestorRegistro');
+        const dropdown = document.getElementById('gestorRegistroDropdown');
+        
+        if (input) {
+            input.value = gestor;
+            input.blur(); // 🔴 FORZAR BLUR PARA CERRAR DROPDOWN
+        }
+        if (hiddenInput) hiddenInput.value = gestor;
+        if (dropdown) {
+            dropdown.classList.remove('show');
+            dropdown.style.display = 'none';
+        }
+        
+        console.log(`✅ Gestor seleccionado para registro: ${gestor}`);
+    };
+    
+    // Cargar gestores al iniciar
+    if (gestoresRegistroLista.length === 0) {
+        cargarGestoresParaRegistro();
+    }
+    
+    console.log('✅ Buscador de gestores para registro inicializado');
+}
 
 
 // ======================================================
@@ -48735,3 +49788,238 @@ window.registrarVozGestor = registrarVozGestor;
 window.cargarGestoresRegistrados = cargarGestoresRegistrados;
 window.cargarSelectGestoresRegistro = cargarSelectGestoresRegistro;
 window.inicializarRegistroVoz = inicializarRegistroVoz;
+
+
+// ======================================================
+// 🔴 PUNTO DE ENTRADA ÚNICO - INICIALIZACIÓN COMPLETA
+// ======================================================
+// 📌 Esta es la ÚNICA función que se ejecuta al cargar la página.
+// 📌 Todas las inicializaciones se llaman desde aquí en orden.
+// ======================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 [DOMContentLoaded] Inicializando sistema de supervisión...');
+
+    // ======================================================
+    // 1. INICIALIZAR EVENTO DE CARGA DE AGENTES (Excel)
+    // ======================================================
+    if (typeof inicializarEventoAgentes === 'function') {
+        inicializarEventoAgentes();
+        console.log('✅ Evento de carga de agentes inicializado');
+    }
+
+    // ======================================================
+    // 2. CONFIGURAR BUSCADOR DEL RANKING
+    // ======================================================
+    const buscador = document.getElementById('buscadorAgenteRanking');
+    if (buscador) {
+        buscador.addEventListener('input', function() {
+            if (typeof filtrarRankingPorBusqueda === 'function') {
+                filtrarRankingPorBusqueda();
+            }
+        });
+        console.log('✅ Buscador ranking configurado');
+    }
+
+    // ======================================================
+    // 3. INICIALIZAR FORMULARIOS
+    // ======================================================
+    if (typeof inicializarFormularioAgentes === 'function') {
+        inicializarFormularioAgentes();
+        console.log('✅ Formulario de agentes inicializado');
+    }
+
+    if (typeof inicializarFormularioUsuarios === 'function') {
+        inicializarFormularioUsuarios();
+        console.log('✅ Formulario de usuarios inicializado');
+    }
+
+    // ======================================================
+    // 4. INICIALIZAR BUSCADOR DE GESTORES
+    // ======================================================
+    if (typeof inicializarBuscadorGestores === 'function') {
+        inicializarBuscadorGestores();
+        console.log('✅ Buscador de gestores inicializado');
+    }
+
+    // ======================================================
+    // 5. CONFIGURAR SELECTOR DE AGRUPACIÓN
+    // ======================================================
+    const selectAgrupacion = document.getElementById('selectAgrupacion');
+    if (selectAgrupacion) {
+        selectAgrupacion.addEventListener('change', function() {
+            if (typeof cambiarAgrupacion === 'function') {
+                cambiarAgrupacion();
+            }
+        });
+        console.log('✅ Selector de agrupación configurado');
+    }
+
+    // ======================================================
+    // 6. FORMULARIO DE CAMBIO DE CONTRASEÑA
+    // ======================================================
+    const formPassword = document.getElementById('formCambiarPassword');
+    if (formPassword) {
+        formPassword.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const nuevaPassword = document.getElementById('nuevaPassword').value;
+            const confirmarPassword = document.getElementById('confirmarPassword').value;
+            
+            if (!nuevaPassword || !confirmarPassword) {
+                alert('⚠️ Complete ambos campos');
+                return;
+            }
+            
+            if (nuevaPassword !== confirmarPassword) {
+                alert('⚠️ Las contraseñas no coinciden');
+                return;
+            }
+            
+            if (nuevaPassword.length < 6) {
+                alert('⚠️ La contraseña debe tener al menos 6 caracteres');
+                return;
+            }
+            
+            const token = localStorage.getItem('meca_token');
+            
+            try {
+                const response = await fetch(`/api/usuarios/${window.usuarioPasswordId}/password`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ password: nuevaPassword })
+                });
+                
+                if (response.ok) {
+                    alert('✅ Contraseña actualizada correctamente');
+                    if (typeof cerrarModalPassword === 'function') {
+                        cerrarModalPassword();
+                    }
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('❌ Error: ' + (error.error || 'No se pudo actualizar'));
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+            }
+        });
+        console.log('✅ Formulario cambio de contraseña configurado');
+    }
+
+    // ======================================================
+    // 7. FORMULARIO DE LOGIN
+    // ======================================================
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        // Remover event listeners anteriores si existen
+        const nuevoForm = loginForm.cloneNode(true);
+        loginForm.parentNode.replaceChild(nuevoForm, loginForm);
+
+        const formFinal = document.getElementById('loginForm');
+        formFinal.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            console.log('🔐 Intentando iniciar sesión...');
+
+            const usuario = document.getElementById('loginUsuario').value.trim();
+            const contrasena = document.getElementById('loginPassword').value;
+
+            if (!usuario || !contrasena) {
+                if (typeof mostrarErrorLogin === 'function') {
+                    mostrarErrorLogin('⚠️ Complete ambos campos');
+                }
+                return;
+            }
+
+            const btn = this.querySelector('button[type="submit"]');
+            const textoOriginal = btn.innerHTML;
+            btn.innerHTML = '⏳ Verificando...';
+            btn.disabled = true;
+
+            try {
+                const exito = await procesarLogin(usuario, contrasena);
+                if (exito) {
+                    console.log('✅ Login exitoso, recargando página...');
+                    location.reload();
+                } else {
+                    console.log('❌ Login fallido');
+                    btn.innerHTML = textoOriginal;
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error en login:', error);
+                if (typeof mostrarErrorLogin === 'function') {
+                    mostrarErrorLogin('Error al iniciar sesión');
+                }
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
+        });
+        console.log('✅ Event listener del formulario de login configurado');
+    }
+
+    // ======================================================
+    // 8. AGREGAR BOTONES (con retrasos para asegurar DOM)
+    // ======================================================
+    setTimeout(() => {
+        if (typeof agregarBotonLimpiarPDA === 'function') {
+            agregarBotonLimpiarPDA();
+            console.log('✅ Botón de limpieza PDA agregado');
+        }
+        if (typeof agregarBotonRefreshPDA === 'function') {
+            agregarBotonRefreshPDA();
+            console.log('✅ Botón refresh PDA agregado');
+        }
+        if (typeof mostrarBotonesSegunRol === 'function') {
+            mostrarBotonesSegunRol();
+            console.log('✅ Botones según rol actualizados');
+        }
+    }, 500);
+
+    // ======================================================
+    // 9. INICIALIZAR MATRIZ
+    // ======================================================
+    setTimeout(() => {
+        if (typeof agregarEstilosMatriz === 'function') {
+            agregarEstilosMatriz();
+        }
+        if (document.getElementById('matrizTreeContainer')) {
+            if (typeof cargarMatrizCompleta === 'function') {
+                cargarMatrizCompleta();
+                console.log('✅ Matriz inicializada');
+            }
+        }
+    }, 300);
+
+    // ======================================================
+    // 10. 🔴 NUEVO: INICIALIZAR REGISTRO DE VOZ DE GESTORES
+    // ======================================================
+    setTimeout(() => {
+        if (typeof inicializarRegistroVoz === 'function') {
+            inicializarRegistroVoz();
+            console.log('✅ Registro de voz inicializado');
+        } else {
+            console.warn('⚠️ inicializarRegistroVoz no está definida');
+        }
+    }, 800);
+
+    // ======================================================
+    // 11. CARGAR ESTADO DE REPORTES (si la pestaña está activa)
+    // ======================================================
+    setTimeout(() => {
+        const tabReportesAuto = document.getElementById('tab-reportesAuto');
+        if (tabReportesAuto && tabReportesAuto.classList.contains('active')) {
+            if (typeof cargarEstadoReportes === 'function') {
+                cargarEstadoReportes();
+                console.log('✅ Estado de reportes cargado');
+            }
+        }
+    }, 600);
+
+    console.log('✅ [DOMContentLoaded] Sistema de supervisión inicializado completamente');
+});

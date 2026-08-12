@@ -2104,11 +2104,13 @@ async function showTab(tabName, event) {
         }
 
         if (tabName === 'transcripcion') {
-            if (typeof cargarTareasProgramadas === 'function') {
-                setTimeout(cargarTareasProgramadas, 300);
+            
+            // 🔴 NUEVO: Cargar dashboard y trazabilidad
+            if (typeof cargarDashboardLoteActivo === 'function') {
+                setTimeout(cargarDashboardLoteActivo, 200);
             }
-            if (typeof cargarTranscripciones === 'function') {
-                setTimeout(cargarTranscripciones, 500);
+            if (typeof cargarHistorialLotes === 'function') {
+                setTimeout(cargarHistorialLotes, 400);
             }
         }
 
@@ -25467,66 +25469,6 @@ function generarDocumentoHTML(data) {
     }
     
     
-    
-    
-   
-
-    async function diagnosticarTablasEscuchas() {
-        const db = getDB();
-        if (!db) {
-            console.error('❌ Base de datos no disponible');
-            return;
-        }
-
-        console.log('🔍 Diagnosticando tablas de escuchas...');
-
-        try {
-            // Verificar tabla tareas_escucha
-            const { data: tareas, error: errorTareas } = await db
-                .from('tareas_escucha')
-                .select('count', { count: 'exact', head: true });
-
-            if (errorTareas) {
-                console.error('❌ Error con tabla tareas_escucha:', errorTareas.message);
-            } else {
-                console.log('✅ Tabla tareas_escucha existe y es accesible');
-            }
-
-            // Verificar tabla asignaciones_escucha
-            const { data: asignaciones, error: errorAsignaciones } = await db
-                .from('asignaciones_escucha')
-                .select('count', { count: 'exact', head: true });
-
-            if (errorAsignaciones) {
-                console.error('❌ Error con tabla asignaciones_escucha:', errorAsignaciones.message);
-            } else {
-                console.log('✅ Tabla asignaciones_escucha existe y es accesible');
-            }
-
-            // Verificar usuarios auditores
-            const { data: auditores, error: errorAuditores } = await db
-                .from('usuarios')
-                .select('usuario, rol, activo')
-                .eq('rol', 'AUDITOR')
-                .eq('activo', true);
-
-            if (errorAuditores) {
-                console.error('❌ Error obteniendo auditores:', errorAuditores.message);
-            } else {
-                console.log(`✅ Auditores activos encontrados: ${auditores?.length || 0}`);
-                if (auditores && auditores.length > 0) {
-                    console.log('   Lista:', auditores.map(a => a.usuario).join(', '));
-                } else {
-                    console.warn('⚠️ No hay auditores activos en el sistema');
-                }
-            }
-
-        } catch (error) {
-            console.error('❌ Error en diagnóstico:', error);
-        }
-    }
-    // ===== FIN FUNCIÓN: diagnosticarTablasEscuchas =========================
-
     // ===== 2. INICIO FUNCIÓN: inicializarGestionEscuchas =================
     async function inicializarGestionEscuchas() {
         console.log('🚀 inicializarGestionEscuchas EJECUTADA');
@@ -27914,13 +27856,12 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
     }
     // ===== FIN FUNCIÓN: marcarIncidenciaResuelta ===========================
 
-    // ===== 29. INICIO FUNCIÓN: cargarHistorialLotes =======================
-    
+    // ===== 29. INICIO FUNCIÓN: cargarHistorialLotes (VERSIÓN MEJORADA CON TRAZABILIDAD) =====
     let loteSeleccionadoId = null;            
     async function cargarHistorialLotes() {
-        console.log('📦 Cargando historial de lotes...');
+        console.log('📦 Cargando historial de lotes con trazabilidad...');
 
-        const tbody = document.getElementById('tablaHistorialLotes');
+        const tbody = document.getElementById('tablaLotesTranscripcion');
         if (!tbody) {
             console.error('❌ Tabla historial no encontrada');
             return;
@@ -27948,15 +27889,20 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
             if (!lotes || lotes.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 40px;">📭 No hay lotes cargados aún. Cargue su primer archivo de escuchas.</td></tr>';
                 window.lotesHistorialGlobal = [];
+                // Actualizar tabla de transcripción también
+                const tbodyTrans = document.getElementById('tablaLotesTranscripcion');
+                if (tbodyTrans) {
+                    tbodyTrans.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 30px;">📭 No hay lotes cargados</td></tr>';
+                }
                 return;
             }
 
-            // Para cada lote, obtener estadísticas de asignaciones
+            // Para cada lote, obtener estadísticas de transcripción
             const lotesConEstadisticas = [];
             for (const lote of lotes) {
                 const { data: asignaciones, error: asigError } = await db
                     .from('asignaciones_escucha')
-                    .select('estado, audio_encontrado, motivo_incidencia')
+                    .select('transcripcion_estado, audio_encontrado')
                     .eq('tarea_id', lote.id);
 
                 if (asigError) {
@@ -27964,123 +27910,74 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     lotesConEstadisticas.push({
                         ...lote,
                         total: 0,
-                        pendientes: 0,
-                        enProceso: 0,
                         gestionados: 0,
-                        incidencias: 0,
+                        pendientes: 0,
+                        errores: 0,
+                        enProceso: 0,
+                        sinAudio: 0,
                         avance: 0
                     });
                     continue;
                 }
 
                 const total = asignaciones?.length || 0;
-                const pendientes = asignaciones?.filter(a => a.estado === 'pendiente').length || 0;
-                const enProceso = asignaciones?.filter(a => a.estado === 'en_proceso').length || 0;
-                const gestionados = asignaciones?.filter(a => a.estado === 'gestionado' || a.estado === 'completado').length || 0;
-                const incidencias = asignaciones?.filter(a => a.audio_encontrado === false && a.motivo_incidencia).length || 0;
+                
+                // 🔴 TRAZABILIDAD COMPLETA POR ESTADO
+                const gestionados = asignaciones?.filter(a => 
+                    a.transcripcion_estado === 'transcrito' || 
+                    a.transcripcion_estado === 'analizado'
+                ).length || 0;
+                
+                const pendientes = asignaciones?.filter(a => 
+                    !a.transcripcion_estado || 
+                    a.transcripcion_estado === 'pendiente'
+                ).length || 0;
+                
+                const errores = asignaciones?.filter(a => 
+                    a.transcripcion_estado === 'error'
+                ).length || 0;
+                
+                const enProceso = asignaciones?.filter(a => 
+                    a.transcripcion_estado === 'en_proceso'
+                ).length || 0;
+                
+                const sinAudio = asignaciones?.filter(a => 
+                    a.transcripcion_estado === 'audio_no_disponible'
+                ).length || 0;
+                
                 const avance = total > 0 ? Math.round((gestionados / total) * 100) : 0;
 
                 lotesConEstadisticas.push({
                     ...lote,
                     total,
-                    pendientes,
-                    enProceso,
                     gestionados,
-                    incidencias,
+                    pendientes,
+                    errores,
+                    enProceso,
+                    sinAudio,
                     avance
                 });
             }
 
             window.lotesHistorialGlobal = lotesConEstadisticas;
 
-            // Generar HTML de la tabla
-            let html = '';
-            for (let i = 0; i < lotesConEstadisticas.length; i++) {
-                const lote = lotesConEstadisticas[i];
-                
-                const fechaStr = lote.fecha_carga ? new Date(lote.fecha_carga).toLocaleString('es-ES') : 'Fecha desconocida';
-                const esActivo = lote.estado === 'activo';
-                
-                let nombreArchivo = '-';
-                if (lote.nombre_archivo) {
-                    nombreArchivo = lote.nombre_archivo.split('/').pop().split('\\').pop() || lote.nombre_archivo;
-                }
+            // Actualizar ambas tablas
+            actualizarTablaHistorialLotes(lotesConEstadisticas);  // Para la pestaña Escuchas (compatibilidad)
+            actualizarTablaLotesTranscripcion(lotesConEstadisticas);  // Para la pestaña Transcripción (nuevo)
+            
+            // Actualizar dashboard del lote activo
+            await cargarDashboardLoteActivo();
 
-                const total = lote.total || 0;
-                const pendientes = lote.pendientes || 0;
-                const enProceso = lote.enProceso || 0;
-                const gestionados = lote.gestionados || 0;
-                const incidencias = lote.incidencias || 0;
-                const avance = lote.avance || 0;
-                
-                let colorBarra = '#28a745';
-                if (avance < 50) colorBarra = '#d93025';
-                else if (avance < 80) colorBarra = '#f39c12';
-
-                const rowStyle = esActivo ? 'style="background: #e8f5e9;"' : '';
-                
-                // Determinar texto y estilo del botón de procesamiento
-                const procesarTexto = esActivo ? '🔄 Reprocesar' : '🎧 Procesar';
-                const procesarColor = esActivo ? '#f39c12' : '#7b1fa2';
-
-                html += `
-                    <tr onclick="seleccionarLoteHistorial(${lote.id})" style="cursor: pointer;" ${rowStyle}>
-                        <td style="padding: 8px; text-align: center;">${i + 1}</td>
-                        <td style="padding: 8px; white-space: nowrap;">${escapeHtml(fechaStr)}</td>
-                        <td style="padding: 8px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(lote.nombre_archivo || '-')}">
-                            ${escapeHtml(nombreArchivo)}
-                        </td>
-                        <td style="padding: 8px; text-align: center; font-weight: bold;">${total}</td>
-                        <td style="padding: 8px; text-align: center; color: var(--warning);">${pendientes}</td>
-                        <td style="padding: 8px; text-align: center; color: var(--accent);">${enProceso}</td>
-                        <td style="padding: 8px; text-align: center; color: var(--ok);">${gestionados}</td>
-                        <td style="padding: 8px; text-align: center; ${incidencias > 0 ? 'color: var(--danger); font-weight: bold;' : 'color: var(--muted);'}">
-                            ${incidencias}
-                        </td>
-                        <td style="padding: 8px; text-align: center;">
-                            <div style="display: inline-flex; align-items: center; gap: 5px;">
-                                <div style="background: #e9ecef; border-radius: 10px; height: 6px; width: 60px;">
-                                    <div style="width: ${avance}%; height: 100%; background: ${colorBarra}; border-radius: 10px;"></div>
-                                </div>
-                                <span style="font-size: 11px;">${avance}%</span>
-                            </div>
-                        </td>
-                        <td style="padding: 8px; text-align: center;">
-                            ${esActivo ? '<span class="badge" style="background: var(--ok);">✅ Activo</span>' : '<span class="badge" style="background: var(--muted);">⏸️ Inactivo</span>'}
-                        </td>
-                        <!-- ✅ NUEVA COLUMNA: BOTÓN DE PROCESAMIENTO -->
-                        <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                            <button onclick="event.stopPropagation(); procesarLoteHistorico(${lote.id})" 
-                                    style="background: ${procesarColor}; padding: 6px 12px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
-                                ${procesarTexto}
-                            </button>
-                        </td>
-                        <!-- ✅ COLUMNA ACCIONES: SOLO VER Y ELIMINAR -->
-                        <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                            <button onclick="event.stopPropagation(); verDetalleLote(${lote.id})" 
-                                    style="background: var(--accent); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
-                                👁️ Ver tickets
-                            </button>
-                            <button onclick="event.stopPropagation(); eliminarLote(${lote.id})" 
-                                    style="background: #dc3545; color: white; padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; margin-left: 5px;">
-                                🗑️
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }
-
-            tbody.innerHTML = html;
             console.log(`✅ Historial de lotes cargado: ${lotesConEstadisticas.length} lotes`);
 
         } catch (error) {
             console.error('❌ Error cargando historial:', error);
             tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
         }
-    }
-    // ===== FIN FUNCIÓN: cargarHistorialLotes ===============================
+    }// ===== FIN FUNCIÓN: cargarHistorialLotes ===============================
     
-    // ===== 30. INICIO FUNCIÓN: actualizarTablaHistorialLotes ==============
+   
+    // ===== 30. INICIO FUNCIÓN: actualizarTablaHistorialLotes (VERSIÓN COMPATIBLE) =====
     function actualizarTablaHistorialLotes(lotes) {
         const tbody = document.getElementById('tablaHistorialLotes');
         if (!tbody) return;
@@ -28101,9 +27998,13 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
             const gestionados = lote.gestionados || 0;
             const avance = total > 0 ? Math.round((gestionados / total) * 100) : 0;
 
-            // Determinar texto y estilo del botón de procesamiento
-            const procesarTexto = esActivo ? '🔄 Reprocesar' : '🎧 Procesar';
-            const procesarColor = esActivo ? '#f39c12' : '#7b1fa2';
+            // Determinar si todos están transcritos
+            const todosTranscritos = total > 0 && gestionados >= total;
+            
+            // Determinar texto del botón según estado de los tickets
+            let procesarTexto = todosTranscritos ? '🔄 Reprocesar' : '🎧 Procesar';
+            let procesarColor = todosTranscritos ? '#f39c12' : '#7b1fa2';
+            let forzarParam = todosTranscritos;
 
             html += `
                 <tr>
@@ -28116,8 +28017,8 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     <td style="padding: 8px; text-align: center; color: var(--warning);">${lote.pendientes || 0}</td>
                     <td style="padding: 8px; text-align: center; color: var(--accent);">${lote.enProceso || 0}</td>
                     <td style="padding: 8px; text-align: center; color: var(--ok);">${gestionados}</td>
-                    <td style="padding: 8px; text-align: center; ${lote.incidencias > 0 ? 'color: var(--danger); font-weight: bold;' : 'color: var(--muted);'}">
-                        ${lote.incidencias || 0}
+                    <td style="padding: 8px; text-align: center; ${lote.errores > 0 ? 'color: var(--danger); font-weight: bold;' : 'color: var(--muted);'}">
+                        ${lote.errores || 0}
                     </td>
                     <td style="padding: 8px; text-align: center;">
                         <div style="display: inline-flex; align-items: center; gap: 5px;">
@@ -28130,14 +28031,12 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     <td style="padding: 8px; text-align: center;">
                         ${esActivo ? '<span class="badge" style="background: var(--ok);">✅ Activo</span>' : '<span class="badge" style="background: var(--muted);">⏸️ Inactivo</span>'}
                     </td>
-                    <!-- ✅ NUEVA COLUMNA: BOTÓN DE PROCESAMIENTO -->
                     <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                        <button onclick="event.stopPropagation(); procesarLoteHistorico(${lote.id})" 
+                        <button onclick="event.stopPropagation(); procesarLoteHistorico(${lote.id}, ${forzarParam})" 
                                 style="background: ${procesarColor}; padding: 6px 12px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
                             ${procesarTexto}
                         </button>
                     </td>
-                    <!-- ✅ COLUMNA ACCIONES: SOLO VER Y ELIMINAR -->
                     <td style="padding: 8px; text-align: center; white-space: nowrap;">
                         <button onclick="event.stopPropagation(); verDetalleLote(${lote.id})" 
                                 style="background: var(--accent); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
@@ -28161,6 +28060,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
      * @param {number} loteId - ID del lote
      * @param {boolean} forzar - Si es true, reprocesa aunque ya tenga transcripción
      */
+    // ===== FUNCIÓN: procesarLoteHistorico (VERSIÓN SIMPLIFICADA) =====
     async function procesarLoteHistorico(loteId, forzar = false) {
         console.log(`🎧 Procesando lote histórico ID: ${loteId} (Forzar: ${forzar})`);
         
@@ -28210,57 +28110,116 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                 return;
             }
             
-            // 4. FILTRAR TICKETS
+            // 4. FILTRAR TICKETS SEGÚN MODO
             let ticketsAProcesar;
             let ticketsYaProcesados;
             
             if (forzar) {
                 // 🔴 REPROCESAR: tomar TODOS los tickets
                 ticketsAProcesar = tickets;
-                ticketsYaProcesados = [];
+                ticketsYaProcesados = tickets.filter(t => 
+                    t.transcripcion_estado === 'transcrito' || 
+                    t.transcripcion_estado === 'analizado'
+                );
                 console.log(`🔄 Reprocesando TODOS los ${tickets.length} tickets (forzado)`);
+                
+                // Si hay tickets ya transcritos, mostrar confirmación
+                if (ticketsYaProcesados.length > 0) {
+                    const confirmar = confirm(
+                        `⚠️ ¿REPROCESAR TODOS LOS TICKETS?\n\n` +
+                        `📦 Lote: ${nombreArchivo}\n` +
+                        `📊 Total tickets: ${tickets.length}\n` +
+                        `✅ Ya transcritos/analizados: ${ticketsYaProcesados.length}\n` +
+                        `📝 Se reprocesarán TODOS los ${tickets.length} tickets.\n\n` +
+                        `⚠️ Esto forzará la transcripción nuevamente de TODOS los tickets.\n` +
+                        `   Los audios ya transcritos se volverán a procesar.\n\n` +
+                        `¿Desea continuar?`
+                    );
+                    if (!confirmar) {
+                        console.log('⏹️ Reprocesamiento cancelado por el usuario');
+                        return;
+                    }
+                } else {
+                    // No hay tickets transcritos, confirmación simple
+                    const confirmar = confirm(
+                        `⚠️ ¿REPROCESAR TODOS LOS TICKETS?\n\n` +
+                        `📦 Lote: ${nombreArchivo}\n` +
+                        `📊 Total tickets: ${tickets.length}\n\n` +
+                        `Se reprocesarán todos los tickets del lote.\n\n` +
+                        `¿Desea continuar?`
+                    );
+                    if (!confirmar) {
+                        console.log('⏹️ Reprocesamiento cancelado por el usuario');
+                        return;
+                    }
+                }
             } else {
-                // PROCESAR NORMAL: solo los que no tienen transcripción
+                // 🔴 PROCESAR NORMAL: SOLO tickets que NO están transcritos/analizados
+                // Esto incluye: pendiente, error, en_proceso, audio_no_disponible, sin_estado, etc.
                 ticketsAProcesar = tickets.filter(t => 
-                    !t.transcripcion_estado || 
-                    t.transcripcion_estado === 'pendiente' ||
-                    t.transcripcion_estado === 'audio_no_disponible'
+                    t.transcripcion_estado !== 'transcrito' && 
+                    t.transcripcion_estado !== 'analizado'
                 );
                 ticketsYaProcesados = tickets.filter(t => 
                     t.transcripcion_estado === 'transcrito' || 
                     t.transcripcion_estado === 'analizado'
                 );
+                
+                console.log(`📝 Procesando tickets NO transcritos/analizados`);
+                console.log(`   📊 Total tickets: ${tickets.length}`);
+                console.log(`   📝 A procesar: ${ticketsAProcesar.length}`);
+                console.log(`   ✅ Ya procesados: ${ticketsYaProcesados.length}`);
+                
+                // 🔴 Si no hay tickets para procesar, ofrecer reprocesar
+                if (ticketsAProcesar.length === 0) {
+                    const confirmar = confirm(
+                        `✅ Todos los ${tickets.length} tickets de este lote ya tienen transcripción.\n\n` +
+                        `📦 Lote: ${nombreArchivo}\n` +
+                        `📊 Total tickets: ${tickets.length}\n` +
+                        `✅ Procesados: ${ticketsYaProcesados.length}\n\n` +
+                        `¿Desea REPROCESAR todos los tickets?\n` +
+                        `(Esto tomará más tiempo y procesará TODOS los audios nuevamente)`
+                    );
+                    if (confirmar) {
+                        await procesarLoteHistorico(loteId, true);
+                    }
+                    return;
+                }
+                
+                // Mostrar resumen de lo que se va a procesar
+                const estados = {};
+                ticketsAProcesar.forEach(t => {
+                    const estado = t.transcripcion_estado || 'sin_estado';
+                    estados[estado] = (estados[estado] || 0) + 1;
+                });
+                
+                let resumenEstados = '';
+                const estadoNombres = {
+                    'pendiente': '⏳ Pendiente',
+                    'error': '❌ Error',
+                    'en_proceso': '🔄 En proceso',
+                    'audio_no_disponible': '🔇 Sin audio',
+                    'sin_estado': '📭 Sin estado'
+                };
+                
+                for (const [estado, count] of Object.entries(estados)) {
+                    const nombre = estadoNombres[estado] || estado;
+                    resumenEstados += `   • ${nombre}: ${count}\n`;
+                }
+                
+                const confirmar = confirm(
+                    `🎧 ¿PROCESAR TICKETS PENDIENTES?\n\n` +
+                    `📦 Lote: ${nombreArchivo}\n` +
+                    `📊 Total tickets: ${tickets.length}\n` +
+                    `📝 Tickets a procesar: ${ticketsAProcesar.length}\n` +
+                    `✅ Ya procesados: ${ticketsYaProcesados.length}\n\n` +
+                    `📋 Detalle de tickets a procesar:\n${resumenEstados}\n` +
+                    `¿Desea continuar?`
+                );
+                if (!confirmar) return;
             }
             
-            console.log(`📊 Tickets totales: ${tickets.length}`);
-            console.log(`   📝 A procesar: ${ticketsAProcesar.length}`);
-            console.log(`   ✅ Ya procesados: ${ticketsYaProcesados.length}`);
-            
-            // 5. MOSTRAR CONFIRMACIÓN
-            if (ticketsAProcesar.length === 0) {
-                alert(`✅ Todos los tickets del lote "${nombreArchivo}" ya tienen transcripción.\n\n` +
-                    `📊 Total: ${tickets.length} tickets\n` +
-                    `✅ Procesados: ${ticketsYaProcesados.length}\n\n` +
-                    `💡 Para reprocesar, use el botón "🔄 Reprocesar" con la opción de forzar.`);
-                return;
-            }
-            
-            const modoTexto = forzar ? '🔄 REPROCESAR (forzado)' : '📝 PROCESAR (solo nuevos)';
-            const mensaje = 
-                `🎧 ${modoTexto}\n\n` +
-                `📦 Lote: ${nombreArchivo}\n` +
-                `🆔 ID: ${loteId}\n` +
-                `📊 Tickets totales: ${tickets.length}\n` +
-                `📝 Tickets a procesar: ${ticketsAProcesar.length}\n` +
-                `${ticketsYaProcesados.length > 0 ? `✅ Ya procesados (se omitirán): ${ticketsYaProcesados.length}\n` : ''}` +
-                `📅 Carga: ${new Date(lote.fecha_carga).toLocaleString('es-ES')}\n` +
-                `📌 Estado: ${esActivo ? '✅ ACTIVO' : '⏸️ HISTÓRICO'}\n\n` +
-                `${forzar ? '⚠️ SE REPROCESARÁN TODOS LOS TICKETS (incluso los que ya tienen transcripción)\n\n' : ''}` +
-                `¿Desea continuar?`;
-            
-            if (!confirm(mensaje)) return;
-            
-            // 6. PREGUNTAR SI ANALIZAR CON OLLAMA
+            // 5. PREGUNTAR SI ANALIZAR CON OLLAMA
             const analizar = confirm(
                 `🧠 ¿Analizar con Ollama?\n\n` +
                 `   • Si selecciona SÍ: se evaluará calidad de la llamada\n` +
@@ -28268,13 +28227,13 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                 `¿Desea analizar?`
             );
             
-            // 7. VERIFICAR CONFIGURACIÓN DE RUTA DE AUDIOS
+            // 6. VERIFICAR CONFIGURACIÓN DE RUTA DE AUDIOS
             if (!configuracionAudios || !configuracionAudios.ruta_base) {
                 alert('⚠️ No hay configuración de ruta de audios. Configure la ruta primero.');
                 return;
             }
             
-            // 8. PROCESAR LOS TICKETS
+            // 7. PROCESAR LOS TICKETS
             procesandoAudios = true;
             
             const token = localStorage.getItem('meca_token');
@@ -28301,7 +28260,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     modelo_whisper: 'small',
                     modelo_ollama: 'llama3.2:3b',
                     modo: forzar ? 'reprocesar' : 'manual',
-                    forzar_reprocesamiento: forzar  // 🔴 CLAVE: este parámetro forza el reprocesamiento
+                    forzar_reprocesamiento: forzar
                 })
             });
             
@@ -28320,9 +28279,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                 // Recargar datos
                 await refrescarMonitoreoEscuchas();
                 await cargarHistorialLotes();
-                if (typeof cargarTranscripciones === 'function') {
-                    await cargarTranscripciones();
-                }
+                
             } else {
                 alert(`❌ Error: ${result.error || 'Error desconocido'}`);
             }
@@ -28338,6 +28295,915 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                 clearInterval(monitorProgresoInterval);
                 monitorProgresoInterval = null;
             }
+        }
+    }
+
+    // ================================================================
+    // NUEVAS FUNCIONES - TRAZABILIDAD DE TRANSCRIPCIÓN
+    // ================================================================
+
+    // ================================================================
+    // 1. CARGAR DASHBOARD DEL LOTE ACTIVO
+    // ================================================================
+    async function cargarDashboardLoteActivo() {
+        console.log('📊 Cargando dashboard del lote activo...');
+        
+        try {
+            // 1. Obtener lote activo
+            const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+            
+            const nombreElement = document.getElementById('loteActivoNombre');
+            if (!loteActivo) {
+                if (nombreElement) {
+                    nombreElement.textContent = '📁 No hay lote activo';
+                    nombreElement.style.background = '#6c757d';
+                }
+                // Resetear KPIs a 0
+                document.getElementById('kpiLoteTotal').textContent = '0';
+                document.getElementById('kpiLoteHecho').textContent = '0';
+                document.getElementById('kpiLotePendiente').textContent = '0';
+                document.getElementById('kpiLoteError').textContent = '0';
+                document.getElementById('kpiLoteProceso').textContent = '0';
+                document.getElementById('kpiLoteSinAudio').textContent = '0';
+                document.getElementById('loteProgresoTexto').textContent = '0%';
+                document.getElementById('loteProgresoBarra').style.width = '0%';
+                return;
+            }
+            
+            // 2. Actualizar nombre del lote
+            const nombreArchivo = loteActivo.nombre_archivo ? 
+                loteActivo.nombre_archivo.split('/').pop().split('\\').pop() : 
+                'Lote sin nombre';
+            if (nombreElement) {
+                nombreElement.textContent = `📁 ${nombreArchivo}`;
+                nombreElement.style.background = 'var(--accent)';
+            }
+            
+            // 3. Obtener tickets del lote
+            const db = getDB();
+            if (!db) return;
+            
+            const { data: tickets, error } = await db
+                .from('asignaciones_escucha')
+                .select('transcripcion_estado, audio_encontrado')
+                .eq('tarea_id', loteActivo.id);
+            
+            if (error) throw error;
+            
+            if (!tickets || tickets.length === 0) {
+                document.getElementById('kpiLoteTotal').textContent = '0';
+                document.getElementById('kpiLoteHecho').textContent = '0';
+                document.getElementById('kpiLotePendiente').textContent = '0';
+                document.getElementById('kpiLoteError').textContent = '0';
+                document.getElementById('kpiLoteProceso').textContent = '0';
+                document.getElementById('kpiLoteSinAudio').textContent = '0';
+                document.getElementById('loteProgresoTexto').textContent = '0%';
+                document.getElementById('loteProgresoBarra').style.width = '0%';
+                return;
+            }
+            
+            // 4. Calcular estadísticas
+            const total = tickets.length;
+            const analizados = tickets.filter(t => t.transcripcion_estado === 'analizado').length;
+            const transcritos = tickets.filter(t => t.transcripcion_estado === 'transcrito').length;
+            const hecho = analizados + transcritos;
+            const pendientes = tickets.filter(t => !t.transcripcion_estado || t.transcripcion_estado === 'pendiente').length;
+            const errores = tickets.filter(t => t.transcripcion_estado === 'error').length;
+            const enProceso = tickets.filter(t => t.transcripcion_estado === 'en_proceso').length;
+            const sinAudio = tickets.filter(t => t.transcripcion_estado === 'audio_no_disponible').length;
+            
+            const progreso = total > 0 ? Math.round((hecho / total) * 100) : 0;
+            
+            // 5. Actualizar KPIs
+            document.getElementById('kpiLoteTotal').textContent = total;
+            document.getElementById('kpiLoteHecho').textContent = hecho;
+            document.getElementById('kpiLotePendiente').textContent = pendientes;
+            document.getElementById('kpiLoteError').textContent = errores;
+            document.getElementById('kpiLoteProceso').textContent = enProceso;
+            document.getElementById('kpiLoteSinAudio').textContent = sinAudio;
+            
+            document.getElementById('loteProgresoTexto').textContent = `${progreso}%`;
+            document.getElementById('loteProgresoBarra').style.width = `${progreso}%`;
+            
+            // 6. Color de la barra según progreso
+            const barra = document.getElementById('loteProgresoBarra');
+            if (progreso >= 90) {
+                barra.style.background = 'linear-gradient(90deg, #28a745, #20c997)';
+            } else if (progreso >= 60) {
+                barra.style.background = 'linear-gradient(90deg, #019DF4, #28a745)';
+            } else if (progreso >= 30) {
+                barra.style.background = 'linear-gradient(90deg, #f39c12, #019DF4)';
+            } else {
+                barra.style.background = 'linear-gradient(90deg, #d93025, #f39c12)';
+            }
+            
+            console.log(`✅ Dashboard actualizado: ${total} tickets, ${progreso}% completado`);
+            
+        } catch (error) {
+            console.error('Error cargando dashboard:', error);
+        }
+    }
+
+    // ================================================================
+    // 2. ACTUALIZAR TABLA DE LOTES CON TRAZABILIDAD
+    // ================================================================
+    function actualizarTablaLotesTranscripcion(lotes) {
+        const tbody = document.getElementById('tablaLotesTranscripcion');
+        if (!tbody) return;
+        
+        if (!lotes || lotes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 30px;">📭 No hay lotes cargados</td></tr>';
+            return;
+        }
+        
+        let html = '';
+        lotes.forEach((lote, idx) => {
+            const fecha = lote.fecha_carga ? new Date(lote.fecha_carga).toLocaleString('es-ES') : '-';
+            const nombreArchivo = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : '-';
+            const esActivo = lote.estado === 'activo';
+            
+            // Estadísticas del lote
+            const total = lote.total || 0;
+            const gestionados = lote.gestionados || 0;  // transcritos + analizados
+            const pendientes = lote.pendientes || 0;
+            const errores = lote.errores || 0;
+            const enProceso = lote.enProceso || 0;
+            const sinAudio = lote.sinAudio || 0;
+            
+            const progreso = total > 0 ? Math.round((gestionados / total) * 100) : 0;
+            
+            // Determinar si todos están transcritos
+            const todosTranscritos = total > 0 && gestionados >= total;
+            
+            // Color de progreso
+            let progresoColor = '#d93025';
+            if (progreso >= 90) progresoColor = '#28a745';
+            else if (progreso >= 60) progresoColor = '#019DF4';
+            else if (progreso >= 30) progresoColor = '#f39c12';
+            
+            // Texto del botón
+            const botonTexto = todosTranscritos ? '🔄 Reprocesar' : '🎧 Procesar';
+            const botonColor = todosTranscritos ? '#f39c12' : '#7b1fa2';
+            const forzarParam = todosTranscritos;
+            
+            html += `
+                <tr style="${esActivo ? 'background: #f0f7ff;' : ''} border-bottom: 1px solid #f0f0f0;">
+                    <td style="padding: 8px 10px; text-align: center; font-weight: bold;">${idx + 1}</td>
+                    <td style="padding: 8px 10px;">
+                        <strong>${escapeHtml(nombreArchivo)}</strong>
+                        ${esActivo ? '<span style="font-size: 10px; background: #28a745; color: white; padding: 2px 8px; border-radius: 10px; margin-left: 8px;">ACTIVO</span>' : ''}
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center; font-size: 12px;">${fecha}</td>
+                    <td style="padding: 8px 10px; text-align: center; font-weight: bold;">${total}</td>
+                    <td style="padding: 8px 10px; text-align: center; font-weight: bold; color: #28a745;">${gestionados}</td>
+                    <td style="padding: 8px 10px; text-align: center; color: #f39c12;">${pendientes}</td>
+                    <td style="padding: 8px 10px; text-align: center; color: #d93025; font-weight: ${errores > 0 ? 'bold' : 'normal'};">${errores}</td>
+                    <td style="padding: 8px 10px; text-align: center; color: #7b1fa2;">${enProceso}</td>
+                    <td style="padding: 8px 10px; text-align: center; color: #6c757d;">${sinAudio}</td>
+                    <td style="padding: 8px 10px; text-align: center;">
+                        <div style="display: flex; align-items: center; gap: 5px; justify-content: center;">
+                            <div style="background: #e9ecef; border-radius: 10px; height: 6px; width: 50px;">
+                                <div style="width: ${progreso}%; height: 100%; background: ${progresoColor}; border-radius: 10px;"></div>
+                            </div>
+                            <span style="font-size: 11px; font-weight: bold; color: ${progresoColor};">${progreso}%</span>
+                        </div>
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center;">
+                        <span class="badge" style="background: ${esActivo ? '#28a745' : '#6c757d'};">
+                            ${esActivo ? '✅ Activo' : '⏸️ Histórico'}
+                        </span>
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center; white-space: nowrap;">
+                        <button onclick="procesarLoteHistorico(${lote.id}, ${forzarParam})" 
+                                style="background: ${botonColor}; padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px; margin-bottom: 3px;">
+                            ${botonTexto}
+                        </button>
+                        <button onclick="verTicketsLote(${lote.id})" 
+                                style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px;">
+                            👁️ Ver
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tbody.innerHTML = html;
+    }
+
+    // ================================================================
+    // 3. FILTRAR LOTES EN LA TABLA DE TRANSCRIPCIÓN
+    // ================================================================
+    function filtrarLotesTranscripcion(busqueda) {
+        const tbody = document.getElementById('tablaLotesTranscripcion');
+        if (!tbody) return;
+        
+        const filas = tbody.querySelectorAll('tr');
+        const busquedaLower = busqueda.toLowerCase().trim();
+        
+        filas.forEach(fila => {
+            if (!fila.dataset.busqueda) {
+                // Guardar texto de búsqueda en el dataset
+                const texto = fila.textContent?.toLowerCase() || '';
+                fila.dataset.busqueda = texto;
+            }
+            
+            if (busquedaLower === '') {
+                fila.style.display = '';
+            } else {
+                const coincide = fila.dataset.busqueda.includes(busquedaLower);
+                fila.style.display = coincide ? '' : 'none';
+            }
+        });
+    }
+
+    // ================================================================
+    // 4. REFRESCAR HISTORIAL DE LOTES (DESDE TRANSCRIPCIÓN)
+    // ================================================================
+    async function refrescarHistorialLotesTranscripcion() {
+        console.log('🔄 Refrescando historial de lotes desde Transcripción...');
+        await cargarHistorialLotes();
+    }
+
+    // ================================================================
+    // 5. REFRESCAR DASHBOARD DEL LOTE
+    // ================================================================
+    async function refrescarDashboardLote() {
+        console.log('🔄 Refrescando dashboard del lote...');
+        await cargarDashboardLoteActivo();
+    }
+
+    // ================================================================
+    // 6. VER TICKETS DE UN LOTE (DRILL-DOWN)
+    // ================================================================
+    async function verTicketsLote(loteId) {
+        console.log(`👁️ Ver tickets del lote ${loteId}`);
+        
+        const container = document.getElementById('detalleLoteContainer');
+        const titulo = document.getElementById('detalleLoteTitulo');
+        const tbody = document.getElementById('tablaTicketsLote');
+        
+        // Mostrar container
+        container.style.display = 'block';
+        
+        // Mostrar loading
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">⏳ Cargando tickets...</td></tr>';
+        
+        try {
+            const db = getDB();
+            if (!db) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ Base de datos no disponible</td></tr>';
+                return;
+            }
+            
+            // Obtener lote
+            const lote = window.lotesHistorialGlobal?.find(l => l.id === loteId);
+            const nombreArchivo = lote?.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : `Lote #${loteId}`;
+            titulo.textContent = `📋 Tickets del Lote: ${nombreArchivo}`;
+            
+            // 🔴 OBTENER TICKETS DEL LOTE - TODOS LOS CAMPOS EN UNA SOLA CONSULTA
+            const { data: tickets, error } = await db
+                .from('asignaciones_escucha')
+                .select('id, ticket, gestor_auditado, motivo_call, transcripcion_estado, transcripcion, analisis_ollama, audio_encontrado')
+                .eq('tarea_id', loteId)
+                .order('id', { ascending: true });
+            
+            if (error) throw error;
+            
+            if (!tickets || tickets.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">📭 No hay tickets en este lote</td></tr>';
+                return;
+            }
+            
+            // 🔴 GENERAR TABLA
+            let html = '';
+            tickets.forEach((t, idx) => {
+                // Estado de transcripción
+                let estadoBadge = '';
+                let estadoColor = '';
+                switch (t.transcripcion_estado) {
+                    case 'analizado':
+                        estadoBadge = '✅ Analizado';
+                        estadoColor = '#28a745';
+                        break;
+                    case 'transcrito':
+                        estadoBadge = '📝 Transcrito';
+                        estadoColor = '#f39c12';
+                        break;
+                    case 'error':
+                        estadoBadge = '❌ Error';
+                        estadoColor = '#d93025';
+                        break;
+                    case 'en_proceso':
+                        estadoBadge = '🔄 En proceso';
+                        estadoColor = '#7b1fa2';
+                        break;
+                    case 'audio_no_disponible':
+                        estadoBadge = '🔇 Sin audio';
+                        estadoColor = '#6c757d';
+                        break;
+                    default:
+                        estadoBadge = '⏳ Pendiente';
+                        estadoColor = '#6c757d';
+                }
+                
+                // 🔴 DETERMINAR QUÉ BOTONES MOSTRAR SEGÚN EL ESTADO
+                let botonesHtml = '';
+                
+                // Si tiene transcripción (el campo transcripcion no está vacío)
+                if (t.transcripcion && t.transcripcion.trim().length > 0) {
+                    // Botón para ver transcripción (usando el ID del ticket)
+                    botonesHtml += `
+                        <button onclick="verTranscripcionTicket(${t.id})" 
+                                style="background: var(--accent); padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px; margin-right: 3px;" 
+                                title="Ver transcripción">
+                            📄
+                        </button>
+                    `;
+                    
+                    // Si tiene análisis de Ollama
+                    if (t.analisis_ollama && t.analisis_ollama.trim().length > 0) {
+                        botonesHtml += `
+                            <button onclick="verAnalisisTicket(${t.id})" 
+                                    style="background: #7b1fa2; padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px;" 
+                                    title="Ver análisis de Ollama">
+                                🧠
+                            </button>
+                        `;
+                    } else if (t.transcripcion_estado === 'transcrito') {
+                        // Si está transcrito pero no analizado
+                        botonesHtml += `
+                            <button onclick="analizarTranscripcionTicket(${t.id})" 
+                                    style="background: #f39c12; padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px;" 
+                                    title="Analizar con Ollama">
+                                🔄
+                            </button>
+                        `;
+                    }
+                } else {
+                    botonesHtml = '<span style="color: var(--muted); font-size: 10px;">-</span>';
+                }
+                
+                html += `
+                    <tr style="border-bottom: 1px solid #f0f0f0;">
+                        <td style="padding: 8px 10px; text-align: center;">${idx + 1}</td>
+                        <td style="padding: 8px 10px; font-family: monospace; font-size: 12px;">${escapeHtml(t.ticket || '-')}</td>
+                        <td style="padding: 8px 10px;">${escapeHtml(t.gestor_auditado || '-')}</td>
+                        <td style="padding: 8px 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.motivo_call || '')}">
+                            ${escapeHtml((t.motivo_call || '-').substring(0, 30))}${(t.motivo_call || '').length > 30 ? '...' : ''}
+                        </td>
+                        <td style="padding: 8px 10px; text-align: center;">
+                            <span style="background: ${estadoColor}; color: white; padding: 3px 10px; border-radius: 12px; font-size: 11px; white-space: nowrap;">
+                                ${estadoBadge}
+                            </span>
+                        </td>
+                        <td style="padding: 8px 10px; text-align: center; white-space: nowrap;">
+                            ${botonesHtml}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+            
+            // 🔴 AGREGAR SCROLL AL CONTENEDOR DE LA TABLA
+            const tablaContainer = container.querySelector('.card > div:last-child');
+            if (tablaContainer) {
+                tablaContainer.style.maxHeight = '400px';
+                tablaContainer.style.overflowY = 'auto';
+            }
+            
+            // Scroll al detalle
+            container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+        } catch (error) {
+            console.error('Error cargando tickets:', error);
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+        }
+    }
+
+    // ================================================================
+    // VER TRANSCRIPCIÓN DE UN TICKET (DESDE LA TABLA DE LOTES)
+    // ================================================================
+    async function verTranscripcionTicket(ticketId) {
+        try {
+            const db = getDB();
+            if (!db) {
+                alert('❌ Base de datos no disponible');
+                return;
+            }
+            
+            const { data: ticket, error } = await db
+                .from('asignaciones_escucha')
+                .select('ticket, transcripcion, transcripcion_estado')
+                .eq('id', ticketId)
+                .single();
+            
+            if (error) throw error;
+            
+            if (!ticket || !ticket.transcripcion) {
+                alert('⚠️ No hay transcripción disponible para este ticket');
+                return;
+            }
+            
+            // 🔴 MOSTRAR EN MODAL EN LUGAR DE ALERT
+            const modalHtml = `
+                <div id="modalTranscripcionTicket" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100060; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                    <div style="background: white; border-radius: 16px; width: 95%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                        <!-- Header -->
+                        <div style="padding: 15px 20px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                            <div>
+                                <strong style="font-size: 16px;">📄 Transcripción</strong>
+                                <div style="font-size: 12px; opacity: 0.8; margin-top: 2px;">Ticket: ${escapeHtml(ticket.ticket || 'Sin ticket')}</div>
+                            </div>
+                            <button onclick="cerrarModalTranscripcionTicket()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                        </div>
+                        <!-- Body -->
+                        <div style="padding: 20px; overflow-y: auto; flex: 1; background: #f8fafc;">
+                            <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e0e0e0;">
+                                <div style="font-weight: 600; margin-bottom: 10px; color: #333;">📝 Texto completo de la transcripción:</div>
+                                <div style="font-size: 14px; line-height: 1.8; white-space: pre-wrap; max-height: 500px; overflow-y: auto; padding: 15px; background: #fafafa; border-radius: 8px; font-family: inherit;">
+                                    ${escapeHtml(ticket.transcripcion)}
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Footer -->
+                        <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
+                            <button onclick="copiarTranscripcionTicket('${escapeHtml(ticket.transcripcion).replace(/'/g, "\\'")}')" 
+                                    style="background: var(--accent); padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                                📋 Copiar texto
+                            </button>
+                            <button onclick="cerrarModalTranscripcionTicket()" 
+                                    style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Eliminar modal existente si hay
+            const existing = document.getElementById('modalTranscripcionTicket');
+            if (existing) existing.remove();
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al cargar la transcripción: ' + error.message);
+        }
+    }
+
+    // ================================================================
+    // CERRAR MODAL DE TRANSCRIPCIÓN DE TICKET
+    // ================================================================
+    function cerrarModalTranscripcionTicket() {
+        const modal = document.getElementById('modalTranscripcionTicket');
+        if (modal) modal.remove();
+    }
+
+    // ================================================================
+    // COPIAR TRANSCRIPCIÓN DE TICKET
+    // ================================================================
+    async function copiarTranscripcionTicket(texto) {
+        try {
+            await navigator.clipboard.writeText(texto);
+            alert('✅ Transcripción copiada al portapapeles');
+        } catch (error) {
+            // Fallback
+            const textarea = document.createElement('textarea');
+            textarea.value = texto;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('✅ Transcripción copiada al portapapeles');
+        }
+    }
+
+
+    // ================================================================
+    // VER ANÁLISIS DE OLLAMA DE UN TICKET (DESDE LA TABLA DE LOTES)
+    // ================================================================
+    async function verAnalisisTicket(ticketId) {
+        try {
+            const db = getDB();
+            if (!db) {
+                alert('❌ Base de datos no disponible');
+                return;
+            }
+            
+            const { data: ticket, error } = await db
+                .from('asignaciones_escucha')
+                .select('ticket, analisis_ollama')
+                .eq('id', ticketId)
+                .single();
+            
+            if (error) throw error;
+            
+            if (!ticket || !ticket.analisis_ollama) {
+                alert('⚠️ No hay análisis de Ollama disponible para este ticket');
+                return;
+            }
+            
+            // Parsear el análisis si es JSON
+            let analisis = ticket.analisis_ollama;
+            let analisisHtml = '';
+            
+            if (typeof analisis === 'string') {
+                try {
+                    analisis = JSON.parse(analisis);
+                } catch (e) {
+                    // Si no es JSON, mostrarlo como texto
+                    analisisHtml = `<pre style="white-space: pre-wrap; font-family: inherit; font-size: 14px; line-height: 1.6;">${escapeHtml(analisis)}</pre>`;
+                }
+            }
+            
+            if (typeof analisis === 'object') {
+                // Calificación
+                const calificacion = analisis.calificacion || 0;
+                const color = calificacion >= 90 ? '#28a745' : (calificacion >= 70 ? '#f39c12' : '#d93025');
+                
+                analisisHtml = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
+                            <div style="font-size: 11px; color: #6c757d;">Calificación</div>
+                            <div style="font-size: 24px; font-weight: bold; color: ${color};">${calificacion}%</div>
+                        </div>
+                        <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
+                            <div style="font-size: 11px; color: #6c757d;">Sentimiento Cliente</div>
+                            <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">${analisis.sentimiento_cliente || 'neutral'}</div>
+                        </div>
+                        <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
+                            <div style="font-size: 11px; color: #6c757d;">Sentimiento Gestor</div>
+                            <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">${analisis.sentimiento_gestor || 'neutral'}</div>
+                        </div>
+                    </div>
+                    
+                    ${analisis.justificacion ? `
+                        <div style="background: white; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid #e0e0e0;">
+                            <div style="font-weight: 600; margin-bottom: 8px; color: #333;">📝 Justificación</div>
+                            <div style="font-size: 14px; line-height: 1.6;">${escapeHtml(analisis.justificacion)}</div>
+                        </div>
+                    ` : ''}
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div style="background: white; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0;">
+                            <div style="font-weight: 600; margin-bottom: 10px; color: #28a745;">✅ Protocolos cumplidos</div>
+                            ${analisis.protocolos_cumplidos && analisis.protocolos_cumplidos.length > 0 ? 
+                                analisis.protocolos_cumplidos.map(p => 
+                                    `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0;">✓ ${escapeHtml(p)}</div>`
+                                ).join('') : 
+                                '<div style="color: #6c757d; font-size: 13px;">No hay protocolos cumplidos</div>'
+                            }
+                        </div>
+                        <div style="background: white; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0;">
+                            <div style="font-weight: 600; margin-bottom: 10px; color: #d93025;">❌ Protocolos incumplidos</div>
+                            ${analisis.protocolos_incumplidos && analisis.protocolos_incumplidos.length > 0 ? 
+                                analisis.protocolos_incumplidos.map(p => 
+                                    `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0;">✗ ${escapeHtml(p)}</div>`
+                                ).join('') : 
+                                '<div style="color: #6c757d; font-size: 13px;">No hay protocolos incumplidos</div>'
+                            }
+                        </div>
+                    </div>
+                    
+                    ${analisis.recomendaciones && analisis.recomendaciones.length > 0 ? `
+                        <div style="background: #fff8e0; border-radius: 10px; padding: 15px; margin-top: 15px; border: 1px solid #f39c12;">
+                            <div style="font-weight: 600; margin-bottom: 8px; color: #f39c12;">💡 Recomendaciones</div>
+                            ${analisis.recomendaciones.map(r => 
+                                `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0e6d0;">• ${escapeHtml(r)}</div>`
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                `;
+            }
+            
+            // Modal
+            const modalHtml = `
+                <div id="modalAnalisisTicket" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100060; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                    <div style="background: white; border-radius: 16px; width: 95%; max-width: 750px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                        <!-- Header -->
+                        <div style="padding: 15px 20px; background: linear-gradient(135deg, #7b1fa2, #9c27b0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+                            <div>
+                                <strong style="font-size: 16px;">🧠 Análisis de Ollama</strong>
+                                <div style="font-size: 12px; opacity: 0.8; margin-top: 2px;">Ticket: ${escapeHtml(ticket.ticket || 'Sin ticket')}</div>
+                            </div>
+                            <button onclick="cerrarModalAnalisisTicket()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+                        </div>
+                        <!-- Body -->
+                        <div style="padding: 20px; overflow-y: auto; flex: 1; background: #f8fafc;">
+                            ${analisisHtml}
+                        </div>
+                        <!-- Footer -->
+                        <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
+                            <button onclick="copiarAnalisisTicket(${ticketId})" 
+                                    style="background: #7b1fa2; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                                📋 Copiar análisis
+                            </button>
+                            <button onclick="cerrarModalAnalisisTicket()" 
+                                    style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const existing = document.getElementById('modalAnalisisTicket');
+            if (existing) existing.remove();
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al cargar el análisis: ' + error.message);
+        }
+    }
+
+    // ================================================================
+    // CERRAR MODAL DE ANÁLISIS DE TICKET
+    // ================================================================
+    function cerrarModalAnalisisTicket() {
+        const modal = document.getElementById('modalAnalisisTicket');
+        if (modal) modal.remove();
+    }
+
+    // ================================================================
+    // COPIAR ANÁLISIS DE TICKET
+    // ================================================================
+    async function copiarAnalisisTicket(ticketId) {
+        try {
+            const db = getDB();
+            if (!db) return;
+            
+            const { data: ticket, error } = await db
+                .from('asignaciones_escucha')
+                .select('analisis_ollama')
+                .eq('id', ticketId)
+                .single();
+            
+            if (error) throw error;
+            
+            if (!ticket || !ticket.analisis_ollama) {
+                alert('⚠️ No hay análisis para copiar');
+                return;
+            }
+            
+            let texto = ticket.analisis_ollama;
+            if (typeof texto === 'string') {
+                try {
+                    const parsed = JSON.parse(texto);
+                    texto = JSON.stringify(parsed, null, 2);
+                } catch (e) {
+                    // Mantener como texto
+                }
+            } else if (typeof texto === 'object') {
+                texto = JSON.stringify(texto, null, 2);
+            }
+            
+            await navigator.clipboard.writeText(texto);
+            alert('✅ Análisis copiado al portapapeles');
+            
+        } catch (error) {
+            alert('❌ Error al copiar: ' + error.message);
+        }
+    }
+
+    // ================================================================
+    // ANALIZAR TRANSCRIPCIÓN DE UN TICKET (DESDE LA TABLA DE LOTES)
+    // ================================================================
+    async function analizarTranscripcionTicket(ticketId) {
+        if (!confirm(`🧠 ¿Analizar la transcripción de este ticket con Ollama?`)) return;
+        
+        try {
+            // Usar la función existente que ya tienes
+            await analizarTranscripcionEscucha(ticketId);
+            
+            // Recargar la tabla de tickets del lote
+            const container = document.getElementById('detalleLoteContainer');
+            if (container.style.display !== 'none') {
+                // Obtener el lote ID del título
+                const titulo = document.getElementById('detalleLoteTitulo')?.textContent || '';
+                const loteId = titulo.match(/\d+/)?.[0];
+                if (loteId) {
+                    await verTicketsLote(parseInt(loteId));
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Error al analizar: ' + error.message);
+        }
+    }
+    
+    // ================================================================
+    // 7. CERRAR DETALLE DE LOTE
+    // ================================================================
+    function cerrarDetalleLote() {
+        document.getElementById('detalleLoteContainer').style.display = 'none';
+    }
+
+    // ================================================================
+    // 8. PROCESAR LOTE ACTIVO (DESDE EL DASHBOARD)
+    // ================================================================
+    async function procesarLoteActivo() {
+        const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+        
+        if (!loteActivo) {
+            alert('⚠️ No hay un lote activo. Cargue un archivo de escuchas primero.');
+            return;
+        }
+        
+        // Usar la función existente con el ID del lote activo
+        await procesarLoteHistorico(loteActivo.id, false);
+    }
+
+    // ================================================================
+    // 9. VER DETALLE DEL LOTE ACTIVO
+    // ================================================================
+    async function verDetalleLoteActivo() {
+        const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+        
+        if (!loteActivo) {
+            alert('⚠️ No hay un lote activo.');
+            return;
+        }
+        
+        await verTicketsLote(loteActivo.id);
+    }
+
+    // ================================================================
+    // 10. REPROCESAR TICKET INDIVIDUAL
+    // ================================================================
+    async function reprocesarTicketIndividual(ticketId) {
+        if (!confirm(`⚠️ ¿Reprocesar el ticket ID ${ticketId}?\n\nEsto forzará la transcripción nuevamente de este ticket.`)) {
+            return;
+        }
+        
+        try {
+            const token = localStorage.getItem('meca_token');
+            const response = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/procesar-lote`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ticket_ids: [ticketId],
+                    analizar_con_ollama: true,
+                    ruta_audios: configuracionAudios?.ruta_base,
+                    modo: 'reprocesar',
+                    forzar_reprocesamiento: true
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(`✅ Ticket ${ticketId} reprocesado correctamente`);
+                // Recargar el detalle del lote activo
+                const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+                if (loteActivo) {
+                    await verTicketsLote(loteActivo.id);
+                }
+                await cargarDashboardLoteActivo();
+                await cargarHistorialLotes();
+            } else {
+                alert(`❌ Error: ${result.error || 'Error desconocido'}`);
+            }
+        } catch (error) {
+            alert(`❌ Error: ${error.message}`);
+        }
+    }
+
+    // ================================================================
+    // 11. EXPORTAR TRAZABILIDAD DE LOTES A CSV
+    // ================================================================
+    function exportarTrazabilidadLotesCSV() {
+        const lotes = window.lotesHistorialGlobal || [];
+        
+        if (lotes.length === 0) {
+            alert('⚠️ No hay lotes para exportar');
+            return;
+        }
+        
+        const headers = [
+            'ID Lote',
+            'Archivo',
+            'Fecha Carga',
+            'Total Tickets',
+            '✅ Hecho (Transcritos/Analizados)',
+            '⏳ Pendientes',
+            '❌ Errores',
+            '🔄 En Proceso',
+            '🔇 Sin Audio',
+            'Progreso (%)',
+            'Estado'
+        ];
+        
+        const rows = lotes.map(lote => {
+            const nombreArchivo = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : '-';
+            const fecha = lote.fecha_carga ? new Date(lote.fecha_carga).toLocaleString('es-ES') : '-';
+            
+            return [
+                lote.id,
+                `"${nombreArchivo}"`,
+                `"${fecha}"`,
+                lote.total || 0,
+                lote.gestionados || 0,
+                lote.pendientes || 0,
+                lote.errores || 0,
+                lote.enProceso || 0,
+                lote.sinAudio || 0,
+                lote.avance || 0,
+                lote.estado === 'activo' ? 'Activo' : 'Histórico'
+            ];
+        });
+        
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.join(','))
+        ].join('\n');
+        
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `trazabilidad_lotes_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        alert(`✅ Exportados ${lotes.length} lotes`);
+    }
+
+    // ================================================================
+    // 12. EXPORTAR DETALLE DE LOTE A CSV
+    // ================================================================
+    async function exportarDetalleLoteCSV() {
+        const titulo = document.getElementById('detalleLoteTitulo')?.textContent || '';
+        const loteId = titulo.match(/\d+/)?.[0];
+        
+        if (!loteId) {
+            alert('⚠️ No hay lote seleccionado');
+            return;
+        }
+        
+        try {
+            const db = getDB();
+            if (!db) {
+                alert('❌ Base de datos no disponible');
+                return;
+            }
+            
+            const { data: tickets, error } = await db
+                .from('asignaciones_escucha')
+                .select('id, ticket, gestor_auditado, motivo_call, transcripcion_estado, calificacion')
+                .eq('tarea_id', parseInt(loteId))
+                .order('id', { ascending: true });
+            
+            if (error) throw error;
+            
+            if (!tickets || tickets.length === 0) {
+                alert('⚠️ No hay tickets en este lote');
+                return;
+            }
+            
+            const headers = [
+                'ID Ticket',
+                'Ticket PSI',
+                'Gestor Auditado',
+                'Motivo Call',
+                'Estado Transcripción',
+                'Calificación (%)'
+            ];
+            
+            const rows = tickets.map(t => [
+                t.id,
+                `"${t.ticket || ''}"`,
+                `"${t.gestor_auditado || ''}"`,
+                `"${t.motivo_call || ''}"`,
+                t.transcripcion_estado || 'Pendiente',
+                t.calificacion || ''
+            ]);
+            
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.join(','))
+            ].join('\n');
+            
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `detalle_lote_${loteId}_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            alert(`✅ Exportados ${tickets.length} tickets del lote ${loteId}`);
+            
+        } catch (error) {
+            console.error('Error exportando detalle:', error);
+            alert(`❌ Error: ${error.message}`);
         }
     }
 
@@ -28538,9 +29404,9 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
         }
 
         html += `
-            </tbody>
-        </table>
-    `;
+                </tbody>
+            </table>
+        `;
 
         tbody.innerHTML = html;
     }
@@ -32680,7 +33546,9 @@ async function recargarRedirectRoles() {
     mostrarMensajeTemporal('✅ Redirecciones recargadas', 'var(--ok)');
 }
 
-// Función auxiliar para mostrar mensajes temporales (si no existe)
+// ======================================================
+// MOSTRAR MENSAJE TEMPORAL (UTILIDAD)
+// ======================================================
 function mostrarMensajeTemporal(mensaje, color = 'var(--ok)') {
     // Eliminar mensaje anterior si existe
     const existing = document.querySelector('.mensaje-temporal-recarga');
@@ -32700,6 +33568,8 @@ function mostrarMensajeTemporal(mensaje, color = 'var(--ok)') {
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         animation: slideIn 0.3s ease;
         font-weight: 500;
+        max-width: 400px;
+        word-break: break-word;
     `;
     div.textContent = mensaje;
     document.body.appendChild(div);
@@ -38984,235 +39854,6 @@ function inicializarFiltrosGestionPersonasGP() {
     console.log("✅ Filtros de Gestión de Personas inicializados");
 }
 
-// ======================================================
-// EJECUTAR TAREA AHORA (DESDE LA TABLA)
-// ======================================================
-
-async function ejecutarTareaAhora(tareaId) {
-    if (!confirm(`⚠️ ¿Ejecutar la tarea ID ${tareaId} ahora?\n\nEsto iniciará el proceso de transcripción inmediatamente.`)) {
-        return;
-    }
-    
-    try {
-        const token = localStorage.getItem('meca_token');
-        
-        // Mostrar indicador en el botón
-        const buttons = document.querySelectorAll(`button[onclick*="ejecutarTareaAhora(${tareaId})"]`);
-        buttons.forEach(btn => {
-            btn.textContent = '⏳';
-            btn.disabled = true;
-        });
-        
-        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/tareas/${tareaId}/ejecutar`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            alert(`✅ Tarea ${tareaId} iniciada correctamente`);
-            
-            // Recargar la tabla de tareas y transcripciones después de unos segundos
-            setTimeout(() => {
-                if (typeof cargarTareasProgramadas === 'function') {
-                    cargarTareasProgramadas();
-                }
-                if (typeof cargarTranscripciones === 'function') {
-                    cargarTranscripciones();
-                }
-            }, 3000);
-            
-        } else {
-            alert(`❌ Error al ejecutar la tarea:\n${result.error || 'Error desconocido'}`);
-        }
-        
-    } catch (error) {
-        console.error('Error ejecutando tarea:', error);
-        alert(`❌ Error: ${error.message}`);
-    } finally {
-        // Restaurar botones
-        const buttons = document.querySelectorAll(`button[onclick*="ejecutarTareaAhora(${tareaId})"]`);
-        buttons.forEach(btn => {
-            btn.textContent = '▶️';
-            btn.disabled = false;
-        });
-    }
-}
-
-// ======================================================
-// VER LOGS DE TAREA (DESDE LA TABLA)
-// ======================================================
-
-async function verLogsTarea(tareaId) {
-    try {
-        const token = localStorage.getItem('meca_token');
-        
-        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/logs/${tareaId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        const result = await response.json();
-        
-        if (!result.logs || result.logs.length === 0) {
-            alert(`📋 TAREA #${tareaId}\n\n⏳ No hay logs disponibles. La tarea aún no se ha ejecutado.`);
-            return;
-        }
-        
-        // Generar mensaje con los logs
-        let mensaje = `📋 LOGS DE TAREA #${tareaId}\n`;
-        mensaje += `${'═'.repeat(50)}\n\n`;
-        
-        result.logs.forEach(log => {
-            mensaje += `  ${log}\n`;
-        });
-        
-        mensaje += `\n${'═'.repeat(50)}`;
-        mensaje += `\n📌 Total logs: ${result.logs.length}`;
-        
-        alert(mensaje);
-        
-    } catch (error) {
-        console.error('Error obteniendo logs:', error);
-        alert(`❌ Error al obtener logs:\n${error.message}`);
-    }
-}
-
-// ======================================================
-// EXPORTAR TAREAS A CSV
-// ======================================================
-
-function exportarTareasCSV() {
-    if (!tareasDataGlobal || tareasDataGlobal.length === 0) {
-        alert('⚠️ No hay datos de tareas para exportar');
-        return;
-    }
-    
-    // Headers
-    const headers = [
-        'ID',
-        'Nombre',
-        'Estado',
-        'Frecuencia',
-        'Origen',
-        'Carpeta/URL',
-        'Fecha Creación',
-        'Última Ejecución',
-        'Estado Ejecución',
-        'Archivos Procesados'
-    ];
-    
-    // Construir filas
-    const rows = tareasDataGlobal.map(t => [
-        t.id,
-        `"${t.nombre || ''}"`,
-        t.estado || '',
-        t.frecuencia || '',
-        t.tipo_origen || 'local',
-        `"${t.carpeta_origen || t.sftp_host || t.sharepoint_site || ''}"`,
-        t.fecha_creacion ? new Date(t.fecha_creacion).toLocaleString('es-ES') : '',
-        t.ultima_ejecucion ? new Date(t.ultima_ejecucion).toLocaleString('es-ES') : '',
-        t.ultima_ejecucion_estado || 'sin_ejecutar',
-        `${t.ultima_ejecucion_correctos || 0}/${t.ultima_ejecucion_total || 0}`
-    ]);
-    
-    // Generar CSV
-    const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-    ].join('\n');
-    
-    // Descargar
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tareas_programadas_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    alert(`✅ Exportadas ${tareasDataGlobal.length} tareas`);
-}
-
-// ======================================================
-// ELIMINAR TAREA PROGRAMADA
-// ======================================================
-
-async function eliminarTarea(tareaId, nombreTarea) {
-    // Confirmación con información detallada
-    const confirmar = confirm(
-        `⚠️ ¿ELIMINAR TAREA PROGRAMADA?\n\n` +
-        `🆔 ID: ${tareaId}\n` +
-        `📌 Nombre: ${nombreTarea || 'Sin nombre'}\n\n` +
-        `Esta acción eliminará:\n` +
-        `   • La tarea programada\n` +
-        `   • Todos los logs de ejecución asociados\n` +
-        `   • Todas las transcripciones generadas por esta tarea\n\n` +
-        `⚠️ Esta acción NO se puede deshacer.\n\n` +
-        `¿Está seguro de continuar?`
-    );
-    
-    if (!confirmar) return;
-    
-    // Confirmación adicional con código
-    const codigo = prompt('Para confirmar, escribe "ELIMINAR TAREA" en mayúsculas:');
-    if (codigo !== 'ELIMINAR TAREA') {
-        alert('❌ Operación cancelada.');
-        return;
-    }
-    
-    try {
-        const token = localStorage.getItem('meca_token');
-        
-        // Mostrar indicador en el botón
-        const buttons = document.querySelectorAll(`button[onclick*="eliminarTarea(${tareaId},"]`);
-        buttons.forEach(btn => {
-            btn.textContent = '⏳';
-            btn.disabled = true;
-        });
-        
-        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/tareas/${tareaId}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const result = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(result.error || 'Error al eliminar tarea');
-        }
-        
-        alert(`✅ Tarea "${nombreTarea || tareaId}" eliminada correctamente`);
-        
-        // Recargar la tabla de tareas
-        if (typeof cargarTareasProgramadas === 'function') {
-            cargarTareasProgramadas();
-        }
-        
-        // También recargar transcripciones si es necesario
-        if (typeof cargarTranscripciones === 'function') {
-            cargarTranscripciones();
-        }
-        
-    } catch (error) {
-        console.error('Error eliminando tarea:', error);
-        alert(`❌ Error al eliminar la tarea:\n${error.message}`);
-    } finally {
-        // Restaurar botones
-        const buttons = document.querySelectorAll(`button[onclick*="eliminarTarea(${tareaId},"]`);
-        buttons.forEach(btn => {
-            btn.textContent = '🗑️';
-            btn.disabled = false;
-        });
-    }
-}
-
 
     // ===== 2. INICIO FUNCIÓN: escapeHtml ===================================
     function escapeHtml(text) {
@@ -43099,162 +43740,6 @@ function formatDate(dateStr) {
 let progresoActivo = false;
 let progresoInterval = null;
 let tareaEnProgreso = null;
-
-// ======================================================
-// FUNCIÓN: subirYTranscribirConProgreso
-// ======================================================
-
-async function subirYTranscribirConProgreso() {
-    const fileInput = document.getElementById('audioFileInput');
-    const status = document.getElementById('uploadStatus');
-    
-    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-        alert('⚠️ Seleccione un archivo de audio');
-        return;
-    }
-    
-    const file = fileInput.files[0];
-    const crearTarea = document.getElementById('crearTareaAuto')?.checked !== false;
-    
-    // Mostrar barra de progreso
-    mostrarProgreso('📤 Subiendo audio...', 5);
-    agregarLogProgreso('📤 Iniciando subida del archivo: ' + file.name);
-    
-    try {
-        // ======================================================
-        // PASO 1: SUBIR AUDIO
-        // ======================================================
-        const formData = new FormData();
-        formData.append('audio', file);
-        formData.append('crear_tarea', crearTarea ? 'true' : 'false');
-        formData.append('creado_por', usuarioActual?.nombre_completo || 'MECA');
-        
-        const token = localStorage.getItem('meca_token');
-        
-        const uploadResponse = await fetch('http://localhost:5001/api/transcripcion/subir', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: formData
-        });
-        
-        const uploadData = await uploadResponse.json();
-        
-        if (!uploadData.success) {
-            throw new Error(uploadData.error || 'Error al subir archivo');
-        }
-        
-        agregarLogProgreso('✅ Audio subido: ' + uploadData.archivo);
-        actualizarProgreso('📝 Preparando transcripción...', 20);
-        
-        // ======================================================
-        // PASO 2: INICIAR TRANSCRIPCIÓN
-        // ======================================================
-        
-        if (uploadData.tarea_id) {
-            agregarLogProgreso('📋 Tarea creada con ID: ' + uploadData.tarea_id);
-            
-            // Verificar si la tarea ya tiene transcripciones previas
-            const transCheck = await fetch(`http://localhost:5001/api/transcripcion/listar?tarea_id=${uploadData.tarea_id}&limit=1`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const transCheckData = await transCheck.json();
-            
-            if (transCheckData.data && transCheckData.data.length > 0) {
-                const existente = transCheckData.data[0];
-                if (existente.estado === 'analizado') {
-                    agregarLogProgreso('✅ Ya existe una transcripción analizada para este audio');
-                    actualizarProgreso('✅ Transcripción ya completada', 100);
-                    setTimeout(() => {
-                        ocultarProgreso();
-                        cargarTranscripciones();
-                        if (status) {
-                            status.innerHTML = '<span style="color: var(--ok);">✅ Transcripción ya existente</span>';
-                        }
-                    }, 2000);
-                    return;
-                }
-            }
-            
-            // Iniciar la tarea
-            const ejecutarResponse = await fetch(`http://localhost:5001/api/transcripcion/tareas/${uploadData.tarea_id}/ejecutar`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            const ejecutarData = await ejecutarResponse.json();
-            
-            if (!ejecutarData.success) {
-                throw new Error(ejecutarData.error || 'Error al iniciar tarea');
-            }
-            
-            agregarLogProgreso('🚀 Tarea iniciada');
-            tareaEnProgreso = uploadData.tarea_id;
-            
-            // ======================================================
-            // PASO 3: MONITOREAR PROGRESO
-            // ======================================================
-            actualizarProgreso('🔄 Transcribiendo audio...', 40);
-            await monitorearProgreso(uploadData.tarea_id);
-            
-        } else {
-            // Si no hay tarea, transcribir directamente
-            agregarLogProgreso('🎤 Transcribiendo directamente...');
-            actualizarProgreso('🎤 Transcribiendo audio...', 40);
-            
-            const transcribeResponse = await fetch('http://localhost:5001/api/transcripcion/transcribir', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    audio_path: uploadData.ruta,
-                    modelo: 'small',
-                    idioma: 'Spanish',
-                    analizar_con_ollama: true
-                })
-            });
-            
-            const transcribeData = await transcribeResponse.json();
-            
-            if (!transcribeData.success) {
-                throw new Error(transcribeData.error || 'Error en transcripción');
-            }
-            
-            agregarLogProgreso('✅ Transcripción completada');
-            actualizarProgreso('✅ Transcripción completada', 100);
-        }
-        
-        // ======================================================
-        // COMPLETADO
-        // ======================================================
-        agregarLogProgreso('✅ Proceso completado exitosamente');
-        actualizarProgreso('✅ Transcripción completada', 100);
-        
-        setTimeout(() => {
-            ocultarProgreso();
-            cargarTranscripciones();
-            if (status) {
-                status.innerHTML = '<span style="color: var(--ok);">✅ Transcripción completada exitosamente</span>';
-            }
-        }, 3000);
-        
-    } catch (error) {
-        console.error('❌ Error:', error);
-        agregarLogProgreso('❌ Error: ' + error.message);
-        actualizarProgreso('❌ Error: ' + error.message, 0, true);
-        
-        if (status) {
-            status.innerHTML = `<span style="color: var(--danger);">❌ ${error.message}</span>`;
-        }
-        
-        setTimeout(ocultarProgreso, 5000);
-    }
-}
-
 // ======================================================
 // FUNCIÓN: MONITOREAR PROGRESO
 // ======================================================
@@ -44566,707 +45051,6 @@ async function inicializarReglasAdmin() {
 // MÓDULO: Transcripción - Panel MECA
 // ======================================================
 
-let transcripcionesData = [];
-
-/**
- * cargarTranscripciones - Carga la lista de transcripciones
- */
-async function cargarTranscripciones() {
-    const tbody = document.getElementById('tablaTranscripciones');
-    if (!tbody) return;
-    
-    const busqueda = document.getElementById('buscarTranscripcion')?.value || '';
-    const estado = document.getElementById('filtroEstadoTranscripcion')?.value || '';
-    
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">⏳ Cargando...</td></tr>';
-    
-    try {
-        const result = await API.listarTranscripciones({ estado, limit: 50 });
-        
-        console.log('📊 Resultado completo:', result); // 🔴 LOG PARA DEPURACIÓN
-        
-        if (!result.success) {
-            console.error('❌ Error en la respuesta:', result);
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ ${result.error || 'Error desconocido'}</td></tr>`;
-            return;
-        }
-        
-        // 🔴 VERIFICAR LA ESTRUCTURA DE LOS DATOS
-        const transcripciones = result.data || [];
-        console.log('📊 Transcripciones:', transcripciones);
-        
-        if (transcripciones.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--muted);">📭 No hay transcripciones</td></tr>';
-            return;
-        }
-        
-        let html = '';
-        for (const t of transcripciones) {
-            const fecha = t.fecha_transcripcion ? new Date(t.fecha_transcripcion).toLocaleString('es-ES') : '-';
-            
-            let estadoBadge = '';
-            if (t.estado === 'analizado') {
-                estadoBadge = '<span class="badge" style="background: var(--ok);">✅ Analizado</span>';
-            } else if (t.estado === 'transcrito') {
-                estadoBadge = '<span class="badge" style="background: var(--warning);">📝 Transcrito</span>';
-            } else if (t.estado === 'error') {
-                estadoBadge = '<span class="badge" style="background: var(--danger);">❌ Error</span>';
-            } else {
-                estadoBadge = `<span class="badge" style="background: #6c757d;">${t.estado}</span>`;
-            }
-            
-            let calificacionHtml = '-';
-            if (t.calificacion !== null && t.calificacion !== undefined) {
-                const color = t.calificacion >= 90 ? '#28a745' : (t.calificacion >= 70 ? '#f39c12' : '#d93025');
-                calificacionHtml = `<span style="color: ${color}; font-weight: bold;">${t.calificacion}%</span>`;
-            }
-            
-            const nombreMostrar = t.audio_nombre || 'Sin nombre';
-            
-            html += `
-                <tr>
-                    <td style="padding: 8px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(t.audio_nombre || '')}">
-                        <strong>${escapeHtml(nombreMostrar)}</strong>
-                    </td>
-                    <td style="padding: 8px; text-align: center; font-size: 12px;">${fecha}</td>
-                    <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
-                    <td style="padding: 8px; text-align: center; font-size: 16px; font-weight: bold;">${calificacionHtml}</td>
-                    <td style="padding: 8px; text-align: center; font-size: 12px;">${escapeHtml(t.nombre_tarea || '-')}</td>
-                    <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                        <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center;">
-                            <button onclick="verTranscripcionCompleta(${t.id})" 
-                                    style="background: #019DF4; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
-                                    title="Ver transcripción completa">
-                                📄
-                            </button>
-                            <button onclick="verAnalisisOllama(${t.id})" 
-                                    style="background: #7b1fa2; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
-                                    title="Ver análisis de Ollama">
-                                🧠
-                            </button>
-                            ${t.estado === 'transcrito' ? `
-                                <button onclick="analizarTranscripcionMECA(${t.id})" 
-                                        style="background: #f39c12; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
-                                        title="Analizar con Ollama">
-                                    🔄
-                                </button>
-                            ` : ''}
-                            <button onclick="eliminarTranscripcion(${t.id}, '${escapeHtml(t.audio_nombre || '')}')" 
-                                    style="background: #d93025; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" 
-                                    title="Eliminar transcripción">
-                                🗑️
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        }
-        
-        tbody.innerHTML = html;
-        
-        // Actualizar KPIs
-        await actualizarKPIsTranscripcion();
-        
-    } catch (error) {
-        console.error('❌ Error cargando transcripciones:', error);
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
-    }
-}
-
-// ======================================================
-// 1. VER TRANSCRIPCIÓN COMPLETA
-// ======================================================
-
-async function verTranscripcionCompleta(id) {
-    console.log('📄 verTranscripcionCompleta - ID:', id);
-    
-    try {
-        const result = await API.obtenerTranscripcion(id);
-        console.log('📊 Resultado:', result);
-        
-        if (!result.success || !result.data) {
-            alert('❌ No se pudo obtener la transcripción');
-            return;
-        }
-        
-        const data = result.data;
-        
-        // Crear modal
-        const modalHtml = `
-            <div id="modalTranscripcionCompleta" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100050; display: flex; justify-content: center; align-items: center; padding: 20px;">
-                <div style="background: white; border-radius: 16px; width: 95%; max-width: 800px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-                    <!-- Header -->
-                    <div style="padding: 15px 20px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                        <div>
-                            <strong style="font-size: 16px;">📄 Transcripción Completa</strong>
-                            <div style="font-size: 12px; opacity: 0.8; margin-top: 2px;">${escapeHtml(data.audio_nombre || 'Sin nombre')}</div>
-                        </div>
-                        <button onclick="cerrarModalTranscripcion()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
-                    </div>
-                    
-                    <!-- Body -->
-                    <div style="padding: 20px; overflow-y: auto; flex: 1; background: #f8fafc;">
-                        <div style="margin-bottom: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
-                            <div><strong>📅 Fecha:</strong> ${data.fecha_transcripcion || 'N/A'}</div>
-                            <div><strong>📊 Estado:</strong> ${data.estado || 'N/A'}</div>
-                            <div><strong>🎯 Calificación:</strong> ${data.calificacion !== null ? data.calificacion + '%' : 'Pendiente'}</div>
-                            <div><strong>📋 Tarea:</strong> ${data.nombre_tarea || 'Manual'}</div>
-                        </div>
-                        
-                        <div style="background: white; border-radius: 12px; padding: 20px; border: 1px solid #e0e0e0;">
-                            <div style="font-weight: 600; margin-bottom: 10px; color: #333;">📝 Texto de la transcripción:</div>
-                            <div style="font-size: 14px; line-height: 1.8; white-space: pre-wrap; max-height: 400px; overflow-y: auto; padding: 10px; background: #fafafa; border-radius: 8px; font-family: inherit;">
-                                ${escapeHtml(data.transcripcion || 'Sin transcripción')}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Footer -->
-                    <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
-                        <button onclick="copiarTranscripcion(${id})" style="background: var(--accent); padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
-                            📋 Copiar texto
-                        </button>
-                        <button onclick="cerrarModalTranscripcion()" style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
-                            Cerrar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Eliminar modal existente
-        const existing = document.getElementById('modalTranscripcionCompleta');
-        if (existing) existing.remove();
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('❌ Error al cargar la transcripción: ' + error.message);
-    }
-}
-
-// ======================================================
-// 2. CERRAR MODAL DE TRANSCRIPCIÓN
-// ======================================================
-
-function cerrarModalTranscripcion() {
-    const modal = document.getElementById('modalTranscripcionCompleta');
-    if (modal) modal.remove();
-}
-
-// ======================================================
-// 3. COPIAR TRANSCRIPCIÓN
-// ======================================================
-
-async function copiarTranscripcion(id) {
-    try {
-        const result = await API.obtenerTranscripcion(id);
-        if (result.success && result.data && result.data.transcripcion) {
-            await navigator.clipboard.writeText(result.data.transcripcion);
-            alert('✅ Transcripción copiada al portapapeles');
-        }
-    } catch (error) {
-        alert('❌ Error al copiar: ' + error.message);
-    }
-}
-
-// ======================================================
-// 4. VER ANÁLISIS DE OLLAMA
-// ======================================================
-
-async function verAnalisisOllama(id) {
-    console.log('🧠 verAnalisisOllama - ID:', id);
-    
-    try {
-        const result = await API.obtenerTranscripcion(id);
-        
-        if (!result.success || !result.data) {
-            alert('❌ No se pudo obtener el análisis');
-            return;
-        }
-        
-        const data = result.data;
-        
-        if (!data.analisis_ollama) {
-            alert('⚠️ Esta transcripción aún no tiene análisis de Ollama.\n\nUse el botón 🔄 para analizarla.');
-            return;
-        }
-        
-        // Parsear el análisis
-        let analisis = data.analisis_ollama;
-        if (typeof analisis === 'string') {
-            try {
-                analisis = JSON.parse(analisis);
-            } catch (e) {
-                // Si no se puede parsear, mostrar como texto
-            }
-        }
-        
-        // Crear modal
-        const modalHtml = `
-            <div id="modalAnalisisOllama" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100050; display: flex; justify-content: center; align-items: center; padding: 20px;">
-                <div style="background: white; border-radius: 16px; width: 95%; max-width: 750px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-                    <!-- Header -->
-                    <div style="padding: 15px 20px; background: linear-gradient(135deg, #7b1fa2, #9c27b0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                        <div>
-                            <strong style="font-size: 16px;">🧠 Análisis con Ollama</strong>
-                            <div style="font-size: 12px; opacity: 0.8; margin-top: 2px;">${escapeHtml(data.audio_nombre || 'Sin nombre')}</div>
-                        </div>
-                        <button onclick="cerrarModalAnalisis()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
-                    </div>
-                    
-                    <!-- Body -->
-                    <div style="padding: 20px; overflow-y: auto; flex: 1; background: #f8fafc;">
-                        <!-- Resumen -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px;">
-                            <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
-                                <div style="font-size: 11px; color: #6c757d;">Calificación</div>
-                                <div style="font-size: 24px; font-weight: bold; color: ${analisis.calificacion >= 90 ? '#28a745' : (analisis.calificacion >= 70 ? '#f39c12' : '#d93025')};">${analisis.calificacion || 0}%</div>
-                            </div>
-                            <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
-                                <div style="font-size: 11px; color: #6c757d;">Sentimiento Cliente</div>
-                                <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">${analisis.sentimiento_cliente || 'neutral'}</div>
-                            </div>
-                            <div style="background: white; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #e0e0e0;">
-                                <div style="font-size: 11px; color: #6c757d;">Sentimiento Gestor</div>
-                                <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">${analisis.sentimiento_gestor || 'neutral'}</div>
-                            </div>
-                        </div>
-                        
-                        <!-- Justificación -->
-                        ${analisis.justificacion ? `
-                            <div style="background: white; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid #e0e0e0;">
-                                <div style="font-weight: 600; margin-bottom: 8px; color: #333;">📝 Justificación</div>
-                                <div style="font-size: 14px; line-height: 1.6;">${escapeHtml(analisis.justificacion)}</div>
-                            </div>
-                        ` : ''}
-                        
-                        <!-- Protocolos cumplidos -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div style="background: white; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0;">
-                                <div style="font-weight: 600; margin-bottom: 10px; color: #28a745;">✅ Protocolos cumplidos</div>
-                                ${analisis.protocolos_cumplidos && analisis.protocolos_cumplidos.length > 0 ? 
-                                    analisis.protocolos_cumplidos.map(p => 
-                                        `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0;">✓ ${escapeHtml(p)}</div>`
-                                    ).join('') : 
-                                    '<div style="color: #6c757d; font-size: 13px;">No hay protocolos cumplidos</div>'
-                                }
-                            </div>
-                            <div style="background: white; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0;">
-                                <div style="font-weight: 600; margin-bottom: 10px; color: #d93025;">❌ Protocolos incumplidos</div>
-                                ${analisis.protocolos_incumplidos && analisis.protocolos_incumplidos.length > 0 ? 
-                                    analisis.protocolos_incumplidos.map(p => 
-                                        `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0f0f0;">✗ ${escapeHtml(p)}</div>`
-                                    ).join('') : 
-                                    '<div style="color: #6c757d; font-size: 13px;">No hay protocolos incumplidos</div>'
-                                }
-                            </div>
-                        </div>
-                        
-                        <!-- Recomendaciones -->
-                        ${analisis.recomendaciones && analisis.recomendaciones.length > 0 ? `
-                            <div style="background: #fff8e0; border-radius: 10px; padding: 15px; margin-top: 15px; border: 1px solid #f39c12;">
-                                <div style="font-weight: 600; margin-bottom: 8px; color: #f39c12;">💡 Recomendaciones</div>
-                                ${analisis.recomendaciones.map(r => 
-                                    `<div style="padding: 4px 0; font-size: 13px; border-bottom: 1px solid #f0e6d0;">• ${escapeHtml(r)}</div>`
-                                ).join('')}
-                            </div>
-                        ` : ''}
-                    </div>
-                    
-                    <!-- Footer -->
-                    <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
-                        <button onclick="copiarAnalisisOllama(${id})" style="background: #7b1fa2; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
-                            📋 Copiar análisis
-                        </button>
-                        <button onclick="cerrarModalAnalisis()" style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
-                            Cerrar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        // Eliminar modal existente
-        const existing = document.getElementById('modalAnalisisOllama');
-        if (existing) existing.remove();
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('❌ Error al cargar el análisis: ' + error.message);
-    }
-}
-
-// ======================================================
-// 5. CERRAR MODAL DE ANÁLISIS
-// ======================================================
-
-function cerrarModalAnalisis() {
-    const modal = document.getElementById('modalAnalisisOllama');
-    if (modal) modal.remove();
-}
-
-// ======================================================
-// 6. COPIAR ANÁLISIS DE OLLAMA
-// ======================================================
-
-async function copiarAnalisisOllama(id) {
-    try {
-        const result = await API.obtenerTranscripcion(id);
-        if (result.success && result.data && result.data.analisis_ollama) {
-            let analisis = result.data.analisis_ollama;
-            if (typeof analisis === 'string') {
-                analisis = JSON.parse(analisis);
-            }
-            const texto = JSON.stringify(analisis, null, 2);
-            await navigator.clipboard.writeText(texto);
-            alert('✅ Análisis copiado al portapapeles');
-        }
-    } catch (error) {
-        alert('❌ Error al copiar: ' + error.message);
-    }
-}
-
-// ======================================================
-// 7. ELIMINAR TRANSCRIPCIÓN
-// ======================================================
-
-async function eliminarTranscripcion(id, nombre) {
-    console.log('🗑️ eliminarTranscripcion - ID:', id);
-    
-    // Confirmación con información detallada
-    const confirmar = confirm(
-        `⚠️ ¿ELIMINAR TRANSCRIPCIÓN?\n\n` +
-        `📄 Archivo: ${nombre || 'Sin nombre'}\n` +
-        `🆔 ID: ${id}\n\n` +
-        `Esta acción eliminará:\n` +
-        `   • La transcripción\n` +
-        `   • El análisis de Ollama (si existe)\n` +
-        `   • El registro de la base de datos\n\n` +
-        `⚠️ Esta acción NO se puede deshacer.\n\n` +
-        `¿Está seguro de continuar?`
-    );
-    
-    if (!confirmar) return;
-    
-    // Confirmación adicional con código
-    const codigo = prompt('Para confirmar, escribe "ELIMINAR" en mayúsculas:');
-    if (codigo !== 'ELIMINAR') {
-        alert('❌ Operación cancelada.');
-        return;
-    }
-    
-    try {
-        const token = localStorage.getItem('meca_token');
-        
-        // Eliminar la transcripción
-        const response = await fetch(`http://localhost:5001/api/transcripcion/${id}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || 'Error al eliminar');
-        }
-        
-        alert(`✅ Transcripción eliminada correctamente\n\n📄 ${nombre || 'Sin nombre'}`);
-        
-        // Recargar la tabla
-        cargarTranscripciones();
-        
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('❌ Error al eliminar: ' + error.message);
-    }
-}
-
-// ======================================================
-// 8. ANALIZAR TRANSCRIPCIÓN (Reintentar)
-// ======================================================
-
-async function analizarTranscripcionMECA(id) {
-    console.log('🔄 analizarTranscripcionMECA - ID:', id);
-    
-    if (!confirm(`🧠 ¿Reintentar análisis con Ollama para la transcripción ID ${id}?`)) return;
-    
-    try {
-        const result = await API.analizarTranscripcion(id);
-        
-        if (result.success) {
-            alert(`✅ Análisis completado\n\n📊 Calificación: ${result.analisis?.calificacion || 0}%`);
-            cargarTranscripciones();
-        } else {
-            alert(`❌ Error: ${result.error || 'No se pudo analizar'}`);
-        }
-    } catch (error) {
-        alert(`❌ Error: ${error.message}`);
-    }
-}
-
-
-/**
- * actualizarKPIsTranscripcion - Actualiza los KPIs del dashboard
- */
-async function actualizarKPIsTranscripcion() {
-    try {
-        const result = await API.obtenerEstadisticasTranscripcion();
-        
-        if (!result.success) return;
-        
-        const data = result.data;
-        document.getElementById('kpiTotalTranscripciones').textContent = data.total || 0;
-        document.getElementById('kpiHoyTranscripciones').textContent = data.hoy || 0;
-        document.getElementById('kpiCalificadasTranscripciones').textContent = data.calificadas || 0;
-        document.getElementById('kpiPromedioTranscripciones').textContent = (data.promedio || 0) + '%';
-        
-    } catch (error) {
-        console.error('Error actualizando KPIs:', error);
-    }
-}
-
-/**
- * subirAudioDesdeMECA - Sube un audio desde la interfaz
- */
-async function subirAudioDesdeMECA() {
-    const fileInput = document.getElementById('audioFileInput');
-    const status = document.getElementById('uploadStatus');
-    
-    if (!fileInput.files || fileInput.files.length === 0) {
-        status.innerHTML = '<span style="color: var(--danger);">⚠️ Seleccione un archivo de audio</span>';
-        return;
-    }
-    
-    const file = fileInput.files[0];
-    const crearTarea = document.getElementById('crearTareaAuto').checked;
-    
-    status.innerHTML = '<span style="color: var(--accent);">⏳ Subiendo archivo...</span>';
-    
-    try {
-        const result = await API.subirAudio(file, { crearTarea });
-        
-        if (result.success) {
-            status.innerHTML = `<span style="color: var(--ok);">✅ Audio subido: ${result.archivo}</span>`;
-            fileInput.value = '';
-            
-            // Si se creó tarea, mostrar ID
-            if (result.tarea_id) {
-                status.innerHTML += `<br><span style="color: var(--accent);">📋 Tarea creada: ID ${result.tarea_id}</span>`;
-            }
-            
-            // Recargar lista
-            setTimeout(cargarTranscripciones, 1000);
-        } else {
-            status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${result.error}</span>`;
-        }
-    } catch (error) {
-        status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${error.message}</span>`;
-    }
-}
-
-/**
- * programarTareaTranscripcion - Programa una tarea desde la interfaz
- */
-async function programarTareaTranscripcion() {
-    const nombre = document.getElementById('tareaNombre').value.trim();
-    const frecuencia = document.getElementById('tareaFrecuencia').value;
-    const hora = document.getElementById('tareaHora').value;
-    const modelo = document.getElementById('tareaModelo').value;
-    const analizar = document.getElementById('tareaAnalizarOllama').checked;
-    const tipoOrigen = document.getElementById('tareaTipoOrigen').value;
-    const diaSemana = document.getElementById('tareaDiaSemana')?.value || null;
-    const diaMes = document.getElementById('tareaDiaMes')?.value || null;
-    const intervaloMinutos = document.getElementById('tareaIntervalo')?.value || null;
-
-    const status = document.getElementById('tareaStatus');
-    
-    if (!nombre) {
-        status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese un nombre para la tarea</span>';
-        return;
-    }
-    
-    status.innerHTML = '<span style="color: var(--accent);">⏳ Creando tarea...</span>';
-    
-    // Construir datos según el origen
-    const data = {
-        nombre,
-        frecuencia,
-        hora_ejecucion: hora || null,
-        dia_semana: parseInt(diaSemana) || null,
-        dia_mes: parseInt(diaMes) || null,
-        intervalo_minutos: parseInt(intervaloMinutos) || null,
-        modelo_whisper: modelo,
-        analizar_con_ollama: analizar,
-        creado_por: 'MECA',
-        tipo_origen: tipoOrigen
-    };
-    
-    // Configuración local
-    if (tipoOrigen === 'local') {
-        data.carpeta_origen = document.getElementById('tareaCarpetaOrigen').value;
-    }
-    
-    // Configuración SFTP
-    if (tipoOrigen === 'sftp') {
-        data.sftp_host = document.getElementById('tareaSftpHost').value;
-        data.sftp_port = parseInt(document.getElementById('tareaSftpPort').value) || 22;
-        data.sftp_user = document.getElementById('tareaSftpUser').value;
-        data.sftp_password = document.getElementById('tareaSftpPassword').value;
-        data.sftp_ruta = document.getElementById('tareaSftpRuta').value || '/';
-    }
-    
-    // Configuración SharePoint
-    if (tipoOrigen === 'sharepoint') {
-        data.sharepoint_site = document.getElementById('tareaSharepointSite').value;
-        data.sharepoint_library = document.getElementById('tareaSharepointLibrary').value;
-        data.sharepoint_user = document.getElementById('tareaSharepointUser').value;
-        data.sharepoint_password = document.getElementById('tareaSharepointPassword').value;
-    }
-    
-    try {
-        const result = await API.crearTareaTranscripcion(data);
-        
-        if (result.success) {
-            status.innerHTML = `<span style="color: var(--ok);">✅ Tarea creada: ID ${result.id}</span>`;
-            document.getElementById('tareaNombre').value = '';
-            setTimeout(cargarTranscripciones, 1000);
-        } else {
-            status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${result.error}</span>`;
-        }
-    } catch (error) {
-        status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${error.message}</span>`;
-    }
-}
-
-// ======================================================
-// CARGAR TAREAS PROGRAMADAS (CON BOTÓN ELIMINAR)
-// ======================================================
-
-let tareasDataGlobal = [];
-
-async function cargarTareasProgramadas() {
-    const tbody = document.getElementById('tablaTareasProgramadas');
-    if (!tbody) return;
-    
-    const filtroOrigen = document.getElementById('filtroTareaOrigen')?.value || '';
-    const filtroEstado = document.getElementById('filtroTareaEstado')?.value || '';
-    const filtroEjecucion = document.getElementById('filtroTareaEjecucion')?.value || '';
-    const busqueda = document.getElementById('buscarTarea')?.value?.toLowerCase() || '';
-    
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px;">⏳ Cargando...</td></tr>';
-    
-    try {
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch(`${API_URL_TRANSCRIPCION}/api/transcripcion/tareas/todas`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        const result = await response.json();
-        
-        if (!result.success) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--danger);">❌ ${result.error || 'Error'}</td></tr>`;
-            return;
-        }
-        
-        let tareas = result.data || [];
-        tareasDataGlobal = tareas;
-        
-        // Aplicar filtros
-        if (filtroOrigen) {
-            tareas = tareas.filter(t => t.tipo_origen === filtroOrigen);
-        }
-        if (filtroEstado) {
-            tareas = tareas.filter(t => t.estado === filtroEstado);
-        }
-        if (filtroEjecucion === 'sin_ejecutar') {
-            tareas = tareas.filter(t => !t.ultima_ejecucion);
-        } else if (filtroEjecucion) {
-            tareas = tareas.filter(t => t.ultima_ejecucion_estado === filtroEjecucion);
-        }
-        if (busqueda) {
-            tareas = tareas.filter(t => 
-                t.nombre?.toLowerCase().includes(busqueda) ||
-                t.carpeta_origen?.toLowerCase().includes(busqueda) ||
-                t.sftp_host?.toLowerCase().includes(busqueda)
-            );
-        }
-        
-        // Actualizar badges
-        const total = result.data?.length || 0;
-        const activas = result.data?.filter(t => t.estado === 'activo').length || 0;
-        const conError = result.data?.filter(t => t.ultima_ejecucion_estado === 'error').length || 0;
-        
-        document.getElementById('totalTareasBadge').textContent = `${total} tareas`;
-        document.getElementById('activasBadge').textContent = `${activas} activas`;
-        document.getElementById('erroresBadge').textContent = `${conError} errores`;
-        
-        if (tareas.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--muted);">📭 No hay tareas</td></tr>';
-            return;
-        }
-        
-        let html = '';
-        for (const tarea of tareas) {
-            const origenIcono = tarea.tipo_origen === 'sftp' ? '🌐' : (tarea.tipo_origen === 'sharepoint' ? '📁' : '📂');
-            
-            let estadoBadge = '';
-            if (tarea.estado === 'activo') {
-                estadoBadge = '<span style="color: var(--ok); font-weight: bold;">✅</span>';
-            } else {
-                estadoBadge = '<span style="color: #6c757d;">⏸️</span>';
-            }
-            
-            let ejecucionBadge = '';
-            if (tarea.ultima_ejecucion_estado === 'completado') {
-                ejecucionBadge = '<span style="color: var(--ok);">✅</span>';
-            } else if (tarea.ultima_ejecucion_estado === 'en_proceso') {
-                ejecucionBadge = '<span style="color: var(--accent);">🔄</span>';
-            } else if (tarea.ultima_ejecucion_estado === 'error') {
-                ejecucionBadge = '<span style="color: var(--danger);">❌</span>';
-            } else {
-                ejecucionBadge = '<span style="color: #6c757d;">⏳</span>';
-            }
-            
-            const fechaUltima = tarea.ultima_ejecucion ? new Date(tarea.ultima_ejecucion).toLocaleString('es-ES') : '-';
-            
-            html += `
-                <tr>
-                    <td style="padding: 6px 8px; text-align: center; font-weight: bold;">${tarea.id}</td>
-                    <td style="padding: 6px 8px;">
-                        <strong style="font-size: 12px;">${escapeHtml(tarea.nombre)}</strong>
-                        <div style="font-size: 10px; color: var(--muted);">${tarea.frecuencia || 'manual'}</div>
-                    </td>
-                    <td style="padding: 6px 8px; text-align: center; font-size: 16px;" title="${tarea.tipo_origen || 'local'}">${origenIcono}</td>
-                    <td style="padding: 6px 8px; text-align: center; font-size: 12px;">${tarea.frecuencia || '-'}</td>
-                    <td style="padding: 6px 8px; text-align: center;">
-                        ${estadoBadge} ${ejecucionBadge}
-                    </td>
-                    <td style="padding: 6px 8px; text-align: center; font-size: 11px;">${fechaUltima}</td>
-                    <td style="padding: 6px 8px; text-align: center; white-space: nowrap;">
-                        <button onclick="ejecutarTareaAhora(${tarea.id})" style="background: var(--accent); padding: 2px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" title="Ejecutar ahora">▶️</button>
-                        <button onclick="verLogsTarea(${tarea.id})" style="background: #7b1fa2; padding: 2px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" title="Ver logs">📋</button>
-                        <!-- 🔴 BOTÓN ELIMINAR -->
-                        <button onclick="eliminarTarea(${tarea.id}, '${escapeHtml(tarea.nombre)}')" style="background: #d93025; padding: 2px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;" title="Eliminar tarea">🗑️</button>
-                    </td>
-                </tr>
-            `;
-        }
-        
-        tbody.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Error cargando tareas:', error);
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 20px; color: var(--danger);">❌ ${error.message}</td></tr>`;
-    }
-}
-
 /**
  * verTranscripcion - Muestra el detalle completo de una transcripción
  */
@@ -45342,138 +45126,6 @@ async function verTranscripcion(id) {
     }
 }
 
-/**
- * analizarTranscripcionMECA - Reintenta el análisis de una transcripción
- */
-async function analizarTranscripcionMECA(id) {
-    if (!confirm(`🧠 ¿Reintentar análisis con Ollama para la transcripción ID ${id}?`)) return;
-    
-    try {
-        const result = await API.analizarTranscripcion(id);
-        
-        if (result.success) {
-            alert(`✅ Análisis completado\n\n📊 Calificación: ${result.analisis?.calificacion || 0}%`);
-            cargarTranscripciones();
-        } else {
-            alert(`❌ Error: ${result.error || 'No se pudo analizar'}`);
-        }
-    } catch (error) {
-        alert(`❌ Error: ${error.message}`);
-    }
-}
-
-// Cargar al abrir la pestaña
-document.addEventListener('showTab', function(e) {
-    if (e.detail && e.detail.tabName === 'transcripcion') {
-        cargarTranscripciones();
-    }
-});
-
-// ======================================================
-// FUNCIÓN: toggleOrigenConfig
-// ======================================================
-
-function toggleOrigenConfig() {
-    const tipo = document.getElementById('tareaTipoOrigen').value;
-    
-    document.getElementById('configLocal').style.display = tipo === 'local' ? 'block' : 'none';
-    document.getElementById('configSftp').style.display = tipo === 'sftp' ? 'block' : 'none';
-    document.getElementById('configSharepoint').style.display = tipo === 'sharepoint' ? 'block' : 'none';
-}
-
-// ======================================================
-// FUNCIÓN: testSftpConexion
-// ======================================================
-
-async function testSftpConexion() {
-    const resultDiv = document.getElementById('sftpTestResult');
-    resultDiv.innerHTML = '⏳ Probando conexión...';
-    resultDiv.style.color = 'var(--accent)';
-    
-    const data = {
-        host: document.getElementById('tareaSftpHost').value,
-        port: parseInt(document.getElementById('tareaSftpPort').value) || 22,
-        username: document.getElementById('tareaSftpUser').value,
-        password: document.getElementById('tareaSftpPassword').value
-    };
-    
-    if (!data.host || !data.username || !data.password) {
-        resultDiv.innerHTML = '⚠️ Complete todos los campos';
-        resultDiv.style.color = 'var(--danger)';
-        return;
-    }
-    
-    try {
-        const response = await fetch('http://localhost:5001/api/transcripcion/test/sftp', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('meca_token')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            resultDiv.innerHTML = '✅ ' + result.message;
-            resultDiv.style.color = 'var(--ok)';
-        } else {
-            resultDiv.innerHTML = '❌ ' + (result.error || 'Error de conexión');
-            resultDiv.style.color = 'var(--danger)';
-        }
-    } catch (error) {
-        resultDiv.innerHTML = '❌ Error: ' + error.message;
-        resultDiv.style.color = 'var(--danger)';
-    }
-}
-
-// ======================================================
-// FUNCIÓN: testSharepointConexion
-// ======================================================
-
-async function testSharepointConexion() {
-    const resultDiv = document.getElementById('sharepointTestResult');
-    resultDiv.innerHTML = '⏳ Probando conexión...';
-    resultDiv.style.color = 'var(--accent)';
-    
-    const data = {
-        site_url: document.getElementById('tareaSharepointSite').value,
-        username: document.getElementById('tareaSharepointUser').value,
-        password: document.getElementById('tareaSharepointPassword').value,
-        library: document.getElementById('tareaSharepointLibrary').value
-    };
-    
-    if (!data.site_url || !data.username || !data.password || !data.library) {
-        resultDiv.innerHTML = '⚠️ Complete todos los campos';
-        resultDiv.style.color = 'var(--danger)';
-        return;
-    }
-    
-    try {
-        const response = await fetch('http://localhost:5001/api/transcripcion/test/sharepoint', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('meca_token')}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            resultDiv.innerHTML = '✅ ' + result.message;
-            resultDiv.style.color = 'var(--ok)';
-        } else {
-            resultDiv.innerHTML = '❌ ' + (result.error || 'Error de conexión');
-            resultDiv.style.color = 'var(--danger)';
-        }
-    } catch (error) {
-        resultDiv.innerHTML = '❌ Error: ' + error.message;
-        resultDiv.style.color = 'var(--danger)';
-    }
-}
 
 // =============================================
 // FUNCIONES PARA REPORTES AUTOMÁTICOS
@@ -47094,16 +46746,47 @@ async function cargarConfiguracionAudios() {
     }
 }
 
+// ======================================================
+// GUARDAR CONFIGURACIÓN DE AUDIOS (CORREGIDA)
+// ======================================================
 async function guardarConfiguracionAudios() {
     const ruta = document.getElementById('configRutaAudios')?.value.trim();
     const extensionesRaw = document.getElementById('configExtensiones')?.value.trim();
+    const status = document.getElementById('configAudiosStatus');
     
+    // 🔴 VALIDACIÓN MEJORADA
     if (!ruta) {
-        alert('⚠️ Ingrese una ruta de audios válida');
+        if (status) {
+            status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese una ruta de audios válida</span>';
+        }
         return;
     }
     
-    const extensiones = extensionesRaw ? extensionesRaw.split(',').map(e => e.trim()) : ['.mp3', '.wav'];
+    // Normalizar la ruta (reemplazar \ con / o mantener según sistema)
+    const rutaNormalizada = ruta.replace(/\\/g, '/');
+    
+    // Validar que la ruta tenga al menos una letra de unidad o sea una ruta UNC
+    if (!rutaNormalizada.match(/^[A-Za-z]:\//) && !rutaNormalizada.match(/^\/\//)) {
+        if (status) {
+            status.innerHTML = '<span style="color: var(--danger);">⚠️ Formato de ruta inválido. Use: C:/ruta/o //servidor/ruta</span>';
+        }
+        return;
+    }
+    
+    const extensiones = extensionesRaw ? extensionesRaw.split(',').map(e => e.trim()) : ['.mp3', '.wav', '.m4a', '.flac', '.aac', '.ogg'];
+    
+    // Validar extensiones
+    const extensionesValidas = extensiones.filter(e => e.startsWith('.'));
+    if (extensionesValidas.length === 0) {
+        if (status) {
+            status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese al menos una extensión válida (ej: .mp3,.wav)</span>';
+        }
+        return;
+    }
+    
+    if (status) {
+        status.innerHTML = '<span style="color: var(--accent);">⏳ Guardando configuración...</span>';
+    }
     
     try {
         const token = localStorage.getItem('meca_token');
@@ -47114,35 +46797,56 @@ async function guardarConfiguracionAudios() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                ruta_base: ruta,
-                extensiones: extensiones
+                ruta_base: rutaNormalizada,
+                extensiones: extensionesValidas
             })
         });
         
         const result = await response.json();
         
         if (result.success) {
-            alert('✅ Configuración guardada correctamente');
+            if (status) {
+                status.innerHTML = `<span style="color: var(--ok);">✅ Configuración guardada: ${rutaNormalizada}</span>`;
+            }
+            // Actualizar variable global
             configuracionAudios = {
-                ruta_base: ruta,
-                extensiones: extensiones
+                ruta_base: rutaNormalizada,
+                extensiones: extensionesValidas
             };
             localStorage.setItem('config_audios', JSON.stringify(configuracionAudios));
+            mostrarMensajeTemporal('✅ Configuración guardada correctamente', 'var(--ok)');
         } else {
-            alert('❌ Error: ' + (result.error || 'No se pudo guardar'));
+            if (status) {
+                status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${result.error || 'No se pudo guardar'}</span>`;
+            }
         }
     } catch (error) {
-        alert('❌ Error: ' + error.message);
+        console.error('Error guardando configuración:', error);
+        if (status) {
+            status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${error.message}</span>`;
+        }
     }
 }
 
+// ======================================================
+// PROBAR RUTA DE AUDIOS (CORREGIDA)
+// ======================================================
 async function probarRutaAudios() {
     const ruta = document.getElementById('configRutaAudios')?.value.trim();
     const status = document.getElementById('configAudiosStatus');
     
     if (!ruta) {
-        if (status) status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese una ruta primero</span>';
+        if (status) {
+            status.innerHTML = '<span style="color: var(--danger);">⚠️ Ingrese una ruta primero</span>';
+        }
         return;
+    }
+    
+    // Normalizar ruta
+    const rutaNormalizada = ruta.replace(/\\/g, '/');
+    
+    if (status) {
+        status.innerHTML = '<span style="color: var(--accent);">🔍 Verificando ruta...</span>';
     }
     
     try {
@@ -47153,22 +46857,26 @@ async function probarRutaAudios() {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ ruta_base: ruta })
+            body: JSON.stringify({ ruta_base: rutaNormalizada })
         });
         
         const result = await response.json();
         
         if (status) {
             if (result.success) {
+                const cantidad = result.cantidad_audios !== undefined ? result.cantidad_audios : '?';
                 status.innerHTML = `
-                    <span style="color: var(--ok);">✅ Ruta válida: ${ruta}</span>
-                    ${result.cantidad_audios !== undefined ? `<span style="margin-left: 15px;">📊 ${result.cantidad_audios} archivos de audio encontrados</span>` : ''}
+                    <span style="color: var(--ok);">✅ Ruta válida: ${rutaNormalizada}</span>
+                    <span style="margin-left: 15px; font-size: 12px;">📊 ${cantidad} archivos de audio encontrados</span>
                 `;
+                // Mostrar mensaje temporal también
+                mostrarMensajeTemporal(`✅ Ruta válida: ${cantidad} archivos encontrados`, 'var(--ok)');
             } else {
-                status.innerHTML = `<span style="color: var(--danger);">❌ ${result.error || 'Ruta inválida'}</span>`;
+                status.innerHTML = `<span style="color: var(--danger);">❌ ${result.error || 'Ruta inválida o inaccesible'}</span>`;
             }
         }
     } catch (error) {
+        console.error('Error probando ruta:', error);
         if (status) {
             status.innerHTML = `<span style="color: var(--danger);">❌ Error: ${error.message}</span>`;
         }
@@ -47783,9 +47491,7 @@ async function procesarAudiosDeLote(loteId, opciones = {}) {
             if (typeof cargarHistorialLotes === 'function') {
                 cargarHistorialLotes();
             }
-            if (typeof cargarTranscripciones === 'function') {
-                cargarTranscripciones();
-            }
+           
         }, 2000);
         
         procesandoAudios = false;
