@@ -31476,56 +31476,99 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
 
     // ===== 7. INICIO FUNCIÓN: editarUsuario ==============================
     async function editarUsuario(id) {
-        console.log('✏️ EDITANDO USUARIO - ID recibido:', id);
+    console.log('✏️ EDITANDO USUARIO - ID recibido:', id);
+    
+    window.usuarioEnEdicion = id;
+    
+    const token = localStorage.getItem('meca_token');
+    
+    try {
+        // 1. Obtener datos del usuario
+        const response = await fetch(`/api/usuarios/${id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
         
-        window.usuarioEnEdicion = id;
-        
-        const token = localStorage.getItem('meca_token');
-        
-        try {
-            const response = await fetch(`/api/usuarios/${id}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const usuario = await response.json();
-            
-            console.log('📝 Usuario cargado:', usuario);
-            
-            // Cargar datos en el formulario
-            document.getElementById('usuarioUsername').value = usuario.usuario || '';
-            document.getElementById('usuarioNombreCompleto').value = usuario.nombre_completo || '';
-            document.getElementById('usuarioPassword').value = '';
-            document.getElementById('usuarioPasswordConfirm').value = '';
-            
-            // ✅ USAR rol_id CORRECTAMENTE
-            document.getElementById('usuarioRol').value = usuario.rol_id || '';
-            document.getElementById('usuarioActivo').value = usuario.activo ? 'true' : 'false';
-            
-            // Cambiar el texto del botón
-            const btnSubmit = document.querySelector('#formUsuario button[type="submit"]');
-            if (btnSubmit) {
-                btnSubmit.textContent = '✏️ Actualizar Usuario';
-                btnSubmit.style.background = 'var(--warning)';
-            }
-            
-            // Mostrar botón cancelar
-            const btnCancelar = document.getElementById('btnCancelarEdicion');
-            if (btnCancelar) {
-                btnCancelar.style.display = 'inline-flex';
-            }
-            
-            alert(`✏️ Editando usuario: ${usuario.usuario}\n\nDeje la contraseña en blanco para mantener la actual.`);
-            
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Error al cargar usuario: ' + error.message);
-            window.usuarioEnEdicion = null;
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
+        
+        const usuario = await response.json();
+        console.log('📝 Usuario cargado:', usuario);
+        
+        // 2. Obtener referencias a los elementos del modal
+        const usernameInput = document.getElementById('modalUsuarioUsername');
+        const nombreInput = document.getElementById('modalUsuarioNombre');
+        const passwordInput = document.getElementById('modalUsuarioPassword');
+        const passwordConfirmInput = document.getElementById('modalUsuarioPasswordConfirm');
+        const rolSelect = document.getElementById('modalUsuarioRol');
+        const activoSelect = document.getElementById('modalUsuarioActivo');
+        const tituloModal = document.getElementById('modalUsuarioTitulo');
+        const modal = document.getElementById('modalNuevoUsuario');
+        
+        // Validar elementos esenciales
+        if (!modal) {
+            console.error('❌ Modal modalNuevoUsuario no encontrado');
+            alert('❌ No se pudo abrir el modal de edición');
+            window.usuarioEnEdicion = null;
+            return;
+        }
+        
+        // 3. 🔴 PASO CRÍTICO: Cargar los roles en el select ANTES de establecer el valor
+        console.log('📋 Cargando roles en el modal...');
+        cargarRolesEnModal();  // ← ESTA ES LA LÍNEA QUE FALTA
+        
+        // 4. Cargar datos del usuario
+        usernameInput.value = usuario.usuario || '';
+        nombreInput.value = usuario.nombre_completo || '';
+        if (passwordInput) passwordInput.value = '';
+        if (passwordConfirmInput) passwordConfirmInput.value = '';
+        
+        // 5. 🔴 Establecer el valor del rol DESPUÉS de cargar las opciones
+        // Usar setTimeout para asegurar que las opciones ya estén renderizadas
+        setTimeout(() => {
+            if (usuario.rol_id) {
+                rolSelect.value = usuario.rol_id;
+                console.log(`✅ Rol seleccionado: ${usuario.rol_id}`);
+            } else {
+                console.warn('⚠️ Usuario sin rol_id');
+            }
+            activoSelect.value = usuario.activo ? 'true' : 'false';
+        }, 50);
+        
+        // 6. Cambiar el título del modal
+        if (tituloModal) {
+            tituloModal.textContent = `✏️ Editar Usuario: ${usuario.usuario}`;
+        }
+        
+        // 7. Configurar el botón guardar
+        const btnGuardar = document.querySelector('#modalNuevoUsuario .btn-guardar') || 
+                           document.querySelector('#modalNuevoUsuario button[type="submit"]') ||
+                           document.querySelector('#modalNuevoUsuario .modal-footer button:last-child');
+        
+        if (btnGuardar) {
+            btnGuardar.textContent = '✏️ Actualizar Usuario';
+            btnGuardar.style.background = '#f39c12';
+            btnGuardar.style.color = 'white';
+            btnGuardar.dataset.editando = 'true';
+            btnGuardar.dataset.userId = id;
+        }
+        
+        // 8. Mostrar el modal
+        modal.style.display = 'flex';
+        
+        // Enfocar el primer campo
+        setTimeout(() => {
+            usernameInput.focus();
+        }, 300);
+        
+        console.log(`✅ Modal abierto para editar usuario: ${usuario.usuario}`);
+        
+    } catch (error) {
+        console.error('❌ Error cargando usuario:', error);
+        alert(`❌ Error al cargar usuario: ${error.message}`);
+        window.usuarioEnEdicion = null;
     }
+}
     // ===== FIN FUNCIÓN: editarUsuario ======================================
 
     // ===== 8. INICIO FUNCIÓN: cambiarPasswordUsuario =====================
@@ -32046,48 +32089,113 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
         const rolId = document.getElementById('modalUsuarioRol').value;
         const activo = document.getElementById('modalUsuarioActivo').value === 'true';
         
+        // 🔴 DETECTAR SI ES EDICIÓN
+        const btnGuardar = document.querySelector('#modalNuevoUsuario .btn-guardar') || 
+                        document.querySelector('#modalNuevoUsuario button[type="submit"]') ||
+                        document.querySelector('#modalNuevoUsuario button:last-child');
+        const esEdicion = btnGuardar?.dataset?.editando === 'true' || window.usuarioEnEdicion;
+        const userId = window.usuarioEnEdicion;
+        
         // 1. Validaciones
-        if (!username || !nombreCompleto || !password || !rolId) {
-            alert('⚠️ Complete todos los campos obligatorios');
+        if (!username || !nombreCompleto || !rolId) {
+            alert('⚠️ Complete todos los campos obligatorios (usuario, nombre y rol)');
             return;
         }
         
-        if (password !== passwordConfirm) {
-            alert('⚠️ Las contraseñas no coinciden');
-            return;
+        // Solo validar contraseña si es NUEVO usuario o si se ingresó una nueva
+        if (!esEdicion) {
+            if (!password || password !== passwordConfirm) {
+                alert('⚠️ Las contraseñas no coinciden');
+                return;
+            }
+            if (password.length < 6) {
+                alert('⚠️ La contraseña debe tener al menos 6 caracteres');
+                return;
+            }
+        } else if (password && password.length > 0) {
+            // Si está editando y se ingresó una contraseña, validarla
+            if (password !== passwordConfirm) {
+                alert('⚠️ Las contraseñas no coinciden');
+                return;
+            }
+            if (password.length < 6) {
+                alert('⚠️ La contraseña debe tener al menos 6 caracteres');
+                return;
+            }
         }
         
-        if (password.length < 6) {
-            alert('⚠️ La contraseña debe tener al menos 6 caracteres');
-            return;
-        }
-        
-        // 2. Enviar al servidor
         try {
             const token = localStorage.getItem('meca_token');
-            const response = await fetch('/api/usuarios', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+            let url, method, bodyData;
+            
+            if (esEdicion && userId) {
+                // ======================================================
+                // ACTUALIZAR USUARIO EXISTENTE
+                // ======================================================
+                url = `/api/usuarios/${userId}`;
+                method = 'PUT';
+                bodyData = {
+                    usuario: username,
+                    nombre_completo: nombreCompleto,
+                    rol_id: parseInt(rolId),
+                    activo: activo
+                };
+                
+                // Solo incluir contraseña si se ingresó una nueva
+                if (password && password.length > 0) {
+                    bodyData.contrasena = password;
+                }
+                
+                console.log(`📤 Actualizando usuario ID ${userId}:`, bodyData);
+                
+            } else {
+                // ======================================================
+                // CREAR NUEVO USUARIO
+                // ======================================================
+                url = '/api/usuarios';
+                method = 'POST';
+                bodyData = {
                     usuario: username,
                     nombre_completo: nombreCompleto,
                     contrasena: password,
                     rol_id: parseInt(rolId),
                     activo: activo
-                })
+                };
+                
+                console.log('📤 Creando nuevo usuario:', bodyData);
+            }
+            
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(bodyData)
             });
             
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.error || 'Error al crear usuario');
+                throw new Error(error.error || `Error ${response.status}`);
             }
             
-            alert(`✅ Usuario "${username}" creado correctamente`);
+            const result = await response.json();
             
-            // 3. Cerrar modal y recargar datos
+            const mensaje = esEdicion 
+                ? `✅ Usuario "${username}" actualizado correctamente` 
+                : `✅ Usuario "${username}" creado correctamente`;
+            
+            alert(mensaje);
+            
+            // Limpiar estado de edición
+            window.usuarioEnEdicion = null;
+            if (btnGuardar) {
+                btnGuardar.dataset.editando = 'false';
+                btnGuardar.textContent = '💾 Guardar Usuario';
+                btnGuardar.style.background = '';
+            }
+            
+            // Cerrar modal y recargar
             cerrarModalNuevoUsuario();
             await cargarUsuarios();
             await cargarRoles();
@@ -32098,7 +32206,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
             
         } catch (error) {
             console.error('❌ Error:', error);
-            alert('❌ Error al crear usuario: ' + error.message);
+            alert(`❌ Error: ${error.message}`);
         }
     }
 

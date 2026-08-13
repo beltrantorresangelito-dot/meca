@@ -1909,11 +1909,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
         }
         
         try {
+            // 🔴 AÑADIR redirect_url A LA CONSULTA
             const result = await pool.query(`
-                SELECT id, codigo, nombre, activo, created_at, updated_at
+                SELECT id, codigo, nombre, activo, redirect_url, created_at, updated_at
                 FROM roles
                 ORDER BY id
             `);
+            
+            console.log(`✅ ${result.rows.length} roles obtenidos (con redirect_url)`);
             
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
