@@ -22,7 +22,7 @@ const routes = {};
 // ======================================================
 
 // Encriptar contraseñas
-function hashSHA256(texto) { 
+function hashSHA256(texto) {
     return crypto.createHash('sha256').update(texto).digest('hex');
 }
 
@@ -57,16 +57,16 @@ async function procesarLogin(usuario, contrasena) {
         }
 
         if (usuarioData.rol_activo === false) {
-            return { 
-                success: false, 
-                error: 'El rol asignado a este usuario está desactivado' 
+            return {
+                success: false,
+                error: 'El rol asignado a este usuario está desactivado'
             };
         }
 
         if (!usuarioData.rol_id) {
-            return { 
-                success: false, 
-                error: 'Usuario sin rol asignado' 
+            return {
+                success: false,
+                error: 'Usuario sin rol asignado'
             };
         }
 
@@ -335,7 +335,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
             if (result.rows.length > 0) {
                 const rol = result.rows[0];
                 rolNombre = rol.nombre || rolCodigo;
-                
+
                 // 🔴 USAR LA URL CONFIGURADA EN LA BD
                 if (rol.redirect_url) {
                     redirectUrl = rol.redirect_url;
@@ -354,7 +354,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
             console.log(`✅ Redirección final: ${rolNombre} -> ${redirectUrl}`);
 
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
+            respuesta.end(JSON.stringify({
                 redirectUrl,
                 rol: rolCodigo,
                 rolNombre: rolNombre
@@ -371,54 +371,54 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // server.js - Endpoint para actualizar redirect_url de un rol
     if (ruta.match(/^\/api\/roles\/\d+\/redirect$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/roles/:id/redirect');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const rolId = parseInt(ruta.split('/')[3]);
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { redirect_url } = JSON.parse(body);
-                
+
                 if (!redirect_url) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'redirect_url es requerido' }));
                     return;
                 }
-                
+
                 // Validar formato de URL
                 if (!redirect_url.startsWith('/')) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'redirect_url debe comenzar con /' }));
                     return;
                 }
-                
+
                 const result = await pool.query(
                     'UPDATE roles SET redirect_url = $1, updated_at = NOW() WHERE id = $2 RETURNING id, codigo, nombre, redirect_url',
                     [redirect_url, rolId]
                 );
-                
+
                 if (result.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
                     return;
                 }
-                
+
                 console.log(`✅ Redirección actualizada para ${result.rows[0].nombre}: ${redirect_url}`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ 
-                    success: true, 
+                respuesta.end(JSON.stringify({
+                    success: true,
                     rol: result.rows[0]
                 }));
-                
+
             } catch (error) {
                 console.error('Error:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -438,8 +438,8 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // ======================================================
 
     // 1. CONFIGURACIÓN DINÁMICA (detecta entorno)
-    const PYTHON_API_URL = process.env.PYTHON_API_URL || 
-        (process.env.NODE_ENV === 'production' 
+    const PYTHON_API_URL = process.env.PYTHON_API_URL ||
+        (process.env.NODE_ENV === 'production'
             ? 'http://10.4.240.68:5001'  // ← IP de producción (cámbiala)
             : 'http://localhost:5001'       // ← IP de desarrollo
         );
@@ -449,23 +449,23 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // 2. ENDPOINT: REPRODUCIR AUDIO (PROXY) - USANDO startsWith
     if (ruta.startsWith('/api/audio/reproducir/') && metodo === 'GET') {
         console.log(`[API] GET /api/audio/reproducir/*`);
-        
+
         // Extraer ticketId de la URL: /api/audio/reproducir/123
         const ticketId = ruta.split('/').pop();
-        
+
         if (!ticketId || isNaN(ticketId)) {
             respuesta.writeHead(400, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Ticket ID inválido' }));
             return;
         }
-        
+
         try {
             console.log(`🎧 [PROXY] Solicitando audio para ticket: ${ticketId}`);
             console.log(`   → Python: ${PYTHON_API_URL}/api/audio/reproducir/${ticketId}`);
-            
+
             // Hacer fetch al servidor Python
             const response = await fetch(`${PYTHON_API_URL}/api/audio/reproducir/${ticketId}`);
-            
+
             // Si Python devuelve error, propagarlo
             if (!response.ok) {
                 let errorText = '';
@@ -474,48 +474,48 @@ const servidor = http.createServer(async (peticion, respuesta) => {
                 } catch (e) {
                     errorText = 'Sin detalles adicionales';
                 }
-                
+
                 console.error(`❌ [PROXY] Error desde Python: ${response.status} - ${errorText.substring(0, 200)}`);
-                
+
                 respuesta.writeHead(response.status, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ 
+                respuesta.end(JSON.stringify({
                     error: `Error desde servidor de audio: ${response.status}`,
                     details: errorText.substring(0, 300)
                 }));
                 return;
             }
-            
+
             // Obtener el tipo de contenido (audio/mpeg, audio/wav, etc.)
             const contentType = response.headers.get('content-type') || 'application/octet-stream';
-            
+
             // Obtener el body como buffer
             const buffer = await response.arrayBuffer();
             const data = Buffer.from(buffer);
-            
+
             // Establecer headers para el navegador
             respuesta.setHeader('Content-Type', contentType);
             respuesta.setHeader('Accept-Ranges', 'bytes');
             respuesta.setHeader('Cache-Control', 'public, max-age=86400');
             respuesta.setHeader('Content-Length', data.length);
-            
+
             // Mantener Content-Disposition si Python lo envía
             const contentDisposition = response.headers.get('content-disposition');
             if (contentDisposition) {
                 respuesta.setHeader('Content-Disposition', contentDisposition);
             }
-            
+
             console.log(`✅ [PROXY] Audio servido para ticket: ${ticketId} (${contentType}, ${(data.length / 1024).toFixed(1)} KB)`);
-            
+
             respuesta.writeHead(200);
             respuesta.end(data);
-            
+
         } catch (error) {
             console.error(`❌ [PROXY] Error sirviendo audio:`, error.message);
-            
+
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
+            respuesta.end(JSON.stringify({
                 error: 'Error al obtener el audio',
-                details: error.message 
+                details: error.message
             }));
         }
         return;
@@ -524,23 +524,23 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // 3. ENDPOINT: VERIFICAR AUDIO (PROXY - OPCIONAL)
     if (ruta.startsWith('/api/audio/verificar/') && metodo === 'GET') {
         console.log(`[API] GET /api/audio/verificar/*`);
-        
+
         const ticketId = ruta.split('/').pop();
-        
+
         try {
             const response = await fetch(`${PYTHON_API_URL}/api/audio/verificar/${ticketId}`);
             const data = await response.json();
-            
+
             respuesta.writeHead(response.status, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(data));
-            
+
         } catch (error) {
             console.error(`❌ [PROXY] Error verificando audio:`, error.message);
-            
+
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
+            respuesta.end(JSON.stringify({
                 existe: false,
-                error: error.message 
+                error: error.message
             }));
         }
         return;
@@ -839,11 +839,118 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         return;
     }
 
-    // ======================================================
-    // API - ESCUCHAS
+   // ======================================================
+    // API - ESCUCHAS - GUARDAR ASIGNACIONES (VERSIÓN DEFINITIVA)
     // ======================================================
 
-    // Obtener asignaciones
+    if (ruta === '/api/escuchas/asignaciones' && metodo === 'POST') {
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+
+        try {
+            let body = '';
+            peticion.on('data', chunk => body += chunk);
+            peticion.on('end', async () => {
+                try {
+                    const data = JSON.parse(body);
+                    const { tarea_id, asignaciones } = data;
+
+                    if (!tarea_id || !asignaciones || !Array.isArray(asignaciones) || asignaciones.length === 0) {
+                        respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                        respuesta.end(JSON.stringify({ error: 'Datos inválidos' }));
+                        return;
+                    }
+
+                    // 🔴 IMPORTANTE: Verificar si el ticket ya existe en este lote ANTES de insertar
+                    let insertados = 0;
+                    let duplicados = 0;
+
+                    for (const asig of asignaciones) {
+                        // 🔴 PASO 1: Verificar si el ticket ya existe en este lote
+                        const checkQuery = `
+                            SELECT id FROM asignaciones_escucha 
+                            WHERE ticket = $1 AND tarea_id = $2
+                        `;
+                        const checkResult = await pool.query(checkQuery, [asig.ticket || '', tarea_id]);
+
+                        if (checkResult.rows.length > 0) {
+                            console.log(`⚠️ Ticket ${asig.ticket} ya existe en lote ${tarea_id}, omitiendo`);
+                            duplicados++;
+                            continue;
+                        }
+
+                        // 🔴 PASO 2: Insertar SOLO si no existe
+                        const insertQuery = `
+                            INSERT INTO asignaciones_escucha (
+                                id, tarea_id, ticket, supervisor_responsable, gestor_auditado,
+                                auditor_asignado, motivos, submotivos, subnivel, peticion,
+                                usuario_dni, usuario_mov, motivo_call, fecha_descarga,
+                                campana, campana_id, estado, fecha_asignacion, created_at, updated_at
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+                            RETURNING id
+                        `;
+
+                        const values = [
+                            asig.id,
+                            tarea_id,
+                            asig.ticket || '',
+                            asig.supervisor_responsable || '',
+                            asig.gestor_auditado || '',
+                            asig.auditor_asignado || '',
+                            asig.motivos || '',
+                            asig.submotivos || '',
+                            asig.subnivel || '',
+                            asig.peticion || '',
+                            asig.usuario_dni || '',
+                            asig.usuario_mov || '',
+                            asig.motivo_call || '',
+                            asig.fecha_descarga || null,
+                            asig.campana || '',
+                            asig.campana_id || null,
+                            asig.estado || 'pendiente',
+                            asig.fecha_asignacion || new Date().toISOString(),
+                            asig.created_at || new Date().toISOString(),
+                            asig.updated_at || new Date().toISOString()
+                        ];
+
+                        const result = await pool.query(insertQuery, values);
+                        if (result.rows.length > 0) {
+                            insertados++;
+                        }
+                    }
+
+                    respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({
+                        success: true,
+                        total: asignaciones.length,
+                        insertados: insertados,
+                        duplicados: duplicados,
+                        message: `${insertados} asignaciones guardadas, ${duplicados} duplicadas omitidas`
+                    }));
+
+                } catch (error) {
+                    console.error('❌ Error POST /api/escuchas/asignaciones:', error);
+                    respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: error.message }));
+                }
+            });
+        } catch (error) {
+            console.error('❌ Error:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+        return;
+    }
+
+    // ======================================================
+    // API - ESCUCHAS - RUTAS COMPLETAS
+    // ======================================================
+
+    // 1. GET - Obtener asignaciones
     if (ruta === '/api/escuchas/asignaciones' && metodo === 'GET') {
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
@@ -851,212 +958,47 @@ const servidor = http.createServer(async (peticion, respuesta) => {
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
-            const result = await pool.query('SELECT * FROM asignaciones_escucha ORDER BY fecha_asignacion DESC');
+            const result = await pool.query(
+                'SELECT * FROM asignaciones_escucha'
+            );
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
+            respuesta.end(JSON.stringify(result.rows || []));
         } catch (error) {
+            console.error('❌ Error GET /api/escuchas/asignaciones:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify([]));
         }
         return;
     }
 
-    // Crear asignaciones
-    // ======================================================
-// API - ESCUCHAS - Crear asignaciones (POST) - CON ID
-// ======================================================
-if (ruta === '/api/escuchas/asignaciones' && metodo === 'POST') {
-    console.log('[API] POST /api/escuchas/asignaciones');
-    
-    const token = peticion.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-        return;
-    }
-    
-    let body = '';
-    peticion.on('data', chunk => body += chunk);
-    peticion.on('end', async () => {
-        try {
-            const data = JSON.parse(body);
-            const { tarea_id, asignaciones } = data;
-            
-            console.log(`📊 Recibidas ${asignaciones?.length || 0} asignaciones para tarea ${tarea_id}`);
-            
-            if (!asignaciones || asignaciones.length === 0) {
-                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'No hay asignaciones' }));
-                return;
-            }
+   
 
-            // 🔴 VALIDAR QUE TODAS TENGAN ID
-            const sinId = asignaciones.filter(a => !a.id);
-            if (sinId.length > 0) {
-                console.error(`❌ ${sinId.length} asignaciones sin ID`);
-                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ 
-                    error: `${sinId.length} asignaciones sin ID`,
-                    muestra: sinId.slice(0, 3).map(a => a.ticket)
-                }));
-                return;
-            }
-
-            console.log(`   IDs generados: ${asignaciones[0].id} - ${asignaciones[asignaciones.length-1].id}`);
-            
-            // 🔴 INSERTAR CON ID
-            const client = await pool.connect();
-            let insertados = 0;
-            
-            try {
-                await client.query('BEGIN');
-                
-                for (const asig of asignaciones) {
-                    // 🔴 CLAVE: INSERT CON id COMO PRIMER CAMPO
-                    const result = await client.query(`
-                        INSERT INTO asignaciones_escucha (
-                            id,
-                            tarea_id, 
-                            ticket, 
-                            supervisor_responsable, 
-                            gestor_auditado,
-                            auditor_asignado, 
-                            motivos, 
-                            submotivos, 
-                            subnivel, 
-                            peticion,
-                            usuario_dni, 
-                            usuario_mov, 
-                            motivo_call, 
-                            fecha_descarga,
-                            estado, 
-                            fecha_asignacion, 
-                            created_at, 
-                            updated_at
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-                        RETURNING id
-                    `, [
-                        asig.id,
-                        asig.tarea_id, 
-                        asig.ticket, 
-                        asig.supervisor_responsable, 
-                        asig.gestor_auditado,
-                        asig.auditor_asignado, 
-                        asig.motivos, 
-                        asig.submotivos, 
-                        asig.subnivel, 
-                        asig.peticion,
-                        asig.usuario_dni, 
-                        asig.usuario_mov, 
-                        asig.motivo_call, 
-                        asig.fecha_descarga,
-                        asig.estado, 
-                        asig.fecha_asignacion, 
-                        asig.created_at, 
-                        asig.updated_at
-                    ]);
-                    insertados++;
-                }
-                
-                await client.query('COMMIT');
-                console.log(`✅ ${insertados} asignaciones insertadas correctamente`);
-                
-                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true, total: insertados }));
-                
-            } catch (err) {
-                await client.query('ROLLBACK');
-                console.error('❌ Error en transacción:', err);
-                throw err;
-            } finally {
-                client.release();
-            }
-            
-        } catch (error) {
-            console.error('❌ Error en POST /api/escuchas/asignaciones:', error);
-            
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
-                error: error.message,
-                stack: error.stack 
-            }));
-        }
-    });
-    return;
-}
-
-// ======================================================
-// API - ESCUCHAS - Eliminar lote (DELETE)
-// ======================================================
-if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
-    console.log('[API] DELETE /api/escuchas/lotes/:id');
-    
-    const token = peticion.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-        return;
-    }
-    
-    const loteId = parseInt(ruta.split('/').pop());
-    
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        
-        // 1. Verificar que el lote existe
-        const check = await client.query(
-            'SELECT id, nombre_archivo FROM tareas_escucha WHERE id = $1',
-            [loteId]
-        );
-        
-        if (check.rows.length === 0) {
-            await client.query('ROLLBACK');
-            respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Lote no encontrado' }));
-            client.release();
+    // 3. GET - Obtener tareas (lotes)
+    if (ruta === '/api/escuchas/tareas' && metodo === 'GET') {
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
-        const nombreArchivo = check.rows[0].nombre_archivo || 'Desconocido';
-        
-        // 2. Eliminar asignaciones relacionadas (ON DELETE CASCADE debería hacer esto)
-        // Pero por seguridad, eliminamos manualmente
-        await client.query(
-            'DELETE FROM asignaciones_escucha WHERE tarea_id = $1',
-            [loteId]
-        );
-        
-        // 3. Eliminar el lote
-        await client.query(
-            'DELETE FROM tareas_escucha WHERE id = $1',
-            [loteId]
-        );
-        
-        await client.query('COMMIT');
-        
-        console.log(`✅ Lote ${loteId} eliminado: ${nombreArchivo}`);
-        
-        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ 
-            success: true, 
-            message: `Lote "${nombreArchivo}" eliminado correctamente`
-        }));
-        
-    } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('❌ Error eliminando lote:', error);
-        respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: error.message }));
-    } finally {
-        client.release();
-    }
-    return;
-}
 
-    // Crear tarea (lote)
+        try {
+            const result = await pool.query(
+                'SELECT * FROM tareas_escucha ORDER BY id DESC'
+            );
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows || []));
+        } catch (error) {
+            console.error('❌ Error GET /api/escuchas/tareas:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify([]));
+        }
+        return;
+    }
+
+    // 4. POST - Crear tarea (lote)
     if (ruta === '/api/escuchas/tareas' && metodo === 'POST') {
     console.log('[API] POST /api/escuchas/tareas');
     
@@ -1074,8 +1016,7 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
             const data = JSON.parse(body);
             console.log('📥 Body recibido:', data);
             
-            // 🔴 EXTRAER SOLO LOS CAMPOS QUE EXISTEN EN LA TABLA
-            const { id, fecha_carga, nombre_archivo, total_registros, estado, creado_por, created_at } = data;
+            const { id, fecha_carga, nombre_archivo, total_registros, estado, creado_por } = data;
             
             // 🔴 VALIDAR CAMPOS OBLIGATORIOS
             if (!id) {
@@ -1090,7 +1031,34 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 return;
             }
             
-            // 🔴 INSERTAR SOLO LAS COLUMNAS QUE EXISTEN (6 columnas)
+            // 🔴 VERIFICAR SI EL LOTE YA EXISTE (PREVENIR DUPLICADOS)
+            // Buscar por nombre_archivo en los últimos 5 minutos
+            const checkQuery = `
+                SELECT id, fecha_carga, total_registros 
+                FROM tareas_escucha 
+                WHERE nombre_archivo = $1 
+                AND fecha_carga > NOW() - INTERVAL '5 minutes'
+                ORDER BY id DESC 
+                LIMIT 1
+            `;
+            const checkResult = await pool.query(checkQuery, [nombre_archivo || '']);
+
+            if (checkResult.rows.length > 0) {
+                const existente = checkResult.rows[0];
+                console.log(`⚠️ Lote duplicado detectado para "${nombre_archivo}", reutilizando ID: ${existente.id}`);
+                
+                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({
+                    success: true,
+                    id: existente.id,
+                    total_registros: existente.total_registros,
+                    message: 'Lote ya existente, reutilizado',
+                    reutilizado: true
+                }));
+                return;
+            }
+            
+            // 🔴 INSERTAR NUEVO LOTE
             const result = await pool.query(`
                 INSERT INTO tareas_escucha (
                     id, 
@@ -1113,7 +1081,12 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
             console.log(`✅ Tarea creada con ID: ${result.rows[0].id}`);
             
             respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ id: result.rows[0].id }));
+            respuesta.end(JSON.stringify({
+                success: true,
+                id: result.rows[0].id,
+                message: 'Tarea creada correctamente',
+                reutilizado: false
+            }));
             
         } catch (error) {
             console.error('❌ Error creando tarea:', error);
@@ -1125,6 +1098,76 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     });
     return;
 }
+
+    // ======================================================
+    // API - ESCUCHAS - Eliminar lote (DELETE)
+    // ======================================================
+    if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
+        console.log('[API] DELETE /api/escuchas/lotes/:id');
+
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+
+        const loteId = parseInt(ruta.split('/').pop());
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // 1. Verificar que el lote existe
+            const check = await client.query(
+                'SELECT id, nombre_archivo FROM tareas_escucha WHERE id = $1',
+                [loteId]
+            );
+
+            if (check.rows.length === 0) {
+                await client.query('ROLLBACK');
+                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: 'Lote no encontrado' }));
+                client.release();
+                return;
+            }
+
+            const nombreArchivo = check.rows[0].nombre_archivo || 'Desconocido';
+
+            // 2. Eliminar asignaciones relacionadas (ON DELETE CASCADE debería hacer esto)
+            // Pero por seguridad, eliminamos manualmente
+            await client.query(
+                'DELETE FROM asignaciones_escucha WHERE tarea_id = $1',
+                [loteId]
+            );
+
+            // 3. Eliminar el lote
+            await client.query(
+                'DELETE FROM tareas_escucha WHERE id = $1',
+                [loteId]
+            );
+
+            await client.query('COMMIT');
+
+            console.log(`✅ Lote ${loteId} eliminado: ${nombreArchivo}`);
+
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({
+                success: true,
+                message: `Lote "${nombreArchivo}" eliminado correctamente`
+            }));
+
+        } catch (error) {
+            await client.query('ROLLBACK');
+            console.error('❌ Error eliminando lote:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        } finally {
+            client.release();
+        }
+        return;
+    }
+
 
     // Mis escuchas (por auditor)
     if (ruta === '/api/escuchas/mis-escuchas' && metodo === 'GET') {
@@ -1288,14 +1331,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // Obtener agentes (con filtros por líder, ubicación, localidad)
     if (ruta === '/api/agentes' && metodo === 'GET') {
         console.log('[API] GET agentes');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const { lider, ubicacion, localidad } = urlParseada.query;
             // 🔴 MODIFICADO: Incluir id, estado, created_at
@@ -1304,7 +1347,7 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                         WHERE 1=1`;
             const params = [];
             let idx = 1;
-            
+
             if (lider) {
                 query += ` AND lider_2026 = $${idx++}`;
                 params.push(lider);
@@ -1317,16 +1360,16 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 query += ` AND localidad = $${idx++}`;
                 params.push(localidad);
             }
-            
+
             query += ' ORDER BY nombre';
-            
+
             const result = await pool.query(query, params);
-            
+
             console.log(`   ✅ ${result.rows.length} agentes encontrados`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('❌ Error en agentes:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1334,33 +1377,33 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
         }
         return;
     }
-    
+
     // ======================================================
     // API - AGENTES - Actualizar agente
     // ======================================================
     if (ruta.match(/^\/api\/agentes\/\d+$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/agentes/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const datos = JSON.parse(body);
-                
+
                 // Construir la consulta de actualización
                 const updates = [];
                 const values = [];
                 let idx = 1;
-                
+
                 if (datos.nombre !== undefined) {
                     updates.push(`nombre = $${idx++}`);
                     values.push(datos.nombre);
@@ -1389,32 +1432,32 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     updates.push(`funciones = $${idx++}`);
                     values.push(datos.funciones);
                 }
-                
+
                 updates.push(`updated_at = NOW()`);
-                
+
                 if (updates.length === 1) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'No hay datos para actualizar' }));
                     return;
                 }
-                
+
                 values.push(id);
-                
+
                 const query = `UPDATE agentes SET ${updates.join(', ')} WHERE id = $${idx}`;
-                
+
                 const result = await pool.query(query, values);
-                
+
                 if (result.rowCount === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Agente no encontrado' }));
                     return;
                 }
-                
+
                 console.log(`✅ Agente ID ${id} actualizado`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: true, message: 'Agente actualizado correctamente' }));
-                
+
             } catch (error) {
                 console.error('Error actualizando agente:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1429,30 +1472,30 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta.match(/^\/api\/agentes\/\d+$/) && metodo === 'DELETE') {
         console.log('[API] DELETE /api/agentes/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         try {
             const result = await pool.query('DELETE FROM agentes WHERE id = $1 RETURNING id', [id]);
-            
+
             if (result.rowCount === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Agente no encontrado' }));
                 return;
             }
-            
+
             console.log(`✅ Agente ID ${id} eliminado`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ success: true, message: 'Agente eliminado correctamente' }));
-            
+
         } catch (error) {
             console.error('Error eliminando agente:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1469,7 +1512,7 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query('SELECT * FROM rol_pestanas');
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1491,9 +1534,9 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         try {
             const result = await pool.query('SELECT * FROM agentes WHERE id = $1', [id]);
             if (result.rows.length === 0) {
@@ -1515,14 +1558,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta === '/api/agentes/categorias' && metodo === 'GET') {
         console.log('[API] GET /api/agentes/categorias');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(`
                 SELECT DISTINCT categoria_label 
@@ -1531,13 +1574,13 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 AND categoria_label != ''
                 ORDER BY categoria_label
             `);
-            
+
             const categorias = result.rows.map(row => row.categoria_label);
             console.log(`✅ ${categorias.length} categorías encontradas`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(categorias));
-            
+
         } catch (error) {
             console.error('❌ Error en categorias:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1567,14 +1610,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta === '/api/agentes/exportar' && metodo === 'GET') {
         console.log('[API] GET /api/agentes/exportar');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(`
                 SELECT 
@@ -1593,13 +1636,13 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 FROM agentes 
                 ORDER BY nombre
             `);
-            
+
             const agentes = result.rows;
-            
+
             // Crear CSV
             const headers = ['ID', 'Nombre', 'DNI', 'Carnet', 'Correo', 'Estado', 'Líder', 'Ubicación', 'Localidad', 'Categoría', 'Funciones', 'Fecha Registro'];
             const csvRows = [headers.join(',')];
-            
+
             for (const agente of agentes) {
                 const values = headers.map(header => {
                     let value = '';
@@ -1625,15 +1668,15 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 }).join(',');
                 csvRows.push(values);
             }
-            
+
             const csvContent = "\uFEFF" + csvRows.join('\n');
-            
+
             respuesta.writeHead(200, {
                 'Content-Type': 'text/csv; charset=utf-8',
                 'Content-Disposition': `attachment; filename="agentes_${new Date().toISOString().slice(0, 10)}.csv"`
             });
             respuesta.end(csvContent);
-            
+
         } catch (error) {
             console.error('❌ Error exportando agentes:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1671,14 +1714,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
 
     if (ruta === '/api/usuarios/auditores-activos' && metodo === 'GET') {
         console.log('[API] GET /api/usuarios/auditores-activos');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             // ✅ USAR rol_id EN LUGAR DE rol
             const result = await pool.query(`
@@ -1688,12 +1731,12 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 WHERE r.codigo = 'AUDITOR' AND u.activo = true
                 ORDER BY u.nombre_completo
             `);
-            
+
             console.log(`✅ ${result.rows.length} auditores activos encontrados`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('❌ Error en auditores-activos:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1707,14 +1750,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta === '/api/usuarios' && metodo === 'GET') {
         console.log('[API] GET /api/usuarios');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             // ✅ Usar JOIN para obtener el nombre del rol
             const result = await pool.query(`
@@ -1733,10 +1776,10 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 LEFT JOIN roles r ON u.rol_id = r.id
                 ORDER BY u.usuario
             `);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('Error en /api/usuarios:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1750,29 +1793,29 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta === '/api/usuarios' && metodo === 'POST') {
         console.log('[API] POST /api/usuarios');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { usuario, nombre_completo, contrasena, rol_id, activo } = JSON.parse(body);
-                
+
                 console.log('📝 Creando usuario:', { usuario, nombre_completo, rol_id, activo });
-                
+
                 // Validaciones básicas
                 if (!usuario || !nombre_completo || !contrasena || !rol_id) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Faltan campos requeridos' }));
                     return;
                 }
-                
+
                 // Verificar si ya existe
                 const existe = await pool.query('SELECT id FROM usuarios WHERE usuario = $1', [usuario]);
                 if (existe.rows.length > 0) {
@@ -1780,7 +1823,7 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     respuesta.end(JSON.stringify({ error: 'El usuario ya existe' }));
                     return;
                 }
-                
+
                 // Verificar que el rol existe
                 const rolCheck = await pool.query('SELECT id FROM roles WHERE id = $1', [rol_id]);
                 if (rolCheck.rows.length === 0) {
@@ -1788,14 +1831,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     respuesta.end(JSON.stringify({ error: 'El rol seleccionado no existe' }));
                     return;
                 }
-                
+
                 // Hashear contraseña
                 const hashPassword = crypto.createHash('sha256').update(contrasena).digest('hex');
-                
+
                 // Obtener siguiente ID
                 const maxId = await pool.query('SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM usuarios');
                 const nuevoId = maxId.rows[0].next_id;
-                
+
                 // ✅ Insertar SOLO con rol_id (sin campo 'rol')
                 const result = await pool.query(`
                     INSERT INTO usuarios (
@@ -1811,15 +1854,15 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
                     RETURNING id, usuario, nombre_completo, rol_id, activo
                 `, [nuevoId, usuario, nombre_completo, hashPassword, rol_id, activo]);
-                
+
                 console.log(`✅ Usuario creado: ${usuario} (ID: ${nuevoId}) con rol_id: ${rol_id}`);
-                
+
                 respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ 
-                    success: true, 
-                    usuario: result.rows[0] 
+                respuesta.end(JSON.stringify({
+                    success: true,
+                    usuario: result.rows[0]
                 }));
-                
+
             } catch (error) {
                 console.error('❌ Error creando usuario:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1832,26 +1875,26 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // server.js - Endpoint para obtener TODAS las pestañas (sin filtrar por rol)
     if (ruta === '/api/pestanas/todas' && metodo === 'GET') {
         console.log('[API] GET /api/pestanas/todas');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             // 🔴 AHORA DEVUELVE TODAS (visibles y ocultas) PARA ADMIN
             const result = await pool.query(
                 'SELECT * FROM pestanas_sistema ORDER BY orden, id'
                 // ❌ SIN filtro WHERE visible = true
             );
-            
+
             console.log(`✅ ${result.rows.length} pestañas totales (${result.rows.filter(p => p.visible).length} visibles, ${result.rows.filter(p => !p.visible).length} ocultas)`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1865,27 +1908,27 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta.match(/^\/api\/rol-pestanas\/\d+$/) && metodo === 'GET') {
         console.log('[API] GET /api/rol-pestanas/:rolId');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const rolId = parseInt(ruta.split('/').pop());
-        
+
         try {
             const result = await pool.query(
                 'SELECT pestana_codigo FROM rol_pestanas WHERE rol_id = $1',
                 [rolId]
             );
-            
+
             console.log(`✅ ${result.rows.length} pestañas asignadas al rol ${rolId}`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1900,14 +1943,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta === '/api/roles' && metodo === 'GET') {
         console.log('[API] GET /api/roles');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             // 🔴 AÑADIR redirect_url A LA CONSULTA
             const result = await pool.query(`
@@ -1915,12 +1958,12 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 FROM roles
                 ORDER BY id
             `);
-            
+
             console.log(`✅ ${result.rows.length} roles obtenidos (con redirect_url)`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('Error obteniendo roles:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -1936,29 +1979,29 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta.match(/^\/api\/roles\/\d+$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/roles/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { codigo, nombre, activo, pestanas } = JSON.parse(body);
-                
+
                 // 1. Validar datos
                 if (!codigo || !nombre) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Código y nombre son requeridos' }));
                     return;
                 }
-                
+
                 // 2. Verificar que el rol existe
                 const check = await pool.query('SELECT id FROM roles WHERE id = $1', [id]);
                 if (check.rows.length === 0) {
@@ -1966,7 +2009,7 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
                     return;
                 }
-                
+
                 // 3. Verificar que no exista otro rol con el mismo código
                 const duplicado = await pool.query(
                     'SELECT id FROM roles WHERE codigo = $1 AND id != $2',
@@ -1977,7 +2020,7 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     respuesta.end(JSON.stringify({ error: `Ya existe un rol con el código "${codigo}"` }));
                     return;
                 }
-                
+
                 // 4. Actualizar el rol
                 const result = await pool.query(`
                     UPDATE roles 
@@ -1988,14 +2031,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     WHERE id = $4
                     RETURNING id, codigo, nombre, activo, created_at, updated_at
                 `, [codigo.toUpperCase(), nombre, activo !== false, id]);
-                
+
                 const rolActualizado = result.rows[0];
-                
+
                 // 5. Si se enviaron pestañas, actualizar permisos
                 if (pestanas && Array.isArray(pestanas)) {
                     // 5a. Eliminar permisos existentes
                     await pool.query('DELETE FROM rol_pestanas WHERE rol_id = $1', [id]);
-                    
+
                     // 5b. Insertar nuevos permisos
                     if (pestanas.length > 0) {
                         const values = pestanas.map(codigo => `(${id}, '${codigo}')`).join(', ');
@@ -2003,19 +2046,19 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                             `INSERT INTO rol_pestanas (rol_id, pestana_codigo) VALUES ${values}`
                         );
                     }
-                    
+
                     console.log(`   ✅ ${pestanas.length} pestañas asignadas al rol ${id}`);
                 }
-                
+
                 console.log(`✅ Rol "${nombre}" actualizado (ID: ${id})`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ 
-                    success: true, 
+                respuesta.end(JSON.stringify({
+                    success: true,
                     rol: rolActualizado,
                     message: 'Rol actualizado correctamente'
                 }));
-                
+
             } catch (error) {
                 console.error('❌ Error actualizando rol:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -2024,22 +2067,22 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
         });
         return;
     }
-    
+
     // ======================================================
     // API - USUARIOS - Eliminar usuario (DELETE)
     // ======================================================
     if (ruta.match(/^\/api\/usuarios\/\d+$/) && metodo === 'DELETE') {
         console.log('[API] DELETE /api/usuarios/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         try {
             const check = await pool.query('SELECT id FROM usuarios WHERE id = $1', [id]);
             if (check.rows.length === 0) {
@@ -2047,14 +2090,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 respuesta.end(JSON.stringify({ error: 'Usuario no encontrado' }));
                 return;
             }
-            
+
             await pool.query('DELETE FROM usuarios WHERE id = $1', [id]);
-            
+
             console.log(`✅ Usuario ID ${id} eliminado`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ success: true, message: 'Usuario eliminado' }));
-            
+
         } catch (error) {
             console.error('Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -2068,14 +2111,14 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta === '/api/usuarios/exportar' && metodo === 'GET') {
         console.log('[API] GET /api/usuarios/exportar');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(`
                 SELECT 
@@ -2090,13 +2133,13 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 LEFT JOIN roles r ON u.rol_id = r.id
                 ORDER BY u.id
             `);
-            
+
             const usuarios = result.rows;
-            
+
             // Crear CSV
             const headers = ['ID', 'Usuario', 'Nombre Completo', 'Estado', 'Rol', 'Fecha Registro', 'Último Login'];
             const csvRows = [headers.join(',')];
-            
+
             for (const user of usuarios) {
                 const values = headers.map(header => {
                     let value = '';
@@ -2117,15 +2160,15 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                 }).join(',');
                 csvRows.push(values);
             }
-            
+
             const csvContent = "\uFEFF" + csvRows.join('\n');
-            
+
             respuesta.writeHead(200, {
                 'Content-Type': 'text/csv; charset=utf-8',
                 'Content-Disposition': `attachment; filename="usuarios_${new Date().toISOString().slice(0, 10)}.csv"`
             });
             respuesta.end(csvContent);
-            
+
         } catch (error) {
             console.error('Error exportando usuarios:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -2139,22 +2182,22 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta === '/api/roles' && metodo === 'POST') {
         console.log('[API] POST /api/roles');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { codigo, nombre, activo } = JSON.parse(body);
-                
+
                 console.log(`📝 Creando rol: ${codigo} - ${nombre}`);
-                
+
                 // Verificar si ya existe
                 const existe = await pool.query('SELECT id FROM roles WHERE codigo = $1', [codigo]);
                 if (existe.rows.length > 0) {
@@ -2162,19 +2205,19 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     respuesta.end(JSON.stringify({ error: 'El código de rol ya existe' }));
                     return;
                 }
-                
+
                 // Insertar nuevo rol
                 const result = await pool.query(`
                     INSERT INTO roles (codigo, nombre, activo, created_at, updated_at)
                     VALUES ($1, $2, $3, NOW(), NOW())
                     RETURNING id, codigo, nombre, activo
                 `, [codigo, nombre, activo]);
-                
+
                 console.log(`✅ Rol "${nombre}" creado con ID ${result.rows[0].id}`);
-                
+
                 respuesta.writeHead(201, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: true, rol: result.rows[0] }));
-                
+
             } catch (error) {
                 console.error('Error creando rol:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -2189,22 +2232,22 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta.match(/^\/api\/roles\/\d+\/desactivar$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/roles/:id/desactivar');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/')[3]);
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { activo } = JSON.parse(body);
-                
+
                 // Verificar que el rol existe
                 const check = await pool.query('SELECT id, nombre FROM roles WHERE id = $1', [id]);
                 if (check.rows.length === 0) {
@@ -2212,9 +2255,9 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
                     return;
                 }
-                
+
                 const rolNombre = check.rows[0].nombre;
-                
+
                 // Actualizar el estado
                 const result = await pool.query(`
                     UPDATE roles 
@@ -2223,17 +2266,17 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     WHERE id = $2
                     RETURNING id, codigo, nombre, activo, updated_at
                 `, [activo, id]);
-                
+
                 const estadoTexto = activo ? 'reactivado' : 'desactivado';
                 console.log(`✅ Rol "${rolNombre}" ${estadoTexto} (ID: ${id})`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ 
-                    success: true, 
+                respuesta.end(JSON.stringify({
+                    success: true,
                     rol: result.rows[0],
                     message: `Rol "${rolNombre}" ${estadoTexto} correctamente`
                 }));
-                
+
             } catch (error) {
                 console.error('❌ Error desactivando rol:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -2248,22 +2291,22 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
     // ======================================================
     if (ruta.match(/^\/api\/roles\/\d+\/reactivar$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/roles/:id/reactivar');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/')[3]);
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { activo } = JSON.parse(body);
-                
+
                 // Verificar que el rol existe
                 const check = await pool.query('SELECT id, nombre FROM roles WHERE id = $1', [id]);
                 if (check.rows.length === 0) {
@@ -2271,18 +2314,18 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
                     return;
                 }
-                
+
                 const rolNombre = check.rows[0].nombre;
-                
+
                 // Si ya está activo, notificar
                 if (check.rows[0].activo === true) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ 
-                        error: `El rol "${rolNombre}" ya está activo` 
+                    respuesta.end(JSON.stringify({
+                        error: `El rol "${rolNombre}" ya está activo`
                     }));
                     return;
                 }
-                
+
                 // Reactivar el rol
                 const result = await pool.query(`
                     UPDATE roles 
@@ -2291,16 +2334,16 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
                     WHERE id = $1
                     RETURNING id, codigo, nombre, activo, updated_at
                 `, [id]);
-                
+
                 console.log(`✅ Rol "${rolNombre}" reactivado (ID: ${id})`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ 
-                    success: true, 
+                respuesta.end(JSON.stringify({
+                    success: true,
                     rol: result.rows[0],
                     message: `Rol "${rolNombre}" reactivado correctamente`
                 }));
-                
+
             } catch (error) {
                 console.error('❌ Error reactivando rol:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -2350,78 +2393,78 @@ if (ruta.match(/^\/api\/escuchas\/lotes\/\d+$/) && metodo === 'DELETE') {
         return;
     }
 
-// ======================================================
-// API - REPORTES - Meses disponibles (VERSIÓN CORREGIDA)
-// ======================================================
-if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
-    console.log('[API] GET /api/reportes/meses-disponibles');
-    
-    const token = peticion.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-        return;
-    }
-    
-    try {
-        // 🔴 CONSULTA CORREGIDA - Obtener TODAS las fechas
-        const result = await pool.query(`
+    // ======================================================
+    // API - REPORTES - Meses disponibles (VERSIÓN CORREGIDA)
+    // ======================================================
+    if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
+        console.log('[API] GET /api/reportes/meses-disponibles');
+
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+
+        try {
+            // 🔴 CONSULTA CORREGIDA - Obtener TODAS las fechas
+            const result = await pool.query(`
             SELECT fecha_formateada 
             FROM evaluaciones 
             WHERE fecha_formateada IS NOT NULL 
             AND fecha_formateada != ''
             ORDER BY fecha_formateada DESC
         `);
-        
-        console.log(`📊 Se obtuvieron ${result.rows.length} registros con fecha_formateada`);
-        
-        // Procesar resultados para obtener meses únicos
-        const mesesMap = new Map();
-        const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-        
-        for (const row of result.rows) {
-            const fechaStr = row.fecha_formateada;
-            if (fechaStr && fechaStr.includes('/')) {
-                const partes = fechaStr.split('/');
-                if (partes.length >= 3) {
-                    const dia = partes[0];
-                    const mes = parseInt(partes[1]);
-                    const anio = parseInt(partes[2]);
-                    
-                    if (!isNaN(anio) && !isNaN(mes) && mes >= 1 && mes <= 12) {
-                        const key = `${anio}-${mes.toString().padStart(2, '0')}`;
-                        if (!mesesMap.has(key)) {
-                            mesesMap.set(key, {
-                                anio: anio,
-                                mes: mes,
-                                valor: key,
-                                label: `${mesesNombres[mes-1]} ${anio}`
-                            });
+
+            console.log(`📊 Se obtuvieron ${result.rows.length} registros con fecha_formateada`);
+
+            // Procesar resultados para obtener meses únicos
+            const mesesMap = new Map();
+            const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+            for (const row of result.rows) {
+                const fechaStr = row.fecha_formateada;
+                if (fechaStr && fechaStr.includes('/')) {
+                    const partes = fechaStr.split('/');
+                    if (partes.length >= 3) {
+                        const dia = partes[0];
+                        const mes = parseInt(partes[1]);
+                        const anio = parseInt(partes[2]);
+
+                        if (!isNaN(anio) && !isNaN(mes) && mes >= 1 && mes <= 12) {
+                            const key = `${anio}-${mes.toString().padStart(2, '0')}`;
+                            if (!mesesMap.has(key)) {
+                                mesesMap.set(key, {
+                                    anio: anio,
+                                    mes: mes,
+                                    valor: key,
+                                    label: `${mesesNombres[mes - 1]} ${anio}`
+                                });
+                            }
                         }
                     }
                 }
             }
+
+            // Convertir a array y ordenar (más reciente primero)
+            const meses = Array.from(mesesMap.values()).sort((a, b) => {
+                if (a.anio !== b.anio) return b.anio - a.anio;
+                return b.mes - a.mes;
+            });
+
+            console.log(`✅ ${meses.length} meses disponibles únicos`);
+
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(meses));
+
+        } catch (error) {
+            console.error('❌ Error en meses-disponibles:', error);
+            // En caso de error, devolver array vacío
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify([]));
         }
-        
-        // Convertir a array y ordenar (más reciente primero)
-        const meses = Array.from(mesesMap.values()).sort((a, b) => {
-            if (a.anio !== b.anio) return b.anio - a.anio;
-            return b.mes - a.mes;
-        });
-        
-        console.log(`✅ ${meses.length} meses disponibles únicos`);
-        
-        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify(meses));
-        
-    } catch (error) {
-        console.error('❌ Error en meses-disponibles:', error);
-        // En caso de error, devolver array vacío
-        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify([]));
+        return;
     }
-    return;
-}
 
     // Evolutivo
     if (ruta === '/api/reportes/evolutivo' && metodo === 'GET') {
@@ -2466,18 +2509,18 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta === '/api/reportes/errores-auditores' && metodo === 'GET') {
         console.log('[API] GET /api/reportes/errores-auditores');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const { periodo, auditor } = urlParseada.query;
             const periodoDias = parseInt(periodo) || 30;
-            
+
             // Obtener evaluaciones con detalles
             const result = await pool.query(`
                 SELECT 
@@ -2496,25 +2539,25 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 WHERE e.fecha_formateada IS NOT NULL
                 ORDER BY e.fecha DESC
             `);
-            
+
             // Calcular fecha límite
             const fechaLimite = new Date();
             fechaLimite.setDate(fechaLimite.getDate() - periodoDias);
-            
+
             // Procesar en JavaScript
             const erroresPorAuditorPorFecha = {};
             const auditoresSet = new Set();
             const fechasSet = new Set();
             const detallesPorAuditorPorFecha = {};  // 🔴 CLAVE: Inicializar detalles
-            
+
             for (const row of result.rows) {
                 // Filtrar por auditor
                 if (auditor !== 'todos' && row.evaluador !== auditor) continue;
-                
+
                 // Parsear fecha
                 let fechaStr = '';
                 let fechaEval = null;
-                
+
                 if (row.fecha_formateada) {
                     fechaStr = row.fecha_formateada.split(' ')[0];
                     const partes = fechaStr.split('/');
@@ -2522,16 +2565,16 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                         fechaEval = new Date(partes[2], partes[1] - 1, partes[0]);
                     }
                 }
-                
+
                 // Filtrar por período
                 if (fechaEval && fechaEval < fechaLimite) continue;
                 if (!fechaStr) continue;
-                
+
                 if (row.evaluador) auditoresSet.add(row.evaluador);
                 fechasSet.add(fechaStr);
-                
+
                 const esError = row.cumple === false || row.cumple === 0 || row.cumple === 'false';
-                
+
                 if (esError && row.detalle_id) {
                     // Contar errores por fecha
                     if (!erroresPorAuditorPorFecha[row.evaluador]) {
@@ -2541,7 +2584,7 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                         erroresPorAuditorPorFecha[row.evaluador][fechaStr] = 0;
                     }
                     erroresPorAuditorPorFecha[row.evaluador][fechaStr]++;
-                    
+
                     // 🔴 GUARDAR DETALLES
                     if (!detallesPorAuditorPorFecha[row.evaluador]) {
                         detallesPorAuditorPorFecha[row.evaluador] = {};
@@ -2560,18 +2603,18 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     });
                 }
             }
-            
+
             // Ordenar fechas
             const fechasOrdenadas = Array.from(fechasSet).sort((a, b) => {
                 const [diaA, mesA, anioA] = a.split('/');
                 const [diaB, mesB, anioB] = b.split('/');
-                return new Date(anioB, mesB-1, diaB) - new Date(anioA, mesA-1, diaA);
+                return new Date(anioB, mesB - 1, diaB) - new Date(anioA, mesA - 1, diaA);
             });
-            
+
             const auditoresLista = Array.from(auditoresSet).sort();
-            
+
             console.log(`✅ Auditores: ${auditoresLista.length}, Fechas: ${fechasOrdenadas.length}`);
-            
+
             // 🔴 CLAVE: Incluir detallesPorAuditorPorFecha en la respuesta
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({
@@ -2580,7 +2623,7 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 auditores: auditoresLista,
                 detallesPorAuditorPorFecha  // <--- ESTO ES LO QUE FALTA
             }));
-            
+
         } catch (error) {
             console.error('❌ Error:', error);
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
@@ -2593,7 +2636,7 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         }
         return;
     }
-    
+
 
     // Evaluaciones con detalles
     if (ruta === '/api/reportes/evaluaciones-con-detalles' && metodo === 'GET') {
@@ -2651,17 +2694,17 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta === '/api/reportes/resumen-por-lider' && metodo === 'GET') {
         console.log('[API] GET /api/reportes/resumen-por-lider');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const { fechaInicio, fechaFin } = urlParseada.query;
-            
+
             // 🔴 CONSULTA AGRUPADA POR LÍDER
             const query = `
                 SELECT 
@@ -2695,9 +2738,9 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 GROUP BY a.lider_2026
                 ORDER BY promedio_general DESC
             `;
-            
+
             const result = await pool.query(query);
-            
+
             const datos = result.rows.map(row => ({
                 nombre: row.nombre,
                 totalAgentes: parseInt(row.total_agentes),
@@ -2710,12 +2753,12 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 gestoresQ4: parseInt(row.gestores_q4) || 0,
                 pctQ4: parseFloat(row.pct_q4) || 0
             }));
-            
+
             console.log(`✅ ${datos.length} líderes encontrados`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(datos));
-            
+
         } catch (error) {
             console.error('❌ Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -2729,14 +2772,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta === '/api/reportes/resumen-por-ubicacion' && metodo === 'GET') {
         console.log('[API] GET /api/reportes/resumen-por-ubicacion');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const query = `
                 SELECT 
@@ -2770,9 +2813,9 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 GROUP BY a.ubicacion
                 ORDER BY promedio_general DESC
             `;
-            
+
             const result = await pool.query(query);
-            
+
             const datos = result.rows.map(row => ({
                 nombre: row.nombre,
                 totalAgentes: parseInt(row.total_agentes),
@@ -2785,12 +2828,12 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 gestoresQ4: parseInt(row.gestores_q4) || 0,
                 pctQ4: parseFloat(row.pct_q4) || 0
             }));
-            
+
             console.log(`✅ ${datos.length} ubicaciones encontradas`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(datos));
-            
+
         } catch (error) {
             console.error('❌ Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -2804,14 +2847,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta === '/api/reportes/resumen-por-localidad' && metodo === 'GET') {
         console.log('[API] GET /api/reportes/resumen-por-localidad');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const query = `
                 SELECT 
@@ -2845,9 +2888,9 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 GROUP BY a.localidad
                 ORDER BY promedio_general DESC
             `;
-            
+
             const result = await pool.query(query);
-            
+
             const datos = result.rows.map(row => ({
                 nombre: row.nombre,
                 totalAgentes: parseInt(row.total_agentes),
@@ -2860,12 +2903,12 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 gestoresQ4: parseInt(row.gestores_q4) || 0,
                 pctQ4: parseFloat(row.pct_q4) || 0
             }));
-            
+
             console.log(`✅ ${datos.length} localidades encontradas`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(datos));
-            
+
         } catch (error) {
             console.error('❌ Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -2874,21 +2917,21 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
         return;
     }
 
-        // ======================================================
+    // ======================================================
     // API - PDA (Plan de Desarrollo y Acción)
     // ======================================================
 
     // Obtener PDA pendientes
     if (ruta === '/api/pda/pendientes' && metodo === 'GET') {
         console.log('[API] GET /api/pda/pendientes');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             // Verificar si la tabla existe
             const checkTable = await pool.query(`
@@ -2897,14 +2940,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     WHERE table_name = 'pda_cabecera'
                 );
             `);
-            
+
             if (!checkTable.rows[0].exists) {
                 console.log('⚠️ Tabla pda_cabecera no existe, devolviendo array vacío');
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify([]));
                 return;
             }
-            
+
             const result = await pool.query(
                 `SELECT * FROM pda_cabecera 
                  WHERE estado IN ('pendiente', 'notificado', 'en_gestion') 
@@ -2923,14 +2966,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // Obtener PDA en seguimiento
     if (ruta === '/api/pda/seguimiento' && metodo === 'GET') {
         console.log('[API] GET /api/pda/seguimiento');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const checkTable = await pool.query(`
                 SELECT EXISTS (
@@ -2938,13 +2981,13 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     WHERE table_name = 'pda_cabecera'
                 );
             `);
-            
+
             if (!checkTable.rows[0].exists) {
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify([]));
                 return;
             }
-            
+
             const result = await pool.query(
                 `SELECT * FROM pda_cabecera 
                  WHERE estado = 'en_seguimiento' 
@@ -2963,14 +3006,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // Obtener historial de PDA
     if (ruta === '/api/pda/historial' && metodo === 'GET') {
         console.log('[API] GET /api/pda/historial');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const checkTable = await pool.query(`
                 SELECT EXISTS (
@@ -2978,13 +3021,13 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     WHERE table_name = 'pda_cabecera'
                 );
             `);
-            
+
             if (!checkTable.rows[0].exists) {
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify([]));
                 return;
             }
-            
+
             const result = await pool.query(
                 `SELECT * FROM pda_cabecera 
                  WHERE estado IN ('completado', 'escalado', 'corregido') 
@@ -3004,43 +3047,43 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // Obtener detalle de un PDA específico
     if (ruta.match(/^\/api\/pda\/\d+$/) && metodo === 'GET') {
         console.log('[API] GET /api/pda/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const pdaId = ruta.split('/').pop();
-        
+
         try {
             // Obtener cabecera
             const headerResult = await pool.query(
                 'SELECT * FROM pda_cabecera WHERE id = $1',
                 [pdaId]
             );
-            
+
             if (headerResult.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'PDA no encontrado' }));
                 return;
             }
-            
+
             // Obtener acciones
             const accionesResult = await pool.query(
                 'SELECT * FROM pda_acciones WHERE pda_id = $1 ORDER BY id',
                 [pdaId]
             );
-            
+
             const pda = headerResult.rows[0];
             pda.acciones = accionesResult.rows;
-            
+
             // Calcular progreso
             const totalAcciones = accionesResult.rows.length;
             const completadas = accionesResult.rows.filter(a => a.completado === true).length;
             pda.progreso = totalAcciones > 0 ? Math.round((completadas / totalAcciones) * 100) : 0;
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(pda));
         } catch (error) {
@@ -3054,14 +3097,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // Exportar reporte PDA
     if (ruta === '/api/pda/exportar' && metodo === 'GET') {
         console.log('[API] GET /api/pda/exportar');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(`
                 SELECT 
@@ -3078,7 +3121,7 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 GROUP BY pc.id, pc.agente, pc.fecha_deteccion, pc.estado, pc.promedio_basal, pc.cuartil_basal
                 ORDER BY pc.created_at DESC
             `);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
         } catch (error) {
@@ -3127,17 +3170,17 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta.match(/^\/api\/sesiones\/usuarios\/\d+$/) && metodo === 'GET') {
         console.log('[API] GET /api/sesiones/usuarios/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const usuarioId = parseInt(ruta.split('/').pop());
         const { activas } = urlParseada.query;
-        
+
         try {
             // 🔴 CONSULTA SIN motivo_cierre (no existe en la tabla)
             let query = `
@@ -3157,20 +3200,20 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 WHERE usuario_id = $1
             `;
             const params = [usuarioId];
-            
+
             if (activas === 'true') {
                 query += ` AND estado = 'activa'`;
             }
-            
+
             query += ` ORDER BY fecha_inicio DESC`;
-            
+
             const result = await pool.query(query, params);
-            
+
             console.log(`✅ ${result.rows.length} sesiones encontradas para usuario ${usuarioId}`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('❌ Error obteniendo sesiones:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -3184,20 +3227,20 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta === '/api/sesiones/cerrar' && metodo === 'POST') {
         console.log('[API] POST /api/sesiones/cerrar');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { sessionToken } = JSON.parse(body);
-                
+
                 // 🔴 SIN motivo_cierre
                 const result = await pool.query(`
                     UPDATE sesiones_activas 
@@ -3206,15 +3249,15 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     WHERE session_token = $1 AND estado = 'activa'
                     RETURNING id
                 `, [sessionToken]);
-                
+
                 console.log(`✅ Sesión cerrada: ${result.rowCount} afectadas`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ 
-                    success: true, 
-                    afectadas: result.rowCount 
+                respuesta.end(JSON.stringify({
+                    success: true,
+                    afectadas: result.rowCount
                 }));
-                
+
             } catch (error) {
                 console.error('Error cerrando sesión:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -3229,31 +3272,31 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta.startsWith('/api/sesiones/usuarios/') && ruta.endsWith('/cerrar-todas') && metodo === 'POST') {
         console.log('[API] POST /api/sesiones/usuarios/:id/cerrar-todas');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         // 🔴 EXTRAER ID DE FORMA ROBUSTA
         // Ejemplo: /api/sesiones/usuarios/5/cerrar-todas
         const partes = ruta.split('/');
         // partes = ['', 'api', 'sesiones', 'usuarios', '5', 'cerrar-todas']
         const usuarioId = parseInt(partes[4]); // El ID está en la posición 4
-        
+
         console.log('URL:', ruta);
         console.log('Partes:', partes);
         console.log('ID extraído:', usuarioId);
-        
+
         if (isNaN(usuarioId)) {
             console.error('❌ No se pudo extraer el ID');
             respuesta.writeHead(400, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'ID de usuario inválido', ruta: ruta }));
             return;
         }
-        
+
         try {
             const result = await pool.query(`
                 UPDATE sesiones_activas 
@@ -3262,15 +3305,15 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 WHERE usuario_id = $1 AND estado = 'activa'
                 RETURNING id
             `, [usuarioId]);
-            
+
             console.log(`✅ Cerradas ${result.rowCount} sesiones para usuario ${usuarioId}`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
-                success: true, 
-                cerradas: result.rowCount 
+            respuesta.end(JSON.stringify({
+                success: true,
+                cerradas: result.rowCount
             }));
-            
+
         } catch (error) {
             console.error('❌ Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -3312,42 +3355,42 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta.match(/^\/api\/usuarios\/\d+\/password$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/usuarios/:id/password');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/')[3]);
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { password } = JSON.parse(body);
-                
+
                 const hashPassword = crypto.createHash('sha256').update(password).digest('hex');
-                
+
                 const result = await pool.query(`
                     UPDATE usuarios 
                     SET contrasena = $1, updated_at = NOW() 
                     WHERE id = $2
                     RETURNING id
                 `, [hashPassword, id]);
-                
+
                 if (result.rowCount === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Usuario no encontrado' }));
                     return;
                 }
-                
+
                 console.log(`✅ Password actualizado para usuario ID ${id}`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: true }));
-                
+
             } catch (error) {
                 console.error('Error:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -3362,32 +3405,32 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta.match(/^\/api\/usuarios\/\d+$/) && metodo === 'GET') {
         console.log('[API] GET /api/usuarios/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         try {
             const result = await pool.query(`
                 SELECT id, usuario, nombre_completo, activo, created_at, rol_id
                 FROM usuarios 
                 WHERE id = $1
             `, [id]);
-            
+
             if (result.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Usuario no encontrado' }));
                 return;
             }
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows[0]));
-            
+
         } catch (error) {
             console.error('Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -3401,39 +3444,39 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta.match(/^\/api\/usuarios\/\d+$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/usuarios/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { usuario, nombre_completo, rol_id, activo, contrasena } = JSON.parse(body);
-                
+
                 console.log(`📝 Actualizando usuario ID ${id}:`, { usuario, nombre_completo, rol_id, activo });
-                
+
                 // Construir la consulta dinámicamente
                 const updates = [];
                 const values = [];
                 let idx = 1;
-                
+
                 if (usuario !== undefined) {
                     updates.push(`usuario = $${idx++}`);
                     values.push(usuario);
                 }
-                
+
                 if (nombre_completo !== undefined) {
                     updates.push(`nombre_completo = $${idx++}`);
                     values.push(nombre_completo);
                 }
-                
+
                 // ✅ Actualizar SOLO rol_id (sin campo 'rol')
                 if (rol_id !== undefined) {
                     // Verificar que el rol existe
@@ -3446,40 +3489,40 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     updates.push(`rol_id = $${idx++}`);
                     values.push(rol_id);
                 }
-                
+
                 if (activo !== undefined) {
                     updates.push(`activo = $${idx++}`);
                     values.push(activo);
                 }
-                
+
                 if (contrasena) {
                     const hashPassword = crypto.createHash('sha256').update(contrasena).digest('hex');
                     updates.push(`contrasena = $${idx++}`);
                     values.push(hashPassword);
                 }
-                
+
                 updates.push(`updated_at = NOW()`);
-                
+
                 values.push(id);
-                
+
                 const query = `UPDATE usuarios SET ${updates.join(', ')} WHERE id = $${idx}`;
-                
+
                 console.log('📝 Query:', query);
                 console.log('📝 Values:', values);
-                
+
                 const result = await pool.query(query, values);
-                
+
                 if (result.rowCount === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Usuario no encontrado' }));
                     return;
                 }
-                
+
                 console.log(`✅ Usuario ID ${id} actualizado`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: true, message: 'Usuario actualizado' }));
-                
+
             } catch (error) {
                 console.error('❌ Error actualizando usuario:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -3490,21 +3533,21 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     }
 
 
-        // ======================================================
+    // ======================================================
     // API - ADMINISTRACIÓN DE MATRIZ DE EVALUACIÓN
     // ======================================================
 
     // ========== FRENTES ==========
     if (ruta === '/api/matriz/frentes' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/frentes');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(
                 'SELECT id, codigo, nombre, peso_maximo, orden, activo FROM frentes ORDER BY orden'
@@ -3524,70 +3567,70 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta === '/api/matriz/frentes' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/frentes');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { codigo, nombre, peso_maximo, orden, activo } = JSON.parse(body);
-                
+
                 if (!codigo || !nombre || !peso_maximo) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Faltan campos obligatorios' }));
                     return;
                 }
-                
+
                 if (peso_maximo <= 0 || peso_maximo > 100) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'El peso debe ser mayor a 0 y menor o igual a 100' }));
                     return;
                 }
-                
+
                 // 1. Obtener versión activa
                 const versionResult = await pool.query(
                     'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
                 );
-                
+
                 if (versionResult.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
                     return;
                 }
-                
+
                 const versionId = versionResult.rows[0].id;
-                
+
                 // 2. Verificar que no exista un frente con el mismo código en la versión activa
                 const existenteResult = await pool.query(
                     'SELECT id FROM version_frentes WHERE version_id = $1 AND codigo = $2',
                     [versionId, codigo]
                 );
-                
+
                 if (existenteResult.rows.length > 0) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: `Ya existe un frente con el código "${codigo}" en esta versión` }));
                     return;
                 }
-                
+
                 // 3. 🔴 VALIDAR SUMA TOTAL DE FRENTES SOLO EN LA VERSIÓN ACTIVA
                 const frentesResult = await pool.query(
                     'SELECT COALESCE(SUM(peso_maximo), 0) as total FROM version_frentes WHERE version_id = $1 AND activo = true',
                     [versionId]
                 );
-                
+
                 const sumaActual = parseFloat(frentesResult.rows[0].total) || 0;
                 const nuevoPeso = parseFloat(peso_maximo);
                 const nuevaSuma = sumaActual + nuevoPeso;
-                
+
                 if (nuevaSuma > 100) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ 
+                    respuesta.end(JSON.stringify({
                         error: `La suma total de los frentes en la versión activa excede el 100%. Actual: ${sumaActual}% + ${nuevoPeso}% = ${nuevaSuma}%`,
                         suma_actual: sumaActual,
                         nuevo_peso: nuevoPeso,
@@ -3596,7 +3639,7 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     }));
                     return;
                 }
-                
+
                 // 4. Insertar frente en la versión activa
                 const result = await pool.query(`
                     INSERT INTO version_frentes (
@@ -3611,12 +3654,12 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
                     RETURNING id, codigo, nombre, peso_maximo, orden, activo
                 `, [versionId, codigo, nombre, nuevoPeso, orden || 0, activo !== false]);
-                
+
                 console.log(`✅ Frente creado en versión ${versionId}: ${codigo} (ID: ${result.rows[0].id})`);
-                
+
                 respuesta.writeHead(201, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify(result.rows[0]));
-                
+
             } catch (error) {
                 console.error('Error creando frente:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -3631,78 +3674,78 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta.match(/^\/api\/matriz\/frentes\/\d+$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/matriz/frentes/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { codigo, nombre, peso_maximo, orden, activo } = JSON.parse(body);
-                
+
                 // 1. Obtener versión activa
                 const versionResult = await pool.query(
                     'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
                 );
-                
+
                 if (versionResult.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
                     return;
                 }
-                
+
                 const versionId = versionResult.rows[0].id;
-                
+
                 // 2. Verificar que el frente existe en la versión activa
                 const frenteResult = await pool.query(
                     'SELECT id, peso_maximo, codigo FROM version_frentes WHERE id = $1 AND version_id = $2',
                     [id, versionId]
                 );
-                
+
                 if (frenteResult.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Frente no encontrado en la versión activa' }));
                     return;
                 }
-                
+
                 const frenteActual = frenteResult.rows[0];
                 const pesoActual = parseFloat(frenteActual.peso_maximo);
                 const nuevoPeso = peso_maximo !== undefined ? parseFloat(peso_maximo) : pesoActual;
                 const nuevoCodigo = codigo || frenteActual.codigo;
-                
+
                 // 3. Verificar que no exista otro frente con el mismo código en la versión activa
                 if (codigo && codigo !== frenteActual.codigo) {
                     const existenteResult = await pool.query(
                         'SELECT id FROM version_frentes WHERE version_id = $1 AND codigo = $2 AND id != $3',
                         [versionId, codigo, id]
                     );
-                    
+
                     if (existenteResult.rows.length > 0) {
                         respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                         respuesta.end(JSON.stringify({ error: `Ya existe un frente con el código "${codigo}" en esta versión` }));
                         return;
                     }
                 }
-                
+
                 // 4. 🔴 VALIDAR SUMA TOTAL DE FRENTES SOLO EN LA VERSIÓN ACTIVA (excluyendo el actual)
                 const frentesResult = await pool.query(
                     'SELECT COALESCE(SUM(peso_maximo), 0) as total FROM version_frentes WHERE version_id = $1 AND activo = true AND id != $2',
                     [versionId, id]
                 );
-                
+
                 const sumaOtros = parseFloat(frentesResult.rows[0].total) || 0;
                 const nuevaSuma = sumaOtros + nuevoPeso;
-                
+
                 if (nuevaSuma > 100) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ 
+                    respuesta.end(JSON.stringify({
                         error: `La suma total de los frentes en la versión activa excede el 100%. Otros: ${sumaOtros}% + ${nuevoPeso}% = ${nuevaSuma}%`,
                         suma_actual: sumaOtros,
                         nuevo_peso: nuevoPeso,
@@ -3711,7 +3754,7 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     }));
                     return;
                 }
-                
+
                 // 5. Actualizar frente en la versión activa
                 const result = await pool.query(`
                     UPDATE version_frentes 
@@ -3731,12 +3774,12 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     activo !== undefined ? activo : true,
                     id
                 ]);
-                
+
                 console.log(`✅ Frente actualizado en versión ${versionId}: ${nuevoCodigo} (ID: ${id})`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify(result.rows[0]));
-                
+
             } catch (error) {
                 console.error('Error actualizando frente:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -3749,14 +3792,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // Eliminar Frente (con cascada y mensaje informativo)
     if (ruta.match(/^\/api\/matriz\/frentes\/\d+$/) && metodo === 'DELETE') {
         console.log('[API] DELETE /api/matriz/frentes/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = ruta.split('/').pop();
         try {
             // Obtener información del frente
@@ -3764,36 +3807,36 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 'SELECT nombre FROM frentes WHERE id = $1',
                 [id]
             );
-            
+
             if (frenteInfo.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Frente no encontrado' }));
                 return;
             }
-            
+
             // Obtener IDs de atributos para eliminar sub-motivos
             const atributos = await pool.query(
                 'SELECT id FROM atributos WHERE frente_id = $1',
                 [id]
             );
-            
+
             // Eliminar sub-motivos primero
             for (const attr of atributos.rows) {
                 await pool.query('DELETE FROM sub_motivos WHERE atributo_id = $1', [attr.id]);
             }
-            
+
             // Eliminar atributos
             await pool.query('DELETE FROM atributos WHERE frente_id = $1', [id]);
-            
+
             // Finalmente eliminar el frente
             await pool.query('DELETE FROM frentes WHERE id = $1', [id]);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
-                success: true, 
+            respuesta.end(JSON.stringify({
+                success: true,
                 message: `✅ Frente "${frenteInfo.rows[0].nombre}" eliminado correctamente.`
             }));
-            
+
         } catch (error) {
             console.error('Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -3805,14 +3848,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ========== ATRIBUTOS ==========
     if (ruta === '/api/matriz/atributos' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/atributos');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const { frente_id } = urlParseada.query;
         try {
             let query = 'SELECT id, frente_id, nombre, peso_maximo, orden, activo FROM atributos';
@@ -3839,84 +3882,84 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta === '/api/matriz/atributos' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/atributos');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { frente_id, nombre, peso_maximo, orden, activo } = JSON.parse(body);
-                
+
                 if (!frente_id || !nombre || !peso_maximo) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Faltan campos obligatorios' }));
                     return;
                 }
-                
+
                 if (peso_maximo <= 0) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'El peso debe ser mayor a 0' }));
                     return;
                 }
-                
+
                 // 1. Obtener versión activa
                 const versionResult = await pool.query(
                     'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
                 );
-                
+
                 if (versionResult.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
                     return;
                 }
-                
+
                 const versionId = versionResult.rows[0].id;
-                
+
                 // 2. Verificar que el frente existe en la versión activa
                 const frenteResult = await pool.query(
                     'SELECT id, peso_maximo FROM version_frentes WHERE id = $1 AND version_id = $2 AND activo = true',
                     [frente_id, versionId]
                 );
-                
+
                 if (frenteResult.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Frente no encontrado en la versión activa' }));
                     return;
                 }
-                
+
                 const pesoMaximoFrente = parseFloat(frenteResult.rows[0].peso_maximo);
-                
+
                 // 3. Verificar que no exista un atributo con el mismo nombre en la versión activa
                 const existenteResult = await pool.query(
                     'SELECT id FROM version_atributos va JOIN version_frentes vf ON va.version_frente_id = vf.id WHERE vf.version_id = $1 AND va.nombre = $2 AND va.version_frente_id = $3',
                     [versionId, nombre, frente_id]
                 );
-                
+
                 if (existenteResult.rows.length > 0) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: `Ya existe un atributo con el nombre "${nombre}" en este frente en la versión activa` }));
                     return;
                 }
-                
+
                 // 4. 🔴 VALIDAR SUMA DE ATRIBUTOS SOLO EN LA VERSIÓN ACTIVA
                 const atributosResult = await pool.query(
                     'SELECT COALESCE(SUM(va.peso_maximo), 0) as total FROM version_atributos va JOIN version_frentes vf ON va.version_frente_id = vf.id WHERE vf.version_id = $1 AND va.version_frente_id = $2 AND va.activo = true',
                     [versionId, frente_id]
                 );
-                
+
                 const sumaActual = parseFloat(atributosResult.rows[0].total) || 0;
                 const nuevoPeso = parseFloat(peso_maximo);
                 const nuevaSuma = sumaActual + nuevoPeso;
-                
+
                 if (nuevaSuma > pesoMaximoFrente) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ 
+                    respuesta.end(JSON.stringify({
                         error: `La suma de los atributos en la versión activa excede el peso del frente (${pesoMaximoFrente}%). Actual: ${sumaActual}% + ${nuevoPeso}% = ${nuevaSuma}%`,
                         suma_actual: sumaActual,
                         nuevo_peso: nuevoPeso,
@@ -3925,7 +3968,7 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     }));
                     return;
                 }
-                
+
                 // 5. Insertar atributo en la versión activa
                 const result = await pool.query(`
                     INSERT INTO version_atributos (
@@ -3939,12 +3982,12 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
                     RETURNING id, nombre, peso_maximo, orden, activo
                 `, [frente_id, nombre, nuevoPeso, orden || 0, activo !== false]);
-                
+
                 console.log(`✅ Atributo creado en versión ${versionId}: ${nombre} (ID: ${result.rows[0].id})`);
-                
+
                 respuesta.writeHead(201, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify(result.rows[0]));
-                
+
             } catch (error) {
                 console.error('Error creando atributo:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -3957,14 +4000,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // Eliminar Atributo (con cascada)
     if (ruta.match(/^\/api\/matriz\/atributos\/\d+$/) && metodo === 'DELETE') {
         console.log('[API] DELETE /api/matriz/atributos/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = ruta.split('/').pop();
         try {
             // Obtener información del atributo
@@ -3972,25 +4015,25 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                 'SELECT nombre FROM atributos WHERE id = $1',
                 [id]
             );
-            
+
             if (atributoInfo.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Atributo no encontrado' }));
                 return;
             }
-            
+
             // Obtener conteo de sub-motivos
             const conteo = await pool.query(
                 'SELECT COUNT(*) as total FROM sub_motivos WHERE atributo_id = $1',
                 [id]
             );
-            
+
             // Eliminar (ON DELETE CASCADE eliminará los sub-motivos)
             await pool.query('DELETE FROM atributos WHERE id = $1', [id]);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
-                success: true, 
+            respuesta.end(JSON.stringify({
+                success: true,
                 message: `✅ Atributo "${atributoInfo.rows[0].nombre}" eliminado.\n📊 Se eliminaron: ${conteo.rows[0].total} sub-motivos.`
             }));
         } catch (error) {
@@ -4004,14 +4047,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ========== SUB-MOTIVOS ==========
     if (ruta === '/api/matriz/sub-motivos' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/sub-motivos');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const { atributo_id } = urlParseada.query;
         try {
             let query = 'SELECT id, atributo_id, codigo, descripcion, peso_individual, orden, activo FROM sub_motivos';
@@ -4038,45 +4081,45 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // ======================================================
     if (ruta === '/api/matriz/sub-motivos' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/sub-motivos');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { atributo_id, codigo, descripcion, peso_individual, orden, activo } = JSON.parse(body);
-                
+
                 if (!atributo_id || !codigo || !descripcion || !peso_individual) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Faltan campos obligatorios' }));
                     return;
                 }
-                
+
                 if (peso_individual <= 0) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'El peso debe ser mayor a 0' }));
                     return;
                 }
-                
+
                 // 1. Obtener versión activa
                 const versionResult = await pool.query(
                     'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
                 );
-                
+
                 if (versionResult.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
                     return;
                 }
-                
+
                 const versionId = versionResult.rows[0].id;
-                
+
                 // 2. Verificar que el atributo existe en la versión activa
                 const atributoResult = await pool.query(`
                     SELECT va.id, va.peso_maximo
@@ -4084,15 +4127,15 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     JOIN version_frentes vf ON va.version_frente_id = vf.id
                     WHERE va.id = $1 AND vf.version_id = $2 AND va.activo = true
                 `, [atributo_id, versionId]);
-                
+
                 if (atributoResult.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Atributo no encontrado en la versión activa' }));
                     return;
                 }
-                
+
                 const pesoMaximoAtributo = parseFloat(atributoResult.rows[0].peso_maximo);
-                
+
                 // 3. Verificar que no exista un sub-motivo con el mismo código en la versión activa
                 const existenteResult = await pool.query(`
                     SELECT vsm.id FROM version_sub_motivos vsm 
@@ -4100,13 +4143,13 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     JOIN version_frentes vf ON va.version_frente_id = vf.id
                     WHERE vf.version_id = $1 AND vsm.codigo = $2 AND vsm.version_atributo_id = $3
                 `, [versionId, codigo, atributo_id]);
-                
+
                 if (existenteResult.rows.length > 0) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: `Ya existe un sub-motivo con el código "${codigo}" en este atributo en la versión activa` }));
                     return;
                 }
-                
+
                 // 4. 🔴 VALIDAR SUMA DE SUB-MOTIVOS SOLO EN LA VERSIÓN ACTIVA
                 const subMotivosResult = await pool.query(`
                     SELECT COALESCE(SUM(vsm.peso_individual), 0) as total 
@@ -4115,14 +4158,14 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     JOIN version_frentes vf ON va.version_frente_id = vf.id
                     WHERE vf.version_id = $1 AND vsm.version_atributo_id = $2 AND vsm.activo = true
                 `, [versionId, atributo_id]);
-                
+
                 const sumaActual = parseFloat(subMotivosResult.rows[0].total) || 0;
                 const nuevoPeso = parseFloat(peso_individual);
                 const nuevaSuma = sumaActual + nuevoPeso;
-                
+
                 if (nuevaSuma > pesoMaximoAtributo) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ 
+                    respuesta.end(JSON.stringify({
                         error: `La suma de los sub-motivos en la versión activa excede el peso del atributo (${pesoMaximoAtributo}%). Actual: ${sumaActual}% + ${nuevoPeso}% = ${nuevaSuma}%`,
                         suma_actual: sumaActual,
                         nuevo_peso: nuevoPeso,
@@ -4131,7 +4174,7 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     }));
                     return;
                 }
-                
+
                 // 5. Insertar sub-motivo en la versión activa
                 const result = await pool.query(`
                     INSERT INTO version_sub_motivos (
@@ -4146,12 +4189,12 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
                     ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
                     RETURNING id, codigo, descripcion, peso_individual, orden, activo
                 `, [atributo_id, codigo, descripcion, nuevoPeso, orden || 0, activo !== false]);
-                
+
                 console.log(`✅ Sub-motivo creado en versión ${versionId}: ${codigo} (ID: ${result.rows[0].id})`);
-                
+
                 respuesta.writeHead(201, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify(result.rows[0]));
-                
+
             } catch (error) {
                 console.error('Error creando sub-motivo:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -4164,32 +4207,32 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     // Eliminar Sub-motivo (simple)
     if (ruta.match(/^\/api\/matriz\/sub-motivos\/\d+$/) && metodo === 'DELETE') {
         console.log('[API] DELETE /api/matriz/sub-motivos/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = ruta.split('/').pop();
         try {
             const subMotivoInfo = await pool.query(
                 'SELECT codigo, descripcion FROM sub_motivos WHERE id = $1',
                 [id]
             );
-            
+
             if (subMotivoInfo.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Sub-motivo no encontrado' }));
                 return;
             }
-            
+
             await pool.query('DELETE FROM sub_motivos WHERE id = $1', [id]);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
-                success: true, 
+            respuesta.end(JSON.stringify({
+                success: true,
                 message: `✅ Sub-motivo "${subMotivoInfo.rows[0].codigo}" eliminado.`
             }));
         } catch (error) {
@@ -4201,67 +4244,67 @@ if (ruta === '/api/reportes/meses-disponibles' && metodo === 'GET') {
     }
 
     // ======================================================
-// CONGELAR VERSIÓN ACTUAL (CREAR SNAPSHOT) - CORREGIDO
-// ======================================================
+    // CONGELAR VERSIÓN ACTUAL (CREAR SNAPSHOT) - CORREGIDO
+    // ======================================================
 
-if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
-    console.log('[API] POST /api/matriz/versiones/congelar');
-    
-    const token = peticion.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-        return;
-    }
-    
-    let body = '';
-    peticion.on('data', chunk => body += chunk);
-    peticion.on('end', async () => {
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-            
-            const { version, descripcion, fecha_vigencia } = JSON.parse(body);
-            
-            if (!version || !fecha_vigencia) {
-                await client.query('ROLLBACK');
-                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'Versión y fecha vigencia son requeridos' }));
-                client.release();
-                return;
-            }
-            
-            // 1. Obtener versión activa actual
-            const versionActivaResult = await client.query(
-                'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
-            );
-            
-            if (versionActivaResult.rows.length === 0) {
-                await client.query('ROLLBACK');
-                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'No hay una versión activa para congelar' }));
-                client.release();
-                return;
-            }
-            
-            const versionActivaId = versionActivaResult.rows[0].id;
-            
-            // 2. Verificar que la nueva versión no exista ya
-            const existeResult = await client.query(
-                'SELECT id FROM versiones_matriz WHERE version = $1',
-                [version]
-            );
-            
-            if (existeResult.rows.length > 0) {
-                await client.query('ROLLBACK');
-                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: `La versión "${version}" ya existe` }));
-                client.release();
-                return;
-            }
-            
-            // 3. Crear la nueva versión (INACTIVA por defecto)
-            const nuevaVersionResult = await client.query(`
+    if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
+        console.log('[API] POST /api/matriz/versiones/congelar');
+
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+
+        let body = '';
+        peticion.on('data', chunk => body += chunk);
+        peticion.on('end', async () => {
+            const client = await pool.connect();
+            try {
+                await client.query('BEGIN');
+
+                const { version, descripcion, fecha_vigencia } = JSON.parse(body);
+
+                if (!version || !fecha_vigencia) {
+                    await client.query('ROLLBACK');
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Versión y fecha vigencia son requeridos' }));
+                    client.release();
+                    return;
+                }
+
+                // 1. Obtener versión activa actual
+                const versionActivaResult = await client.query(
+                    'SELECT id FROM versiones_matriz WHERE activa = true LIMIT 1'
+                );
+
+                if (versionActivaResult.rows.length === 0) {
+                    await client.query('ROLLBACK');
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'No hay una versión activa para congelar' }));
+                    client.release();
+                    return;
+                }
+
+                const versionActivaId = versionActivaResult.rows[0].id;
+
+                // 2. Verificar que la nueva versión no exista ya
+                const existeResult = await client.query(
+                    'SELECT id FROM versiones_matriz WHERE version = $1',
+                    [version]
+                );
+
+                if (existeResult.rows.length > 0) {
+                    await client.query('ROLLBACK');
+                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: `La versión "${version}" ya existe` }));
+                    client.release();
+                    return;
+                }
+
+                // 3. Crear la nueva versión (INACTIVA por defecto)
+                const nuevaVersionResult = await client.query(`
                 INSERT INTO versiones_matriz (
                     version,
                     descripcion,
@@ -4272,19 +4315,19 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                 ) VALUES ($1, $2, $3, false, $4, NOW())
                 RETURNING id
             `, [version, descripcion || `Snapshot de versión ${versionActivaId}`, fecha_vigencia, 'Sistema']);
-            
-            const nuevaVersionId = nuevaVersionResult.rows[0].id;
-            
-            // 4. COPIAR FRENTES Y GUARDAR MAPA DE IDs
-            const frentes = await client.query(
-                'SELECT id, codigo, nombre, peso_maximo, orden, activo FROM version_frentes WHERE version_id = $1',
-                [versionActivaId]
-            );
-            
-            const mapaFrentes = {}; // old_id -> new_id
-            
-            for (const frente of frentes.rows) {
-                const nuevoFrenteResult = await client.query(`
+
+                const nuevaVersionId = nuevaVersionResult.rows[0].id;
+
+                // 4. COPIAR FRENTES Y GUARDAR MAPA DE IDs
+                const frentes = await client.query(
+                    'SELECT id, codigo, nombre, peso_maximo, orden, activo FROM version_frentes WHERE version_id = $1',
+                    [versionActivaId]
+                );
+
+                const mapaFrentes = {}; // old_id -> new_id
+
+                for (const frente of frentes.rows) {
+                    const nuevoFrenteResult = await client.query(`
                     INSERT INTO version_frentes (
                         version_id,
                         codigo,
@@ -4297,32 +4340,32 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
                     RETURNING id
                 `, [
-                    nuevaVersionId,
-                    frente.codigo,
-                    frente.nombre,
-                    frente.peso_maximo,
-                    frente.orden,
-                    frente.activo
-                ]);
-                
-                const nuevoFrenteId = nuevoFrenteResult.rows[0].id;
-                mapaFrentes[frente.id] = nuevoFrenteId;
-            }
-            
-            console.log(`   📦 Frentes copiados: ${frentes.rows.length}`);
-            
-            // 5. COPIAR ATRIBUTOS USANDO EL MAPA DE FRENTES
-            let totalAtributos = 0;
-            const mapaAtributos = {}; // old_id -> new_id
-            
-            for (const [oldFrenteId, newFrenteId] of Object.entries(mapaFrentes)) {
-                const atributos = await client.query(
-                    'SELECT id, nombre, peso_maximo, orden, activo FROM version_atributos WHERE version_frente_id = $1',
-                    [oldFrenteId]
-                );
-                
-                for (const attr of atributos.rows) {
-                    const nuevoAtributoResult = await client.query(`
+                        nuevaVersionId,
+                        frente.codigo,
+                        frente.nombre,
+                        frente.peso_maximo,
+                        frente.orden,
+                        frente.activo
+                    ]);
+
+                    const nuevoFrenteId = nuevoFrenteResult.rows[0].id;
+                    mapaFrentes[frente.id] = nuevoFrenteId;
+                }
+
+                console.log(`   📦 Frentes copiados: ${frentes.rows.length}`);
+
+                // 5. COPIAR ATRIBUTOS USANDO EL MAPA DE FRENTES
+                let totalAtributos = 0;
+                const mapaAtributos = {}; // old_id -> new_id
+
+                for (const [oldFrenteId, newFrenteId] of Object.entries(mapaFrentes)) {
+                    const atributos = await client.query(
+                        'SELECT id, nombre, peso_maximo, orden, activo FROM version_atributos WHERE version_frente_id = $1',
+                        [oldFrenteId]
+                    );
+
+                    for (const attr of atributos.rows) {
+                        const nuevoAtributoResult = await client.query(`
                         INSERT INTO version_atributos (
                             version_frente_id,
                             nombre,
@@ -4334,32 +4377,32 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
                         RETURNING id
                     `, [
-                        newFrenteId,
-                        attr.nombre,
-                        attr.peso_maximo,
-                        attr.orden,
-                        attr.activo
-                    ]);
-                    
-                    const nuevoAtributoId = nuevoAtributoResult.rows[0].id;
-                    mapaAtributos[attr.id] = nuevoAtributoId;
-                    totalAtributos++;
+                            newFrenteId,
+                            attr.nombre,
+                            attr.peso_maximo,
+                            attr.orden,
+                            attr.activo
+                        ]);
+
+                        const nuevoAtributoId = nuevoAtributoResult.rows[0].id;
+                        mapaAtributos[attr.id] = nuevoAtributoId;
+                        totalAtributos++;
+                    }
                 }
-            }
-            
-            console.log(`   📄 Atributos copiados: ${totalAtributos}`);
-            
-            // 6. COPIAR SUB-MOTIVOS USANDO EL MAPA DE ATRIBUTOS
-            let totalSubMotivos = 0;
-            
-            for (const [oldAttrId, newAttrId] of Object.entries(mapaAtributos)) {
-                const subMotivos = await client.query(
-                    'SELECT codigo, descripcion, peso_individual, orden, activo FROM version_sub_motivos WHERE version_atributo_id = $1',
-                    [oldAttrId]
-                );
-                
-                for (const sub of subMotivos.rows) {
-                    await client.query(`
+
+                console.log(`   📄 Atributos copiados: ${totalAtributos}`);
+
+                // 6. COPIAR SUB-MOTIVOS USANDO EL MAPA DE ATRIBUTOS
+                let totalSubMotivos = 0;
+
+                for (const [oldAttrId, newAttrId] of Object.entries(mapaAtributos)) {
+                    const subMotivos = await client.query(
+                        'SELECT codigo, descripcion, peso_individual, orden, activo FROM version_sub_motivos WHERE version_atributo_id = $1',
+                        [oldAttrId]
+                    );
+
+                    for (const sub of subMotivos.rows) {
+                        await client.query(`
                         INSERT INTO version_sub_motivos (
                             version_atributo_id,
                             codigo,
@@ -4371,48 +4414,48 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                             updated_at
                         ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
                     `, [
-                        newAttrId,
-                        sub.codigo,
-                        sub.descripcion,
-                        sub.peso_individual,
-                        sub.orden,
-                        sub.activo
-                    ]);
-                    totalSubMotivos++;
+                            newAttrId,
+                            sub.codigo,
+                            sub.descripcion,
+                            sub.peso_individual,
+                            sub.orden,
+                            sub.activo
+                        ]);
+                        totalSubMotivos++;
+                    }
                 }
+
+                console.log(`   🔹 Sub-motivos copiados: ${totalSubMotivos}`);
+
+                // 7. Confirmar transacción
+                await client.query('COMMIT');
+
+                console.log(`✅ Versión "${version}" creada como snapshot (ID: ${nuevaVersionId})`);
+                console.log(`   📊 Resumen: ${frentes.rows.length} frentes, ${totalAtributos} atributos, ${totalSubMotivos} sub-motivos`);
+
+                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({
+                    success: true,
+                    message: `Versión "${version}" creada exitosamente como snapshot`,
+                    version_id: nuevaVersionId,
+                    resumen: {
+                        frentes: frentes.rows.length,
+                        atributos: totalAtributos,
+                        sub_motivos: totalSubMotivos
+                    }
+                }));
+
+            } catch (error) {
+                await client.query('ROLLBACK');
+                console.error('❌ Error congelando versión:', error);
+                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: error.message }));
+            } finally {
+                client.release();
             }
-            
-            console.log(`   🔹 Sub-motivos copiados: ${totalSubMotivos}`);
-            
-            // 7. Confirmar transacción
-            await client.query('COMMIT');
-            
-            console.log(`✅ Versión "${version}" creada como snapshot (ID: ${nuevaVersionId})`);
-            console.log(`   📊 Resumen: ${frentes.rows.length} frentes, ${totalAtributos} atributos, ${totalSubMotivos} sub-motivos`);
-            
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({
-                success: true,
-                message: `Versión "${version}" creada exitosamente como snapshot`,
-                version_id: nuevaVersionId,
-                resumen: {
-                    frentes: frentes.rows.length,
-                    atributos: totalAtributos,
-                    sub_motivos: totalSubMotivos
-                }
-            }));
-            
-        } catch (error) {
-            await client.query('ROLLBACK');
-            console.error('❌ Error congelando versión:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        } finally {
-            client.release();
-        }
-    });
-    return;
-}
+        });
+        return;
+    }
 
 
 
@@ -4422,14 +4465,14 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
 
     if (ruta === '/api/matriz/versiones' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/versiones');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             // Verificar si la tabla existe
             const checkTable = await pool.query(`
@@ -4438,26 +4481,26 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     WHERE table_name = 'versiones_matriz'
                 );
             `);
-            
+
             if (!checkTable.rows[0].exists) {
                 console.log('⚠️ Tabla versiones_matriz no existe, devolviendo array vacío');
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify([]));
                 return;
             }
-            
+
             const result = await pool.query(`
                 SELECT id, version, descripcion, fecha_vigencia, activa, 
                     creado_por, creado_en, publicado_por, publicado_en
                 FROM versiones_matriz 
                 ORDER BY creado_en DESC
             `);
-            
+
             console.log(`✅ ${result.rows.length} versiones encontradas`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('❌ Error en /api/matriz/versiones:', error);
             // En caso de error, devolver array vacío en lugar de error 500
@@ -4469,14 +4512,14 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
 
     if (ruta === '/api/matriz/versiones' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/versiones');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
@@ -4499,14 +4542,14 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
 
     if (ruta.match(/^\/api\/matriz\/versiones\/\d+\/activar$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/matriz/versiones/:id/activar');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = ruta.split('/')[4];
         try {
             await pool.query('UPDATE versiones_matriz SET activa = false');
@@ -4524,31 +4567,31 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // ========== RECALCULAR EVALUACIONES COMPLETO ==========
     if (ruta === '/api/matriz/recalcular' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/recalcular - INICIO');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             let actualizados = 0;
             let errores = 0;
-            
+
             // ======================================================
             // PASO 1: Actualizar los pesos en detalles_evaluacion
             // ======================================================
             console.log('📊 PASO 1: Actualizando pesos en detalles_evaluacion...');
-            
+
             const detalles = await pool.query(`
                 SELECT d.id, d.submotivo, d.evaluacion_id
                 FROM detalles_evaluacion d
                 WHERE d.submotivo IS NOT NULL
             `);
-            
+
             console.log(`   Total detalles a procesar: ${detalles.rowCount}`);
-            
+
             for (const detalle of detalles.rows) {
                 try {
                     // Buscar el peso actual del submotivo
@@ -4556,19 +4599,19 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         SELECT peso_individual FROM sub_motivos 
                         WHERE codigo = $1 AND activo = true
                     `, [detalle.submotivo]);
-                    
+
                     if (subMotivo.rows.length > 0) {
                         const nuevoPeso = parseFloat(subMotivo.rows[0].peso_individual);
-                        
+
                         // Actualizar el peso en detalles_evaluacion
                         await pool.query(`
                             UPDATE detalles_evaluacion 
                             SET peso = $1
                             WHERE id = $2
                         `, [nuevoPeso, detalle.id]);
-                        
+
                         actualizados++;
-                        
+
                         if (actualizados % 1000 === 0) {
                             console.log(`   Procesados ${actualizados} detalles...`);
                         }
@@ -4580,22 +4623,22 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     console.error(`   ❌ Error en detalle ${detalle.id}:`, err.message);
                 }
             }
-            
+
             console.log(`   ✅ ${actualizados} detalles actualizados, ${errores} errores`);
-            
+
             // ======================================================
             // PASO 2: Recalcular totales por evaluación
             // ======================================================
             console.log('📊 PASO 2: Recalculando totales por evaluación...');
-            
+
             const evaluaciones = await pool.query(`
                 SELECT DISTINCT evaluacion_id FROM detalles_evaluacion
             `);
-            
+
             console.log(`   Total evaluaciones a procesar: ${evaluaciones.rowCount}`);
-            
+
             let evaluacionesActualizadas = 0;
-            
+
             for (const eval of evaluaciones.rows) {
                 try {
                     // Calcular totales por bloque
@@ -4608,9 +4651,9 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         FROM detalles_evaluacion
                         WHERE evaluacion_id = $1
                     `, [eval.evaluacion_id]);
-                    
+
                     const t = totales.rows[0];
-                    
+
                     // Actualizar evaluación
                     await pool.query(`
                         UPDATE evaluaciones 
@@ -4620,20 +4663,20 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                             nota_final = $4
                         WHERE id = $5
                     `, [t.total_enc, t.total_ecuf, t.total_ecn, t.nota_final, eval.evaluacion_id]);
-                    
+
                     evaluacionesActualizadas++;
-                    
+
                     if (evaluacionesActualizadas % 100 === 0) {
                         console.log(`   Procesadas ${evaluacionesActualizadas} evaluaciones...`);
                     }
-                    
+
                 } catch (err) {
                     console.error(`   ❌ Error en evaluación ${eval.evaluacion_id}:`, err.message);
                 }
             }
-            
+
             console.log(`   ✅ ${evaluacionesActualizadas} evaluaciones actualizadas`);
-            
+
             // ======================================================
             // PASO 3: Resumen final
             // ======================================================
@@ -4645,23 +4688,23 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     MAX(nota_final) as nota_max
                 FROM evaluaciones
             `);
-            
+
             console.log('📊 RESUMEN FINAL:');
             console.log(`   Total evaluaciones: ${resumen.rows[0].total_evaluaciones}`);
             console.log(`   Promedio notas: ${resumen.rows[0].promedio_notas}%`);
             console.log(`   Nota mínima: ${resumen.rows[0].nota_min}%`);
             console.log(`   Nota máxima: ${resumen.rows[0].nota_max}%`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
-                success: true, 
+            respuesta.end(JSON.stringify({
+                success: true,
                 detalles_actualizados: actualizados,
                 evaluaciones_actualizadas: evaluacionesActualizadas,
                 errores: errores,
                 resumen: resumen.rows[0],
                 message: `${evaluacionesActualizadas} evaluaciones y ${actualizados} detalles actualizados`
             }));
-            
+
         } catch (error) {
             console.error('❌ Error en recalcular:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -4677,46 +4720,46 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Validar sub-motivos de un atributo
     if (ruta === '/api/matriz/validar/sub-motivos' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/validar/sub-motivos');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { atributo_id, sub_motivo_id, nuevo_peso, excluir_id } = JSON.parse(body);
-                
+
                 // Obtener peso máximo del atributo
                 const atributo = await pool.query(
                     'SELECT peso_maximo FROM atributos WHERE id = $1',
                     [atributo_id]
                 );
-                
+
                 if (atributo.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Atributo no encontrado' }));
                     return;
                 }
-                
+
                 const pesoMaximo = parseFloat(atributo.rows[0].peso_maximo);
-                
+
                 // Sumar pesos de sub-motivos (excluyendo el que se está editando)
                 let query = 'SELECT COALESCE(SUM(peso_individual), 0) as total FROM sub_motivos WHERE atributo_id = $1';
                 let params = [atributo_id];
-                
+
                 if (excluir_id) {
                     query += ' AND id != $2';
                     params.push(excluir_id);
                 }
-                
+
                 const sumaActual = await pool.query(query, params);
                 let totalActual = parseFloat(sumaActual.rows[0].total);
-                
+
                 if (sub_motivo_id) {
                     // Es una actualización
                     const subActual = await pool.query(
@@ -4727,23 +4770,23 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         totalActual -= parseFloat(subActual.rows[0].peso_individual);
                     }
                 }
-                
+
                 const nuevoTotal = totalActual + nuevo_peso;
-                
+
                 if (nuevoTotal > pesoMaximo) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ 
-                        valid: false, 
+                    respuesta.end(JSON.stringify({
+                        valid: false,
                         error: `La suma de los sub-motivos (${nuevoTotal}%) excede el peso máximo del atributo (${pesoMaximo}%)`,
                         total_actual: nuevoTotal,
                         peso_maximo: pesoMaximo
                     }));
                     return;
                 }
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ valid: true, total: nuevoTotal, peso_maximo: pesoMaximo }));
-                
+
             } catch (error) {
                 console.error('Error:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -4756,44 +4799,44 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Validar atributos de un frente
     if (ruta === '/api/matriz/validar/atributos' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/validar/atributos');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { frente_id, atributo_id, nuevo_peso, excluir_id } = JSON.parse(body);
-                
+
                 const frente = await pool.query(
                     'SELECT peso_maximo FROM frentes WHERE id = $1',
                     [frente_id]
                 );
-                
+
                 if (frente.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Frente no encontrado' }));
                     return;
                 }
-                
+
                 const pesoMaximo = parseFloat(frente.rows[0].peso_maximo);
-                
+
                 let query = 'SELECT COALESCE(SUM(peso_maximo), 0) as total FROM atributos WHERE frente_id = $1';
                 let params = [frente_id];
-                
+
                 if (excluir_id) {
                     query += ' AND id != $2';
                     params.push(excluir_id);
                 }
-                
+
                 const sumaActual = await pool.query(query, params);
                 let totalActual = parseFloat(sumaActual.rows[0].total);
-                
+
                 if (atributo_id) {
                     const attrActual = await pool.query(
                         'SELECT peso_maximo FROM atributos WHERE id = $1',
@@ -4803,23 +4846,23 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         totalActual -= parseFloat(attrActual.rows[0].peso_maximo);
                     }
                 }
-                
+
                 const nuevoTotal = totalActual + nuevo_peso;
-                
+
                 if (nuevoTotal > pesoMaximo) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ 
-                        valid: false, 
+                    respuesta.end(JSON.stringify({
+                        valid: false,
                         error: `La suma de los atributos (${nuevoTotal}%) excede el peso máximo del frente (${pesoMaximo}%)`,
                         total_actual: nuevoTotal,
                         peso_maximo: pesoMaximo
                     }));
                     return;
                 }
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ valid: true, total: nuevoTotal, peso_maximo: pesoMaximo }));
-                
+
             } catch (error) {
                 console.error('Error:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -4832,31 +4875,31 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Validar suma total de frentes
     if (ruta === '/api/matriz/validar/frentes' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/validar/frentes');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { frente_id, nuevo_peso, excluir_id } = JSON.parse(body);
-                
+
                 let query = 'SELECT COALESCE(SUM(peso_maximo), 0) as total FROM frentes WHERE activo = true';
                 let params = [];
-                
+
                 if (excluir_id) {
                     query += ' AND id != $1';
                     params.push(excluir_id);
                 }
-                
+
                 const sumaActual = await pool.query(query, params);
                 let totalActual = parseFloat(sumaActual.rows[0].total);
-                
+
                 if (frente_id) {
                     const frenteActual = await pool.query(
                         'SELECT peso_maximo FROM frentes WHERE id = $1',
@@ -4866,23 +4909,23 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         totalActual -= parseFloat(frenteActual.rows[0].peso_maximo);
                     }
                 }
-                
+
                 const nuevoTotal = totalActual + nuevo_peso;
-                
+
                 if (nuevoTotal > 100) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ 
-                        valid: false, 
+                    respuesta.end(JSON.stringify({
+                        valid: false,
                         error: `La suma total de los frentes (${nuevoTotal}%) excede el 100%`,
                         total_actual: nuevoTotal,
                         peso_maximo: 100
                     }));
                     return;
                 }
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ valid: true, total: nuevoTotal, peso_maximo: 100 }));
-                
+
             } catch (error) {
                 console.error('Error:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5250,16 +5293,16 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // ======================================================
     if (ruta.match(/^\/api\/roles\/\d+$/) && metodo === 'DELETE') {
         console.log('[API] DELETE /api/roles/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         try {
             // 1. Verificar que el rol existe
             const check = await pool.query('SELECT id, nombre FROM roles WHERE id = $1', [id]);
@@ -5268,36 +5311,36 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                 respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
                 return;
             }
-            
+
             const rolNombre = check.rows[0].nombre;
-            
+
             // 2. Verificar si tiene usuarios asignados
             const usuarios = await pool.query('SELECT COUNT(*) as total FROM usuarios WHERE rol_id = $1', [id]);
             const cantidadUsuarios = parseInt(usuarios.rows[0].total);
-            
+
             if (cantidadUsuarios > 0) {
                 respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ 
+                respuesta.end(JSON.stringify({
                     error: `El rol "${rolNombre}" tiene ${cantidadUsuarios} usuario(s) asignado(s). No se puede eliminar.`,
                     usuarios_asignados: cantidadUsuarios
                 }));
                 return;
             }
-            
+
             // 3. Eliminar permisos de pestañas
             await pool.query('DELETE FROM rol_pestanas WHERE rol_id = $1', [id]);
-            
+
             // 4. Eliminar el rol
             await pool.query('DELETE FROM roles WHERE id = $1', [id]);
-            
+
             console.log(`✅ Rol "${rolNombre}" eliminado físicamente (ID: ${id})`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
-                success: true, 
+            respuesta.end(JSON.stringify({
+                success: true,
                 message: `Rol "${rolNombre}" eliminado correctamente`
             }));
-            
+
         } catch (error) {
             console.error('❌ Error eliminando rol:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5313,23 +5356,23 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Eliminar todos los permisos de un rol (DELETE)
     if (ruta.match(/^\/api\/rol-pestanas\/\d+$/) && metodo === 'DELETE') {
         console.log('[API] DELETE /api/rol-pestanas/:rolId');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const rolId = parseInt(ruta.split('/').pop());
-        
+
         try {
             const result = await pool.query('DELETE FROM rol_pestanas WHERE rol_id = $1 RETURNING id', [rolId]);
             console.log(`✅ Eliminados ${result.rowCount} permisos para rol ${rolId}`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ success: true, eliminados: result.rowCount }));
-            
+
         } catch (error) {
             console.error('Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5341,26 +5384,26 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Insertar nuevos permisos (POST)
     if (ruta === '/api/rol-pestanas' && metodo === 'POST') {
         console.log('[API] POST /api/rol-pestanas');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
                 const { rol_id, pestanas } = JSON.parse(body);
-                
+
                 if (!rol_id || !pestanas || pestanas.length === 0) {
                     respuesta.writeHead(400, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Datos inválidos' }));
                     return;
                 }
-                
+
                 let insertados = 0;
                 for (const codigo of pestanas) {
                     await pool.query(
@@ -5369,12 +5412,12 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     );
                     insertados++;
                 }
-                
+
                 console.log(`✅ Insertados ${insertados} permisos para rol ${rol_id}`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: true, insertados }));
-                
+
             } catch (error) {
                 console.error('Error:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5390,7 +5433,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // ======================================================
     if (ruta.match(/^\/api\/rpc\/[\w_]+$/) && metodo === 'POST') {
         console.log('[API] POST /api/rpc');
-        
+
         const functionName = ruta.split('/').pop().replace(/[^a-zA-Z0-9_]/g, '');
         let body = '';
         peticion.on('data', chunk => body += chunk);
@@ -5414,7 +5457,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         'SELECT cerrar_mes($1, $2, $3) as resultado',
                         [anio || params.p_anio, mes || params.p_mes, params.p_usuario || 'admin']
                     );
-                    
+
                     respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify(result.rows[0].resultado));
                     return;
@@ -5467,7 +5510,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
 
         // 🔐 Verificar token
         const token = peticion.headers['authorization']?.split(' ')[1];
-        
+
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
@@ -5478,21 +5521,21 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
             // Decodificar token para obtener el usuario
             const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
             const usuarioId = payload.id;
-            
+
             // 1. Obtener el rol del usuario
             const userResult = await pool.query(
                 'SELECT rol_id FROM usuarios WHERE id = $1 AND activo = true',
                 [usuarioId]
             );
-            
+
             if (userResult.rows.length === 0) {
                 respuesta.writeHead(401, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Usuario no encontrado o inactivo' }));
                 return;
             }
-            
+
             const rolId = userResult.rows[0].rol_id;
-            
+
             // 2. Obtener pestañas permitidas para ese rol
             const result = await pool.query(
                 `SELECT p.* FROM pestanas_sistema p
@@ -5501,12 +5544,12 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                  ORDER BY p.orden`,
                 [rolId]
             );
-            
+
             console.log(`✅ Usuario ${payload.usuario} (rol_id: ${rolId}) - ${result.rows.length} pestañas permitidas`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('Error en pestanas con auth:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5520,14 +5563,14 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // ======================================================
     if (ruta === '/api/estado-bd' && metodo === 'GET') {
         console.log('[API] GET /api/estado-bd');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             // 1. Tamaño total de la base de datos
             const sizeResult = await pool.query(`
@@ -5535,14 +5578,14 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
             `);
             const totalSizeBytes = parseInt(sizeResult.rows[0].size_bytes);
             const totalSizeMB = totalSizeBytes / (1024 * 1024);
-            
+
             let totalSizeFormatted = '';
             if (totalSizeMB >= 1024) {
                 totalSizeFormatted = `${(totalSizeMB / 1024).toFixed(2)} GB`;
             } else {
                 totalSizeFormatted = `${totalSizeMB.toFixed(2)} MB`;
             }
-            
+
             // 2. Obtener todas las tablas del esquema public
             // Dentro del endpoint /api/estado-bd, reemplaza la sección de tablas:
 
@@ -5566,18 +5609,18 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     const countResult = await pool.query(`SELECT COUNT(*) as count FROM "${t.tablename}"`);
                     const rowCount = parseInt(countResult.rows[0].count);
                     totalRows += rowCount;
-                    
+
                     const totalMB = t.total_bytes / (1024 * 1024);
                     const tableMB = t.table_bytes / (1024 * 1024);
                     const indexMB = t.index_bytes / (1024 * 1024);
-                    
+
                     let totalFormatted = '';
                     if (totalMB >= 1024) {
                         totalFormatted = `${(totalMB / 1024).toFixed(2)} GB`;
                     } else {
                         totalFormatted = `${totalMB.toFixed(2)} MB`;
                     }
-                    
+
                     let tableFormatted = '';
                     if (tableMB >= 1024) {
                         tableFormatted = `${(tableMB / 1024).toFixed(2)} GB`;
@@ -5586,7 +5629,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     } else {
                         tableFormatted = `${(tableMB * 1024).toFixed(0)} KB`;
                     }
-                    
+
                     let indexFormatted = '';
                     if (indexMB >= 1024) {
                         indexFormatted = `${(indexMB / 1024).toFixed(2)} GB`;
@@ -5595,7 +5638,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     } else {
                         indexFormatted = `${(indexMB * 1024).toFixed(0)} KB`;
                     }
-                    
+
                     tablas.push({
                         tablename: t.tablename,
                         total_size_mb: parseFloat(totalMB.toFixed(2)),
@@ -5607,7 +5650,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         indexes_size_formatted: indexFormatted,
                         row_count: rowCount
                     });
-                    
+
                 } catch (err) {
                     console.warn(`Error procesando ${t.tablename}:`, err.message);
                     tablas.push({
@@ -5620,12 +5663,12 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     });
                 }
             }
-            
+
             // Ordenar por tamaño descendente
             tablas.sort((a, b) => b.total_size_mb - a.total_size_mb);
-            
+
             console.log(`✅ BD Size: ${totalSizeFormatted} | Total registros: ${totalRows.toLocaleString()} | Tablas: ${tablas.length}`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({
                 totalSizeMB: parseFloat(totalSizeMB.toFixed(2)),
@@ -5635,7 +5678,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                 totalTables: tablas.length,
                 tablas: tablas
             }));
-            
+
         } catch (error) {
             console.error('❌ Error en /api/estado-bd:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5643,20 +5686,20 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
         }
         return;
     }
-    
+
     // ======================================================
     // API - ESTADO BD - Tamaño de tablas específico
     // ======================================================
     if (ruta === '/api/estado-bd/tablas' && metodo === 'GET') {
         console.log('[API] GET /api/estado-bd/tablas');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(`
                 SELECT 
@@ -5666,16 +5709,16 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                 WHERE schemaname = 'public'
                 ORDER BY total_bytes DESC
             `);
-            
+
             const tablas = result.rows.map(t => ({
                 tablename: t.tablename,
                 total_size_mb: parseFloat((t.total_bytes / (1024 * 1024)).toFixed(2)),
                 total_size_bytes: parseInt(t.total_bytes)
             }));
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(tablas));
-            
+
         } catch (error) {
             console.error('Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5691,32 +5734,32 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Obtener todas las versiones
     if (ruta === '/api/versiones' && metodo === 'GET') {
         console.log('[API] GET /api/versiones');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const { tipo } = urlParseada.query;
-        
+
         try {
             let query = 'SELECT * FROM versiones_sistema';
             const params = [];
-            
+
             if (tipo && tipo !== 'todos') {
                 query += ' WHERE tipo = $1';
                 params.push(tipo);
             }
-            
+
             query += ' ORDER BY fecha_publicacion DESC';
-            
+
             const result = await pool.query(query, params);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('Error obteniendo versiones:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5728,14 +5771,14 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Publicar nueva versión
     if (ruta === '/api/versiones' && metodo === 'POST') {
         console.log('[API] POST /api/versiones');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         // Para multipart/form-data, necesitamos procesar el body de otra forma
         let body = '';
         peticion.on('data', chunk => body += chunk);
@@ -5744,18 +5787,18 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                 // Parsear multipart manualmente o usar una librería
                 // Por simplicidad, asumimos JSON
                 const { version, tipo, descripcion, publicado_por, contenido_html, nombre_archivo } = JSON.parse(body);
-                
+
                 const result = await pool.query(`
                     INSERT INTO versiones_sistema (version, tipo, nombre_archivo, contenido_html, descripcion, publicado_por, tamano_bytes, es_activo, fecha_publicacion)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
                     RETURNING id
                 `, [version, tipo, nombre_archivo, contenido_html, descripcion, publicado_por, contenido_html.length, false]);
-                
+
                 console.log(`✅ Versión ${version} publicada`);
-                
+
                 respuesta.writeHead(201, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: true, id: result.rows[0].id }));
-                
+
             } catch (error) {
                 console.error('Error publicando versión:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5768,35 +5811,35 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Activar una versión
     if (ruta.match(/^\/api\/versiones\/\d+\/activar$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/versiones/:id/activar');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/')[3]);
         const { tipo } = urlParseada.query;
-        
+
         try {
             // Desactivar todas las versiones del mismo tipo
             await pool.query('UPDATE versiones_sistema SET es_activo = false WHERE tipo = $1', [tipo]);
-            
+
             // Activar la versión seleccionada
             const result = await pool.query('UPDATE versiones_sistema SET es_activo = true WHERE id = $1 RETURNING id', [id]);
-            
+
             if (result.rowCount === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Versión no encontrada' }));
                 return;
             }
-            
+
             console.log(`✅ Versión ID ${id} activada`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ success: true }));
-            
+
         } catch (error) {
             console.error('Error activando versión:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5808,30 +5851,30 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Eliminar una versión
     if (ruta.match(/^\/api\/versiones\/\d+$/) && metodo === 'DELETE') {
         console.log('[API] DELETE /api/versiones/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         try {
             const result = await pool.query('DELETE FROM versiones_sistema WHERE id = $1 RETURNING id', [id]);
-            
+
             if (result.rowCount === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Versión no encontrada' }));
                 return;
             }
-            
+
             console.log(`✅ Versión ID ${id} eliminada`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ success: true }));
-            
+
         } catch (error) {
             console.error('Error eliminando versión:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5845,31 +5888,31 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // ======================================================
     if (ruta.match(/^\/api\/solicitudes\/\d+$/) && metodo === 'GET') {
         console.log('[API] GET /api/solicitudes/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         const id = parseInt(ruta.split('/').pop());
-        
+
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(
                 'SELECT * FROM solicitudes_requerimientos WHERE id = $1',
                 [id]
             );
-            
+
             if (result.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Solicitud no encontrada' }));
                 return;
             }
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows[0]));
-            
+
         } catch (error) {
             console.error('Error obteniendo solicitud:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5883,27 +5926,27 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // ======================================================
     if (ruta.match(/^\/api\/solicitudes\/\d+$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/solicitudes/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         const id = parseInt(ruta.split('/').pop());
-        
+
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
-                const { estado, fecha_aprobacion, fecha_inicio_desarrollo, fecha_entrega, 
-                        responsable_asignado, tiempo_estimado_horas, motivo_rechazo } = JSON.parse(body);
-                
+                const { estado, fecha_aprobacion, fecha_inicio_desarrollo, fecha_entrega,
+                    responsable_asignado, tiempo_estimado_horas, motivo_rechazo } = JSON.parse(body);
+
                 let query = 'UPDATE solicitudes_requerimientos SET estado = $1, updated_at = NOW()';
                 const values = [estado];
                 let idx = 2;
-                
+
                 if (fecha_aprobacion) {
                     query += `, fecha_aprobacion = $${idx++}`;
                     values.push(fecha_aprobacion);
@@ -5928,23 +5971,23 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     query += `, motivo_rechazo = $${idx++}`;
                     values.push(motivo_rechazo);
                 }
-                
+
                 query += ` WHERE id = $${idx}`;
                 values.push(id);
-                
+
                 const result = await pool.query(query, values);
-                
+
                 if (result.rowCount === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ error: 'Solicitud no encontrada' }));
                     return;
                 }
-                
+
                 console.log(`✅ Solicitud ${id} actualizada a estado: ${estado}`);
-                
+
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: true }));
-                
+
             } catch (error) {
                 console.error('Error:', error);
                 respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -5961,14 +6004,14 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Obtener estructura completa de evaluación (versión activa)
     if (ruta === '/api/evaluacion/estructura' && metodo === 'GET') {
         console.log('[API] GET /api/evaluacion/estructura');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             // Verificar si las tablas existen
             const checkTables = await pool.query(`
@@ -5977,36 +6020,36 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     WHERE table_name = 'versiones_matriz'
                 );
             `);
-            
+
             if (!checkTables.rows[0].exists) {
                 console.log('⚠️ Tablas de estructura no encontradas');
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ 
-                    version: 'default', 
+                respuesta.end(JSON.stringify({
+                    version: 'default',
                     frentes: [],
                     message: 'Tablas de estructura no configuradas aún'
                 }));
                 return;
             }
-            
+
             // Obtener versión activa
             const versionActiva = await pool.query(`
                 SELECT id, version FROM versiones_matriz WHERE activa = true LIMIT 1
             `);
-            
+
             const versionNombre = versionActiva.rows[0]?.version || 'default';
-            
+
             // Obtener frentes
             const frentes = await pool.query(`
                 SELECT id, codigo, nombre, peso_maximo, orden 
                 FROM frentes WHERE activo = true ORDER BY orden
             `);
-            
+
             const resultado = {
                 version: versionNombre,
                 frentes: []
             };
-            
+
             for (const frente of frentes.rows) {
                 // Obtener atributos del frente
                 const atributos = await pool.query(`
@@ -6015,7 +6058,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     WHERE frente_id = $1 AND activo = true 
                     ORDER BY orden
                 `, [frente.id]);
-                
+
                 const frenteData = {
                     id: frente.id,
                     codigo: frente.codigo,
@@ -6023,7 +6066,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     peso_maximo: parseFloat(frente.peso_maximo),
                     atributos: []
                 };
-                
+
                 for (const attr of atributos.rows) {
                     // Obtener sub-motivos del atributo
                     const subMotivos = await pool.query(`
@@ -6032,7 +6075,7 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         WHERE atributo_id = $1 AND activo = true 
                         ORDER BY orden
                     `, [attr.id]);
-                    
+
                     frenteData.atributos.push({
                         id: attr.id,
                         nombre: attr.nombre,
@@ -6045,23 +6088,23 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         }))
                     });
                 }
-                
+
                 resultado.frentes.push(frenteData);
             }
-            
+
             // Obtener reglas especiales
             const reglas = await pool.query(`
                 SELECT sub_motivo_origen, tipo_regla, sub_motivos_afectados, configuracion
                 FROM reglas_evaluacion WHERE activo = true
             `);
-            
+
             resultado.reglas = reglas.rows;
-            
+
             console.log(`✅ Estructura de evaluación cargada - Versión: ${versionNombre}, Frentes: ${resultado.frentes.length}`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(resultado));
-            
+
         } catch (error) {
             console.error('❌ Error en /api/evaluacion/estructura:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -6073,14 +6116,14 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // Obtener versión activa
     if (ruta === '/api/evaluacion/version-activa' && metodo === 'GET') {
         console.log('[API] GET /api/evaluacion/version-activa');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(`
                 SELECT id, version, descripcion, activa, created_at 
@@ -6088,25 +6131,25 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                 WHERE activa = true 
                 LIMIT 1
             `);
-            
+
             if (result.rows.length === 0) {
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ version: 'default', activa: false, message: 'No hay versión activa configurada' }));
                 return;
             }
-            
+
             console.log(`✅ Versión activa: ${result.rows[0].version}`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows[0]));
-            
+
         } catch (error) {
             console.error('❌ Error en /api/evaluacion/version-activa:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: error.message }));
         }
         return;
-    }    
+    }
 
     // ======================================================
     // API - MATRIZ VERSIONADA (NUEVO SISTEMA DE VERSIONADO)
@@ -6115,28 +6158,28 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // ---------- OBTENER VERSIÓN ACTIVA ----------
     if (ruta === '/api/matriz/versiones/activa' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/versiones/activa');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(`
                 SELECT * FROM versiones_matriz WHERE activa = true LIMIT 1
             `);
-            
+
             if (result.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
                 return;
             }
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows[0]));
-            
+
         } catch (error) {
             console.error('Error en /api/matriz/versiones/activa:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -6148,21 +6191,21 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // ---------- OBTENER VERSIÓN POR FECHA ----------
     if (ruta === '/api/matriz/versiones/por-fecha' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/versiones/por-fecha');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const { fecha } = urlParseada.query;
         if (!fecha) {
             respuesta.writeHead(400, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Fecha requerida' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(`
                 SELECT * FROM versiones_matriz 
@@ -6170,16 +6213,16 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                 ORDER BY fecha_vigencia DESC 
                 LIMIT 1
             `, [fecha]);
-            
+
             if (result.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'No hay versión para esta fecha' }));
                 return;
             }
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows[0]));
-            
+
         } catch (error) {
             console.error('Error en /api/matriz/versiones/por-fecha:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -6191,43 +6234,43 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // ---------- OBTENER ESTRUCTURA COMPLETA DE UNA VERSIÓN ----------
     if (ruta.match(/^\/api\/matriz\/versiones\/\d+\/estructura$/) && metodo === 'GET') {
         console.log('[API] GET /api/matriz/versiones/:id/estructura');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         // Extraer ID de la URL: /api/matriz/versiones/3/estructura
         const parts = ruta.split('/');
         // parts = ['', 'api', 'matriz', 'versiones', '3', 'estructura']
         const versionId = parseInt(parts[4]);
-        
+
         if (!versionId || isNaN(versionId)) {
             respuesta.writeHead(400, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'ID de versión inválido' }));
             return;
         }
-        
+
         console.log(`📡 Obteniendo estructura de versión ID: ${versionId}`);
-        
+
         try {
             // 1. Obtener la versión
             const versionResult = await pool.query(
                 'SELECT * FROM versiones_matriz WHERE id = $1',
                 [versionId]
             );
-            
+
             if (versionResult.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Versión no encontrada' }));
                 return;
             }
-            
+
             const version = versionResult.rows[0];
             console.log(`✅ Versión encontrada: ${version.version}`);
-            
+
             // 2. Obtener frentes de la versión
             const frentesResult = await pool.query(`
                 SELECT id, codigo, nombre, peso_maximo, orden 
@@ -6235,14 +6278,14 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                 WHERE version_id = $1 AND activo = true 
                 ORDER BY orden
             `, [versionId]);
-            
+
             console.log(`   📋 Frentes encontrados: ${frentesResult.rows.length}`);
-            
+
             const estructura = {
                 version: version,
                 frentes: []
             };
-            
+
             for (const frente of frentesResult.rows) {
                 // 3. Obtener atributos del frente
                 const atributosResult = await pool.query(`
@@ -6251,14 +6294,14 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                     WHERE version_frente_id = $1 AND activo = true 
                     ORDER BY orden
                 `, [frente.id]);
-                
+
                 console.log(`      📋 Atributos para ${frente.codigo}: ${atributosResult.rows.length}`);
-                
+
                 const frenteData = {
                     ...frente,
                     atributos: []
                 };
-                
+
                 for (const attr of atributosResult.rows) {
                     // 4. Obtener sub-motivos del atributo
                     const subMotivosResult = await pool.query(`
@@ -6267,21 +6310,21 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
                         WHERE version_atributo_id = $1 AND activo = true 
                         ORDER BY orden
                     `, [attr.id]);
-                    
+
                     frenteData.atributos.push({
                         ...attr,
                         sub_motivos: subMotivosResult.rows
                     });
                 }
-                
+
                 estructura.frentes.push(frenteData);
             }
-            
+
             console.log(`✅ Estructura completada: ${estructura.frentes.length} frentes`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(estructura));
-            
+
         } catch (error) {
             console.error('❌ Error obteniendo estructura:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -6293,24 +6336,24 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
     // ---------- OBTENER VERSIONES DE MATRIZ ----------
     if (ruta === '/api/matriz/versiones' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/versiones');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(`
                 SELECT id, version, descripcion, fecha_vigencia, activa, creado_por, creado_en, publicado_por, publicado_en
                 FROM versiones_matriz 
                 ORDER BY creado_en DESC
             `);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('Error en /api/matriz/versiones:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -6318,41 +6361,41 @@ if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
         }
         return;
     }
-    
+
 
     // ======================================================
-// API - REGLAS DE EVALUACIÓN POR VERSIÓN
-// ======================================================
+    // API - REGLAS DE EVALUACIÓN POR VERSIÓN
+    // ======================================================
 
-if (ruta.match(/^\/api\/reglas-evaluacion\/version\/\d+$/) && metodo === 'GET') {
-    console.log('[API] GET /api/reglas-evaluacion/version/:id');
-    
-    const token = peticion.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-        return;
-    }
-    
-    const versionId = parseInt(ruta.split('/').pop());
-    
-    try {
-        // Verificar si la tabla existe
-        const checkTable = await pool.query(`
+    if (ruta.match(/^\/api\/reglas-evaluacion\/version\/\d+$/) && metodo === 'GET') {
+        console.log('[API] GET /api/reglas-evaluacion/version/:id');
+
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+
+        const versionId = parseInt(ruta.split('/').pop());
+
+        try {
+            // Verificar si la tabla existe
+            const checkTable = await pool.query(`
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
                 WHERE table_name = 'reglas_evaluacion'
             );
         `);
-        
-        if (!checkTable.rows[0].exists) {
-            console.log('⚠️ Tabla reglas_evaluacion no existe, devolviendo array vacío');
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify([]));
-            return;
-        }
-        
-        const result = await pool.query(`
+
+            if (!checkTable.rows[0].exists) {
+                console.log('⚠️ Tabla reglas_evaluacion no existe, devolviendo array vacío');
+                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify([]));
+                return;
+            }
+
+            const result = await pool.query(`
             SELECT 
                 id,
                 version_id,
@@ -6370,38 +6413,38 @@ if (ruta.match(/^\/api\/reglas-evaluacion\/version\/\d+$/) && metodo === 'GET') 
             WHERE version_id = $1 AND activo = true 
             ORDER BY orden
         `, [versionId]);
-        
-        console.log(`✅ ${result.rows.length} reglas encontradas para versión ${versionId}`);
-        
-        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify(result.rows));
-        
-    } catch (error) {
-        console.error('❌ Error en /api/reglas-evaluacion/version/:id:', error);
-        // En caso de error, devolver array vacío
-        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify([]));
-    }
-    return;
-}
 
-// ======================================================
-// API - REGLAS DE EVALUACIÓN - CRUD
-// ======================================================
+            console.log(`✅ ${result.rows.length} reglas encontradas para versión ${versionId}`);
 
-// GET - Obtener todas las reglas (para administración)
-if (ruta === '/api/reglas-evaluacion' && metodo === 'GET') {
-    console.log('[API] GET /api/reglas-evaluacion');
-    
-    const token = peticion.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows));
+
+        } catch (error) {
+            console.error('❌ Error en /api/reglas-evaluacion/version/:id:', error);
+            // En caso de error, devolver array vacío
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify([]));
+        }
         return;
     }
-    
-    try {
-        const result = await pool.query(`
+
+    // ======================================================
+    // API - REGLAS DE EVALUACIÓN - CRUD
+    // ======================================================
+
+    // GET - Obtener todas las reglas (para administración)
+    if (ruta === '/api/reglas-evaluacion' && metodo === 'GET') {
+        console.log('[API] GET /api/reglas-evaluacion');
+
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+
+        try {
+            const result = await pool.query(`
             SELECT 
                 re.*,
                 vm.version as version_nombre
@@ -6409,48 +6452,48 @@ if (ruta === '/api/reglas-evaluacion' && metodo === 'GET') {
             JOIN versiones_matriz vm ON re.version_id = vm.id
             ORDER BY vm.id, re.orden
         `);
-        
-        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify(result.rows));
-        
-    } catch (error) {
-        console.error('Error:', error);
-        respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify([]));
-    }
-    return;
-}
 
-// POST - Crear nueva regla
-if (ruta === '/api/reglas-evaluacion' && metodo === 'POST') {
-    console.log('[API] POST /api/reglas-evaluacion');
-    
-    const token = peticion.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows));
+
+        } catch (error) {
+            console.error('Error:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify([]));
+        }
         return;
     }
-    
-    let body = '';
-    peticion.on('data', chunk => body += chunk);
-    peticion.on('end', async () => {
-        try {
-            const data = JSON.parse(body);
-            
-            // 🔴 Asegurar que los campos JSON sean válidos
-            const submotivosAfectados = data.submotivos_afectados ? JSON.stringify(data.submotivos_afectados) : null;
-            const excepciones = data.excepciones ? JSON.stringify(data.excepciones) : null;
-            
-            console.log('📝 Insertando regla:', {
-                version_id: data.version_id,
-                submotivo_origen: data.submotivo_origen,
-                accion_tipo: data.accion_tipo,
-                submotivos_afectados: submotivosAfectados,
-                excepciones: excepciones
-            });
-            
-            const result = await pool.query(`
+
+    // POST - Crear nueva regla
+    if (ruta === '/api/reglas-evaluacion' && metodo === 'POST') {
+        console.log('[API] POST /api/reglas-evaluacion');
+
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+
+        let body = '';
+        peticion.on('data', chunk => body += chunk);
+        peticion.on('end', async () => {
+            try {
+                const data = JSON.parse(body);
+
+                // 🔴 Asegurar que los campos JSON sean válidos
+                const submotivosAfectados = data.submotivos_afectados ? JSON.stringify(data.submotivos_afectados) : null;
+                const excepciones = data.excepciones ? JSON.stringify(data.excepciones) : null;
+
+                console.log('📝 Insertando regla:', {
+                    version_id: data.version_id,
+                    submotivo_origen: data.submotivo_origen,
+                    accion_tipo: data.accion_tipo,
+                    submotivos_afectados: submotivosAfectados,
+                    excepciones: excepciones
+                });
+
+                const result = await pool.query(`
                 INSERT INTO reglas_evaluacion (
                     version_id,
                     submotivo_origen,
@@ -6468,64 +6511,64 @@ if (ruta === '/api/reglas-evaluacion' && metodo === 'POST') {
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, NOW(), NOW())
                 RETURNING *
             `, [
-                data.version_id,
-                data.submotivo_origen,
-                data.bloque_origen,
-                data.atributo_origen,
-                data.valor_condicion || '0',
-                data.accion_tipo || 'marcar_no_aplica',
-                data.accion_valor || 'NA',
-                submotivosAfectados,
-                excepciones,
-                data.orden || 0,
-                data.activo !== false
-            ]);
-            
-            console.log(`✅ Regla creada: ${data.submotivo_origen} → ${data.accion_tipo}`);
-            
-            respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows[0]));
-            
-        } catch (error) {
-            console.error('❌ Error creando regla:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-    });
-    return;
-}
+                    data.version_id,
+                    data.submotivo_origen,
+                    data.bloque_origen,
+                    data.atributo_origen,
+                    data.valor_condicion || '0',
+                    data.accion_tipo || 'marcar_no_aplica',
+                    data.accion_valor || 'NA',
+                    submotivosAfectados,
+                    excepciones,
+                    data.orden || 0,
+                    data.activo !== false
+                ]);
 
+                console.log(`✅ Regla creada: ${data.submotivo_origen} → ${data.accion_tipo}`);
 
+                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify(result.rows[0]));
 
-// PUT - Actualizar regla
-if (ruta.match(/^\/api\/reglas-evaluacion\/\d+$/) && metodo === 'PUT') {
-    console.log('[API] PUT /api/reglas-evaluacion/:id');
-    
-    const token = peticion.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            } catch (error) {
+                console.error('❌ Error creando regla:', error);
+                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: error.message }));
+            }
+        });
         return;
     }
-    
-    const id = parseInt(ruta.split('/').pop());
-    
-    let body = '';
-    peticion.on('data', chunk => body += chunk);
-    peticion.on('end', async () => {
-        try {
-            const data = JSON.parse(body);
-            
-            // 🔴 Asegurar que los campos JSON sean válidos
-            const submotivosAfectados = data.submotivos_afectados ? JSON.stringify(data.submotivos_afectados) : null;
-            const excepciones = data.excepciones ? JSON.stringify(data.excepciones) : null;
-            
-            console.log('📝 Actualizando regla ID:', id);
-            console.log('   submotivo_origen:', data.submotivo_origen);
-            console.log('   submotivos_afectados:', submotivosAfectados);
-            console.log('   excepciones:', excepciones);
-            
-            const result = await pool.query(`
+
+
+
+    // PUT - Actualizar regla
+    if (ruta.match(/^\/api\/reglas-evaluacion\/\d+$/) && metodo === 'PUT') {
+        console.log('[API] PUT /api/reglas-evaluacion/:id');
+
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+
+        const id = parseInt(ruta.split('/').pop());
+
+        let body = '';
+        peticion.on('data', chunk => body += chunk);
+        peticion.on('end', async () => {
+            try {
+                const data = JSON.parse(body);
+
+                // 🔴 Asegurar que los campos JSON sean válidos
+                const submotivosAfectados = data.submotivos_afectados ? JSON.stringify(data.submotivos_afectados) : null;
+                const excepciones = data.excepciones ? JSON.stringify(data.excepciones) : null;
+
+                console.log('📝 Actualizando regla ID:', id);
+                console.log('   submotivo_origen:', data.submotivo_origen);
+                console.log('   submotivos_afectados:', submotivosAfectados);
+                console.log('   excepciones:', excepciones);
+
+                const result = await pool.query(`
                 UPDATE reglas_evaluacion 
                 SET 
                     submotivo_origen = $1,
@@ -6542,106 +6585,106 @@ if (ruta.match(/^\/api\/reglas-evaluacion\/\d+$/) && metodo === 'PUT') {
                 WHERE id = $11
                 RETURNING *
             `, [
-                data.submotivo_origen,
-                data.bloque_origen,
-                data.atributo_origen,
-                data.valor_condicion || '0',
-                data.accion_tipo || 'marcar_no_aplica',
-                data.accion_valor || 'NA',
-                submotivosAfectados,
-                excepciones,
-                data.orden || 0,
-                data.activo !== false,
-                id
-            ]);
-            
+                    data.submotivo_origen,
+                    data.bloque_origen,
+                    data.atributo_origen,
+                    data.valor_condicion || '0',
+                    data.accion_tipo || 'marcar_no_aplica',
+                    data.accion_valor || 'NA',
+                    submotivosAfectados,
+                    excepciones,
+                    data.orden || 0,
+                    data.activo !== false,
+                    id
+                ]);
+
+                if (result.rows.length === 0) {
+                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ error: 'Regla no encontrada' }));
+                    return;
+                }
+
+                console.log(`✅ Regla actualizada: ${data.submotivo_origen} → ${data.accion_tipo} (ID: ${id})`);
+
+                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify(result.rows[0]));
+
+            } catch (error) {
+                console.error('❌ Error actualizando regla:', error);
+                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+                respuesta.end(JSON.stringify({ error: error.message }));
+            }
+        });
+        return;
+    }
+
+
+    // DELETE - Eliminar regla
+    if (ruta.match(/^\/api\/reglas-evaluacion\/\d+$/) && metodo === 'DELETE') {
+        console.log('[API] DELETE /api/reglas-evaluacion/:id');
+
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
+            return;
+        }
+
+        const id = parseInt(ruta.split('/').pop());
+
+        try {
+            const result = await pool.query(`
+            DELETE FROM reglas_evaluacion WHERE id = $1 RETURNING id
+        `, [id]);
+
             if (result.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Regla no encontrada' }));
                 return;
             }
-            
-            console.log(`✅ Regla actualizada: ${data.submotivo_origen} → ${data.accion_tipo} (ID: ${id})`);
-            
+
+            console.log(`✅ Regla eliminada: ID ${id}`);
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows[0]));
-            
+            respuesta.end(JSON.stringify({
+                success: true,
+                message: 'Regla eliminada correctamente',
+                id: id
+            }));
+
         } catch (error) {
-            console.error('❌ Error actualizando regla:', error);
+            console.error('❌ Error eliminando regla:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: error.message }));
         }
-    });
-    return;
-}
-
-
-// DELETE - Eliminar regla
-if (ruta.match(/^\/api\/reglas-evaluacion\/\d+$/) && metodo === 'DELETE') {
-    console.log('[API] DELETE /api/reglas-evaluacion/:id');
-    
-    const token = peticion.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
         return;
     }
-    
-    const id = parseInt(ruta.split('/').pop());
-    
-    try {
-        const result = await pool.query(`
-            DELETE FROM reglas_evaluacion WHERE id = $1 RETURNING id
-        `, [id]);
-        
-        if (result.rows.length === 0) {
-            respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Regla no encontrada' }));
+
+    // ======================================================
+    // GET /api/reglas-evaluacion/version/:id - CORREGIDO
+    // ======================================================
+
+    if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
+        console.log('[API] GET /api/reglas-evaluacion/version/:id');
+
+        const token = peticion.headers['authorization']?.split(' ')[1];
+        if (!token) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
-        console.log(`✅ Regla eliminada: ID ${id}`);
-        
-        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ 
-            success: true, 
-            message: 'Regla eliminada correctamente',
-            id: id
-        }));
-        
-    } catch (error) {
-        console.error('❌ Error eliminando regla:', error);
-        respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: error.message }));
-    }
-    return;
-}
 
-// ======================================================
-// GET /api/reglas-evaluacion/version/:id - CORREGIDO
-// ======================================================
+        const parts = ruta.split('/');
+        const versionId = parseInt(parts[parts.length - 1]);
 
-if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
-    console.log('[API] GET /api/reglas-evaluacion/version/:id');
-    
-    const token = peticion.headers['authorization']?.split(' ')[1];
-    if (!token) {
-        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-        return;
-    }
-    
-    const parts = ruta.split('/');
-    const versionId = parseInt(parts[parts.length - 1]);
-    
-    if (!versionId || isNaN(versionId)) {
-        respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: 'ID de versión inválido' }));
-        return;
-    }
-    
-    try {
-        const result = await pool.query(`
+        if (!versionId || isNaN(versionId)) {
+            respuesta.writeHead(400, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: 'ID de versión inválido' }));
+            return;
+        }
+
+        try {
+            const result = await pool.query(`
             SELECT 
                 id,
                 version_id,
@@ -6659,19 +6702,19 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
             WHERE version_id = $1 AND activo = true 
             ORDER BY orden
         `, [versionId]);
-        
-        console.log(`✅ ${result.rows.length} reglas encontradas para versión ${versionId}`);
-        
-        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify(result.rows));
-        
-    } catch (error) {
-        console.error('❌ Error:', error);
-        respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ error: error.message }));
+
+            console.log(`✅ ${result.rows.length} reglas encontradas para versión ${versionId}`);
+
+            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify(result.rows));
+
+        } catch (error) {
+            console.error('❌ Error:', error);
+            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: error.message }));
+        }
+        return;
     }
-    return;
-}
 
     // ======================================================
     // API - CRITERIOS DE CUARTILES (CRUD)
@@ -6680,14 +6723,14 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
     // 1. OBTENER TODOS LOS CRITERIOS
     if (ruta === '/api/criterios-cuartiles' && metodo === 'GET') {
         console.log('[API] GET /api/criterios-cuartiles');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const result = await pool.query(
                 'SELECT * FROM criterios_cuartiles ORDER BY fecha_vigencia_desde DESC, orden ASC'
@@ -6705,14 +6748,14 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
     // 2. OBTENER CRITERIOS ACTIVOS
     if (ruta === '/api/criterios-cuartiles/activos' && metodo === 'GET') {
         console.log('[API] GET /api/criterios-cuartiles/activos');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         try {
             const hoy = new Date().toISOString().split('T')[0];
             const result = await pool.query(
@@ -6736,33 +6779,33 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
     // 3. CREAR NUEVO CRITERIO
     if (ruta === '/api/criterios-cuartiles' && metodo === 'POST') {
         console.log('[API] POST /api/criterios-cuartiles');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
-                const { 
-                    cuartil, 
-                    nombre, 
-                    limite_inferior, 
-                    limite_superior, 
-                    color_hex, 
-                    icono, 
-                    orden, 
-                    fecha_vigencia_desde, 
+                const {
+                    cuartil,
+                    nombre,
+                    limite_inferior,
+                    limite_superior,
+                    color_hex,
+                    icono,
+                    orden,
+                    fecha_vigencia_desde,
                     fecha_vigencia_hasta,
-                    activo 
+                    activo
                 } = JSON.parse(body);
-                
+
                 const fechaHasta = fecha_vigencia_hasta || null;
-                
+
                 const result = await pool.query(
                     `INSERT INTO criterios_cuartiles 
                      (cuartil, nombre, limite_inferior, limite_superior, color_hex, icono, orden, 
@@ -6770,12 +6813,12 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                      RETURNING *`,
                     [
-                        cuartil, nombre, limite_inferior, limite_superior, 
-                        color_hex, icono, orden, fecha_vigencia_desde, 
+                        cuartil, nombre, limite_inferior, limite_superior,
+                        color_hex, icono, orden, fecha_vigencia_desde,
                         fechaHasta, 'admin', activo !== false
                     ]
                 );
-                
+
                 console.log(`✅ Criterio creado: ${nombre} (${cuartil})`);
                 respuesta.writeHead(201, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: true, data: result.rows[0] }));
@@ -6791,27 +6834,27 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
     // 4. ACTUALIZAR CRITERIO
     if (ruta.match(/^\/api\/criterios-cuartiles\/\d+$/) && metodo === 'PUT') {
         console.log('[API] PUT /api/criterios-cuartiles/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
         let body = '';
         peticion.on('data', chunk => body += chunk);
         peticion.on('end', async () => {
             try {
-                const { 
-                    cuartil, nombre, limite_inferior, limite_superior, 
-                    color_hex, icono, orden, fecha_vigencia_desde, 
-                    fecha_vigencia_hasta, activo 
+                const {
+                    cuartil, nombre, limite_inferior, limite_superior,
+                    color_hex, icono, orden, fecha_vigencia_desde,
+                    fecha_vigencia_hasta, activo
                 } = JSON.parse(body);
-                
+
                 const fechaHasta = fecha_vigencia_hasta || null;
-                
+
                 const result = await pool.query(
                     `UPDATE criterios_cuartiles 
                      SET cuartil = $1, nombre = $2, limite_inferior = $3, limite_superior = $4, 
@@ -6821,18 +6864,18 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
                      WHERE id = $11
                      RETURNING *`,
                     [
-                        cuartil, nombre, limite_inferior, limite_superior, 
+                        cuartil, nombre, limite_inferior, limite_superior,
                         color_hex, icono, orden, activo !== false,
                         fecha_vigencia_desde, fechaHasta, id
                     ]
                 );
-                
+
                 if (result.rows.length === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                     respuesta.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
                     return;
                 }
-                
+
                 console.log(`✅ Criterio actualizado: ${nombre} (${cuartil})`);
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: true, data: result.rows[0] }));
@@ -6848,40 +6891,40 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
     // 5. DESACTIVAR CRITERIO (DELETE)
     if (ruta.match(/^\/api\/criterios-cuartiles\/\d+$/) && metodo === 'DELETE') {
         console.log('[API] DELETE /api/criterios-cuartiles/:id');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/').pop());
-        
+
         try {
             const check = await pool.query(
                 'SELECT id, nombre FROM criterios_cuartiles WHERE id = $1',
                 [id]
             );
-            
+
             if (check.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
                 return;
             }
-            
+
             const nombre = check.rows[0].nombre;
-            
+
             await pool.query(
                 'UPDATE criterios_cuartiles SET activo = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
                 [id]
             );
-            
+
             console.log(`✅ Criterio "${nombre}" desactivado (ID: ${id})`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ 
-                success: true, 
+            respuesta.end(JSON.stringify({
+                success: true,
                 message: `Criterio "${nombre}" desactivado correctamente`
             }));
         } catch (error) {
@@ -6895,28 +6938,28 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
     // 6. ACTIVAR CRITERIO
     if (ruta.match(/^\/api\/criterios-cuartiles\/\d+\/activar$/) && metodo === 'POST') {
         console.log('[API] POST /api/criterios-cuartiles/:id/activar');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         const id = parseInt(ruta.split('/')[3]);
-        
+
         try {
             const result = await pool.query(
                 'UPDATE criterios_cuartiles SET activo = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
                 [id]
             );
-            
+
             if (result.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
                 return;
             }
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ success: true, data: result.rows[0] }));
         } catch (error) {
@@ -6932,32 +6975,32 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
     // ======================================================
     if (ruta.match(/^\/api\/escuchas\/lotes\/\d+\/tickets$/) && metodo === 'GET') {
         console.log('[API] GET /api/escuchas/lotes/:id/tickets');
-        
+
         const token = peticion.headers['authorization']?.split(' ')[1];
         if (!token) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: 'Token requerido' }));
             return;
         }
-        
+
         // Extraer el ID de la URL: /api/escuchas/lotes/1784149854379/tickets
         const parts = ruta.split('/');
         // parts = ['', 'api', 'escuchas', 'lotes', '1784149854379', 'tickets']
         const loteId = parts[4]; // El ID está en la posición 4
-        
+
         try {
             // 1. Verificar que el lote existe
             const check = await pool.query(
                 'SELECT id, nombre_archivo FROM tareas_escucha WHERE id = $1',
                 [loteId]
             );
-            
+
             if (check.rows.length === 0) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Lote no encontrado' }));
                 return;
             }
-            
+
             // 2. Obtener los tickets del lote
             const result = await pool.query(
                 `SELECT 
@@ -6979,12 +7022,12 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
                 ORDER BY id DESC`,
                 [loteId]
             );
-            
+
             console.log(`✅ ${result.rows.length} tickets encontrados para lote ${loteId}`);
-            
+
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify(result.rows));
-            
+
         } catch (error) {
             console.error('❌ Error obteniendo tickets:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
@@ -6997,24 +7040,24 @@ if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
     // server.js - ENDPOINT PARA ENVIAR CORREO
     // ======================================================
 
-        // Instalar dependencias (ejecutar en terminal):
-        // npm install nodemailer
+    // Instalar dependencias (ejecutar en terminal):
+    // npm install nodemailer
 
-        // Agregar al inicio de server.js:
-        const nodemailer = require('nodemailer');
+    // Agregar al inicio de server.js:
+    const nodemailer = require('nodemailer');
 
-        // Configurar transporte de correo
-        const transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: parseInt(process.env.SMTP_PORT) || 587,
-            secure: false,
-            auth: {
-                user: process.env.SMTP_USER || 'tu-correo@gmail.com',
-                pass: process.env.SMTP_PASS || 'tu-contraseña'
-            }
-        });
+    // Configurar transporte de correo
+    const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.SMTP_PORT) || 587,
+        secure: false,
+        auth: {
+            user: process.env.SMTP_USER || 'tu-correo@gmail.com',
+            pass: process.env.SMTP_PASS || 'tu-contraseña'
+        }
+    });
 
-    
+
     // ======================================================
     // VISTAS HTML
     // ======================================================

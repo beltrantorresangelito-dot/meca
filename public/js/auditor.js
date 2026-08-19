@@ -1799,7 +1799,12 @@ async function finalizarAuditoria() {
         fechaFormateada: fechaFormateada,
         idLlamada: idLlamada,
         fechaDescarga: convertirFecha(document.getElementById('evalFechaDescargaAudio')?.value),
-        totalENC: 0, // Ya no se usa individualmente
+        
+        // 🔴 NUEVOS CAMPOS DE CAMPAÑA
+        campana: document.getElementById('evalCampana')?.value || null,
+        campana_id: document.getElementById('evalCampanaId')?.value || null,
+        
+        totalENC: 0,
         totalECUF: 0,
         totalECN: 0,
         notaFinal: totalGeneral.toFixed(1),
@@ -2061,6 +2066,8 @@ function limpiarFormularioCompleto() {
     const agenteInput = document.getElementById('evalAgenteInput');
     const idLlamada = document.getElementById('evalIdLlamada');
     const fechaDescarga = document.getElementById('evalFechaDescargaAudio');
+    const campanaInput = document.getElementById('evalCampana');
+    const campanaIdHidden = document.getElementById('evalCampanaId');
 
     if (evaluador) evaluador.value = '';
     if (ticketPSI) ticketPSI.value = '';
@@ -2080,6 +2087,15 @@ function limpiarFormularioCompleto() {
         fechaDescarga.value = '';
         fechaDescarga.readOnly = true;
         fechaDescarga.disabled = true;
+    }
+
+    if (campanaInput) {
+        campanaInput.value = '';
+        campanaInput.disabled = true;
+        campanaInput.style.backgroundColor = '#f0f0f0';
+    }
+    if (campanaIdHidden) {
+        campanaIdHidden.value = '';
     }
 
     // ======================================================
@@ -5976,6 +5992,10 @@ function cargarDatosEscuchaEnFormulario(escucha) {
     const idLlamada = document.getElementById('evalIdLlamada');
     const fechaDescarga = document.getElementById('evalFechaDescargaAudio');
     
+    // 🔴 NUEVOS CAMPOS DE CAMPAÑA
+    const campanaInput = document.getElementById('evalCampana');
+    const campanaIdHidden = document.getElementById('evalCampanaId');
+    
     if (ticketPSI) {
         ticketPSI.value = escucha.ticket;
         ticketPSI.readOnly = true;
@@ -6000,7 +6020,24 @@ function cargarDatosEscuchaEnFormulario(escucha) {
         idLlamada.style.backgroundColor = '#f0f0f0';
     }
     
-    // Fecha descarga (código existente)
+    // ======================================================
+    // 🔴 NUEVO: CARGAR DATOS DE CAMPAÑA
+    // ======================================================
+    if (campanaInput) {
+        campanaInput.value = escucha.campana || 'Sin campaña';
+        campanaInput.readOnly = true;
+        campanaInput.disabled = true;
+        campanaInput.style.backgroundColor = '#f0f0f0';
+        campanaInput.style.cursor = 'not-allowed';
+    }
+    
+    if (campanaIdHidden) {
+        campanaIdHidden.value = escucha.campana_id || '';
+    }
+    
+    // ======================================================
+    // 2. FECHA DESCARGA (código existente)
+    // ======================================================
     if (fechaDescarga) {
         if (escucha.fecha_descarga) {
             try {
@@ -6067,7 +6104,7 @@ function cargarDatosEscuchaEnFormulario(escucha) {
     }
     
     // ======================================================
-    // 2. DATOS PSI (código existente)
+    // 3. DATOS PSI (código existente)
     // ======================================================
     const psiMotivos = document.getElementById('psiMotivos');
     const psiSubmotivos = document.getElementById('psiSubmotivos');
@@ -6097,7 +6134,7 @@ function cargarDatosEscuchaEnFormulario(escucha) {
     }
     
     // ======================================================
-    // 3. FECHA DE EVALUACIÓN (código existente)
+    // 4. FECHA DE EVALUACIÓN (código existente)
     // ======================================================
     const fechaInput = document.getElementById('evalFecha');
     if (fechaInput) {
@@ -6107,7 +6144,7 @@ function cargarDatosEscuchaEnFormulario(escucha) {
     }
     
     // ======================================================
-    // 4. LIMPIAR SELECTS (código existente)
+    // 5. LIMPIAR SELECTS (código existente)
     // ======================================================
     const selects = document.querySelectorAll('.cumple-select');
     selects.forEach(select => {
@@ -6132,7 +6169,7 @@ function cargarDatosEscuchaEnFormulario(escucha) {
     });
     
     // ======================================================
-    // 🔴 NUEVO: MOSTRAR TRANSCRIPCIÓN MEJORADA
+    // 6. TRANSCRIPCIÓN (código existente)
     // ======================================================
     const transcripcionContainer = document.getElementById('transcripcionContainer');
     const transcripcionText = document.getElementById('transcripcionText');
@@ -6145,8 +6182,6 @@ function cargarDatosEscuchaEnFormulario(escucha) {
         
         if (tieneTranscripcion) {
             transcripcionContainer.style.display = 'block';
-            
-            // 🔴 USAR EL RENDERIZADOR MEJORADO
             renderizarTranscripcionMejorada(escucha.transcripcion, 'transcripcionText');
             
             if (transcripcionStatus) {
@@ -6172,7 +6207,6 @@ function cargarDatosEscuchaEnFormulario(escucha) {
                 `;
             }
             
-            // Botón de análisis solo si está transcrito
             if (btnAnalizarTranscripcion) {
                 btnAnalizarTranscripcion.style.display = 
                     (escucha.transcripcion_estado === 'transcrito') ? 'inline-flex' : 'none';
@@ -6181,7 +6215,6 @@ function cargarDatosEscuchaEnFormulario(escucha) {
                 }
             }
             
-            // Mostrar análisis si existe
             if (escucha.analisis_ollama && analisisOllamaContainer) {
                 mostrarAnalisisOllamaEnAuditor(escucha.analisis_ollama);
             } else if (analisisOllamaContainer) {
@@ -6196,7 +6229,7 @@ function cargarDatosEscuchaEnFormulario(escucha) {
         }
     }
     
-    console.log('✅ Datos de escucha cargados (incluyendo transcripción)');
+    console.log('✅ Datos de escucha cargados (incluyendo campaña y campaña_id)');
 }
 
 // ======================================================
@@ -7313,6 +7346,8 @@ function cargarDatosEvaluacionEnFormulario(evaluacion) {
     const agenteHidden = document.getElementById('evalAgente');
     const fechaInput = document.getElementById('evalFecha');
     const idLlamadaInput = document.getElementById('evalIdLlamada');
+    const campanaInput = document.getElementById('evalCampana');
+    const campanaIdHidden = document.getElementById('evalCampanaId');
 
     if (ticketPSIInput) {
         ticketPSIInput.value = evaluacion.ticketPSI || '';
@@ -7336,6 +7371,16 @@ function cargarDatosEvaluacionEnFormulario(evaluacion) {
         idLlamadaInput.readOnly = true;
         idLlamadaInput.disabled = true;
         idLlamadaInput.style.backgroundColor = '#f0f0f0';
+    }
+
+    if (campanaInput) {
+        campanaInput.value = evaluacion.campana || 'Sin campaña';
+        campanaInput.readOnly = true;
+        campanaInput.disabled = true;
+        campanaInput.style.backgroundColor = '#f0f0f0';
+    }
+    if (campanaIdHidden) {
+        campanaIdHidden.value = evaluacion.campana_id || '';
     }
 
     if (fechaInput && evaluacion.fecha) {
