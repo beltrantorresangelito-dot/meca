@@ -26,13 +26,17 @@ const { Client } = require('pg');
 // 📌 database: Nombre de la base de datos a conectar
 // ======================================================
 
-const config = {
-    host: '127.0.0.1',      // Servidor local
-    port: 5432,              // Puerto estándar de PostgreSQL
-    user: 'postgres',        // Usuario administrador
-    password: 'postgres',    // Contraseña del usuario
-    database: 'meca_db'      // Base de datos del sistema
-};
+require('dotenv').config();
+
+const config = process.env.DATABASE_URL
+    ? { connectionString: process.env.DATABASE_URL }
+    : {
+        host: process.env.DB_HOST,
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME
+    };
 
 // ======================================================
 // 3. FUNCIÓN PRINCIPAL: initDatabase()

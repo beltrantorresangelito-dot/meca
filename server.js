@@ -10,7 +10,10 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
-const crypto = require('crypto');
+const { hashPassword, verifyPassword } = require('./security/passwords');
+const { signToken, verifyToken } = require('./security/tokens');
+const { applyCors } = require('./security/cors');
+const { authorizeRequest } = require('./security/authorization');
 // Configuración
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -20,11 +23,6 @@ const routes = {};
 // ======================================================
 // FUNCIONES AUXILIARES
 // ======================================================
-
-// Encriptar contraseñas
-function hashSHA256(texto) {
-    return crypto.createHash('sha256').update(texto).digest('hex');
-}
 
 // Validar credenciales
 async function procesarLogin(usuario, contrasena) {
@@ -70,15 +68,30 @@ async function procesarLogin(usuario, contrasena) {
             };
         }
 
-        const hashIngresado = hashSHA256(contrasena);
-        if (usuarioData.contrasena !== hashIngresado) {
+        const passwordCheck = await verifyPassword(contrasena, usuarioData.contrasena);
+        if (!passwordCheck.valid) {
             return { success: false, error: 'Contraseña incorrecta' };
         }
 
+        // Migración progresiva: al autenticar una contraseña SHA-256 legacy,
+        // se reemplaza inmediatamente por un hash scrypt moderno.
+        if (passwordCheck.needsRehash) {
+            const migratedHash = await hashPassword(contrasena);
+            await pool.query(
+                'UPDATE usuarios SET contrasena = $1, updated_at = NOW() WHERE id = $2',
+                [migratedHash, usuarioData.id]
+            );
+        }
+
         if (usuarioData.primer_login === true) {
+            const passwordChangeToken = signToken(
+                { id: usuarioData.id, usuario: usuarioData.usuario },
+                { purpose: 'password_change', expiresInSeconds: 10 * 60 }
+            );
             return {
                 success: false,
                 requiereCambioPassword: true,
+                passwordChangeToken,
                 usuario: {
                     id: usuarioData.id,
                     usuario: usuarioData.usuario,
@@ -90,20 +103,14 @@ async function procesarLogin(usuario, contrasena) {
             };
         }
 
-        const payload = {
+        const token = signToken({
             id: usuarioData.id,
             usuario: usuarioData.usuario,
             nombre_completo: usuarioData.nombre_completo,
             rol_id: usuarioData.rol_id,
             rol_codigo: usuarioData.rol_codigo,
-            rol_nombre: usuarioData.rol_nombre,
-            exp: Math.floor(Date.now() / 1000) + (8 * 60 * 60)
-        };
-
-        const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-        const payloadEncoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
-        const signature = Buffer.from('firma-simple').toString('base64url');
-        const token = `${header}.${payloadEncoded}.${signature}`;
+            rol_nombre: usuarioData.rol_nombre
+        });
 
         pool.query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1', [usuarioData.id]).catch(err => {
             console.log('No se pudo actualizar ultimo_login:', err.message);
@@ -212,10 +219,8 @@ registrarRuta('GET', '/api/health', async (req, res) => {
 // SERVIDOR PRINCIPAL
 // ======================================================
 const servidor = http.createServer(async (peticion, respuesta) => {
-    // CORS headers
-    respuesta.setHeader('Access-Control-Allow-Origin', '*');
-    respuesta.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    respuesta.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    // CORS restringido por CORS_ORIGINS; ya no se utiliza wildcard '*'.
+    applyCors(peticion, respuesta);
 
     if (peticion.method === 'OPTIONS') {
         respuesta.writeHead(204);
@@ -226,6 +231,36 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     const urlParseada = url.parse(peticion.url || '', true);
     const ruta = urlParseada.pathname || '/';
     const metodo = peticion.method || 'GET';
+
+    // Validación central de cualquier Bearer token recibido.
+    // Las rutas legacy que hoy solo comprueban presencia del token quedan protegidas
+    // contra tokens alterados sin tener que reescribir todos los endpoints en esta fase.
+    const authHeader = peticion.headers['authorization'];
+    if (authHeader) {
+        const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        const expectedPurpose = ruta === '/api/auth/cambiar-password' ? 'password_change' : 'access';
+        const verification = verifyToken(bearer, { expectedPurpose });
+        if (!verification.valid) {
+            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+            respuesta.end(JSON.stringify({ error: verification.error || 'Token inválido' }));
+            return;
+        }
+        peticion.auth = verification.payload;
+    }
+
+    // F1.4-B: autorización mínima para operaciones administrativas sensibles.
+    // La autenticación demuestra quién es el usuario; esta política verifica
+    // además si su rol actual puede ejecutar la operación solicitada.
+    const authorization = authorizeRequest({
+        auth: peticion.auth,
+        route: ruta,
+        method: metodo
+    });
+    if (!authorization.allowed) {
+        respuesta.writeHead(authorization.status || 403, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: authorization.error || 'Operación no autorizada' }));
+        return;
+    }
 
     console.log(`${metodo} ${ruta}`);
 
@@ -272,32 +307,14 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     if (ruta === '/api/auth/verify' && metodo === 'GET') {
         console.log('[API] GET /api/auth/verify');
 
-        const token = peticion.headers['authorization']?.split(' ')[1];
-
-        if (!token) {
+        if (!peticion.auth) {
             respuesta.writeHead(401, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ valid: false, error: 'Token requerido' }));
             return;
         }
 
-        try {
-            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-            const expirado = payload.exp * 1000 < Date.now();
-
-            if (expirado) {
-                respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ valid: false, error: 'Token expirado' }));
-                return;
-            }
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ valid: true, usuario: payload }));
-
-        } catch (error) {
-            console.error('Error verificando token:', error);
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ valid: false, error: 'Token invalido' }));
-        }
+        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ valid: true, usuario: peticion.auth }));
         return;
     }
 
@@ -314,9 +331,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         }
 
         try {
-            // Decodificar token
-            const parts = token.split('.');
-            const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+            const payload = peticion.auth;
             const rolCodigo = payload.rol_codigo || payload.rol || 'AUDITOR';
 
             console.log(`🔍 Buscando redirección para rol: ${rolCodigo}`);
@@ -557,7 +572,12 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         peticion.on('end', async () => {
             try {
                 const { usuarioId, nuevaPassword } = JSON.parse(body);
-                const hashNuevo = hashSHA256(nuevaPassword);
+                if (!peticion.auth || peticion.auth.purpose !== 'password_change' || Number(peticion.auth.id) !== Number(usuarioId)) {
+                    respuesta.writeHead(403, { 'Content-Type': 'application/json' });
+                    respuesta.end(JSON.stringify({ success: false, error: 'Cambio de contraseña no autorizado' }));
+                    return;
+                }
+                const hashNuevo = await hashPassword(nuevaPassword);
 
                 await pool.query(
                     'UPDATE usuarios SET contrasena = $1, primer_login = false, updated_at = NOW() WHERE id = $2',
@@ -1833,7 +1853,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
                 }
 
                 // Hashear contraseña
-                const hashPassword = crypto.createHash('sha256').update(contrasena).digest('hex');
+                const passwordHash = await hashPassword(contrasena);
 
                 // Obtener siguiente ID
                 const maxId = await pool.query('SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM usuarios');
@@ -1853,7 +1873,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
                     )
                     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
                     RETURNING id, usuario, nombre_completo, rol_id, activo
-                `, [nuevoId, usuario, nombre_completo, hashPassword, rol_id, activo]);
+                `, [nuevoId, usuario, nombre_completo, passwordHash, rol_id, activo]);
 
                 console.log(`✅ Usuario creado: ${usuario} (ID: ${nuevoId}) con rol_id: ${rol_id}`);
 
@@ -3424,14 +3444,14 @@ const servidor = http.createServer(async (peticion, respuesta) => {
             try {
                 const { password } = JSON.parse(body);
 
-                const hashPassword = crypto.createHash('sha256').update(password).digest('hex');
+                const passwordHash = await hashPassword(password);
 
                 const result = await pool.query(`
                     UPDATE usuarios 
                     SET contrasena = $1, updated_at = NOW() 
                     WHERE id = $2
                     RETURNING id
-                `, [hashPassword, id]);
+                `, [passwordHash, id]);
 
                 if (result.rowCount === 0) {
                     respuesta.writeHead(404, { 'Content-Type': 'application/json' });
@@ -3549,9 +3569,9 @@ const servidor = http.createServer(async (peticion, respuesta) => {
                 }
 
                 if (contrasena) {
-                    const hashPassword = crypto.createHash('sha256').update(contrasena).digest('hex');
+                    const passwordHash = await hashPassword(contrasena);
                     updates.push(`contrasena = $${idx++}`);
-                    values.push(hashPassword);
+                    values.push(passwordHash);
                 }
 
                 updates.push(`updated_at = NOW()`);

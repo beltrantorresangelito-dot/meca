@@ -305,6 +305,7 @@
                             }
                             
                             window.usuarioPrimerLoginId = resultado.usuario.id;
+                            window.passwordChangeToken = resultado.passwordChangeToken;
                             
                             document.getElementById('primerLoginNuevaPassword').value = '';
                             document.getElementById('primerLoginConfirmarPassword').value = '';
@@ -396,7 +397,10 @@
                 try {
                     const response = await fetch('/api/auth/cambiar-password', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${window.passwordChangeToken || ''}`
+                        },
                         body: JSON.stringify({
                             usuarioId: window.usuarioPrimerLoginId,
                             nuevaPassword: nuevaPassword
