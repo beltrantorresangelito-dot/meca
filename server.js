@@ -2505,137 +2505,190 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     }
 
     // ======================================================
-    // API - REPORTES - Errores por auditor (VERSIÓN COMPLETA CON DETALLES)
+    // API - REPORTES - ERRORES POR AUDITOR (VERSIÓN CORREGIDA)
     // ======================================================
-    if (ruta === '/api/reportes/errores-auditores' && metodo === 'GET') {
-        console.log('[API] GET /api/reportes/errores-auditores');
 
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
+   if (ruta === '/api/reportes/errores-auditores' && metodo === 'GET') {
+    console.log('[API] GET /api/reportes/errores-auditores');
 
-        try {
-            const { periodo, auditor } = urlParseada.query;
-            const periodoDias = parseInt(periodo) || 30;
-
-            // Obtener evaluaciones con detalles
-            const result = await pool.query(`
-                SELECT 
-                    e.id,
-                    e.evaluador,
-                    e.fecha_formateada,
-                    e.agente,
-                    d.id as detalle_id,
-                    d.bloque,
-                    d.atributo,
-                    d.submotivo,
-                    d.peso,
-                    d.cumple
-                FROM evaluaciones e
-                LEFT JOIN detalles_evaluacion d ON e.id = d.evaluacion_id
-                WHERE e.fecha_formateada IS NOT NULL
-                ORDER BY e.fecha DESC
-            `);
-
-            // Calcular fecha límite
-            const fechaLimite = new Date();
-            fechaLimite.setDate(fechaLimite.getDate() - periodoDias);
-
-            // Procesar en JavaScript
-            const erroresPorAuditorPorFecha = {};
-            const auditoresSet = new Set();
-            const fechasSet = new Set();
-            const detallesPorAuditorPorFecha = {};  // 🔴 CLAVE: Inicializar detalles
-
-            for (const row of result.rows) {
-                // Filtrar por auditor
-                if (auditor !== 'todos' && row.evaluador !== auditor) continue;
-
-                // Parsear fecha
-                let fechaStr = '';
-                let fechaEval = null;
-
-                if (row.fecha_formateada) {
-                    fechaStr = row.fecha_formateada.split(' ')[0];
-                    const partes = fechaStr.split('/');
-                    if (partes.length === 3) {
-                        fechaEval = new Date(partes[2], partes[1] - 1, partes[0]);
-                    }
-                }
-
-                // Filtrar por período
-                if (fechaEval && fechaEval < fechaLimite) continue;
-                if (!fechaStr) continue;
-
-                if (row.evaluador) auditoresSet.add(row.evaluador);
-                fechasSet.add(fechaStr);
-
-                const esError = row.cumple === false || row.cumple === 0 || row.cumple === 'false';
-
-                if (esError && row.detalle_id) {
-                    // Contar errores por fecha
-                    if (!erroresPorAuditorPorFecha[row.evaluador]) {
-                        erroresPorAuditorPorFecha[row.evaluador] = {};
-                    }
-                    if (!erroresPorAuditorPorFecha[row.evaluador][fechaStr]) {
-                        erroresPorAuditorPorFecha[row.evaluador][fechaStr] = 0;
-                    }
-                    erroresPorAuditorPorFecha[row.evaluador][fechaStr]++;
-
-                    // 🔴 GUARDAR DETALLES
-                    if (!detallesPorAuditorPorFecha[row.evaluador]) {
-                        detallesPorAuditorPorFecha[row.evaluador] = {};
-                    }
-                    if (!detallesPorAuditorPorFecha[row.evaluador][fechaStr]) {
-                        detallesPorAuditorPorFecha[row.evaluador][fechaStr] = [];
-                    }
-                    detallesPorAuditorPorFecha[row.evaluador][fechaStr].push({
-                        agente: row.agente,
-                        errores: [{
-                            bloque: row.bloque || '',
-                            atributo: row.atributo || '',
-                            submotivo: row.submotivo || '',
-                            peso: row.peso || 0
-                        }]
-                    });
-                }
-            }
-
-            // Ordenar fechas
-            const fechasOrdenadas = Array.from(fechasSet).sort((a, b) => {
-                const [diaA, mesA, anioA] = a.split('/');
-                const [diaB, mesB, anioB] = b.split('/');
-                return new Date(anioB, mesB - 1, diaB) - new Date(anioA, mesA - 1, diaA);
-            });
-
-            const auditoresLista = Array.from(auditoresSet).sort();
-
-            console.log(`✅ Auditores: ${auditoresLista.length}, Fechas: ${fechasOrdenadas.length}`);
-
-            // 🔴 CLAVE: Incluir detallesPorAuditorPorFecha en la respuesta
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({
-                erroresPorAuditorPorFecha,
-                fechasOrdenadas,
-                auditores: auditoresLista,
-                detallesPorAuditorPorFecha  // <--- ESTO ES LO QUE FALTA
-            }));
-
-        } catch (error) {
-            console.error('❌ Error:', error);
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({
-                erroresPorAuditorPorFecha: {},
-                fechasOrdenadas: [],
-                auditores: [],
-                detallesPorAuditorPorFecha: {}
-            }));
-        }
+    const token = peticion.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        respuesta.writeHead(401, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({ error: 'Token requerido' }));
         return;
     }
+
+    try {
+        const { periodo, auditor } = urlParseada.query;
+        console.log(`📊 Parámetros: periodo=${periodo}, auditor=${auditor || 'todos'}`);
+
+        // ======================================================
+        // 1. FILTROS
+        // ======================================================
+
+        let fechaFiltro = '';
+        if (periodo && periodo !== 'all' && periodo !== 'todos') {
+            const periodoDias = parseInt(periodo);
+            if (!isNaN(periodoDias) && periodoDias > 0) {
+                fechaFiltro = ` AND e.fecha::date >= CURRENT_DATE - INTERVAL '${periodoDias} days'`;
+            }
+        }
+
+        let auditorFiltro = '';
+        let auditorParam = null;
+        if (auditor && auditor !== 'todos' && auditor !== 'all') {
+            auditorFiltro = ` AND e.evaluador = $1`;
+            auditorParam = auditor;
+        }
+
+        // ======================================================
+        // 2. CONSULTA CON DETALLES
+        // ======================================================
+
+        const queryText = `
+            SELECT 
+                e.evaluador,
+                e.fecha_formateada,
+                e.agente,
+                d.bloque,
+                d.atributo,
+                d.submotivo,
+                d.peso,
+                d.id as detalle_id,
+                d.cumple
+            FROM evaluaciones e
+            INNER JOIN detalles_evaluacion d ON e.id = d.evaluacion_id
+            WHERE e.evaluador IS NOT NULL 
+              AND e.evaluador != ''
+              AND d.cumple = false
+              ${fechaFiltro}
+              ${auditorFiltro}
+            ORDER BY e.evaluador, e.fecha_formateada DESC
+        `;
+
+        const params = auditorParam ? [auditorParam] : [];
+        console.log(`📡 Ejecutando consulta`);
+
+        const result = await pool.query(queryText, params);
+        console.log(`📊 ${result.rows.length} errores encontrados`);
+
+        // ======================================================
+        // 3. PROCESAR DATOS CON NORMALIZACIÓN DE FECHAS
+        // ======================================================
+
+        // 🔴 FUNCIÓN PARA NORMALIZAR FECHA (SOLO DD/MM/YYYY)
+        function normalizarFecha(fechaStr) {
+            if (!fechaStr) return null;
+            let fechaLimpia = fechaStr.split(' ')[0];
+            if (fechaLimpia.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                return fechaLimpia;
+            }
+            if (fechaLimpia.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [anio, mes, dia] = fechaLimpia.split('-');
+                return `${dia}/${mes}/${anio}`;
+            }
+            return fechaLimpia;
+        }
+
+        const erroresPorAuditorPorFecha = {};
+        const detallesPorAuditorPorFecha = {};
+        const fechasSet = new Set();
+        const auditoresSet = new Set();
+
+        for (const row of result.rows) {
+            const evaluador = row.evaluador;
+            // 🔴 NORMALIZAR FECHA
+            const fechaRaw = row.fecha_formateada || '';
+            const fecha = normalizarFecha(fechaRaw);
+
+            if (!evaluador || !fecha) continue;
+
+            auditoresSet.add(evaluador);
+            fechasSet.add(fecha);
+
+            // Contar errores por fecha (fecha normalizada)
+            if (!erroresPorAuditorPorFecha[evaluador]) {
+                erroresPorAuditorPorFecha[evaluador] = {};
+            }
+            if (!erroresPorAuditorPorFecha[evaluador][fecha]) {
+                erroresPorAuditorPorFecha[evaluador][fecha] = 0;
+            }
+            erroresPorAuditorPorFecha[evaluador][fecha]++;
+
+            // Guardar detalles
+            if (!detallesPorAuditorPorFecha[evaluador]) {
+                detallesPorAuditorPorFecha[evaluador] = {};
+            }
+            if (!detallesPorAuditorPorFecha[evaluador][fecha]) {
+                detallesPorAuditorPorFecha[evaluador][fecha] = [];
+            }
+
+            detallesPorAuditorPorFecha[evaluador][fecha].push({
+                agente: row.agente || 'Sin agente',
+                bloque: row.bloque || 'Sin bloque',
+                atributo: row.atributo || 'Sin atributo',
+                submotivo: row.submotivo || 'Sin submotivo',
+                peso: parseFloat(row.peso) || 0,
+                detalle_id: row.detalle_id
+            });
+        }
+
+        // Ordenar fechas
+        const fechasOrdenadas = Array.from(fechasSet).sort((a, b) => {
+            const [diaA, mesA, anioA] = a.split('/');
+            const [diaB, mesB, anioB] = b.split('/');
+            return new Date(anioA, mesA - 1, diaA) - new Date(anioB, mesB - 1, diaB);
+        });
+
+        // Construir lista de auditores con nombres
+        const auditoresLista = Array.from(auditoresSet).sort();
+        const auditoresConNombre = [];
+
+        for (const usuario of auditoresLista) {
+            let nombreCompleto = usuario;
+            try {
+                const nombreResult = await pool.query(
+                    'SELECT nombre_completo FROM usuarios WHERE usuario = $1',
+                    [usuario]
+                );
+                if (nombreResult.rows.length > 0 && nombreResult.rows[0].nombre_completo) {
+                    nombreCompleto = nombreResult.rows[0].nombre_completo;
+                }
+            } catch (e) {}
+
+            auditoresConNombre.push({
+                usuario: usuario,
+                nombre: nombreCompleto
+            });
+        }
+
+        console.log(`✅ Auditores con errores: ${auditoresConNombre.length}`);
+        console.log(`   Fechas únicas: ${fechasOrdenadas.length}`);
+        console.log(`   Detalles guardados para: ${Object.keys(detallesPorAuditorPorFecha).length} auditores`);
+
+        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({
+            success: true,
+            erroresPorAuditorPorFecha,
+            fechasOrdenadas,
+            auditores: auditoresConNombre,
+            detallesPorAuditorPorFecha
+        }));
+
+    } catch (error) {
+        console.error('❌ Error:', error);
+        respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+        respuesta.end(JSON.stringify({
+            success: false,
+            error: error.message,
+            erroresPorAuditorPorFecha: {},
+            fechasOrdenadas: [],
+            auditores: [],
+            detallesPorAuditorPorFecha: {}
+        }));
+    }
+    return;
+}
 
 
     // Evaluaciones con detalles

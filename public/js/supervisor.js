@@ -1905,13 +1905,10 @@ async function showTab(tabName, event) {
         // ======================================================
         if (tabName === 'gestionEscuchas') {
             console.log('🎧 Inicializando pestaña Escuchas');
-
             if (typeof inicializarGestionEscuchas === 'function') {
                 await inicializarGestionEscuchas();
             }
-            if (typeof cargarHistorialLotes === 'function') {
-                await cargarHistorialLotes();
-            }
+            // 🔴 ELIMINADO: cargarHistorialLotes() - ya no se llama aquí
             if (typeof refrescarMonitoreoEscuchas === 'function') {
                 await refrescarMonitoreoEscuchas();
             }
@@ -1921,12 +1918,9 @@ async function showTab(tabName, event) {
             if (typeof inicializarFiltroLoteEscuchas === 'function') {
                 inicializarFiltroLoteEscuchas();
             }
-
-            // 🔴 NUEVO: Cargar configuración de audios
             if (typeof cargarConfiguracionAudios === 'function') {
                 await cargarConfiguracionAudios();
             }
-
             return;
         }
 
@@ -2107,14 +2101,27 @@ async function showTab(tabName, event) {
         }
 
         if (tabName === 'transcripcion') {
-
-            // 🔴 NUEVO: Cargar dashboard y trazabilidad
+            console.log('📝 Inicializando pestaña Transcripción...');
+            
+            // Cargar dashboard
             if (typeof cargarDashboardLoteActivo === 'function') {
                 setTimeout(cargarDashboardLoteActivo, 200);
             }
+            
+            // 🔴 Cargar historial de lotes (con el ID correcto)
             if (typeof cargarHistorialLotes === 'function') {
-                setTimeout(cargarHistorialLotes, 400);
+                setTimeout(async () => {
+                    await cargarHistorialLotes();
+                    console.log('✅ Historial de lotes cargado en pestaña Transcripción');
+                }, 500);
             }
+            
+            // Cargar configuración
+            if (typeof cargarConfiguracionAudios === 'function') {
+                setTimeout(cargarConfiguracionAudios, 600);
+            }
+            
+            return;
         }
 
         if (tabName === 'campanas') {
@@ -2559,8 +2566,8 @@ async function cargarListaAgentesParaBusqueda() {
     const evaluaciones = window.evaluacionesGlobales || [];
     const agentesSet = new Set();
 
-    evaluaciones.forEach(eval => {
-        if (eval.agente) agentesSet.add(eval.agente);
+    evaluaciones.forEach(evalu => {
+        if (evalu.agente) agentesSet.add(evalu.agente);
     });
 
     // Obtener ranking para ordenar
@@ -5055,9 +5062,9 @@ async function calcularProductividadAuditor(evaluaciones) {
 function calcularProductividadAuditores(evaluaciones) {
     const auditores = {};
 
-    evaluaciones.forEach(eval => {
-        const auditor = eval.evaluador || 'Desconocido';
-        const fechaStr = eval.fechaOriginal || eval.fecha || '';
+    evaluaciones.forEach(evalu => {
+        const auditor = evalu.evaluador || 'Desconocido';
+        const fechaStr = evalu.fechaOriginal || evalu.fecha || '';
         const fechaSolo = fechaStr.split(' ')[0];
 
         if (!auditores[auditor]) {
@@ -5081,7 +5088,7 @@ function calcularProductividadAuditores(evaluaciones) {
 
         auditores[auditor].evaluaciones.push({
             fecha: fechaStr,
-            nota: eval.notaFinal
+            nota: evalu.notaFinal
         });
     });
 
@@ -8008,8 +8015,8 @@ function procesarDatosEvolutivosConEvaluaciones(evaluaciones) {
 
     const agrupadoPorFecha = {};
 
-    evaluaciones.forEach(eval => {
-        let fechaCompleta = eval.fechaOriginal || eval.fecha || '';
+    evaluaciones.forEach(evalu => {
+        let fechaCompleta = evalu.fechaOriginal || evalu.fecha || '';
         let fechaSoloDia = '';
 
         if (fechaCompleta.includes(' ')) {
@@ -8033,8 +8040,8 @@ function procesarDatosEvolutivosConEvaluaciones(evaluaciones) {
             };
         }
 
-        if (eval.detalles && eval.detalles.length > 0) {
-            eval.detalles.forEach(det => {
+        if (evalu.detalles && evalu.detalles.length > 0) {
+            evalu.detalles.forEach(det => {
                 const submotivo = det.submotivo;
                 const peso = Number(det.peso) || 0;
                 const cumple = String(det.cumple).toLowerCase() === 'true';
@@ -8273,200 +8280,268 @@ function renderizarGraficoAtributos(canvas, labels, datasets, tituloLeyenda) {
     console.log(`✅ Gráfico de Atributos generado - ${tituloLeyenda}`);
 }
 
-async function actualizarGraficoErroresAuditores() {
-    console.log('📊 actualizarGraficoErroresAuditores - Iniciando...');
+// ======================================================
+// FUNCIÓN: actualizarGraficoErroresAuditores (CORREGIDA)
+// ======================================================
 
-    // Obtener filtros actuales
+async function actualizarGraficoErroresAuditores() {
+    console.log('📊 actualizarGraficoErroresAuditores - INICIANDO...');
+
     const periodoDias = document.getElementById('filtroPeriodoErrores')?.value || '30';
     const auditorSeleccionado = document.getElementById('filtroAuditorErrores')?.value || 'todos';
 
-    console.log(`📊 Filtros: periodo=${periodoDias}, auditor=${auditorSeleccionado}`);
+    console.log(`   📅 Período: ${periodoDias}`);
+    console.log(`   👤 Auditor: ${auditorSeleccionado}`);
 
     try {
-        const resultado = await API.getErroresAuditores(periodoDias, auditorSeleccionado);
+        const token = localStorage.getItem('meca_token');
+        const url = `/api/reportes/errores-auditores?periodo=${periodoDias}&auditor=${auditorSeleccionado}`;
+        console.log(`📡 Llamando a API: ${url}`);
 
-        if (!resultado || !resultado.erroresPorAuditorPorFecha || Object.keys(resultado.erroresPorAuditorPorFecha).length === 0) {
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const resultado = await response.json();
+        console.log('📊 Datos recibidos:', resultado);
+        console.log(`   Auditores: ${resultado.auditores?.length || 0}`);
+        console.log(`   Fechas: ${resultado.fechasOrdenadas?.length || 0}`);
+        console.log(`   Keys de errores: ${Object.keys(resultado.erroresPorAuditorPorFecha || {}).length}`);
+
+        if (!resultado.erroresPorAuditorPorFecha || Object.keys(resultado.erroresPorAuditorPorFecha).length === 0) {
+            console.warn('⚠️ No hay datos de errores');
             mostrarMensajeSinDatosErrores();
             return;
         }
 
-        // Actualizar el selector de auditores con los auditores disponibles
+        // 🔴 GUARDAR EN CACHÉ
+        window.datosErroresCache = resultado;
+
+        // 🔴 ACTUALIZAR SELECTOR DE AUDITORES
         const selectAuditor = document.getElementById('filtroAuditorErrores');
         if (selectAuditor && resultado.auditores && resultado.auditores.length > 0) {
             const valorActual = selectAuditor.value;
             selectAuditor.innerHTML = '<option value="todos">📊 Todos los auditores</option>';
-            resultado.auditores.forEach(auditor => {
-                selectAuditor.innerHTML += `<option value="${escapeHtml(auditor)}" ${valorActual === auditor ? 'selected' : ''}>${escapeHtml(auditor)}</option>`;
+            
+            // 🔴 resultado.auditores es un array de objetos {usuario, nombre}
+            resultado.auditores.forEach(item => {
+                const nombreMostrar = item.nombre || item.usuario;
+                const selected = valorActual === item.usuario ? 'selected' : '';
+                selectAuditor.innerHTML += `<option value="${escapeHtml(item.usuario)}" ${selected}>${escapeHtml(nombreMostrar)}</option>`;
             });
         }
 
-        // Renderizar gráfico con los datos
+        // 🔴 GUARDAR DETALLES PARA DRILL-DOWN
+        // 🔴 GUARDAR DETALLES - CON DIAGNÓSTICO
+if (resultado.detallesPorAuditorPorFecha) {
+    window.detallesErroresPorAuditor = resultado.detallesPorAuditorPorFecha;
+    const keys = Object.keys(window.detallesErroresPorAuditor);
+    console.log('✅ Detalles guardados en window.detallesErroresPorAuditor');
+    console.log('   Cantidad de auditores con detalles:', keys.length);
+    console.log('   Auditores:', keys);
+    
+    if (keys.length > 0) {
+        const primerKey = keys[0];
+        const fechas = Object.keys(window.detallesErroresPorAuditor[primerKey]);
+        console.log(`   Ejemplo para ${primerKey}: ${fechas.length} fechas`);
+        console.log(`   Primer fecha: ${fechas[0]}, items: ${window.detallesErroresPorAuditor[primerKey][fechas[0]]?.length || 0}`);
+    }
+} else {
+    console.warn('⚠️ No hay detallesPorAuditorPorFecha en la respuesta');
+    console.log('   Respuesta completa:', resultado);
+}
+
+        // 🔴 RENDERIZAR GRÁFICO
         renderizarGraficoErroresConDatos(
             resultado.erroresPorAuditorPorFecha,
-            resultado.fechasOrdenadas,
-            resultado.auditores,
+            resultado.fechasOrdenadas || [],
+            resultado.auditores || [],
             periodoDias,
             auditorSeleccionado
         );
 
-        // Actualizar tabla de ranking de errores
-        actualizarTablaRankingErrores(resultado.erroresPorAuditorPorFecha, resultado.fechasOrdenadas, resultado.detallesPorAuditorPorFecha);
+        // 🔴 ACTUALIZAR TABLA
+        actualizarTablaRankingErrores(
+            resultado.erroresPorAuditorPorFecha,
+            resultado.fechasOrdenadas || [],
+            resultado.detallesPorAuditorPorFecha || {}
+        );
 
     } catch (error) {
-        console.error('Error en actualizarGraficoErroresAuditores:', error);
+        console.error('❌ Error:', error);
         mostrarMensajeSinDatosErrores();
+        alert('❌ Error al cargar datos: ' + error.message);
     }
 }
+
+// ======================================================
+// FUNCIÓN: renderizarGraficoErroresConDatos (CORREGIDA)
+// ======================================================
 
 function renderizarGraficoErroresConDatos(erroresPorAuditorPorFecha, fechasOrdenadas, auditores, periodoDias, auditorSeleccionado) {
     console.log('📊 renderizarGraficoErroresConDatos - INICIO');
 
-    // Filtrar fechas por período
-    let fechasFiltradas = [...fechasOrdenadas];
-    if (periodoDias !== 'all') {
-        const dias = parseInt(periodoDias);
-        const hoy = new Date();
-        fechasFiltradas = fechasOrdenadas.filter(fecha => {
-            const [dia, mes, anio] = fecha.split('/');
-            const fechaObj = new Date(anio, mes - 1, dia);
-            const diffDias = Math.floor((hoy - fechaObj) / (1000 * 60 * 60 * 24));
-            return diffDias <= dias;
-        });
-    }
-
-    if (fechasFiltradas.length === 0) {
+    // 🔴 VALIDAR DATOS
+    if (!erroresPorAuditorPorFecha || Object.keys(erroresPorAuditorPorFecha).length === 0) {
+        console.warn('⚠️ No hay datos de errores');
         mostrarMensajeSinDatosErrores();
         return;
     }
 
-    // Formatear etiquetas
-    const labels = fechasFiltradas.map(f => {
+    if (!fechasOrdenadas || fechasOrdenadas.length === 0) {
+        console.warn('⚠️ No hay fechas');
+        mostrarMensajeSinDatosErrores();
+        return;
+    }
+
+    // 🔴 DIAGNÓSTICO
+    console.log('🔍 Datos recibidos:');
+    console.log(`   Auditores: ${auditores?.length || 0}`);
+    console.log(`   Fechas: ${fechasOrdenadas.length}`);
+    for (const auditor of Object.keys(erroresPorAuditorPorFecha)) {
+        const total = Object.values(erroresPorAuditorPorFecha[auditor]).reduce((sum, v) => sum + v, 0);
+        console.log(`   ${auditor}: ${total} errores en ${Object.keys(erroresPorAuditorPorFecha[auditor]).length} fechas`);
+    }
+
+    // 🔴 FILTRAR AUDITORES
+    let auditoresMostrar = [];
+    if (auditorSeleccionado && auditorSeleccionado !== 'todos') {
+        // Buscar el auditor seleccionado por nombre o usuario
+        const encontrado = Object.keys(erroresPorAuditorPorFecha).find(a => 
+            a.toLowerCase().includes(auditorSeleccionado.toLowerCase()) ||
+            auditorSeleccionado.toLowerCase().includes(a.toLowerCase())
+        );
+        if (encontrado) {
+            auditoresMostrar = [encontrado];
+        } else {
+            auditoresMostrar = Object.keys(erroresPorAuditorPorFecha);
+        }
+    } else {
+        auditoresMostrar = Object.keys(erroresPorAuditorPorFecha);
+    }
+
+    if (auditoresMostrar.length === 0) {
+        mostrarMensajeSinDatosErrores();
+        return;
+    }
+
+    // 🔴 CONSTRUIR MAPA DE NOMBRES
+    const nombreMap = {};
+    if (auditores && auditores.length > 0) {
+        auditores.forEach(item => {
+            nombreMap[item.usuario || item] = item.nombre || item.usuario || item;
+        });
+    }
+
+    // 🔴 CONSTRUIR LABELS
+    const labels = fechasOrdenadas.map(f => {
         const partes = f.split('/');
         return `${partes[0]}/${partes[1]}`;
     });
 
-    // Construir datasets
-    const coloresAuditores = [
-        '#d93025', '#f39c12', '#019DF4', '#28a745', '#7b1fa2',
-        '#17a2b8', '#fd7e14', '#6f42c1', '#e83e8c', '#20c997'
-    ];
-
-    let datasets = [];
-    let auditoresMostrar = auditorSeleccionado === 'todos' ? auditores : [auditorSeleccionado];
+    // 🔴 CONSTRUIR DATASETS
+    const colores = ['#d93025', '#f39c12', '#019DF4', '#28a745', '#7b1fa2', '#17a2b8', '#fd7e14', '#6f42c1', '#e83e8c', '#20c997'];
+    const datasets = [];
 
     for (let i = 0; i < auditoresMostrar.length; i++) {
         const auditor = auditoresMostrar[i];
-        const data = fechasFiltradas.map(fecha => erroresPorAuditorPorFecha[auditor]?.[fecha] || 0);
+        const data = fechasOrdenadas.map(fecha => erroresPorAuditorPorFecha[auditor]?.[fecha] || 0);
+        const nombre = nombreMap[auditor] || auditor;
 
-        if (data.some(v => v > 0)) {
-            datasets.push({
-                label: auditor,
-                data: data,
-                borderColor: coloresAuditores[i % coloresAuditores.length],
-                backgroundColor: 'transparent',
-                borderWidth: 2,
-                tension: 0.3,
-                fill: false,
-                pointBackgroundColor: coloresAuditores[i % coloresAuditores.length],
-                pointBorderColor: '#fff',
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                pointBorderWidth: 1
-            });
-        }
+        datasets.push({
+            label: nombre,
+            data: data,
+            borderColor: colores[i % colores.length],
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: false,
+            pointBackgroundColor: colores[i % colores.length],
+            pointBorderColor: '#fff',
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBorderWidth: 1
+        });
     }
 
-    // Calcular promedio del equipo
-    const promedioData = fechasFiltradas.map(fecha => {
-        let suma = 0;
-        let count = 0;
-        for (const auditor of auditores) {
-            const valor = erroresPorAuditorPorFecha[auditor]?.[fecha] || 0;
-            if (valor > 0) {
-                suma += valor;
-                count++;
-            }
-        }
-        return count > 0 ? Math.round((suma / count) * 10) / 10 : 0;
-    });
+    // 🔴 RENDERIZAR GRÁFICO
+    const canvas = document.getElementById('chartEvolutivoErroresAuditores');
+    if (!canvas) {
+        console.error('❌ Canvas no encontrado');
+        return;
+    }
 
-    datasets.push({
-        label: '📊 Promedio equipo',
-        data: promedioData,
-        borderColor: '#6c757d',
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        borderDash: [5, 5],
-        tension: 0.3,
-        fill: false,
-        pointRadius: 0,
-        pointHoverRadius: 0
-    });
-
-    // Destruir gráfico existente
     if (window.chartErroresAuditores) {
         window.chartErroresAuditores.destroy();
         window.chartErroresAuditores = null;
     }
 
-    const canvas = document.getElementById('chartEvolutivoErroresAuditores');
-    if (!canvas) {
-        console.error('❌ Canvas chartEvolutivoErroresAuditores no encontrado');
-        return;
-    }
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+    canvas.width = canvas.clientWidth || 400;
+    canvas.height = canvas.clientHeight || 250;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     window.chartErroresAuditores = new Chart(ctx, {
         type: 'line',
-        data: { labels: labels, datasets: datasets },
+        data: { labels, datasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
             plugins: {
                 tooltip: {
                     callbacks: {
-                        label: function (context) {
-                            let label = context.dataset.label || '';
-                            let value = context.raw;
-                            if (label === '📊 Promedio equipo') {
-                                return `📊 Promedio: ${value} errores/día`;
-                            }
-                            return `${label}: ${value} errores`;
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.raw} errores`;
                         }
                     }
                 },
                 legend: {
                     position: 'bottom',
                     labels: { font: { size: 10 }, usePointStyle: true }
+                },
+                datalabels: {
+                    formatter: function(value) {
+                        return value > 0 ? value : '';
+                    },
+                    anchor: 'end',
+                    align: 'top',
+                    offset: 4,
+                    backgroundColor: function(context) {
+                        return context.dataset.borderColor || '#333';
+                    },
+                    borderRadius: 10,
+                    padding: { left: 5, right: 5, top: 2, bottom: 2 },
+                    color: 'white',
+                    font: { weight: 'bold', size: 9 }
                 }
             },
             scales: {
                 y: {
                     beginAtZero: true,
                     title: { display: true, text: 'Cantidad de Errores' },
+                    grid: { display: false },
                     ticks: { stepSize: 1 }
                 },
                 x: {
                     title: { display: true, text: 'Fecha (Día/Mes)' },
-                    ticks: { maxRotation: 45, minRotation: 45, autoSkip: true }
+                    ticks: { maxRotation: 45, minRotation: 45, autoSkip: true },
+                    grid: { display: false }
                 }
             }
         }
     });
 
-    console.log('✅ Gráfico renderizado correctamente');
+    console.log(`✅ Gráfico renderizado: ${datasets.length} auditores, ${labels.length} fechas`);
 }
 
 function renderizarGraficoErroresDesdeCache(periodoDias, auditorSeleccionado) {
     console.log('📊 renderizarGraficoErroresDesdeCache - INICIO');
-    console.log('datosErroresCache:', window.datosErroresCache);
 
     if (!window.datosErroresCache) {
         console.log('❌ datosErroresCache es null');
@@ -8474,245 +8549,51 @@ function renderizarGraficoErroresDesdeCache(periodoDias, auditorSeleccionado) {
         return;
     }
 
-    const { erroresPorAuditorPorFecha, fechasOrdenadas, auditores, detallesPorAuditorPorFecha } = datosErroresCache;
+    const { erroresPorAuditorPorFecha, fechasOrdenadas, auditores, detallesPorAuditorPorFecha } = window.datosErroresCache;
 
-    // Filtrar fechas por período
-    let fechasFiltradas = [...fechasOrdenadas];
-    if (periodoDias !== 'all') {
-        const dias = parseInt(periodoDias);
-        const hoy = new Date();
-        fechasFiltradas = fechasOrdenadas.filter(fecha => {
-            const [dia, mes, anio] = fecha.split('/');
-            const fechaObj = new Date(anio, mes - 1, dia);
-            const diffDias = Math.floor((hoy - fechaObj) / (1000 * 60 * 60 * 24));
-            return diffDias <= dias;
-        });
-    }
-
-    if (fechasFiltradas.length === 0) {
+    // Validar datos
+    if (!erroresPorAuditorPorFecha || Object.keys(erroresPorAuditorPorFecha).length === 0) {
+        console.warn('⚠️ No hay datos de errores en caché');
         mostrarMensajeSinDatosErrores();
         return;
     }
 
-    // Actualizar select de auditores si es necesario
-    const selectAuditor = document.getElementById('filtroAuditorErrores');
-    if (selectAuditor && selectAuditor.options.length <= 1) {
-        const valorActual = selectAuditor.value;
-        selectAuditor.innerHTML = '<option value="todos">Todos los auditores</option>';
-        auditores.forEach(a => {
-            selectAuditor.innerHTML += `<option value="${escapeHtml(a)}" ${valorActual === a ? 'selected' : ''}>${escapeHtml(a)}</option>`;
+    // Si no hay auditores, extraerlos de las claves
+    let auditoresList = auditores || Object.keys(erroresPorAuditorPorFecha);
+
+    // Si no hay fechas, extraerlas de los datos
+    let fechasList = fechasOrdenadas || [];
+    if (fechasList.length === 0) {
+        const fechasSet = new Set();
+        for (const auditor of auditoresList) {
+            if (erroresPorAuditorPorFecha[auditor]) {
+                for (const fecha of Object.keys(erroresPorAuditorPorFecha[auditor])) {
+                    fechasSet.add(fecha);
+                }
+            }
+        }
+        fechasList = Array.from(fechasSet).sort((a, b) => {
+            const [diaA, mesA, anioA] = a.split('/');
+            const [diaB, mesB, anioB] = b.split('/');
+            return new Date(anioA, mesA - 1, diaA) - new Date(anioB, mesB - 1, diaB);
         });
     }
 
-    // Guardar detalles para drill-down en variable global
-    window.detallesErroresPorAuditor = detallesPorAuditorPorFecha;
-
-    // Formatear etiquetas
-    const labels = fechasFiltradas.map(f => {
-        const partes = f.split('/');
-        return `${partes[0]}/${partes[1]}`;
-    });
-
-    // Construir datasets
-    const coloresAuditores = [
-        '#d93025', '#f39c12', '#019DF4', '#28a745', '#7b1fa2',
-        '#17a2b8', '#fd7e14', '#6f42c1', '#e83e8c', '#20c997'
-    ];
-
-    let datasets = [];
-    let auditoresMostrar = auditorSeleccionado === 'todos' ? auditores : [auditorSeleccionado];
-
-    for (let i = 0; i < auditoresMostrar.length; i++) {
-        const auditor = auditoresMostrar[i];
-        const data = fechasFiltradas.map(fecha => erroresPorAuditorPorFecha[auditor]?.[fecha] || 0);
-
-        if (data.some(v => v > 0)) {
-            datasets.push({
-                label: auditor,
-                data: data,
-                borderColor: coloresAuditores[i % coloresAuditores.length],
-                backgroundColor: 'transparent',
-                borderWidth: 2,
-                tension: 0.3,
-                fill: false,
-                pointBackgroundColor: coloresAuditores[i % coloresAuditores.length],
-                pointBorderColor: '#fff',
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                pointBorderWidth: 1
-            });
-        }
+    // Guardar detalles para drill-down
+    if (detallesPorAuditorPorFecha) {
+        window.detallesErroresPorAuditor = detallesPorAuditorPorFecha;
     }
 
-    // Calcular promedio del equipo
-    const promedioData = fechasFiltradas.map(fecha => {
-        let suma = 0;
-        let count = 0;
-        for (const auditor of auditores) {
-            const valor = erroresPorAuditorPorFecha[auditor]?.[fecha] || 0;
-            if (valor > 0) {
-                suma += valor;
-                count++;
-            }
-        }
-        return count > 0 ? Math.round((suma / count) * 10) / 10 : 0;
-    });
+    // Renderizar con los datos
+    renderizarGraficoErroresConDatos(
+        erroresPorAuditorPorFecha,
+        fechasList,
+        auditoresList,
+        periodoDias,
+        auditorSeleccionado
+    );
 
-    datasets.push({
-        label: '📊 Promedio equipo',
-        data: promedioData,
-        borderColor: '#6c757d',
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        borderDash: [5, 5],
-        tension: 0.3,
-        fill: false,
-        pointRadius: 0,
-        pointHoverRadius: 0
-    });
-
-    // Destruir gráfico existente
-    if (window.chartErroresAuditores) {
-        window.chartErroresAuditores.destroy();
-        window.chartErroresAuditores = null;
-    }
-
-    const canvas = document.getElementById('chartEvolutivoErroresAuditores');
-    if (!canvas) {
-        console.error('❌ Canvas chartEvolutivoErroresAuditores no encontrado');
-        return;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    window.chartErroresAuditores = new Chart(ctx, {
-        type: 'line',
-        data: { labels: labels, datasets: datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            onClick: (event, elements) => {
-                if (elements.length > 0) {
-                    const index = elements[0].index;
-                    const fecha = fechasFiltradas[index];
-                    const datasetIndex = elements[0].datasetIndex;
-                    const auditor = datasets[datasetIndex]?.label;
-                    if (auditor && auditor !== '📊 Promedio equipo') {
-                        mostrarDetalleErroresAuditor(escapeHtml(auditor), fecha);
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            let label = context.dataset.label || '';
-                            let value = context.raw;
-                            if (label === '📊 Promedio equipo') {
-                                return `📊 Promedio: ${value} errores/día`;
-                            }
-                            return `${label}: ${value} errores`;
-                        },
-                        afterBody: function (tooltipItems) {
-                            if (tooltipItems.length > 0) {
-                                const index = tooltipItems[0].dataIndex;
-                                const fecha = fechasFiltradas[index];
-                                return `📅 Fecha: ${fecha}`;
-                            }
-                            return [];
-                        }
-                    },
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    titleColor: '#fff',
-                    bodyColor: '#e9ecef',
-                    padding: 10,
-                    cornerRadius: 8
-                },
-                legend: {
-                    position: 'bottom',
-                    labels: { font: { size: 10 }, usePointStyle: true, boxWidth: 10 }
-                },
-                // 🔴 AGREGAR ESTA SECCIÓN COMPLETA - DATALABELS
-                datalabels: {
-                    // Mostrar solo valores mayores a 0
-                    formatter: function (value, context) {
-                        if (value === 0) return '';
-                        if (value === null || value === undefined) return '';
-                        return Math.round(value);
-                    },
-                    // Posición: arriba del punto
-                    anchor: 'end',
-                    align: 'top',
-                    offset: 6,
-                    // Fondo sólido para contraste (importante)
-                    backgroundColor: function (context) {
-                        // Usar el color de la línea del dataset
-                        const coloresFondo = {
-                            '#d93025': '#b71c1c',  // rojo
-                            '#f39c12': '#e67e22',  // naranja
-                            '#019DF4': '#0b5e9e',  // azul
-                            '#28a745': '#1e7e34',  // verde
-                            '#7b1fa2': '#5e1484',  // morado
-                            '#17a2b8': '#0f7e8c',  // celeste
-                            '#fd7e14': '#e36209',  // naranja
-                            '#6f42c1': '#5a32a3',  // púrpura
-                            '#e83e8c': '#c2185b',  // rosa
-                            '#20c997': '#169b6e'   // verde menta
-                        };
-                        const colorLinea = context.dataset.borderColor;
-                        return coloresFondo[colorLinea] || '#333';
-                    },
-                    // Borde redondeado
-                    borderRadius: 12,
-                    padding: {
-                        left: 6,
-                        right: 6,
-                        top: 3,
-                        bottom: 3
-                    },
-                    // Texto blanco en negrita
-                    color: 'white',
-                    font: {
-                        weight: 'bold',
-                        size: 10,
-                        family: 'sans-serif'
-                    },
-                    // Sombra para destacar del fondo
-                    shadowOffsetX: 1,
-                    shadowOffsetY: 1,
-                    shadowBlur: 3,
-                    shadowColor: 'rgba(0,0,0,0.4)',
-                    // Borde delgado
-                    borderWidth: 1,
-                    borderColor: 'rgba(255,255,255,0.3)'
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Cantidad de Errores', color: '#6c757d', font: { weight: 'bold', size: 11 } },
-                    grid: { display: false },
-                    ticks: { stepSize: 1, precision: 0 }
-                },
-                x: {
-                    title: { display: true, text: 'Fecha (Día/Mes)', color: '#6c757d', font: { weight: 'bold', size: 11 } },
-                    ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 12 },
-                    grid: { display: false }
-                }
-            }
-        }
-    });
-
-    // Actualizar tabla de ranking
-    actualizarTablaRankingErroresRapido(erroresPorAuditorPorFecha, fechasFiltradas);
-
-    console.log('✅ Gráfico de errores por auditor renderizado desde caché');
+    console.log('✅ Gráfico renderizado desde caché');
 }
 
 function procesarErroresPorAuditorOptimizado(evaluacionesConDetalles) {
@@ -8723,12 +8604,12 @@ function procesarErroresPorAuditorOptimizado(evaluacionesConDetalles) {
     // Guardar también los detalles para drill-down
     const detallesPorAuditorPorFecha = {};
 
-    for (const eval of evaluacionesConDetalles) {
-        const auditor = eval.evaluador || 'Sin asignar';
+    for (const evalu of evaluacionesConDetalles) {
+        const auditor = evalu.evaluador || 'Sin asignar';
         auditoresSet.add(auditor);
 
         // Obtener fecha
-        let fechaEval = eval.fecha_formateada || eval.fecha || '';
+        let fechaEval = evalu.fecha_formateada || evalu.fecha || '';
         let fechaSolo = fechaEval.includes(' ') ? fechaEval.split(' ')[0] : fechaEval;
         if (fechaEval.includes('T')) {
             const partes = fechaEval.split('T')[0].split('-');
@@ -8741,7 +8622,7 @@ function procesarErroresPorAuditorOptimizado(evaluacionesConDetalles) {
         todasFechasSet.add(fechaSolo);
 
         // Contar errores de esta evaluación
-        const detalles = eval.detalles_evaluacion || [];
+        const detalles = evalu.detalles_evaluacion || [];
         const errores = detalles.filter(d => {
             const cumple = d.cumple === true || d.cumple === 1 || d.cumple === 'true';
             return !cumple;
@@ -8768,7 +8649,7 @@ function procesarErroresPorAuditorOptimizado(evaluacionesConDetalles) {
         }
         detallesPorAuditorPorFecha[auditor][fechaSolo].push({
             fecha: fechaSolo,
-            agente: eval.agente,
+            agente: evalu.agente,
             errores: errores.map(e => ({
                 bloque: e.bloque,
                 atributo: e.atributo,
@@ -9302,9 +9183,9 @@ function filtrarEvaluacionesPorMes(evaluaciones, mesKey) {
 
     const [anioFiltro, mesFiltro] = mesKey.split('-');
 
-    return evaluaciones.filter(eval => {
+    return evaluaciones.filter(evalu => {
         // Usar fecha_formateada que tiene formato DD/MM/YYYY HH:MM
-        let fechaStr = eval.fecha_formateada || '';
+        let fechaStr = evalu.fecha_formateada || '';
         if (!fechaStr) return false;
 
         // Extraer DD/MM/YYYY
@@ -12314,8 +12195,8 @@ function mostrarDetalleFechaMejorado(fecha, frenteFiltro = null) {
     };
 
     // Filtrar evaluaciones de esa fecha
-    const evaluacionesFecha = evaluaciones.filter(eval => {
-        let fechaEval = eval.fechaOriginal || eval.fecha || '';
+    const evaluacionesFecha = evaluaciones.filter(evalu => {
+        let fechaEval = evalu.fechaOriginal || evalu.fecha || '';
         let fechaSolo = fechaEval.includes(' ') ? fechaEval.split(' ')[0] : fechaEval;
         return fechaSolo === fecha;
     });
@@ -12328,9 +12209,9 @@ function mostrarDetalleFechaMejorado(fecha, frenteFiltro = null) {
     let totalFallas = 0;
     const fallasPorAtributo = {};
 
-    evaluacionesFecha.forEach(eval => {
-        if (eval.detalles) {
-            eval.detalles.forEach(det => {
+    evaluacionesFecha.forEach(evalu => {
+        if (evalu.detalles) {
+            evalu.detalles.forEach(det => {
                 if (!det.cumple && det.submotivo) {
                     // Determinar frente del submotivo
                     const frente = mapaFrentes[det.submotivo] || 'proceso';
@@ -12537,6 +12418,8 @@ async function toggleDetalleErroresAuditor(rowId, auditor) {
     const detailRow = document.getElementById(rowId);
     const icon = document.getElementById(`icon-${rowId}`);
 
+    if (!detailRow) return;
+
     if (detailRow.style.display === 'none') {
         detailRow.style.display = 'table-row';
         if (icon) {
@@ -12559,89 +12442,174 @@ async function toggleDetalleErroresAuditor(rowId, auditor) {
 }
 
 async function generarDetalleErroresAuditorHTML(auditor) {
-    console.log(`📊 Generando detalle para: ${auditor}`);
+    console.log(`📊 generarDetalleErroresAuditorHTML - Auditor: ${auditor}`);
 
-    if (!window.detallesErroresPorAuditor || !window.detallesErroresPorAuditor[auditor]) {
-        return '<div style="text-align: center; padding: 20px; color: var(--muted);">📊 No hay detalles de errores disponibles para este auditor</div>';
-    }
+    let detallesAuditor = null;
+    let nombreAuditor = auditor;
 
-    const detalles = window.detallesErroresPorAuditor[auditor];
-
-    // Agrupar por motivo
-    const porMotivo = {};
-    const porAtributo = {};
-    const porSubmotivo = {};
-    let totalErrores = 0;
-
-    for (const [fecha, items] of Object.entries(detalles)) {
-        for (const item of items) {
-            for (const error of item.errores) {
-                totalErrores++;
-
-                const motivo = error.bloque || 'Sin motivo';
-                porMotivo[motivo] = (porMotivo[motivo] || 0) + 1;
-
-                const atributo = error.atributo || 'Sin atributo';
-                porAtributo[atributo] = (porAtributo[atributo] || 0) + 1;
-
-                const submotivo = error.submotivo || 'Sin submotivo';
-                porSubmotivo[submotivo] = (porSubmotivo[submotivo] || 0) + 1;
+    if (window.detallesErroresPorAuditor) {
+        const keys = Object.keys(window.detallesErroresPorAuditor);
+        console.log('🔍 Claves disponibles en detalles:', keys);
+        
+        const auditorLower = auditor.toLowerCase().trim();
+        
+        for (const key of keys) {
+            const keyLower = key.toLowerCase().trim();
+            
+            if (keyLower === auditorLower) {
+                detallesAuditor = window.detallesErroresPorAuditor[key];
+                nombreAuditor = key;
+                console.log(`✅ Coincidencia exacta: ${nombreAuditor}`);
+                break;
+            }
+            
+            if (auditorLower.includes(keyLower) && keyLower.length > 3) {
+                detallesAuditor = window.detallesErroresPorAuditor[key];
+                nombreAuditor = key;
+                console.log(`✅ Coincidencia parcial: ${nombreAuditor}`);
+                break;
+            }
+            
+            if (keyLower.includes(auditorLower) && auditorLower.length > 3) {
+                detallesAuditor = window.detallesErroresPorAuditor[key];
+                nombreAuditor = key;
+                console.log(`✅ Coincidencia parcial: ${nombreAuditor}`);
+                break;
+            }
+        }
+        
+        if (!detallesAuditor) {
+            const apellido = auditorLower.split(' ')[0];
+            for (const key of keys) {
+                if (keyLower.startsWith(apellido) || keyLower.includes(apellido)) {
+                    detallesAuditor = window.detallesErroresPorAuditor[key];
+                    nombreAuditor = key;
+                    console.log(`✅ Coincidencia por apellido: ${nombreAuditor}`);
+                    break;
+                }
             }
         }
     }
 
-    const topMotivos = Object.entries(porMotivo).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    const topAtributos = Object.entries(porAtributo).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    const topSubmotivos = Object.entries(porSubmotivo).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    if (!detallesAuditor) {
+        console.warn(`⚠️ No hay detalles para ${auditor}`);
+        return `<div style="text-align: center; padding: 20px; color: var(--muted);">
+            📊 No hay detalles de errores disponibles para este auditor
+        </div>`;
+    }
+
+    // 🔴 FUNCIÓN PARA NORMALIZAR FECHA
+    function normalizarFecha(fechaStr) {
+        if (!fechaStr) return null;
+        let fechaLimpia = fechaStr.split(' ')[0];
+        if (fechaLimpia.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+            return fechaLimpia;
+        }
+        if (fechaLimpia.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const [anio, mes, dia] = fechaLimpia.split('-');
+            return `${dia}/${mes}/${anio}`;
+        }
+        return fechaLimpia;
+    }
+
+    const porSubmotivo = {};
+    let totalErrores = 0;
+    let fechasUnicas = new Set();
+
+    for (const [fecha, items] of Object.entries(detallesAuditor)) {
+        const fechaNormalizada = normalizarFecha(fecha);
+        if (!fechaNormalizada) continue;
+
+        fechasUnicas.add(fechaNormalizada);
+        
+        if (!Array.isArray(items)) continue;
+
+        for (const item of items) {
+            totalErrores++;
+            const submotivo = item.submotivo || 'Sin submotivo';
+            
+            if (!porSubmotivo[submotivo]) {
+                porSubmotivo[submotivo] = {
+                    submotivo: submotivo,
+                    bloque: item.bloque || 'Sin bloque',
+                    atributo: item.atributo || 'Sin atributo',
+                    count: 0,
+                    peso: item.peso || 0,
+                    agentes: new Set(),
+                    fechas: new Set()
+                };
+            }
+            porSubmotivo[submotivo].count++;
+            if (item.agente) porSubmotivo[submotivo].agentes.add(item.agente);
+            porSubmotivo[submotivo].fechas.add(fechaNormalizada);
+        }
+    }
+
+    const topSubmotivos = Object.values(porSubmotivo)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+
+    if (topSubmotivos.length === 0) {
+        return `<div style="text-align: center; padding: 20px; color: var(--muted);">
+            📊 No hay submotivos con errores para este auditor
+        </div>`;
+    }
+
+    // Calcular días totales
+    const totalDias = fechasUnicas.size;
 
     let html = `
         <div style="padding: 10px;">
-            <h5 style="margin-bottom: 15px;">📊 Análisis detallado - ${escapeHtml(auditor)}</h5>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
-                <!-- Por Motivo -->
-                <div style="background: white; border-radius: 10px; padding: 12px; border: 1px solid #e0e0e0;">
-                    <div style="font-weight: bold; margin-bottom: 10px; color: #019DF4;">📁 POR MOTIVO</div>
-                    <div style="font-size: 13px;">
-                        ${topMotivos.map(([nombre, count]) => `
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span>${escapeHtml(nombre)}</span>
-                                <span style="font-weight: bold; color: var(--danger);">${count}</span>
-                            </div>
-                        `).join('')}
-                        ${topMotivos.length === 0 ? '<div style="color: var(--muted);">Sin datos</div>' : ''}
-                    </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h5 style="margin: 0; color: #019DF4;">📊 Detalle de errores - ${escapeHtml(nombreAuditor)}</h5>
+                <span style="font-size: 12px; background: #e9ecef; padding: 2px 12px; border-radius: 12px;">
+                    ${totalDias} días | ${totalErrores} errores
+                </span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
+                <div style="background: #f8f9fa; border-radius: 8px; padding: 8px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: var(--danger);">${totalErrores}</div>
+                    <div style="font-size: 10px; color: var(--muted);">Total errores</div>
                 </div>
-                
-                <!-- Por Atributo -->
-                <div style="background: white; border-radius: 10px; padding: 12px; border: 1px solid #e0e0e0;">
-                    <div style="font-weight: bold; margin-bottom: 10px; color: #7b1fa2;">🏷️ POR ATRIBUTO</div>
-                    <div style="font-size: 13px;">
-                        ${topAtributos.map(([nombre, count]) => `
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span>${escapeHtml(nombre.length > 25 ? nombre.substring(0, 22) + '...' : nombre)}</span>
-                                <span style="font-weight: bold; color: var(--danger);">${count}</span>
-                            </div>
-                        `).join('')}
-                        ${topAtributos.length === 0 ? '<div style="color: var(--muted);">Sin datos</div>' : ''}
-                    </div>
+                <div style="background: #f8f9fa; border-radius: 8px; padding: 8px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: var(--accent);">${Object.keys(porSubmotivo).length}</div>
+                    <div style="font-size: 10px; color: var(--muted);">Submotivos únicos</div>
                 </div>
-                
-                <!-- Por Submotivo -->
-                <div style="background: white; border-radius: 10px; padding: 12px; border: 1px solid #e0e0e0;">
-                    <div style="font-weight: bold; margin-bottom: 10px; color: #fd7e14;">🔬 POR SUBMOTIVO</div>
-                    <div style="font-size: 13px;">
-                        ${topSubmotivos.map(([nombre, count]) => `
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span>${escapeHtml(nombre.length > 25 ? nombre.substring(0, 22) + '...' : nombre)}</span>
-                                <span style="font-weight: bold; color: var(--danger);">${count}</span>
-                            </div>
-                        `).join('')}
-                        ${topSubmotivos.length === 0 ? '<div style="color: var(--muted);">Sin datos</div>' : ''}
-                    </div>
+                <div style="background: #f8f9fa; border-radius: 8px; padding: 8px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: bold; color: #7b1fa2;">${totalDias}</div>
+                    <div style="font-size: 10px; color: var(--muted);">Días con errores</div>
                 </div>
             </div>
-            <div style="margin-top: 15px; font-size: 12px; color: var(--muted); text-align: center;">
-                📊 Total de errores registrados: <strong>${totalErrores}</strong>
+            
+            <div style="font-weight: bold; margin-bottom: 10px; font-size: 13px; color: #333;">
+                📋 SUBMOTIVOS CON ERRORES
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                ${topSubmotivos.map((item, idx) => {
+                    const colores = ['#d93025', '#f39c12', '#019DF4', '#28a745', '#7b1fa2'];
+                    const color = colores[idx % colores.length];
+                    return `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid ${color};">
+                            <div>
+                                <span style="font-weight: bold; font-size: 13px;">❌ ${escapeHtml(item.submotivo)}</span>
+                                <div style="font-size: 10px; color: var(--muted);">
+                                    📂 ${escapeHtml(item.bloque)} / ${escapeHtml(item.atributo)}
+                                    ${item.peso ? `| ⚖️ ${item.peso}%` : ''}
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 12px; font-size: 11px; white-space: nowrap;">
+                                <span style="background: ${color}; color: white; padding: 1px 8px; border-radius: 10px;">${item.count}</span>
+                                <span title="Gestores afectados">👥 ${item.agentes.size}</span>
+                                <span title="Días">📅 ${item.fechas.size}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            
+            <div style="margin-top: 10px; font-size: 10px; color: var(--muted); text-align: center; border-top: 1px solid #e0e0e0; padding-top: 8px;">
+                💡 Submotivos ordenados por frecuencia de error
             </div>
         </div>
     `;
@@ -18097,19 +18065,19 @@ function exportarHistorialAgenteCSV() {
 
     const rows = [];
 
-    evaluacionesAgente.forEach(eval => {
-        const fecha = eval.fechaOriginal || eval.fecha || '';
-        const campana = eval.campana || 'Sin campaña';  // 🔴 NUEVO
-        const idLlamada = eval.idLlamada || '';
-        const nota = eval.notaFinal || 0;
-        const rango = eval.rango || '';
-        const enc = eval.totalENC || 0;
-        const ecuf = eval.totalECUF || 0;
-        const ecn = eval.totalECN || 0;
-        const evaluador = eval.evaluador || '';
+    evaluacionesAgente.forEach(evalu => {
+        const fecha = evalu.fechaOriginal || evalu.fecha || '';
+        const campana = evalu.campana || 'Sin campaña';  // 🔴 NUEVO
+        const idLlamada = evalu.idLlamada || '';
+        const nota = evalu.notaFinal || 0;
+        const rango = evalu.rango || '';
+        const enc = evalu.totalENC || 0;
+        const ecuf = evalu.totalECUF || 0;
+        const ecn = evalu.totalECN || 0;
+        const evaluador = evalu.evaluador || '';
 
-        if (eval.detalles && eval.detalles.length > 0) {
-            eval.detalles.forEach(det => {
+        if (evalu.detalles && evalu.detalles.length > 0) {
+            evalu.detalles.forEach(det => {
                 rows.push([
                     `"${fecha}"`,
                     `"${campana}"`,  // 🔴 NUEVO
@@ -18192,13 +18160,13 @@ function mostrarTablaEvaluacionesAgente(agente, evaluaciones) {
 
     let html = '';
 
-    evaluaciones.forEach((eval, index) => {
-        const fecha = eval.fechaOriginal || eval.fecha || 'Sin fecha';
-        const nota = numeroSeguro(eval.notaFinal);
-        const rango = eval.rango || obtenerRango(nota).nombre;
+    evaluaciones.forEach((evalu, index) => {
+        const fecha = evalu.fechaOriginal || evalu.fecha || 'Sin fecha';
+        const nota = numeroSeguro(evalu.notaFinal);
+        const rango = evalu.rango || obtenerRango(nota).nombre;
         
         // 🔴 OBTENER CAMPAÑA
-        const campana = eval.campana || 'Sin campaña';
+        const campana = evalu.campana || 'Sin campaña';
         const campanaBadge = campana !== 'Sin campaña'
             ? `<span style="background: #7b1fa2; color: white; padding: 2px 10px; border-radius: 12px; font-size: 11px; display: inline-block;">📌 ${escapeHtml(campana)}</span>`
             : `<span style="color: var(--muted); font-size: 11px;">-</span>`;
@@ -18209,20 +18177,20 @@ function mostrarTablaEvaluacionesAgente(agente, evaluaciones) {
         else notaColor = 'var(--danger)';
 
         let fechaDescarga = '-';
-        if (eval.fechaDescarga) {
+        if (evalu.fechaDescarga) {
             try {
-                if (eval.fechaDescarga.includes('-')) {
-                    const [anio, mes, dia] = eval.fechaDescarga.split('T')[0].split('-');
+                if (evalu.fechaDescarga.includes('-')) {
+                    const [anio, mes, dia] = evalu.fechaDescarga.split('T')[0].split('-');
                     fechaDescarga = `${dia}/${mes}/${anio}`;
                 } else {
-                    fechaDescarga = eval.fechaDescarga;
+                    fechaDescarga = evalu.fechaDescarga;
                 }
             } catch (e) {
-                fechaDescarga = eval.fechaDescarga || '-';
+                fechaDescarga = evalu.fechaDescarga || '-';
             }
         }
 
-        const rowId = `eval-${eval.id || index}`;
+        const rowId = `eval-${evalu.id || index}`;
 
         html += `
             <tr class="expandable-row" onclick="toggleDetalleEvaluacion('${rowId}')" style="cursor: pointer;">
@@ -18233,20 +18201,20 @@ function mostrarTablaEvaluacionesAgente(agente, evaluaciones) {
                 <td>${escapeHtml(fechaDescarga)}</td>
                 <!-- 🔴 NUEVA COLUMNA: CAMPAÑA -->
                 <td style="text-align: center;">${campanaBadge}</td>
-                <td>${escapeHtml(eval.idLlamada || '-')}</td>
+                <td>${escapeHtml(evalu.idLlamada || '-')}</td>
                 <td style="font-weight: bold; color: ${notaColor};">${nota}%</td>
                 <td><span class="badge" style="background: ${notaColor};">${rango}</span></td>
-                <td>${numeroSeguro(eval.totalENC)}/${obtenerPesosActuales().ENC}</td>
-                <td>${numeroSeguro(eval.totalECUF)}/${obtenerPesosActuales().ECUF}</td>
-                <td>${numeroSeguro(eval.totalECN)}/${obtenerPesosActuales().ECN}</td>
-                <td>${escapeHtml(eval.evaluador || '-')}</td>
+                <td>${numeroSeguro(evalu.totalENC)}/${obtenerPesosActuales().ENC}</td>
+                <td>${numeroSeguro(evalu.totalECUF)}/${obtenerPesosActuales().ECUF}</td>
+                <td>${numeroSeguro(evalu.totalECN)}/${obtenerPesosActuales().ECN}</td>
+                <td>${escapeHtml(evalu.evaluador || '-')}</td>
             </tr>
             <tr id="${rowId}" class="detail-row" style="display: none;">
                 <td colspan="11">  <!-- 🔴 ACTUALIZAR COLSPAN de 10 a 11 -->
                     <div class="detail-content">
                         <strong>📋 Detalle de ítems evaluados:</strong>
                         <div class="detail-items" id="items-${rowId}">
-                            ${generarDetalleItemsHTML(eval.detalles || [])}
+                            ${generarDetalleItemsHTML(evalu.detalles || [])}
                         </div>
                     </div>
                 </td>
@@ -18446,14 +18414,14 @@ function cargarHistorialEvaluaciones() {
     historialFiltrado = [...evaluaciones];
 
     let html = '';
-    evaluaciones.forEach((eval, index) => {
+    evaluaciones.forEach((evalu, index) => {
         let notaColor = '';
-        if (eval.notaFinal >= 90) notaColor = 'var(--ok)';
-        else if (eval.notaFinal >= 85) notaColor = 'var(--warning)';
+        if (evalu.notaFinal >= 90) notaColor = 'var(--ok)';
+        else if (evalu.notaFinal >= 85) notaColor = 'var(--warning)';
         else notaColor = 'var(--danger)';
 
         // Obtener fecha correctamente
-        let fecha = eval.fechaOriginal || eval.fecha || '';
+        let fecha = evalu.fechaOriginal || evalu.fecha || '';
         if (fecha) {
             fecha = mostrarFechaSinT(fecha);
         }
@@ -18461,14 +18429,14 @@ function cargarHistorialEvaluaciones() {
         html += `<tr>
             <td style="padding: 8px; text-align: center;">${index + 1}</td>
             <td style="padding: 8px;">${fecha}</td>
-            <td style="padding: 8px;">${escapeHtml(eval.agente || '')}</td>
-            <td style="padding: 8px;">${escapeHtml(eval.evaluador || '')}</td>
-            <td style="padding: 8px;">${escapeHtml(eval.idLlamada || '')}</td>
-            <td style="padding: 8px; font-weight: bold; color: ${notaColor};">${eval.notaFinal}%</td>
-            <td style="padding: 8px;"><span class="badge" style="background: ${notaColor};">${eval.rango || ''}</span></td>
+            <td style="padding: 8px;">${escapeHtml(evalu.agente || '')}</td>
+            <td style="padding: 8px;">${escapeHtml(evalu.evaluador || '')}</td>
+            <td style="padding: 8px;">${escapeHtml(evalu.idLlamada || '')}</td>
+            <td style="padding: 8px; font-weight: bold; color: ${notaColor};">${evalu.notaFinal}%</td>
+            <td style="padding: 8px;"><span class="badge" style="background: ${notaColor};">${evalu.rango || ''}</span></td>
             <td style="padding: 8px; text-align: center;">
-                <button onclick="verDetalleEvaluacion(${eval.id})" style="padding: 4px 8px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer;">👁️</button>
-                <button onclick="eliminarEvaluacion(${eval.id})" style="padding: 4px 8px; background: #fee; color: var(--danger); border: none; border-radius: 4px; cursor: pointer;">🗑️</button>
+                <button onclick="verDetalleEvaluacion(${evalu.id})" style="padding: 4px 8px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer;">👁️</button>
+                <button onclick="eliminarEvaluacion(${evalu.id})" style="padding: 4px 8px; background: #fee; color: var(--danger); border: none; border-radius: 4px; cursor: pointer;">🗑️</button>
             </td>
         </tr>`;
     });
@@ -18556,23 +18524,23 @@ function actualizarTablaHistorialFiltrada() {
     }
 
     let html = '';
-    historialFiltrado.forEach((eval, index) => {
+    historialFiltrado.forEach((evalu, index) => {
         let notaColor = '';
-        if (eval.notaFinal >= 90) notaColor = 'var(--ok)';
-        else if (eval.notaFinal >= 85) notaColor = 'var(--warning)';
+        if (evalu.notaFinal >= 90) notaColor = 'var(--ok)';
+        else if (evalu.notaFinal >= 85) notaColor = 'var(--warning)';
         else notaColor = 'var(--danger)';
 
         html += `<tr>
                 <td style="padding: 8px; text-align: center;">${index + 1}</td>                
-                <td style="padding: 8px;">${eval.fechaOriginal || eval.fecha || ''}</td>
-                <td style="padding: 8px;">${escapeHtml(eval.agente || '')}</td>
-                <td style="padding: 8px;">${escapeHtml(eval.evaluador || '')}</td>
-                <td style="padding: 8px;">${eval.idLlamada || ''}</td>
-                <td style="padding: 8px; font-weight: bold; color: ${notaColor};">${eval.notaFinal}%</td>
-                <td style="padding: 8px;"><span class="badge" style="background: ${notaColor};">${eval.rango || ''}</span></td>
+                <td style="padding: 8px;">${evalu.fechaOriginal || evalu.fecha || ''}</td>
+                <td style="padding: 8px;">${escapeHtml(evalu.agente || '')}</td>
+                <td style="padding: 8px;">${escapeHtml(evalu.evaluador || '')}</td>
+                <td style="padding: 8px;">${evalu.idLlamada || ''}</td>
+                <td style="padding: 8px; font-weight: bold; color: ${notaColor};">${evalu.notaFinal}%</td>
+                <td style="padding: 8px;"><span class="badge" style="background: ${notaColor};">${evalu.rango || ''}</span></td>
                 <td style="padding: 8px; text-align: center;">
-                    <button onclick="verDetalleEvaluacion(${eval.id})" style="padding: 4px 8px; background: var(--accent); color: white;">👁️</button>
-                    <button onclick="eliminarEvaluacion(${eval.id})" style="padding: 4px 8px; background: #fee; color: var(--danger);">🗑️</button>
+                    <button onclick="verDetalleEvaluacion(${evalu.id})" style="padding: 4px 8px; background: var(--accent); color: white;">👁️</button>
+                    <button onclick="eliminarEvaluacion(${evalu.id})" style="padding: 4px 8px; background: #fee; color: var(--danger);">🗑️</button>
                 </td>
             </tr>`;
     });
@@ -18621,35 +18589,35 @@ function exportarDetalleCSV() {
     const headersCompletos = [...headersGenerales, ...headersDetalle];
     const rows = [];
 
-    evaluaciones.forEach(eval => {
-        const totalENC = numeroSeguro(eval.totalENC);
-        const totalECUF = numeroSeguro(eval.totalECUF);
-        const totalECN = numeroSeguro(eval.totalECN);
-        const notaFinal = numeroSeguro(eval.notaFinal);
-        const campana = eval.campana || 'Sin campaña';  // 🔴 NUEVO
+    evaluaciones.forEach(evalu => {
+        const totalENC = numeroSeguro(evalu.totalENC);
+        const totalECUF = numeroSeguro(evalu.totalECUF);
+        const totalECN = numeroSeguro(evalu.totalECN);
+        const notaFinal = numeroSeguro(evalu.notaFinal);
+        const campana = evalu.campana || 'Sin campaña';  // 🔴 NUEVO
 
-        let fechaValida = eval.fechaOriginal || eval.fecha || new Date().toLocaleString();
+        let fechaValida = evalu.fechaOriginal || evalu.fecha || new Date().toLocaleString();
 
-        if (eval.detalles && eval.detalles.length > 0) {
-            eval.detalles.forEach(detalle => {
+        if (evalu.detalles && evalu.detalles.length > 0) {
+            evalu.detalles.forEach(detalle => {
                 const peso = numeroSeguro(detalle.peso);
                 const cumple = detalle.cumple === true || detalle.cumple === 'true' || detalle.cumple === 1 || detalle.cumple === '1';
                 const pesoObtenido = cumple ? peso : 0;
 
                 rows.push([
-                    eval.id || '',
+                    evalu.id || '',
                     fechaValida,
-                    `"${(eval.agente || '').replace(/"/g, '""')}"`,
-                    `"${(eval.evaluador || '').replace(/"/g, '""')}"`,
-                    `"${(eval.idLlamada || '').replace(/"/g, '""')}"`,
+                    `"${(evalu.agente || '').replace(/"/g, '""')}"`,
+                    `"${(evalu.evaluador || '').replace(/"/g, '""')}"`,
+                    `"${(evalu.idLlamada || '').replace(/"/g, '""')}"`,
                     `"${campana.replace(/"/g, '""')}"`,  // 🔴 NUEVO
                     notaFinal,
-                    `"${eval.rango || ''}"`,
+                    `"${evalu.rango || ''}"`,
                     totalENC,
                     totalECUF,
                     totalECN,
-                    eval.tiempoAuditoria || '',
-                    `"${eval.tiempoAuditoriaFormateado || ''}"`,
+                    evalu.tiempoAuditoria || '',
+                    `"${evalu.tiempoAuditoriaFormateado || ''}"`,
                     `"${(detalle.bloque || '').replace(/"/g, '""')}"`,
                     `"${(detalle.atributo || '').replace(/"/g, '""')}"`,
                     `"${(detalle.submotivo || '').replace(/"/g, '""')}"`,
@@ -18660,19 +18628,19 @@ function exportarDetalleCSV() {
             });
         } else {
             rows.push([
-                eval.id || '',
+                evalu.id || '',
                 fechaValida,
-                `"${(eval.agente || '').replace(/"/g, '""')}"`,
-                `"${(eval.evaluador || '').replace(/"/g, '""')}"`,
-                `"${(eval.idLlamada || '').replace(/"/g, '""')}"`,
+                `"${(evalu.agente || '').replace(/"/g, '""')}"`,
+                `"${(evalu.evaluador || '').replace(/"/g, '""')}"`,
+                `"${(evalu.idLlamada || '').replace(/"/g, '""')}"`,
                 `"${campana.replace(/"/g, '""')}"`,  // 🔴 NUEVO
                 notaFinal,
-                `"${eval.rango || ''}"`,
+                `"${evalu.rango || ''}"`,
                 totalENC,
                 totalECUF,
                 totalECN,
-                eval.tiempoAuditoria || '',
-                `"${eval.tiempoAuditoriaFormateado || ''}"`,
+                evalu.tiempoAuditoria || '',
+                `"${evalu.tiempoAuditoriaFormateado || ''}"`,
                 'Sin detalles',
                 '',
                 '',
@@ -18740,33 +18708,33 @@ function exportarResumenCSV() {
         'Submotivos NO OK'
     ];
 
-    const rows = evaluaciones.map(eval => {
-        const agenteData = agentes[eval.agente];
+    const rows = evaluaciones.map(evalu => {
+        const agenteData = agentes[evalu.agente];
         const promedioAgente = agenteData.suma / agenteData.count;
         const cuartil = obtenerCuartil(promedioAgente);
         const campanas = Array.from(agenteData.campanas || []).join('; ') || 'Sin campaña';  // 🔴 NUEVO
 
-        const totalSubmotivos = eval.detalles ? eval.detalles.length : 0;
-        const submotivosOK = eval.detalles ? eval.detalles.filter(d => d.cumple).length : 0;
+        const totalSubmotivos = evalu.detalles ? evalu.detalles.length : 0;
+        const submotivosOK = evalu.detalles ? evalu.detalles.filter(d => d.cumple).length : 0;
         const submotivosNO = totalSubmotivos - submotivosOK;
 
-        let fechaValida = eval.fechaOriginal || eval.fecha || new Date().toLocaleDateString();
+        let fechaValida = evalu.fechaOriginal || evalu.fecha || new Date().toLocaleDateString();
 
         return [
-            eval.id || '',
+            evalu.id || '',
             fechaValida,
-            `"${eval.agente || ''}"`,
-            `"${eval.evaluador || ''}"`,
-            `"${eval.idLlamada || ''}"`,
+            `"${evalu.agente || ''}"`,
+            `"${evalu.evaluador || ''}"`,
+            `"${evalu.idLlamada || ''}"`,
             `"${campanas}"`,  // 🔴 NUEVO
-            eval.notaFinal || '',
-            `"${eval.rango || ''}"`,
+            evalu.notaFinal || '',
+            `"${evalu.rango || ''}"`,
             `"${cuartil}"`,
-            eval.totalENC || '',
-            eval.totalECUF || '',
-            eval.totalECN || '',
-            eval.tiempoAuditoria || '',
-            `"${eval.tiempoAuditoriaFormateado || ''}"`,
+            evalu.totalENC || '',
+            evalu.totalECUF || '',
+            evalu.totalECN || '',
+            evalu.tiempoAuditoria || '',
+            `"${evalu.tiempoAuditoriaFormateado || ''}"`,
             totalSubmotivos,
             submotivosOK,
             submotivosNO
@@ -18809,18 +18777,18 @@ function mostrarTimeline(agente) {
     });
 
     // Mostrar cada evaluación
-    evaluacionesAgente.forEach((eval, idx) => {
-        const fecha = eval.fechaOriginal || eval.fecha || 'Fecha desconocida';
-        const nota = eval.notaFinal;
-        const rango = eval.rango;
+    evaluacionesAgente.forEach((evalu, idx) => {
+        const fecha = evalu.fechaOriginal || evalu.fecha || 'Fecha desconocida';
+        const nota = evalu.notaFinal;
+        const rango = evalu.rango;
 
         timeline += `📞 EVALUACIÓN ${idx + 1}\n`;
         timeline += `   📅 Fecha: ${fecha}\n`;
         timeline += `   📊 Nota: ${nota}% (${rango})\n`;
 
         // Mostrar fallas si las hay
-        if (eval.detalles) {
-            const fallas = eval.detalles.filter(d => !d.cumple);
+        if (evalu.detalles) {
+            const fallas = evalu.detalles.filter(d => !d.cumple);
             if (fallas.length > 0) {
                 timeline += `   ❌ Fallas:\n`;
                 fallas.forEach(f => {
@@ -24538,9 +24506,9 @@ function getEvaluacionesFiltradas() {
 
     console.log('📅 Filtro - Inicio:', inicioComparable, 'Fin:', finComparable);
 
-    const evaluacionesFiltradas = evaluaciones.filter(eval => {
+    const evaluacionesFiltradas = evaluaciones.filter(evalu => {
         // Obtener fecha de la evaluación
-        let fechaStr = eval.fechaOriginal || eval.fecha || '';
+        let fechaStr = evalu.fechaOriginal || evalu.fecha || '';
         if (!fechaStr || fechaStr === 'Sin fecha') return false;
 
         // Convertir fecha de evaluación a formato YYYYMMDD para comparar
@@ -24759,8 +24727,8 @@ function generarGraficoEvolutivoAuditorias(evaluaciones, auditoresData) {
     const agrupadoPorFecha = {};
     const auditoresNombres = auditoresData.slice(0, 5).map(a => a.nombre);
 
-    evaluaciones.forEach(eval => {
-        const fechaFormateada = formatearFechaDiaMes(eval.fechaOriginal || eval.fecha || '');
+    evaluaciones.forEach(evalu => {
+        const fechaFormateada = formatearFechaDiaMes(evalu.fechaOriginal || evalu.fecha || '');
         if (!fechaFormateada) return;
 
         if (!agrupadoPorFecha[fechaFormateada]) {
@@ -24770,7 +24738,7 @@ function generarGraficoEvolutivoAuditorias(evaluaciones, auditoresData) {
             });
         }
 
-        const auditor = eval.evaluador || 'Desconocido';
+        const auditor = evalu.evaluador || 'Desconocido';
         agrupadoPorFecha[fechaFormateada].total++;
         if (auditoresNombres.includes(auditor)) {
             agrupadoPorFecha[fechaFormateada][auditor]++;
@@ -24989,8 +24957,8 @@ function cargarSelectAuditoresHistorial() {
     const evaluaciones = window.evaluacionesGlobales || [];
     const auditoresSet = new Set();
 
-    evaluaciones.forEach(eval => {
-        if (eval.evaluador) auditoresSet.add(eval.evaluador);
+    evaluaciones.forEach(evalu => {
+        if (evalu.evaluador) auditoresSet.add(evalu.evaluador);
     });
 
     const auditores = Array.from(auditoresSet).sort();
@@ -25106,10 +25074,10 @@ function mostrarTablaEvaluacionesAuditor(auditor, evaluaciones) {
 
     let html = '';
 
-    evaluaciones.forEach((eval, index) => {
-        const fecha = eval.fechaOriginal || eval.fecha || 'Sin fecha';
-        const nota = numeroSeguro(eval.notaFinal);
-        const rango = eval.rango || obtenerRango(nota).nombre;
+    evaluaciones.forEach((evalu, index) => {
+        const fecha = evalu.fechaOriginal || evalu.fecha || 'Sin fecha';
+        const nota = numeroSeguro(evalu.notaFinal);
+        const rango = evalu.rango || obtenerRango(nota).nombre;
 
         let notaColor = '';
         if (nota >= 90) notaColor = 'var(--ok)';
@@ -25118,7 +25086,7 @@ function mostrarTablaEvaluacionesAuditor(auditor, evaluaciones) {
 
 
 
-        const rowId = `auditor-eval-${eval.id || index}`;
+        const rowId = `auditor-eval-${evalu.id || index}`;
 
         // Fila principal (expandible)
         html += `
@@ -25127,20 +25095,20 @@ function mostrarTablaEvaluacionesAuditor(auditor, evaluaciones) {
                         <span class="expand-icon" id="icon-${rowId}">▶</span>
                     </td>
                     <td style="padding: 8px;">${escapeHtml(fecha)}</td>
-                    <td style="padding: 8px;"><strong>${escapeHtml(eval.agente || '-')}</strong></td>
-                    <td style="padding: 8px;">${escapeHtml(eval.idLlamada || '-')}</td>
+                    <td style="padding: 8px;"><strong>${escapeHtml(evalu.agente || '-')}</strong></td>
+                    <td style="padding: 8px;">${escapeHtml(evalu.idLlamada || '-')}</td>
                     <td style="padding: 8px; font-weight: bold; color: ${notaColor};">${nota}%</td>
                     <td style="padding: 8px;"><span class="badge" style="background: ${notaColor};">${rango}</span></td>
-                    <td style="padding: 8px;">${numeroSeguro(eval.totalENC)}/${obtenerPesosActuales().ENC}</td>
-                    <td style="padding: 8px;">${numeroSeguro(eval.totalECUF)}/${obtenerPesosActuales().ECUF}</td>
-                    <td style="padding: 8px;">${numeroSeguro(eval.totalECN)}/${obtenerPesosActuales().ECN}</td>
+                    <td style="padding: 8px;">${numeroSeguro(evalu.totalENC)}/${obtenerPesosActuales().ENC}</td>
+                    <td style="padding: 8px;">${numeroSeguro(evalu.totalECUF)}/${obtenerPesosActuales().ECUF}</td>
+                    <td style="padding: 8px;">${numeroSeguro(evalu.totalECN)}/${obtenerPesosActuales().ECN}</td>
                 </tr>
                 <tr id="${rowId}" class="detail-row" style="display: none;">
                     <td colspan="9">
                         <div class="detail-content">
                             <strong>📋 Detalle de ítems evaluados:</strong>
                             <div class="detail-items" id="items-${rowId}">
-                                ${generarDetalleItemsHTML(eval.detalles || [])}
+                                ${generarDetalleItemsHTML(evalu.detalles || [])}
                             </div>
                         </div>
                     </td>
@@ -25200,18 +25168,18 @@ function exportarHistorialAuditorCSV() {
 
     const rows = [];
 
-    evaluacionesAuditor.forEach(eval => {
-        const fecha = eval.fechaOriginal || eval.fecha || '';
-        const agente = eval.agente || '';
-        const idLlamada = eval.idLlamada || '';
-        const nota = eval.notaFinal || 0;
-        const rango = eval.rango || '';
-        const enc = eval.totalENC || 0;
-        const ecuf = eval.totalECUF || 0;
-        const ecn = eval.totalECN || 0;
+    evaluacionesAuditor.forEach(evalu => {
+        const fecha = evalu.fechaOriginal || evalu.fecha || '';
+        const agente = evalu.agente || '';
+        const idLlamada = evalu.idLlamada || '';
+        const nota = evalu.notaFinal || 0;
+        const rango = evalu.rango || '';
+        const enc = evalu.totalENC || 0;
+        const ecuf = evalu.totalECUF || 0;
+        const ecn = evalu.totalECN || 0;
 
-        if (eval.detalles && eval.detalles.length > 0) {
-            eval.detalles.forEach(det => {
+        if (evalu.detalles && evalu.detalles.length > 0) {
+            evalu.detalles.forEach(det => {
                 rows.push([
                     `"${fecha}"`,
                     `"${agente}"`,
@@ -25376,11 +25344,19 @@ function actualizarTablaRankingErroresRapido(erroresPorAuditorPorFecha, fechasFi
 
 // ===== 22. INICIO FUNCIÓN: toggleDetalleErroresAuditorRapido ==========
 async function toggleDetalleErroresAuditorRapido(auditor) {
+    console.log(`🔍 toggleDetalleErroresAuditorRapido - Auditor: ${auditor}`);
+
+    // Buscar el índice del auditor en la tabla
     const idx = window.statsErroresAuditores?.findIndex(s => s.auditor === auditor);
-    if (idx === undefined || idx === -1) return;
+    if (idx === undefined || idx === -1) {
+        console.warn(`⚠️ Auditor ${auditor} no encontrado`);
+        return;
+    }
 
     const detailRow = document.getElementById(`detail-${idx}`);
     const icon = document.getElementById(`icon-${idx}`);
+
+    if (!detailRow) return;
 
     if (detailRow.style.display === 'none') {
         detailRow.style.display = 'table-row';
@@ -25391,7 +25367,9 @@ async function toggleDetalleErroresAuditorRapido(auditor) {
 
         const detailDiv = document.getElementById(`detail-content-${idx}`);
         if (detailDiv && detailDiv.innerHTML.includes('Cargando detalles')) {
-            detailDiv.innerHTML = await generarDetalleErroresAuditorHTML(auditor);
+            // 🔴 LLAMAR A LA FUNCIÓN CORRECTA
+            const html = await generarDetalleErroresAuditorHTML(auditor);
+            detailDiv.innerHTML = html;
         }
     } else {
         detailRow.style.display = 'none';
@@ -25413,19 +25391,20 @@ function mostrarMensajeSinDatosErrores() {
                 window.chartErroresAuditores.destroy();
                 window.chartErroresAuditores = null;
             }
-            canvas.width = canvas.clientWidth;
-            canvas.height = canvas.clientHeight;
+            canvas.width = canvas.clientWidth || 300;
+            canvas.height = canvas.clientHeight || 200;
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.font = '14px sans-serif';
             ctx.fillStyle = '#6c757d';
             ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
             ctx.fillText('📊 No hay datos de errores en el período seleccionado', canvas.width / 2, canvas.height / 2);
         }
     }
 
     const tbody = document.getElementById('tablaRankingErroresAuditores');
     if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">📊 No hay datos de errores en el período seleccionado<\/td><\/tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay datos de errores en el período seleccionado</td></tr>';
     }
 }
 // ===== FIN FUNCIÓN: mostrarMensajeSinDatosErrores ======================
@@ -25435,61 +25414,81 @@ function actualizarTablaRankingErrores(erroresPorAuditorPorFecha, fechasOrdenada
     const tbody = document.getElementById('tablaRankingErroresAuditores');
     if (!tbody) return;
 
-    // 🔴 GUARDAR DETALLES EN VARIABLE GLOBAL
+    // 🔴 GUARDAR DETALLES
     if (detalles) {
         window.detallesErroresPorAuditor = detalles;
         console.log('✅ Detalles guardados en window.detallesErroresPorAuditor');
+        console.log('   Auditores con detalles:', Object.keys(detalles));
+    } else if (window.detallesErroresPorAuditor) {
+        detalles = window.detallesErroresPorAuditor;
     }
 
-    // Calcular estadísticas por auditor
-    const statsPorAuditor = [];
+    // 🔴 FUNCIÓN PARA NORMALIZAR FECHA
+    function normalizarFecha(fechaStr) {
+        if (!fechaStr) return null;
+        let fechaLimpia = fechaStr.split(' ')[0];
+        if (fechaLimpia.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+            return fechaLimpia;
+        }
+        if (fechaLimpia.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const [anio, mes, dia] = fechaLimpia.split('-');
+            return `${dia}/${mes}/${anio}`;
+        }
+        return fechaLimpia;
+    }
 
-    for (const [auditor, fechas] of Object.entries(erroresPorAuditorPorFecha)) {
+    const statsPorAuditor = [];
+    const auditores = Object.keys(erroresPorAuditorPorFecha);
+
+    for (const auditor of auditores) {
+        const fechas = erroresPorAuditorPorFecha[auditor];
         let totalErrores = 0;
-        let diasConErrores = 0;
-        let submotivosMap = {};
+        let diasUnicos = new Set();
 
         for (const [fecha, cantidad] of Object.entries(fechas)) {
+            const fechaNormalizada = normalizarFecha(fecha);
+            if (fechaNormalizada) {
+                diasUnicos.add(fechaNormalizada);
+            }
             totalErrores += cantidad;
-            if (cantidad > 0) diasConErrores++;
         }
 
+        const diasConErrores = diasUnicos.size;
         const promedioDiario = diasConErrores > 0 ? (totalErrores / diasConErrores).toFixed(1) : 0;
 
-        // Obtener top submotivos desde window.detallesErroresPorAuditor
-        if (window.detallesErroresPorAuditor && window.detallesErroresPorAuditor[auditor]) {
-            for (const [fecha, detalles] of Object.entries(window.detallesErroresPorAuditor[auditor])) {
-                for (const det of detalles) {
-                    for (const error of det.errores) {
-                        if (error.submotivo) {
-                            submotivosMap[error.submotivo] = (submotivosMap[error.submotivo] || 0) + 1;
-                        }
+        // Obtener top submotivos
+        let topSubmotivos = 'Sin datos';
+        if (detalles && detalles[auditor]) {
+            const submotivosMap = {};
+            for (const [fecha, items] of Object.entries(detalles[auditor])) {
+                for (const item of items) {
+                    if (item.submotivo) {
+                        submotivosMap[item.submotivo] = (submotivosMap[item.submotivo] || 0) + 1;
                     }
                 }
             }
+            const top = Object.entries(submotivosMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3);
+            topSubmotivos = top.map(([nombre, count]) => `${nombre.substring(0, 25)} (${count})`).join(', ') || 'Sin datos';
         }
 
-        const topSubmotivos = Object.entries(submotivosMap)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map(([nombre, count]) => `${nombre.substring(0, 25)} (${count})`)
-            .join(', ');
-
         statsPorAuditor.push({
-            auditor,
-            totalErrores,
+            auditor: auditor,
+            totalErrores: totalErrores,
+            diasConErrores: diasConErrores,
             promedioDiario: parseFloat(promedioDiario),
-            topSubmotivos: topSubmotivos || 'Sin datos'
+            topSubmotivos: topSubmotivos
         });
     }
 
-    // Ordenar por total de errores (mayor a menor)
     statsPorAuditor.sort((a, b) => b.totalErrores - a.totalErrores);
 
-    // Calcular promedio general del equipo
     const totalErroresGeneral = statsPorAuditor.reduce((sum, a) => sum + a.totalErrores, 0);
-    const totalAuditores = statsPorAuditor.length;
-    const promedioGeneral = totalAuditores > 0 ? (totalErroresGeneral / totalAuditores).toFixed(1) : 0;
+    const totalDiasConErrores = statsPorAuditor.reduce((sum, a) => sum + a.diasConErrores, 0);
+    const promedioGeneral = totalDiasConErrores > 0
+        ? (totalErroresGeneral / totalDiasConErrores).toFixed(1)
+        : 0;
 
     if (statsPorAuditor.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No hay datos de errores para mostrar</td></tr>';
@@ -25505,35 +25504,34 @@ function actualizarTablaRankingErrores(erroresPorAuditorPorFecha, fechasOrdenada
         const rowId = `auditor-error-${idx}`;
 
         html += `
-                <tr class="expandable-row" onclick="toggleDetalleErroresAuditor('${rowId}', '${escapeHtml(item.auditor)}')" style="cursor: pointer;">
-                    <td style="padding: 8px; text-align: center;">
-                        <span class="expand-icon" id="icon-${rowId}">▶</span>
-                    </td>
-                    <td style="padding: 8px;"><strong>${escapeHtml(item.auditor)}</strong></td>
-                    <td style="padding: 8px; text-align: center; font-weight: bold; color: var(--danger);">${item.totalErrores}</td>
-                    <td style="padding: 8px; text-align: center;">${item.promedioDiario}/día</td>
-                    <td style="padding: 8px;">${vsPromedio}</td>
-                    <td style="padding: 8px; font-size: 12px; max-width: 300px;">${escapeHtml(item.topSubmotivos)}</td>
-                </tr>
-                <tr id="${rowId}" class="detail-row" style="display: none;">
-                    <td colspan="6">
-                        <div class="detail-content" id="detail-${rowId}">
-                            <div style="text-align: center; padding: 20px;">⏳ Cargando detalles...</div>
-                        </div>
-                    </td>
-                </tr>
-            `;
-    });
-
-    // Agregar fila de promedio general
-    html += `
-            <tr style="background: #f0f7ff; font-weight: bold;">
-                <td colspan="2" style="padding: 8px; text-align: right;">📊 PROMEDIO EQUIPO:</td>
-                <td style="padding: 8px; text-align: center;">${totalErroresGeneral}</td>
-                <td style="padding: 8px; text-align: center;">${promedioGeneral}/día</td>
-                <td colspan="2"></td>
+            <tr class="expandable-row" onclick="toggleDetalleErroresAuditor('${rowId}', '${escapeHtml(item.auditor)}')" style="cursor: pointer;">
+                <td style="padding: 8px; text-align: center;">
+                    <span class="expand-icon" id="icon-${rowId}">▶</span>
+                </td>
+                <td style="padding: 8px;"><strong>${escapeHtml(item.auditor)}</strong></td>
+                <td style="padding: 8px; text-align: center; font-weight: bold; color: var(--danger);">${item.totalErrores} (${item.diasConErrores} días)</td>
+                <td style="padding: 8px; text-align: center;">${item.promedioDiario}/día</td>
+                <td style="padding: 8px;">${vsPromedio}</td>
+                <td style="padding: 8px; font-size: 12px; max-width: 300px;">${escapeHtml(item.topSubmotivos)}</td>
+            </tr>
+            <tr id="${rowId}" class="detail-row" style="display: none;">
+                <td colspan="6">
+                    <div class="detail-content" id="detail-${rowId}">
+                        <div style="text-align: center; padding: 20px;">⏳ Cargando detalles...</div>
+                    </div>
+                </td>
             </tr>
         `;
+    });
+
+    html += `
+        <tr style="background: #f0f7ff; font-weight: bold;">
+            <td colspan="2" style="padding: 8px; text-align: right;">📊 PROMEDIO EQUIPO:</td>
+            <td style="padding: 8px; text-align: center;">${totalErroresGeneral} errores (${totalDiasConErrores} días aud.)</td>
+            <td style="padding: 8px; text-align: center;">${promedioGeneral}/día</td>
+            <td colspan="2"></td>
+        </tr>
+    `;
 
     tbody.innerHTML = html;
     window.statsErroresAuditores = statsPorAuditor;
@@ -25693,13 +25691,9 @@ async function inicializarGestionEscuchas() {
         });
     }
 
-    // Cargar historial
-    try {
-        await cargarHistorialLotes();
-        console.log('✅ Historial de lotes cargado automáticamente');
-    } catch (error) {
-        console.error('❌ Error cargando historial:', error);
-    }
+    // ======================================================
+    // 🔴 ELIMINADO: cargarHistorialLotes() - ahora se carga en transcripción
+    // ======================================================
 
     await refrescarMonitoreoEscuchas();
 
@@ -28194,24 +28188,43 @@ async function marcarIncidenciaResuelta(id) {
 
 // ===== 29. INICIO FUNCIÓN: cargarHistorialLotes (VERSIÓN MEJORADA CON TRAZABILIDAD) =====
 let loteSeleccionadoId = null;
+
 async function cargarHistorialLotes() {
     console.log('📦 Cargando historial de lotes con trazabilidad...');
 
-    const tbody = document.getElementById('tablaHistorialLotes');
+    // 🔴 CORREGIDO: Usar el ID correcto de la tabla
+    let tbody = document.getElementById('tablaLotesTranscripcion');
+    let intentos = 0;
+    const maxIntentos = 20;
+
+    while (!tbody && intentos < maxIntentos) {
+        if (intentos === 0) {
+            console.log('⏳ Esperando que la tabla tablaLotesTranscripcion esté disponible...');
+        }
+        await new Promise(r => setTimeout(r, 200));
+        tbody = document.getElementById('tablaLotesTranscripcion');
+        intentos++;
+    }
+
     if (!tbody) {
-        console.error('❌ Tabla historial no encontrada');
+        console.error('❌ Tabla tablaLotesTranscripcion no encontrada después de esperar.');
+        console.log('💡 Asegúrate de que la pestaña "Transcripción" esté activa.');
         return;
     }
+
+    console.log('✅ Tabla tablaLotesTranscripcion encontrada');
 
     try {
         const db = getDB();
         if (!db) {
             console.error('❌ Base de datos no disponible');
-            tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; color: var(--danger);">❌ Base de datos no disponible</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="13" style="text-align: center; color: var(--danger);">❌ Base de datos no disponible</td></tr>';
             return;
         }
 
-        // 🔴 PRIMERO: Obtener todos los lotes (tareas_escucha)
+        // ======================================================
+        // OBTENER TODOS LOS LOTES
+        // ======================================================
         const { data: lotes, error } = await db
             .from('tareas_escucha')
             .select('*')
@@ -28219,50 +28232,40 @@ async function cargarHistorialLotes() {
 
         if (error) {
             console.error('❌ Error obteniendo lotes:', error);
-            tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
             return;
         }
 
         console.log(`📊 Total lotes encontrados: ${lotes?.length || 0}`);
 
         if (!lotes || lotes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 40px;">📭 No hay lotes cargados aún. Cargue su primer archivo de escuchas.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; padding: 40px;">
+                📭 No hay lotes cargados aún. Cargue su primer archivo de escuchas.
+            </td></tr>`;
             window.lotesHistorialGlobal = [];
-            // Actualizar tabla de transcripción también
-            const tbodyTrans = document.getElementById('tablaLotesTranscripcion');
-            if (tbodyTrans) {
-                tbodyTrans.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 30px;">📭 No hay lotes cargados</td></tr>';
-            }
             return;
         }
 
-        // 🔴 Para cada lote, obtener estadísticas de transcripción
+        // ======================================================
+        // PROCESAR CADA LOTE CON ESTADÍSTICAS Y CAMPAÑAS
+        // ======================================================
         const lotesConEstadisticas = [];
+        
         for (const lote of lotes) {
             try {
                 const { data: asignaciones, error: asigError } = await db
                     .from('asignaciones_escucha')
-                    .select('transcripcion_estado, audio_encontrado, estado')
+                    .select('transcripcion_estado, audio_encontrado, estado, campana, campana_id')
                     .eq('tarea_id', lote.id);
-
-                if (asigError) {
-                    console.warn(`Error obteniendo asignaciones para lote ${lote.id}:`, asigError);
-                    lotesConEstadisticas.push({
-                        ...lote,
-                        total: 0,
-                        gestionados: 0,
-                        pendientes: 0,
-                        errores: 0,
-                        enProceso: 0,
-                        sinAudio: 0,
-                        avance: 0
-                    });
-                    continue;
-                }
 
                 const total = asignaciones?.length || 0;
 
-                // 🔴 Contar por estado de transcripción
+                // Recolectar campañas del lote
+                const campanasSet = new Set();
+                (asignaciones || []).forEach(a => {
+                    if (a.campana) campanasSet.add(a.campana);
+                });
+
                 const gestionados = asignaciones?.filter(a =>
                     a.transcripcion_estado === 'transcrito' ||
                     a.transcripcion_estado === 'analizado'
@@ -28295,8 +28298,10 @@ async function cargarHistorialLotes() {
                     errores,
                     enProceso,
                     sinAudio,
-                    avance
+                    avance,
+                    campanas: Array.from(campanasSet)
                 });
+                
             } catch (innerError) {
                 console.warn(`Error procesando lote ${lote.id}:`, innerError);
                 lotesConEstadisticas.push({
@@ -28307,25 +28312,33 @@ async function cargarHistorialLotes() {
                     errores: 0,
                     enProceso: 0,
                     sinAudio: 0,
-                    avance: 0
+                    avance: 0,
+                    campanas: []
                 });
             }
         }
 
+        // ======================================================
+        // GUARDAR Y ACTUALIZAR
+        // ======================================================
         window.lotesHistorialGlobal = lotesConEstadisticas;
 
-        // 🔴 ACTUALIZAR AMBAS TABLAS
-        actualizarTablaHistorialLotes(lotesConEstadisticas);
+        // 🔴 USAR LA FUNCIÓN CORRECTA PARA ESTA TABLA
         actualizarTablaLotesTranscripcion(lotesConEstadisticas);
 
-        // 🔴 ACTUALIZAR DASHBOARD DEL LOTE ACTIVO
-        await cargarDashboardLoteActivo();
+        // Actualizar dashboard
+        if (document.getElementById('loteActivoNombre')) {
+            await cargarDashboardLoteActivo();
+        }
 
         console.log(`✅ Historial de lotes cargado: ${lotesConEstadisticas.length} lotes`);
+        console.log(`📋 Lotes con campañas: ${lotesConEstadisticas.filter(l => l.campanas && l.campanas.length > 0).length}`);
 
     } catch (error) {
         console.error('❌ Error cargando historial:', error);
-        tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+        }
     }
 }
 // ===== FIN FUNCIÓN: cargarHistorialLotes ===============================
@@ -28335,14 +28348,14 @@ async function cargarHistorialLotes() {
 function actualizarTablaHistorialLotes(lotes) {
     const tbody = document.getElementById('tablaHistorialLotes');
     if (!tbody) {
-        console.warn('⚠️ tablaHistorialLotes no encontrada');
+        console.warn('⚠️ tablaHistorialLotes no encontrada - No se puede actualizar');
         return;
     }
 
     console.log(`📊 Actualizando tabla de lotes con ${lotes?.length || 0} lotes`);
 
     if (!lotes || lotes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 40px;">📭 No hay lotes cargados</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 40px;">📭 No hay lotes cargados</td></tr>';
         return;
     }
 
@@ -28352,21 +28365,20 @@ function actualizarTablaHistorialLotes(lotes) {
         const esActivo = lote.estado === 'activo';
         const nombreArchivo = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : 'Lote sin nombre';
 
-        // Calcular progreso
         const total = lote.total || 0;
         const gestionados = lote.gestionados || 0;
         const avance = total > 0 ? Math.round((gestionados / total) * 100) : 0;
 
-        // Determinar si todos están transcritos
-        const todosTranscritos = total > 0 && gestionados >= total;
+        // Campañas del lote
+        const campanas = lote.campanas || [];
+        const campanasBadge = campanas.length > 0
+            ? `<span style="background: #7b1fa2; color: white; padding: 2px 10px; border-radius: 12px; font-size: 10px; display: inline-block;">📌 ${campanas.join(', ')}</span>`
+            : `<span style="color: var(--muted); font-size: 10px;">-</span>`;
 
-        // Texto del botón según estado
+        const todosTranscritos = total > 0 && gestionados >= total;
         let procesarTexto = todosTranscritos ? '🔄 Reprocesar' : '🎧 Procesar';
         let procesarColor = todosTranscritos ? '#f39c12' : '#7b1fa2';
         let forzarParam = todosTranscritos;
-
-        // 🔴 NUEVO: Verificar si el lote tiene tickets para saber si se puede eliminar
-        const tieneTickets = total > 0;
 
         html += `
             <tr style="${esActivo ? 'background: #f0f7ff;' : ''} border-bottom: 1px solid #f0f0f0;">
@@ -28384,6 +28396,8 @@ function actualizarTablaHistorialLotes(lotes) {
                     ${lote.errores || 0}
                 </td>
                 <td style="padding: 8px 10px; text-align: center; color: var(--muted);">${lote.sinAudio || 0}</td>
+                <!-- 🔴 NUEVA COLUMNA: CAMPAÑAS -->
+                <td style="padding: 8px 10px; text-align: center;">${campanasBadge}</td>
                 <td style="padding: 8px 10px; text-align: center;">
                     <div style="display: inline-flex; align-items: center; gap: 5px;">
                         <div style="background: #e9ecef; border-radius: 10px; height: 6px; width: 60px;">
@@ -28404,10 +28418,8 @@ function actualizarTablaHistorialLotes(lotes) {
                             style="background: var(--accent); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
                         👁️ Ver
                     </button>
-                    <!-- 🔴 NUEVO BOTÓN ELIMINAR -->
                     <button onclick="event.stopPropagation(); eliminarLote(${lote.id})" 
-                            style="background: #d93025; padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white; margin-left: 2px;"
-                            title="Eliminar lote">
+                            style="background: #d93025; padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white; margin-left: 2px;">
                         🗑️
                     </button>
                 </td>
@@ -28416,7 +28428,7 @@ function actualizarTablaHistorialLotes(lotes) {
     });
 
     tbody.innerHTML = html;
-    console.log(`✅ Tabla de lotes actualizada: ${lotes.length} lotes con botón eliminar`);
+    console.log(`✅ Tabla de lotes actualizada: ${lotes.length} lotes`);
 }
 // ===== FIN FUNCIÓN: actualizarTablaHistorialLotes ======================
 
@@ -28774,85 +28786,103 @@ async function cargarDashboardLoteActivo() {
 // ================================================================
 function actualizarTablaLotesTranscripcion(lotes) {
     const tbody = document.getElementById('tablaLotesTranscripcion');
-    if (!tbody) return;
+    if (!tbody) {
+        console.warn('⚠️ tablaLotesTranscripcion no encontrada');
+        return;
+    }
+
+    console.log(`📊 Actualizando tabla de transcripción con ${lotes?.length || 0} lotes`);
 
     if (!lotes || lotes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 30px;">📭 No hay lotes cargados</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 30px;">📭 No hay lotes cargados</td></tr>';
         return;
     }
 
     let html = '';
     lotes.forEach((lote, idx) => {
         const fecha = lote.fecha_carga ? new Date(lote.fecha_carga).toLocaleString('es-ES') : '-';
-        const nombreArchivo = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : '-';
         const esActivo = lote.estado === 'activo';
+        const nombreArchivo = lote.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : 'Lote sin nombre';
 
-        // Estadísticas del lote
         const total = lote.total || 0;
-        const gestionados = lote.gestionados || 0;  // transcritos + analizados
+        const gestionados = lote.gestionados || 0;
         const pendientes = lote.pendientes || 0;
         const errores = lote.errores || 0;
         const enProceso = lote.enProceso || 0;
         const sinAudio = lote.sinAudio || 0;
+        const avance = total > 0 ? Math.round((gestionados / total) * 100) : 0;
 
-        const progreso = total > 0 ? Math.round((gestionados / total) * 100) : 0;
+        // Campañas del lote
+        const campanas = lote.campanas || [];
+        const campanasBadge = campanas.length > 0
+            ? `<span style="background: #7b1fa2; color: white; padding: 2px 10px; border-radius: 12px; font-size: 10px; display: inline-block;">📌 ${campanas.join(', ')}</span>`
+            : `<span style="color: var(--muted); font-size: 10px;">-</span>`;
 
-        // Determinar si todos están transcritos
         const todosTranscritos = total > 0 && gestionados >= total;
+        let procesarTexto = todosTranscritos ? '🔄 Reprocesar' : '🎧 Procesar';
+        let procesarColor = todosTranscritos ? '#f39c12' : '#7b1fa2';
+        let forzarParam = todosTranscritos;
 
         // Color de progreso
         let progresoColor = '#d93025';
-        if (progreso >= 90) progresoColor = '#28a745';
-        else if (progreso >= 60) progresoColor = '#019DF4';
-        else if (progreso >= 30) progresoColor = '#f39c12';
+        if (avance >= 90) progresoColor = '#28a745';
+        else if (avance >= 60) progresoColor = '#019DF4';
+        else if (avance >= 30) progresoColor = '#f39c12';
 
-        // Texto del botón
-        const botonTexto = todosTranscritos ? '🔄 Reprocesar' : '🎧 Procesar';
-        const botonColor = todosTranscritos ? '#f39c12' : '#7b1fa2';
-        const forzarParam = todosTranscritos;
+        // 🔴 NUEVO: Verificar si el lote tiene tickets
+        const tieneTickets = total > 0;
 
         html += `
-                <tr style="${esActivo ? 'background: #f0f7ff;' : ''} border-bottom: 1px solid #f0f0f0;">
-                    <td style="padding: 8px 10px; text-align: center; font-weight: bold;">${idx + 1}</td>
-                    <td style="padding: 8px 10px;">
-                        <strong>${escapeHtml(nombreArchivo)}</strong>
-                        ${esActivo ? '<span style="font-size: 10px; background: #28a745; color: white; padding: 2px 8px; border-radius: 10px; margin-left: 8px;">ACTIVO</span>' : ''}
-                    </td>
-                    <td style="padding: 8px 10px; text-align: center; font-size: 12px;">${fecha}</td>
-                    <td style="padding: 8px 10px; text-align: center; font-weight: bold;">${total}</td>
-                    <td style="padding: 8px 10px; text-align: center; font-weight: bold; color: #28a745;">${gestionados}</td>
-                    <td style="padding: 8px 10px; text-align: center; color: #f39c12;">${pendientes}</td>
-                    <td style="padding: 8px 10px; text-align: center; color: #d93025; font-weight: ${errores > 0 ? 'bold' : 'normal'};">${errores}</td>
-                    <td style="padding: 8px 10px; text-align: center; color: #7b1fa2;">${enProceso}</td>
-                    <td style="padding: 8px 10px; text-align: center; color: #6c757d;">${sinAudio}</td>
-                    <td style="padding: 8px 10px; text-align: center;">
-                        <div style="display: flex; align-items: center; gap: 5px; justify-content: center;">
-                            <div style="background: #e9ecef; border-radius: 10px; height: 6px; width: 50px;">
-                                <div style="width: ${progreso}%; height: 100%; background: ${progresoColor}; border-radius: 10px;"></div>
-                            </div>
-                            <span style="font-size: 11px; font-weight: bold; color: ${progresoColor};">${progreso}%</span>
+            <tr style="${esActivo ? 'background: #f0f7ff;' : ''} border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 8px 10px; text-align: center; font-weight: bold;">${idx + 1}</td>
+                <td style="padding: 8px 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(lote.nombre_archivo || '-')}">
+                    <strong>${escapeHtml(nombreArchivo)}</strong>
+                    ${esActivo ? '<span style="font-size: 9px; background: #28a745; color: white; padding: 1px 6px; border-radius: 8px; margin-left: 5px;">ACTIVO</span>' : ''}
+                </td>
+                <td style="padding: 8px 10px; text-align: center; font-size: 11px;">${fecha}</td>
+                <td style="padding: 8px 10px; text-align: center; font-weight: bold;">${total}</td>
+                <td style="padding: 8px 10px; text-align: center; font-weight: bold; color: #28a745;">${gestionados}</td>
+                <td style="padding: 8px 10px; text-align: center; color: #f39c12;">${pendientes}</td>
+                <td style="padding: 8px 10px; text-align: center; ${errores > 0 ? 'color: #d93025; font-weight: bold;' : 'color: var(--muted);'}">${errores}</td>
+                <td style="padding: 8px 10px; text-align: center; color: #7b1fa2;">${enProceso}</td>
+                <td style="padding: 8px 10px; text-align: center; color: #6c757d;">${sinAudio}</td>
+                <!-- Campañas -->
+                <td style="padding: 8px 10px; text-align: center;">${campanasBadge}</td>
+                <td style="padding: 8px 10px; text-align: center;">
+                    <div style="display: flex; align-items: center; gap: 5px; justify-content: center;">
+                        <div style="background: #e9ecef; border-radius: 10px; height: 6px; width: 50px;">
+                            <div style="width: ${avance}%; height: 100%; background: ${progresoColor}; border-radius: 10px;"></div>
                         </div>
-                    </td>
-                    <td style="padding: 8px 10px; text-align: center;">
-                        <span class="badge" style="background: ${esActivo ? '#28a745' : '#6c757d'};">
-                            ${esActivo ? '✅ Activo' : '⏸️ Histórico'}
-                        </span>
-                    </td>
-                    <td style="padding: 8px 10px; text-align: center; white-space: nowrap;">
-                        <button onclick="procesarLoteHistorico(${lote.id}, ${forzarParam})" 
-                                style="background: ${botonColor}; padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px; margin-bottom: 3px;">
-                            ${botonTexto}
-                        </button>
-                        <button onclick="verTicketsLote(${lote.id})" 
-                                style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px;">
-                            👁️ Ver
-                        </button>
-                    </td>
-                </tr>
-            `;
+                        <span style="font-size: 11px; font-weight: bold; color: ${progresoColor};">${avance}%</span>
+                    </div>
+                </td>
+                <td style="padding: 8px 10px; text-align: center;">
+                    <span class="badge" style="background: ${esActivo ? '#28a745' : '#6c757d'}; font-size: 11px;">
+                        ${esActivo ? '✅ Activo' : '⏸️ Histórico'}
+                    </span>
+                </td>
+                <td style="padding: 8px 10px; text-align: center; white-space: nowrap;">
+                    <button onclick="procesarLoteHistorico(${lote.id}, ${forzarParam})" 
+                            style="background: ${procesarColor}; padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px; margin-bottom: 3px; display: inline-block;">
+                        ${procesarTexto}
+                    </button>
+                    <button onclick="verTicketsLote(${lote.id})" 
+                            style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px;">
+                        👁️ Ver
+                    </button>
+                    <!-- 🔴 NUEVO BOTÓN ELIMINAR -->
+                    <button onclick="eliminarLote(${lote.id})" 
+                            style="background: #d93025; padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px; margin-left: 2px;"
+                            title="Eliminar lote completo">
+                        🗑️
+                    </button>
+                </td>
+            </tr>
+        `;
     });
 
     tbody.innerHTML = html;
+    console.log(`✅ Tabla de transcripción actualizada: ${lotes.length} lotes con botón eliminar`);
 }
 
 // ================================================================
@@ -40993,7 +41023,7 @@ function procesarArchivoDetalleAcumulativo(file, callback) {
         // Consolidar con datos existentes
         const idsExistentes = new Set();
         if (datosEvaluaciones && datosEvaluaciones.length > 0) {
-            datosEvaluaciones.forEach(eval => idsExistentes.add(eval.id));
+            datosEvaluaciones.forEach(evalu => idsExistentes.add(evalu.id));
         }
 
         let nuevosRegistros = 0;
@@ -41101,9 +41131,9 @@ function limpiarDuplicados() {
     const mapa = new Map();
     let eliminados = 0;
 
-    datosEvaluaciones.forEach(eval => {
-        if (!mapa.has(eval.id)) {
-            mapa.set(eval.id, eval);
+    datosEvaluaciones.forEach(evalu => {
+        if (!mapa.has(evalu.id)) {
+            mapa.set(evalu.id, evalu);
         } else {
             eliminados++;
         }
@@ -42228,9 +42258,9 @@ function cargarItemsSubmotivos() {
     const evaluaciones = window.evaluacionesGlobales || [];
     const submotivosSet = new Set();
 
-    evaluaciones.forEach(eval => {
-        if (eval.detalles) {
-            eval.detalles.forEach(det => {
+    evaluaciones.forEach(evalu => {
+        if (evalu.detalles) {
+            evalu.detalles.forEach(det => {
                 if (det.submotivo) submotivosSet.add(det.submotivo);
             });
         }
@@ -42262,9 +42292,9 @@ function cargarItemsQuiebreAgente(agente) {
 
     const fallasPorSubmotivo = {};
 
-    evaluacionesAgente.forEach(eval => {
-        if (eval.detalles && eval.detalles.length > 0) {
-            eval.detalles.forEach(det => {
+    evaluacionesAgente.forEach(evalu => {
+        if (evalu.detalles && evalu.detalles.length > 0) {
+            evalu.detalles.forEach(det => {
                 // Usar la misma comparación robusta que en procesarArchivoDetalleAcumulativo
                 const cumpleVal = det.cumple;
                 const cumple = cumpleVal === '1' || cumpleVal === 1 || cumpleVal === 'true' || cumpleVal === true;
@@ -42477,11 +42507,11 @@ window.generarPDA = async function (agente) {
 
         // Recolectar fallas
         let fallasPorSubmotivo = {};
-        for (const eval of evaluacionesAgente) {
+        for (const evalu of evaluacionesAgente) {
             const { data: detalles } = await db
                 .from('detalles_evaluacion')
                 .select('*')
-                .eq('evaluacion_id', eval.id);
+                .eq('evaluacion_id', evalu.id);
 
             if (detalles) {
                 detalles.forEach(det => {

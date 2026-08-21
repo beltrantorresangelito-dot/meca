@@ -3176,62 +3176,8 @@ function actualizarTotalAtributoECN(atributo) {
 
 
 
-function actualizarTotalAtributoECN(atributo) {
-    let pesoTotal = 0;      // Peso máximo posible del atributo
-    let pesoObtenido = 0;   // Peso obtenido según selecciones
+// F1.3: se eliminó una implementación duplicada que ignoraba NO_APLICA.
 
-    // Buscar todos los selects del atributo específico en ECN
-    const selects = document.querySelectorAll(
-        `.cumple-select[data-bloque="ECN"][data-atributo="${atributo}"]`
-    );
-
-    // ======================================================
-    // 1a. SUMAR PESOS DE TODOS LOS ITEMS
-    // ======================================================
-    selects.forEach(select => {
-        const peso = parseFloat(select.dataset.peso);
-        pesoTotal += peso;
-
-        // Cada item suma INDEPENDIENTEMENTE (sin penalización)
-        if (select.value === '1') {
-            pesoObtenido += peso;
-        }
-    });
-
-    // ======================================================
-    // 1b. MAPEAR ATRIBUTOS A IDs DE RESULTADO
-    // ======================================================
-    const mapaIDs = {
-        'SONDEO': 'resultadoSondeo',
-        'NEGOCIACION Y REBATE': 'resultadoNegociacion',
-        'MOTIVO DE NO PAGO': 'resultadoMotivoNoPago',
-        'LUGARES DE PAGO': 'resultadoLugaresPago',
-        'CIERRE': 'resultadoCierre',
-        'IMAGEN CORPORATIVA': 'resultadoImagen',
-        'TIPIFICACION': 'resultadoTipificacion'
-    };
-
-    const resultadoId = mapaIDs[atributo];
-    if (resultadoId) {
-        const resultadoElement = document.getElementById(resultadoId);
-        if (resultadoElement) {
-            // Mostrar formato: "obtenido/total%"
-            resultadoElement.textContent = `${pesoObtenido}/${pesoTotal}%`;
-
-            // Cambiar color según resultado
-            if (pesoObtenido === pesoTotal) {
-                // ✅ Todos los items cumplen
-                resultadoElement.style.color = 'var(--ok)';
-            } else if (pesoObtenido > 0) {
-                // 🟡 Algunos items cumplen
-                resultadoElement.style.color = 'var(--warning)';
-            } else {
-                // 🔴 Ningún item cumple
-                resultadoElement.style.color = 'var(--danger)';
-            }
-        }
-    }
-}
 
 // ======================================================
 // 2. FUNCIÓN: recalcularAtributoENC()
@@ -3739,9 +3685,11 @@ function obtenerRango(puntaje) {
 // ======================================================
 
 function obtenerCuartil(nota) {
-    if (nota >= 90) return 'Q1';   // Excelente
-    if (nota >= 80) return 'Q2';   // Bueno
-    if (nota >= 70) return 'Q3';   // Regular
+    // F1.3 - Regla oficial vigente de Cobranzas.
+    // En fases posteriores esta clasificación debe provenir de la configuración central.
+    if (nota >= 97) return 'Q1';   // Excelente
+    if (nota >= 90) return 'Q2';   // Bien
+    if (nota >= 85) return 'Q3';   // Regular
     return 'Q4';                   // Bajo / Riesgo
 }
 
@@ -7552,7 +7500,7 @@ async function actualizarEvaluacionExistente() {
                 atributo: select.dataset.atributo,
                 submotivo: select.dataset.submotivo,
                 peso: parseFloat(select.dataset.peso),
-                cumple: select.value === '1'
+                cumple: select.value === '1' || select.value === 'NA'
             });
         }
     });
