@@ -1,17 +1,25 @@
 {
-    "name": "meca-mvc",
-    "version": "2.0.0",
-    "description": "Sistema MECA - Arquitectura MVC con PostgreSQL local",
-    "main": "server.js",
-    "scripts": {
-        "start": "node server.js",
-        "dev": "node server.js"
-    },
-    "keywords": ["meca", "calidad", "movistar"],
-    "author": "Angel Torres",
-    "license": "MIT",
-    "dependencies": {
-        "pg": "^8.11.3",
-        "dotenv": "^16.3.1"
-    }
+  "name": "meca-mvc",
+  "version": "2.0.0",
+  "description": "Sistema MECA - Arquitectura MVC con PostgreSQL local",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test",
+    "db:migrate": "node scripts/migrations/cli.js up",
+    "db:status": "node scripts/migrations/cli.js status",
+    "db:rollback": "node scripts/migrations/cli.js down"
+  },
+  "keywords": [
+    "meca",
+    "calidad",
+    "movistar"
+  ],
+  "author": "Angel Torres",
+  "license": "MIT",
+  "dependencies": {
+    "pg": "^8.11.3",
+    "dotenv": "^16.3.1"
+  }
 }
