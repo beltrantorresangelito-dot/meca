@@ -6387,48 +6387,16 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         const versionId = parseInt(ruta.split('/').pop());
 
         try {
-            // Verificar si la tabla existe
-            const checkTable = await pool.query(`
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'reglas_evaluacion'
-            );
-        `);
+            const reglas = await legacyMatrixService.getEvaluationRulesByVersion(versionId);
 
-            if (!checkTable.rows[0].exists) {
-                console.log('⚠️ Tabla reglas_evaluacion no existe, devolviendo array vacío');
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify([]));
-                return;
-            }
-
-            const result = await pool.query(`
-            SELECT 
-                id,
-                version_id,
-                submotivo_origen,
-                bloque_origen,
-                atributo_origen,
-                valor_condicion,
-                accion_tipo,
-                accion_valor,
-                submotivos_afectados,
-                excepciones,
-                orden,
-                activo
-            FROM reglas_evaluacion 
-            WHERE version_id = $1 AND activo = true 
-            ORDER BY orden
-        `, [versionId]);
-
-            console.log(`✅ ${result.rows.length} reglas encontradas para versión ${versionId}`);
+            console.log(`✅ ${reglas.length} reglas encontradas para versión ${versionId}`);
 
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
+            respuesta.end(JSON.stringify(reglas));
 
         } catch (error) {
             console.error('❌ Error en /api/reglas-evaluacion/version/:id:', error);
-            // En caso de error, devolver array vacío
+            // Compatibilidad legacy: siempre devolver array vacío.
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify([]));
         }

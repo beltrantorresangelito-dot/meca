@@ -50,6 +50,25 @@ async listVersions() {
   return this.repository.listLegacyMatrixVersions();
 }
 
+
+async getEvaluationRulesByVersion(versionId) {
+  const parsed = Number(versionId);
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    const error = new Error('ID de versión inválido');
+    error.code = 'VALIDATION_ERROR';
+    throw error;
+  }
+
+  try {
+    return await this.repository.getLegacyEvaluationRulesByVersion(parsed);
+  } catch (error) {
+    // Compatibilidad legacy: este endpoint históricamente nunca bloquea
+    // la evaluación por errores en reglas opcionales.
+    return [];
+  }
+}
+
 }
 
 module.exports = LegacyMatrixService;

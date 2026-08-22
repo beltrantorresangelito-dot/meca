@@ -116,6 +116,41 @@ async listLegacyMatrixVersions() {
   return result.rows;
 }
 
+
+async getLegacyEvaluationRulesByVersion(versionId) {
+  const checkTable = await this.db.query(`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables
+      WHERE table_name = 'reglas_evaluacion'
+    );
+  `);
+
+  if (!checkTable.rows[0].exists) {
+    return [];
+  }
+
+  const result = await this.db.query(`
+    SELECT
+      id,
+      version_id,
+      submotivo_origen,
+      bloque_origen,
+      atributo_origen,
+      valor_condicion,
+      accion_tipo,
+      accion_valor,
+      submotivos_afectados,
+      excepciones,
+      orden,
+      activo
+    FROM reglas_evaluacion
+    WHERE version_id = $1 AND activo = TRUE
+    ORDER BY orden
+  `, [versionId]);
+
+  return result.rows;
+}
+
 }
 
 module.exports = DomainRepository;
