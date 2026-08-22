@@ -10,7 +10,17 @@ test('DOMAPI-SERVER-001 server registra rutas de dominio mediante módulo', () =
   assert.match(server, /require\('\.\/src\/modules\/domain\/domain\.routes'\)/);
 });
 
-test('DOMAPI-SERVER-002 F2.2 no reemplaza endpoints legacy de matriz', () => {
-  assert.match(server, /\/api\/matriz\/versiones\/activa/);
-  assert.match(server, /\/api\/evaluacion\/version-activa/);
+test('DOMAPI-SERVER-002 F2.9 conserva Matrix mediante módulo formal', () => {
+  assert.match(server, /require\('\.\/src\/modules\/matrix'\)/);
+  assert.match(server, /createMatrixReadHandler\(\)/);
+  assert.match(server, /handleMatrixReadRequest/);
+
+  assert.doesNotMatch(
+    server,
+    /if \(ruta === '\/api\/matriz\/versiones\/activa'/
+  );
+  assert.doesNotMatch(
+    server,
+    /if \(ruta === '\/api\/evaluacion\/version-activa'/
+  );
 });

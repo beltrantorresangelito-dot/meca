@@ -1,0 +1,8 @@
+F2.9 SERVER METRICS
+
+Antes: 7080 líneas
+Después: 6826 líneas
+Reducción neta en esta consolidación: 254 líneas
+
+Nota: F2.9 consolida solo las lecturas ya validadas F2.3-F2.8.
+La reducción grande ocurrirá al extraer el resto del dominio Matrix.

@@ -1,0 +1,3 @@
+server.js antes del fix: 6826
+server.js después del fix: 6779
+reducción adicional: 47 líneas

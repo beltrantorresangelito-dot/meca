@@ -15,8 +15,8 @@ const { signToken, verifyToken } = require('./security/tokens');
 const { applyCors } = require('./security/cors');
 const { authorizeRequest } = require('./security/authorization');
 const { registerDomainRoutes } = require('./src/modules/domain/domain.routes');
-const LegacyMatrixService = require('./src/modules/domain/legacy-matrix.service');
-const legacyMatrixService = new LegacyMatrixService();
+const { createMatrixReadHandler } = require('./src/modules/matrix');
+const handleMatrixReadRequest = createMatrixReadHandler();
 // Configuración
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -3616,30 +3616,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // API - ADMINISTRACIÓN DE MATRIZ DE EVALUACIÓN
     // ======================================================
 
-    // ========== FRENTES ==========
-    if (ruta === '/api/matriz/frentes' && metodo === 'GET') {
-        console.log('[API] GET /api/matriz/frentes');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const result = await pool.query(
-                'SELECT id, codigo, nombre, peso_maximo, orden, activo FROM frentes ORDER BY orden'
-            );
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-        } catch (error) {
-            console.error('Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
+    // ========== FRENTES: lecturas delegadas a MatrixModule ==========
 
     // ======================================================
     // FRENTES - POST (CREAR) - CON VALIDACIÓN POR VERSIÓN
@@ -3924,37 +3901,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         return;
     }
 
-    // ========== ATRIBUTOS ==========
-    if (ruta === '/api/matriz/atributos' && metodo === 'GET') {
-        console.log('[API] GET /api/matriz/atributos');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const { frente_id } = urlParseada.query;
-        try {
-            let query = 'SELECT id, frente_id, nombre, peso_maximo, orden, activo FROM atributos';
-            let params = [];
-            if (frente_id) {
-                query += ' WHERE frente_id = $1 ORDER BY orden';
-                params.push(frente_id);
-            } else {
-                query += ' ORDER BY frente_id, orden';
-            }
-            const result = await pool.query(query, params);
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-        } catch (error) {
-            console.error('Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
+    // ========== ATRIBUTOS: lecturas delegadas a MatrixModule ==========
 
     // ======================================================
     // ATRIBUTOS - POST (CREAR) - CON VALIDACIÓN POR VERSIÓN
@@ -4123,37 +4070,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         return;
     }
 
-    // ========== SUB-MOTIVOS ==========
-    if (ruta === '/api/matriz/sub-motivos' && metodo === 'GET') {
-        console.log('[API] GET /api/matriz/sub-motivos');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const { atributo_id } = urlParseada.query;
-        try {
-            let query = 'SELECT id, atributo_id, codigo, descripcion, peso_individual, orden, activo FROM sub_motivos';
-            let params = [];
-            if (atributo_id) {
-                query += ' WHERE atributo_id = $1 ORDER BY orden';
-                params.push(atributo_id);
-            } else {
-                query += ' ORDER BY atributo_id, orden';
-            }
-            const result = await pool.query(query, params);
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-        } catch (error) {
-            console.error('Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
+    // ========== SUB-MOTIVOS: lecturas delegadas a MatrixModule ==========
 
     // ======================================================
     // SUB-MOTIVOS - POST (CREAR) - CON VALIDACIÓN POR VERSIÓN
@@ -4539,55 +4456,8 @@ const servidor = http.createServer(async (peticion, respuesta) => {
 
 
     // ======================================================
-    // API - MATRIZ - OBTENER VERSIONES (CORREGIDO)
+    // API - MATRIZ - ESCRITURAS LEGACY
     // ======================================================
-
-    if (ruta === '/api/matriz/versiones' && metodo === 'GET') {
-        console.log('[API] GET /api/matriz/versiones');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            // Verificar si la tabla existe
-            const checkTable = await pool.query(`
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'versiones_matriz'
-                );
-            `);
-
-            if (!checkTable.rows[0].exists) {
-                console.log('⚠️ Tabla versiones_matriz no existe, devolviendo array vacío');
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify([]));
-                return;
-            }
-
-            const result = await pool.query(`
-                SELECT id, version, descripcion, fecha_vigencia, activa, 
-                    creado_por, creado_en, publicado_por, publicado_en
-                FROM versiones_matriz 
-                ORDER BY creado_en DESC
-            `);
-
-            console.log(`✅ ${result.rows.length} versiones encontradas`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('❌ Error en /api/matriz/versiones:', error);
-            // En caso de error, devolver array vacío en lugar de error 500
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify([]));
-        }
-        return;
-    }
 
     if (ruta === '/api/matriz/versiones' && metodo === 'POST') {
         console.log('[API] POST /api/matriz/versiones');
@@ -6192,214 +6062,16 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         return;
     }
 
-    // Obtener versión activa
-    // F2.4: contrato legacy preservado; SQL extraído de server.js.
-    if (ruta === '/api/evaluacion/version-activa' && metodo === 'GET') {
-        console.log('[API] GET /api/evaluacion/version-activa');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const versionActiva = await legacyMatrixService.getEvaluationActiveVersion();
-
-            if (versionActiva.version !== 'default') {
-                console.log(`✅ Versión activa: ${versionActiva.version}`);
-            }
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(versionActiva));
-
-        } catch (error) {
-            console.error('❌ Error en /api/evaluacion/version-activa:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
     // ======================================================
-    // API - MATRIZ VERSIONADA (NUEVO SISTEMA DE VERSIONADO)
+    // F2.9 - MATRIX MODULE: lecturas versionadas consolidadas
     // ======================================================
-
-    // ---------- OBTENER VERSIÓN ACTIVA ----------
-    // F2.3: mismo contrato legacy, SQL extraído de server.js.
-    if (ruta === '/api/matriz/versiones/activa' && metodo === 'GET') {
-        console.log('[API] GET /api/matriz/versiones/activa');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const versionActiva = await legacyMatrixService.getActiveVersion();
-
-            if (!versionActiva) {
-                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
-                return;
-            }
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(versionActiva));
-
-        } catch (error) {
-            console.error('Error en /api/matriz/versiones/activa:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ---------- OBTENER VERSIÓN POR FECHA ----------
-    // F2.5: contrato legacy preservado; SQL extraído de server.js.
-    if (ruta === '/api/matriz/versiones/por-fecha' && metodo === 'GET') {
-        console.log('[API] GET /api/matriz/versiones/por-fecha');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const { fecha } = urlParseada.query;
-        if (!fecha) {
-            respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Fecha requerida' }));
-            return;
-        }
-
-        try {
-            const version = await legacyMatrixService.getVersionByDate(fecha);
-
-            if (!version) {
-                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'No hay versión para esta fecha' }));
-                return;
-            }
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(version));
-
-        } catch (error) {
-            console.error('Error en /api/matriz/versiones/por-fecha:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ---------- OBTENER ESTRUCTURA COMPLETA DE UNA VERSIÓN ----------
-    // F2.6: toda la construcción jerárquica salió de server.js.
-    if (ruta.match(/^\/api\/matriz\/versiones\/\d+\/estructura$/) && metodo === 'GET') {
-        console.log('[API] GET /api/matriz/versiones/:id/estructura');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const parts = ruta.split('/');
-        const versionId = parseInt(parts[4]);
-
-        if (!versionId || isNaN(versionId)) {
-            respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'ID de versión inválido' }));
-            return;
-        }
-
-        console.log(`📡 Obteniendo estructura de versión ID: ${versionId}`);
-
-        try {
-            const estructura = await legacyMatrixService.getStructure(versionId);
-
-            if (!estructura) {
-                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'Versión no encontrada' }));
-                return;
-            }
-
-            console.log(`✅ Versión encontrada: ${estructura.version.version}`);
-            console.log(`✅ Estructura completada: ${estructura.frentes.length} frentes`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(estructura));
-
-        } catch (error) {
-            console.error('❌ Error obteniendo estructura:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ---------- OBTENER VERSIONES DE MATRIZ ----------
-    // F2.7: listado legacy delegado al módulo de matriz.
-    if (ruta === '/api/matriz/versiones' && metodo === 'GET') {
-        console.log('[API] GET /api/matriz/versiones');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const versiones = await legacyMatrixService.listVersions();
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(versiones));
-
-        } catch (error) {
-            console.error('Error en /api/matriz/versiones:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-
-    // ======================================================
-    // API - REGLAS DE EVALUACIÓN POR VERSIÓN
-    // ======================================================
-
-    if (ruta.match(/^\/api\/reglas-evaluacion\/version\/\d+$/) && metodo === 'GET') {
-        console.log('[API] GET /api/reglas-evaluacion/version/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const versionId = parseInt(ruta.split('/').pop());
-
-        try {
-            const reglas = await legacyMatrixService.getEvaluationRulesByVersion(versionId);
-
-            console.log(`✅ ${reglas.length} reglas encontradas para versión ${versionId}`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(reglas));
-
-        } catch (error) {
-            console.error('❌ Error en /api/reglas-evaluacion/version/:id:', error);
-            // Compatibilidad legacy: siempre devolver array vacío.
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify([]));
-        }
+    if (await handleMatrixReadRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta,
+        query: urlParseada.query
+    })) {
         return;
     }
 
@@ -6407,37 +6079,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // API - REGLAS DE EVALUACIÓN - CRUD
     // ======================================================
 
-    // GET - Obtener todas las reglas (para administración)
-    if (ruta === '/api/reglas-evaluacion' && metodo === 'GET') {
-        console.log('[API] GET /api/reglas-evaluacion');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const result = await pool.query(`
-            SELECT 
-                re.*,
-                vm.version as version_nombre
-            FROM reglas_evaluacion re
-            JOIN versiones_matriz vm ON re.version_id = vm.id
-            ORDER BY vm.id, re.orden
-        `);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify([]));
-        }
-        return;
-    }
+    // GET administrativo de reglas delegado a MatrixModule.
 
     // POST - Crear nueva regla
     if (ruta === '/api/reglas-evaluacion' && metodo === 'POST') {
@@ -6629,62 +6271,6 @@ const servidor = http.createServer(async (peticion, respuesta) => {
 
         } catch (error) {
             console.error('❌ Error eliminando regla:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ======================================================
-    // GET /api/reglas-evaluacion/version/:id - CORREGIDO
-    // ======================================================
-
-    if (ruta.startsWith('/api/reglas-evaluacion/version/') && metodo === 'GET') {
-        console.log('[API] GET /api/reglas-evaluacion/version/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const parts = ruta.split('/');
-        const versionId = parseInt(parts[parts.length - 1]);
-
-        if (!versionId || isNaN(versionId)) {
-            respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'ID de versión inválido' }));
-            return;
-        }
-
-        try {
-            const result = await pool.query(`
-            SELECT 
-                id,
-                version_id,
-                submotivo_origen,
-                bloque_origen,
-                atributo_origen,
-                valor_condicion,
-                accion_tipo,
-                accion_valor,
-                submotivos_afectados,
-                excepciones,
-                orden,
-                activo
-            FROM reglas_evaluacion 
-            WHERE version_id = $1 AND activo = true 
-            ORDER BY orden
-        `, [versionId]);
-
-            console.log(`✅ ${result.rows.length} reglas encontradas para versión ${versionId}`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('❌ Error:', error);
             respuesta.writeHead(500, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: error.message }));
         }
