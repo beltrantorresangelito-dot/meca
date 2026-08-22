@@ -24,17 +24,32 @@ test('VERREPO-002 activación usa UPDATEs dentro del repository', () => {
 });
 
 test('VERSERVER-001 lifecycle ya no está inline en server.js', () => {
+  // El endpoint de congelado ya no debe implementarse inline.
   assert.doesNotMatch(
     serverSource,
-    /if \(ruta === '\/api\/matriz\/versiones\/congelar'/
+    /if\s*\(\s*ruta\s*===\s*['"]\/api\/matriz\/versiones\/congelar['"]/
   );
+
+  // La activación ya no debe contener su implementación SQL legacy inline.
   assert.doesNotMatch(
     serverSource,
-    /versiones\\\/\\d\+\\\/activar/
+    /UPDATE\s+versiones_matriz\s+SET\s+activa\s*=\s*FALSE\s+WHERE\s+activa\s*=\s*TRUE/i
   );
+
+  // Los validadores ya no deben implementarse inline.
   assert.doesNotMatch(
     serverSource,
-    /if \(ruta === '\/api\/matriz\/validar\/frentes'/
+    /if\s*\(\s*ruta\s*===\s*['"]\/api\/matriz\/validar\/frentes['"]/
+  );
+
+  assert.doesNotMatch(
+    serverSource,
+    /if\s*\(\s*ruta\s*===\s*['"]\/api\/matriz\/validar\/atributos['"]/
+  );
+
+  assert.doesNotMatch(
+    serverSource,
+    /if\s*\(\s*ruta\s*===\s*['"]\/api\/matriz\/validar\/sub-motivos['"]/
   );
 });
 

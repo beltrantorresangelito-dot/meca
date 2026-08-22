@@ -915,8 +915,12 @@ async copyVersionTree(client, sourceVersionId, targetVersionId) {
         rule.valor_condicion,
         rule.accion_tipo,
         rule.accion_valor,
-        rule.submotivos_afectados,
-        rule.excepciones,
+        rule.submotivos_afectados == null
+          ? null
+          : JSON.stringify(rule.submotivos_afectados),
+        rule.excepciones == null
+          ? null
+          : JSON.stringify(rule.excepciones),
         rule.orden,
         rule.activo
       ]);
