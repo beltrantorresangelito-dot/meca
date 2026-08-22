@@ -14,11 +14,15 @@ const { hashPassword, verifyPassword } = require('./security/passwords');
 const { signToken, verifyToken } = require('./security/tokens');
 const { applyCors } = require('./security/cors');
 const { authorizeRequest } = require('./security/authorization');
+const { registerDomainRoutes } = require('./src/modules/domain/domain.routes');
 // Configuración
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
 // Mapa de rutas de la API
 const routes = {};
+// F2.2: endpoints de lectura del dominio multi-Quiebre.
+// Se registran en el mapa existente para evitar agregar más lógica al monolito.
+registerDomainRoutes(routes);
 
 // ======================================================
 // FUNCIONES AUXILIARES
