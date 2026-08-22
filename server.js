@@ -15,6 +15,8 @@ const { signToken, verifyToken } = require('./security/tokens');
 const { applyCors } = require('./security/cors');
 const { authorizeRequest } = require('./security/authorization');
 const { registerDomainRoutes } = require('./src/modules/domain/domain.routes');
+const LegacyMatrixService = require('./src/modules/domain/legacy-matrix.service');
+const legacyMatrixService = new LegacyMatrixService();
 // Configuración
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -6233,6 +6235,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // ======================================================
 
     // ---------- OBTENER VERSIÓN ACTIVA ----------
+    // F2.3: mismo contrato legacy, SQL extraído de server.js.
     if (ruta === '/api/matriz/versiones/activa' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/versiones/activa');
 
@@ -6244,18 +6247,16 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         }
 
         try {
-            const result = await pool.query(`
-                SELECT * FROM versiones_matriz WHERE activa = true LIMIT 1
-            `);
+            const versionActiva = await legacyMatrixService.getActiveVersion();
 
-            if (result.rows.length === 0) {
+            if (!versionActiva) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'No hay versión activa' }));
                 return;
             }
 
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows[0]));
+            respuesta.end(JSON.stringify(versionActiva));
 
         } catch (error) {
             console.error('Error en /api/matriz/versiones/activa:', error);
