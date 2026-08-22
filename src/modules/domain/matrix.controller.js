@@ -246,55 +246,6 @@ async deleteFront(req, res, id) {
   }
 }
 
-
-async createAttribute(req, res, body) {
-  if (!this.requireToken(req, res)) return;
-
-  try {
-    const row = await this.service.createAttribute(body);
-    MatrixController.json(res, 201, row);
-  } catch (error) {
-    console.error('Error creando atributo:', error);
-    MatrixController.json(
-      res,
-      error.status || 500,
-      error.payload || { error: error.message }
-    );
-  }
-}
-
-async updateAttribute(req, res, id, body) {
-  if (!this.requireToken(req, res)) return;
-
-  try {
-    const row = await this.service.updateAttribute(id, body);
-    MatrixController.json(res, 200, row);
-  } catch (error) {
-    console.error('Error actualizando atributo:', error);
-    MatrixController.json(
-      res,
-      error.status || 500,
-      error.payload || { error: error.message }
-    );
-  }
-}
-
-async deleteAttribute(req, res, id) {
-  if (!this.requireToken(req, res)) return;
-
-  try {
-    const result = await this.service.deleteAttribute(id);
-    MatrixController.json(res, 200, result);
-  } catch (error) {
-    console.error('Error eliminando atributo:', error);
-    MatrixController.json(
-      res,
-      error.status || 500,
-      error.payload || { error: error.message }
-    );
-  }
-}
-
 }
 
 module.exports = MatrixController;

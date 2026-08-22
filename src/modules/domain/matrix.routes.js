@@ -176,54 +176,6 @@ function createMatrixWriteHandler({
       return true;
     }
 
-
-if (ruta === '/api/matriz/atributos' && metodo === 'POST') {
-  console.log('[API] POST /api/matriz/atributos');
-
-  let body;
-  try {
-    body = await readJsonBody(peticion);
-  } catch (error) {
-    MatrixController.json(respuesta, 500, { error: error.message });
-    return true;
-  }
-
-  await controller.createAttribute(peticion, respuesta, body);
-  return true;
-}
-
-const attributeMatch = ruta.match(/^\/api\/matriz\/atributos\/(\d+)$/);
-
-if (attributeMatch && metodo === 'PUT') {
-  console.log('[API] PUT /api/matriz/atributos/:id');
-
-  let body;
-  try {
-    body = await readJsonBody(peticion);
-  } catch (error) {
-    MatrixController.json(respuesta, 500, { error: error.message });
-    return true;
-  }
-
-  await controller.updateAttribute(
-    peticion,
-    respuesta,
-    attributeMatch[1],
-    body
-  );
-  return true;
-}
-
-if (attributeMatch && metodo === 'DELETE') {
-  console.log('[API] DELETE /api/matriz/atributos/:id');
-  await controller.deleteAttribute(
-    peticion,
-    respuesta,
-    attributeMatch[1]
-  );
-  return true;
-}
-
     return false;
   };
 }
