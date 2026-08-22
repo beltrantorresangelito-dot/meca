@@ -295,6 +295,151 @@ async deleteAttribute(req, res, id) {
   }
 }
 
+
+async createSubReason(req, res, body) {
+  if (!this.requireToken(req, res)) return;
+
+  try {
+    const row = await this.service.createSubReason(body);
+    MatrixController.json(res, 201, row);
+  } catch (error) {
+    console.error('Error creando sub-motivo:', error);
+    MatrixController.json(
+      res,
+      error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+async updateSubReason(req, res, id, body) {
+  if (!this.requireToken(req, res)) return;
+
+  try {
+    const row = await this.service.updateSubReason(id, body);
+    MatrixController.json(res, 200, row);
+  } catch (error) {
+    console.error('Error actualizando sub-motivo:', error);
+    MatrixController.json(
+      res,
+      error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+async deleteSubReason(req, res, id) {
+  if (!this.requireToken(req, res)) return;
+
+  try {
+    const result = await this.service.deleteSubReason(id);
+    MatrixController.json(res, 200, result);
+  } catch (error) {
+    console.error('Error eliminando sub-motivo:', error);
+    MatrixController.json(
+      res,
+      error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+
+async freezeVersion(req, res, body) {
+  if (!this.requireToken(req, res)) return;
+  try {
+    const result = await this.service.freezeVersion(body);
+    MatrixController.json(res, 200, result);
+  } catch (error) {
+    MatrixController.json(
+      res, error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+async createEmptyVersion(req, res, body) {
+  if (!this.requireToken(req, res)) return;
+  try {
+    const result = await this.service.createEmptyVersion(body);
+    MatrixController.json(res, 200, result);
+  } catch (error) {
+    MatrixController.json(
+      res, error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+async activateVersion(req, res, id) {
+  if (!this.requireToken(req, res)) return;
+  try {
+    const result = await this.service.activateVersion(id);
+    // Contrato legacy: { success: true }
+    MatrixController.json(res, 200, { success: result.success });
+  } catch (error) {
+    MatrixController.json(
+      res, error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+async validateVersionIntegrity(req, res, id) {
+  if (!this.requireToken(req, res)) return;
+  try {
+    const result = await this.service.validateVersionIntegrity(id);
+    MatrixController.json(res, 200, result);
+  } catch (error) {
+    MatrixController.json(
+      res, error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+async validateFrontWeight(req, res, body) {
+  if (!this.requireToken(req, res)) return;
+  try {
+    MatrixController.json(
+      res, 200, await this.service.validateFrontWeight(body)
+    );
+  } catch (error) {
+    MatrixController.json(
+      res, error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+async validateAttributeWeight(req, res, body) {
+  if (!this.requireToken(req, res)) return;
+  try {
+    MatrixController.json(
+      res, 200, await this.service.validateAttributeWeight(body)
+    );
+  } catch (error) {
+    MatrixController.json(
+      res, error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+async validateSubReasonWeight(req, res, body) {
+  if (!this.requireToken(req, res)) return;
+  try {
+    MatrixController.json(
+      res, 200, await this.service.validateSubReasonWeight(body)
+    );
+  } catch (error) {
+    MatrixController.json(
+      res, error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
 }
 
 module.exports = MatrixController;

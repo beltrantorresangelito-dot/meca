@@ -224,6 +224,131 @@ if (attributeMatch && metodo === 'DELETE') {
   return true;
 }
 
+
+if (ruta === '/api/matriz/sub-motivos' && metodo === 'POST') {
+  console.log('[API] POST /api/matriz/sub-motivos');
+
+  let body;
+  try {
+    body = await readJsonBody(peticion);
+  } catch (error) {
+    MatrixController.json(respuesta, 500, { error: error.message });
+    return true;
+  }
+
+  await controller.createSubReason(peticion, respuesta, body);
+  return true;
+}
+
+const subReasonMatch = ruta.match(/^\/api\/matriz\/sub-motivos\/(\d+)$/);
+
+if (subReasonMatch && metodo === 'PUT') {
+  console.log('[API] PUT /api/matriz/sub-motivos/:id');
+
+  let body;
+  try {
+    body = await readJsonBody(peticion);
+  } catch (error) {
+    MatrixController.json(respuesta, 500, { error: error.message });
+    return true;
+  }
+
+  await controller.updateSubReason(
+    peticion,
+    respuesta,
+    subReasonMatch[1],
+    body
+  );
+  return true;
+}
+
+if (subReasonMatch && metodo === 'DELETE') {
+  console.log('[API] DELETE /api/matriz/sub-motivos/:id');
+  await controller.deleteSubReason(
+    peticion,
+    respuesta,
+    subReasonMatch[1]
+  );
+  return true;
+}
+
+
+
+if (ruta === '/api/matriz/versiones/congelar' && metodo === 'POST') {
+  let body;
+  try { body = await readJsonBody(peticion); }
+  catch (error) {
+    MatrixController.json(respuesta, 500, { error: error.message });
+    return true;
+  }
+  await controller.freezeVersion(peticion, respuesta, body);
+  return true;
+}
+
+if (ruta === '/api/matriz/versiones' && metodo === 'POST') {
+  let body;
+  try { body = await readJsonBody(peticion); }
+  catch (error) {
+    MatrixController.json(respuesta, 500, { error: error.message });
+    return true;
+  }
+  await controller.createEmptyVersion(peticion, respuesta, body);
+  return true;
+}
+
+const activateVersionMatch = ruta.match(
+  /^\/api\/matriz\/versiones\/(\d+)\/activar$/
+);
+if (activateVersionMatch && metodo === 'PUT') {
+  await controller.activateVersion(
+    peticion, respuesta, activateVersionMatch[1]
+  );
+  return true;
+}
+
+const integrityMatch = ruta.match(
+  /^\/api\/matriz\/versiones\/(\d+)\/integridad$/
+);
+if (integrityMatch && metodo === 'GET') {
+  await controller.validateVersionIntegrity(
+    peticion, respuesta, integrityMatch[1]
+  );
+  return true;
+}
+
+if (ruta === '/api/matriz/validar/frentes' && metodo === 'POST') {
+  let body;
+  try { body = await readJsonBody(peticion); }
+  catch (error) {
+    MatrixController.json(respuesta, 500, { error: error.message });
+    return true;
+  }
+  await controller.validateFrontWeight(peticion, respuesta, body);
+  return true;
+}
+
+if (ruta === '/api/matriz/validar/atributos' && metodo === 'POST') {
+  let body;
+  try { body = await readJsonBody(peticion); }
+  catch (error) {
+    MatrixController.json(respuesta, 500, { error: error.message });
+    return true;
+  }
+  await controller.validateAttributeWeight(peticion, respuesta, body);
+  return true;
+}
+
+if (ruta === '/api/matriz/validar/sub-motivos' && metodo === 'POST') {
+  let body;
+  try { body = await readJsonBody(peticion); }
+  catch (error) {
+    MatrixController.json(respuesta, 500, { error: error.message });
+    return true;
+  }
+  await controller.validateSubReasonWeight(peticion, respuesta, body);
+  return true;
+}
+
     return false;
   };
 }
