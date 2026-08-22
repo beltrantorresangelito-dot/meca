@@ -6193,6 +6193,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     }
 
     // Obtener versión activa
+    // F2.4: contrato legacy preservado; SQL extraído de server.js.
     if (ruta === '/api/evaluacion/version-activa' && metodo === 'GET') {
         console.log('[API] GET /api/evaluacion/version-activa');
 
@@ -6204,23 +6205,14 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         }
 
         try {
-            const result = await pool.query(`
-                SELECT id, version, descripcion, activa, created_at 
-                FROM versiones_matriz 
-                WHERE activa = true 
-                LIMIT 1
-            `);
+            const versionActiva = await legacyMatrixService.getEvaluationActiveVersion();
 
-            if (result.rows.length === 0) {
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ version: 'default', activa: false, message: 'No hay versión activa configurada' }));
-                return;
+            if (versionActiva.version !== 'default') {
+                console.log(`✅ Versión activa: ${versionActiva.version}`);
             }
 
-            console.log(`✅ Versión activa: ${result.rows[0].version}`);
-
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows[0]));
+            respuesta.end(JSON.stringify(versionActiva));
 
         } catch (error) {
             console.error('❌ Error en /api/evaluacion/version-activa:', error);
@@ -6267,6 +6259,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     }
 
     // ---------- OBTENER VERSIÓN POR FECHA ----------
+    // F2.5: contrato legacy preservado; SQL extraído de server.js.
     if (ruta === '/api/matriz/versiones/por-fecha' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/versiones/por-fecha');
 
@@ -6285,21 +6278,16 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         }
 
         try {
-            const result = await pool.query(`
-                SELECT * FROM versiones_matriz 
-                WHERE fecha_vigencia <= $1 
-                ORDER BY fecha_vigencia DESC 
-                LIMIT 1
-            `, [fecha]);
+            const version = await legacyMatrixService.getVersionByDate(fecha);
 
-            if (result.rows.length === 0) {
+            if (!version) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'No hay versión para esta fecha' }));
                 return;
             }
 
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows[0]));
+            respuesta.end(JSON.stringify(version));
 
         } catch (error) {
             console.error('Error en /api/matriz/versiones/por-fecha:', error);
@@ -6310,6 +6298,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     }
 
     // ---------- OBTENER ESTRUCTURA COMPLETA DE UNA VERSIÓN ----------
+    // F2.6: toda la construcción jerárquica salió de server.js.
     if (ruta.match(/^\/api\/matriz\/versiones\/\d+\/estructura$/) && metodo === 'GET') {
         console.log('[API] GET /api/matriz/versiones/:id/estructura');
 
@@ -6320,9 +6309,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
             return;
         }
 
-        // Extraer ID de la URL: /api/matriz/versiones/3/estructura
         const parts = ruta.split('/');
-        // parts = ['', 'api', 'matriz', 'versiones', '3', 'estructura']
         const versionId = parseInt(parts[4]);
 
         if (!versionId || isNaN(versionId)) {
@@ -6334,70 +6321,15 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         console.log(`📡 Obteniendo estructura de versión ID: ${versionId}`);
 
         try {
-            // 1. Obtener la versión
-            const versionResult = await pool.query(
-                'SELECT * FROM versiones_matriz WHERE id = $1',
-                [versionId]
-            );
+            const estructura = await legacyMatrixService.getStructure(versionId);
 
-            if (versionResult.rows.length === 0) {
+            if (!estructura) {
                 respuesta.writeHead(404, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({ error: 'Versión no encontrada' }));
                 return;
             }
 
-            const version = versionResult.rows[0];
-            console.log(`✅ Versión encontrada: ${version.version}`);
-
-            // 2. Obtener frentes de la versión
-            const frentesResult = await pool.query(`
-                SELECT id, codigo, nombre, peso_maximo, orden 
-                FROM version_frentes 
-                WHERE version_id = $1 AND activo = true 
-                ORDER BY orden
-            `, [versionId]);
-
-            console.log(`   📋 Frentes encontrados: ${frentesResult.rows.length}`);
-
-            const estructura = {
-                version: version,
-                frentes: []
-            };
-
-            for (const frente of frentesResult.rows) {
-                // 3. Obtener atributos del frente
-                const atributosResult = await pool.query(`
-                    SELECT id, nombre, peso_maximo, orden 
-                    FROM version_atributos 
-                    WHERE version_frente_id = $1 AND activo = true 
-                    ORDER BY orden
-                `, [frente.id]);
-
-                console.log(`      📋 Atributos para ${frente.codigo}: ${atributosResult.rows.length}`);
-
-                const frenteData = {
-                    ...frente,
-                    atributos: []
-                };
-
-                for (const attr of atributosResult.rows) {
-                    // 4. Obtener sub-motivos del atributo
-                    const subMotivosResult = await pool.query(`
-                        SELECT id, codigo, descripcion, peso_individual, orden 
-                        FROM version_sub_motivos 
-                        WHERE version_atributo_id = $1 AND activo = true 
-                        ORDER BY orden
-                    `, [attr.id]);
-
-                    frenteData.atributos.push({
-                        ...attr,
-                        sub_motivos: subMotivosResult.rows
-                    });
-                }
-
-                estructura.frentes.push(frenteData);
-            }
-
+            console.log(`✅ Versión encontrada: ${estructura.version.version}`);
             console.log(`✅ Estructura completada: ${estructura.frentes.length} frentes`);
 
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
@@ -6412,6 +6344,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     }
 
     // ---------- OBTENER VERSIONES DE MATRIZ ----------
+    // F2.7: listado legacy delegado al módulo de matriz.
     if (ruta === '/api/matriz/versiones' && metodo === 'GET') {
         console.log('[API] GET /api/matriz/versiones');
 
@@ -6423,14 +6356,10 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         }
 
         try {
-            const result = await pool.query(`
-                SELECT id, version, descripcion, fecha_vigencia, activa, creado_por, creado_en, publicado_por, publicado_en
-                FROM versiones_matriz 
-                ORDER BY creado_en DESC
-            `);
+            const versiones = await legacyMatrixService.listVersions();
 
             respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
+            respuesta.end(JSON.stringify(versiones));
 
         } catch (error) {
             console.error('Error en /api/matriz/versiones:', error);
