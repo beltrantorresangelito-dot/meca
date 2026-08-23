@@ -92,6 +92,16 @@ if (ruta === '/api/reglas-evaluacion') {
       return true;
     }
 
+
+if (ruta === '/api/evaluacion/estructura') {
+  console.log('[API] GET /api/evaluacion/estructura');
+  await controller.getActiveEvaluationStructure(
+    peticion,
+    respuesta
+  );
+  return true;
+}
+
     return false;
   };
 }
@@ -346,6 +356,49 @@ if (ruta === '/api/matriz/validar/sub-motivos' && metodo === 'POST') {
     return true;
   }
   await controller.validateSubReasonWeight(peticion, respuesta, body);
+  return true;
+}
+
+
+if (ruta === '/api/reglas-evaluacion' && metodo === 'POST') {
+  let body;
+  try { body = await readJsonBody(peticion); }
+  catch (error) {
+    MatrixController.json(respuesta, 500, { error: error.message });
+    return true;
+  }
+
+  await controller.createEvaluationRule(peticion, respuesta, body);
+  return true;
+}
+
+const evaluationRuleMatch = ruta.match(
+  /^\/api\/reglas-evaluacion\/(\d+)$/
+);
+
+if (evaluationRuleMatch && metodo === 'PUT') {
+  let body;
+  try { body = await readJsonBody(peticion); }
+  catch (error) {
+    MatrixController.json(respuesta, 500, { error: error.message });
+    return true;
+  }
+
+  await controller.updateEvaluationRule(
+    peticion,
+    respuesta,
+    evaluationRuleMatch[1],
+    body
+  );
+  return true;
+}
+
+if (evaluationRuleMatch && metodo === 'DELETE') {
+  await controller.deleteEvaluationRule(
+    peticion,
+    respuesta,
+    evaluationRuleMatch[1]
+  );
   return true;
 }
 

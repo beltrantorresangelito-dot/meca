@@ -1108,6 +1108,133 @@ async validateSubReasonWeight(client, { atributoId, nuevoPeso, excluirId }) {
   };
 }
 
+
+async createEvaluationRule(client, data) {
+  const affected = data.submotivos_afectados == null
+    ? null
+    : JSON.stringify(data.submotivos_afectados);
+
+  const exceptions = data.excepciones == null
+    ? null
+    : JSON.stringify(data.excepciones);
+
+  const result = await client.query(`
+    INSERT INTO reglas_evaluacion (
+      version_id,
+      submotivo_origen,
+      bloque_origen,
+      atributo_origen,
+      valor_condicion,
+      accion_tipo,
+      accion_valor,
+      submotivos_afectados,
+      excepciones,
+      orden,
+      activo,
+      created_at,
+      updated_at
+    ) VALUES (
+      $1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,NOW(),NOW()
+    )
+    RETURNING *
+  `, [
+    data.version_id,
+    data.submotivo_origen,
+    data.bloque_origen,
+    data.atributo_origen,
+    data.valor_condicion || '0',
+    data.accion_tipo || 'marcar_no_aplica',
+    data.accion_valor || 'NA',
+    affected,
+    exceptions,
+    data.orden || 0,
+    data.activo !== false
+  ]);
+
+  return result.rows[0];
+}
+
+async updateEvaluationRule(client, id, data) {
+  const affected = data.submotivos_afectados == null
+    ? null
+    : JSON.stringify(data.submotivos_afectados);
+
+  const exceptions = data.excepciones == null
+    ? null
+    : JSON.stringify(data.excepciones);
+
+  const result = await client.query(`
+    UPDATE reglas_evaluacion
+    SET
+      submotivo_origen = $1,
+      bloque_origen = $2,
+      atributo_origen = $3,
+      valor_condicion = $4,
+      accion_tipo = $5,
+      accion_valor = $6,
+      submotivos_afectados = $7::jsonb,
+      excepciones = $8::jsonb,
+      orden = $9,
+      activo = $10,
+      updated_at = NOW()
+    WHERE id = $11
+    RETURNING *
+  `, [
+    data.submotivo_origen,
+    data.bloque_origen,
+    data.atributo_origen,
+    data.valor_condicion || '0',
+    data.accion_tipo || 'marcar_no_aplica',
+    data.accion_valor || 'NA',
+    affected,
+    exceptions,
+    data.orden || 0,
+    data.activo !== false,
+    id
+  ]);
+
+  return result.rows[0] || null;
+}
+
+async deleteEvaluationRule(client, id) {
+  const result = await client.query(
+    'DELETE FROM reglas_evaluacion WHERE id = $1 RETURNING id',
+    [id]
+  );
+  return result.rows[0] || null;
+}
+
+async getActiveEvaluationStructure() {
+  const tableExists = await this.matrixVersionsTableExists();
+  if (!tableExists) {
+    return {
+      version: 'default',
+      frentes: [],
+      reglas: [],
+      message: 'Tablas de estructura no configuradas aún'
+    };
+  }
+
+  const active = await this.getLegacyActiveMatrixVersion();
+  if (!active) {
+    return {
+      version: 'default',
+      frentes: [],
+      reglas: [],
+      message: 'No hay versión activa configurada'
+    };
+  }
+
+  const structure = await this.getLegacyMatrixStructure(active.id);
+  const rules = await this.getLegacyEvaluationRulesByVersion(active.id);
+
+  return {
+    version: active.version || 'default',
+    frentes: structure?.frentes || [],
+    reglas: rules || []
+  };
+}
+
 }
 
 module.exports = MatrixRepository;

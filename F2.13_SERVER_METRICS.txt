@@ -1,0 +1,3 @@
+server.js antes F2.13: 5574
+server.js después F2.13: 5260
+reducción F2.13: 314 líneas

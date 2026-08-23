@@ -440,6 +440,64 @@ async validateSubReasonWeight(req, res, body) {
   }
 }
 
+
+async getActiveEvaluationStructure(req, res) {
+  if (!this.requireToken(req, res)) return;
+
+  try {
+    const result = await this.service.getActiveEvaluationStructure();
+    MatrixController.json(res, 200, result);
+  } catch (error) {
+    console.error('Error en /api/evaluacion/estructura:', error);
+    MatrixController.json(res, 500, { error: error.message });
+  }
+}
+
+async createEvaluationRule(req, res, body) {
+  if (!this.requireToken(req, res)) return;
+
+  try {
+    const row = await this.service.createEvaluationRule(body);
+    MatrixController.json(res, 201, row);
+  } catch (error) {
+    MatrixController.json(
+      res,
+      error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+async updateEvaluationRule(req, res, id, body) {
+  if (!this.requireToken(req, res)) return;
+
+  try {
+    const row = await this.service.updateEvaluationRule(id, body);
+    MatrixController.json(res, 200, row);
+  } catch (error) {
+    MatrixController.json(
+      res,
+      error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
+async deleteEvaluationRule(req, res, id) {
+  if (!this.requireToken(req, res)) return;
+
+  try {
+    const result = await this.service.deleteEvaluationRule(id);
+    MatrixController.json(res, 200, result);
+  } catch (error) {
+    MatrixController.json(
+      res,
+      error.status || 500,
+      error.payload || { error: error.message }
+    );
+  }
+}
+
 }
 
 module.exports = MatrixController;

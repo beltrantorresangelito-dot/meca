@@ -917,6 +917,63 @@ async validateSubReasonWeight(input = {}) {
   });
 }
 
+
+async getActiveEvaluationStructure() {
+  return this.repository.getActiveEvaluationStructure();
+}
+
+async createEvaluationRule(input = {}) {
+  if (!input.version_id || !input.submotivo_origen) {
+    throw MatrixService.writeError('Faltan campos obligatorios', 400);
+  }
+
+  return this.repository.withTransaction(client =>
+    this.repository.createEvaluationRule(client, input)
+  );
+}
+
+async updateEvaluationRule(id, input = {}) {
+  const parsedId = Number(id);
+  if (!Number.isInteger(parsedId) || parsedId <= 0) {
+    throw MatrixService.writeError('ID de regla inválido', 400);
+  }
+
+  return this.repository.withTransaction(async client => {
+    const row = await this.repository.updateEvaluationRule(
+      client,
+      parsedId,
+      input
+    );
+
+    if (!row) {
+      throw MatrixService.writeError('Regla no encontrada', 404);
+    }
+
+    return row;
+  });
+}
+
+async deleteEvaluationRule(id) {
+  const parsedId = Number(id);
+  if (!Number.isInteger(parsedId) || parsedId <= 0) {
+    throw MatrixService.writeError('ID de regla inválido', 400);
+  }
+
+  return this.repository.withTransaction(async client => {
+    const row = await this.repository.deleteEvaluationRule(client, parsedId);
+
+    if (!row) {
+      throw MatrixService.writeError('Regla no encontrada', 404);
+    }
+
+    return {
+      success: true,
+      message: 'Regla eliminada correctamente',
+      id: parsedId
+    };
+  });
+}
+
 }
 
 module.exports = MatrixService;
