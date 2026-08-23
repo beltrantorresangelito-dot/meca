@@ -1,0 +1,215 @@
+class ListeningsRepository {
+  constructor(db) {
+    this.db = db;
+  }
+
+  async assignmentExists(ticket, taskId) {
+    const result = await this.db.query(
+      `SELECT id FROM asignaciones_escucha
+       WHERE ticket = $1 AND tarea_id = $2`,
+      [ticket || '', taskId]
+    );
+    return result.rows.length > 0;
+  }
+
+  async insertAssignment(data) {
+    const result = await this.db.query(`
+      INSERT INTO asignaciones_escucha (
+        id, tarea_id, ticket, supervisor_responsable, gestor_auditado,
+        auditor_asignado, motivos, submotivos, subnivel, peticion,
+        usuario_dni, usuario_mov, motivo_call, fecha_descarga,
+        campana, campana_id, estado, fecha_asignacion, created_at, updated_at
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+        $11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+      )
+      RETURNING id
+    `, [
+      data.id,
+      data.tarea_id,
+      data.ticket || '',
+      data.supervisor_responsable || '',
+      data.gestor_auditado || '',
+      data.auditor_asignado || '',
+      data.motivos || '',
+      data.submotivos || '',
+      data.subnivel || '',
+      data.peticion || '',
+      data.usuario_dni || '',
+      data.usuario_mov || '',
+      data.motivo_call || '',
+      data.fecha_descarga || null,
+      data.campana || '',
+      data.campana_id || null,
+      data.estado || 'pendiente',
+      data.fecha_asignacion || new Date().toISOString(),
+      data.created_at || new Date().toISOString(),
+      data.updated_at || new Date().toISOString()
+    ]);
+    return result.rows[0] || null;
+  }
+
+  async listAssignments() {
+    const result = await this.db.query('SELECT * FROM asignaciones_escucha');
+    return result.rows || [];
+  }
+
+  async listTasks() {
+    const result = await this.db.query(
+      'SELECT * FROM tareas_escucha ORDER BY id DESC'
+    );
+    return result.rows || [];
+  }
+
+  async findRecentTaskByFilename(filename) {
+    const result = await this.db.query(`
+      SELECT id, fecha_carga, total_registros
+      FROM tareas_escucha
+      WHERE nombre_archivo = $1
+        AND fecha_carga > NOW() - INTERVAL '5 minutes'
+      ORDER BY id DESC
+      LIMIT 1
+    `, [filename || '']);
+    return result.rows[0] || null;
+  }
+
+  async insertTask(data) {
+    const result = await this.db.query(`
+      INSERT INTO tareas_escucha (
+        id, fecha_carga, nombre_archivo,
+        total_registros, estado, creado_por
+      ) VALUES ($1,$2,$3,$4,$5,$6)
+      RETURNING id
+    `, [
+      data.id,
+      data.fecha_carga,
+      data.nombre_archivo || null,
+      data.total_registros || 0,
+      data.estado || 'activo',
+      data.creado_por || 'supervisor'
+    ]);
+    return result.rows[0] || null;
+  }
+
+  async withTransaction(work) {
+    const client = await this.db.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await work(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getTaskById(taskId, executor = this.db) {
+    const result = await executor.query(
+      'SELECT id, nombre_archivo FROM tareas_escucha WHERE id = $1',
+      [taskId]
+    );
+    return result.rows[0] || null;
+  }
+
+  async deleteAssignmentsByTask(client, taskId) {
+    await client.query(
+      'DELETE FROM asignaciones_escucha WHERE tarea_id = $1',
+      [taskId]
+    );
+  }
+
+  async deleteTask(client, taskId) {
+    await client.query(
+      'DELETE FROM tareas_escucha WHERE id = $1',
+      [taskId]
+    );
+  }
+
+  async listMyListenings(auditor) {
+    const result = await this.db.query(`
+      SELECT * FROM asignaciones_escucha
+      WHERE auditor_asignado = $1
+        AND audio_disponible = true
+        AND estado IN ('pendiente', 'en_proceso')
+    `, [auditor]);
+    return result.rows;
+  }
+
+  async startListening(id) {
+    await this.db.query(
+      "UPDATE asignaciones_escucha SET estado = 'en_proceso', updated_at = NOW() WHERE id = $1",
+      [id]
+    );
+  }
+
+  async reportIncident(id, motivo) {
+    await this.db.query(`
+      UPDATE asignaciones_escucha
+      SET audio_disponible = false,
+          motivo_incidencia = $1,
+          fecha_incidencia = NOW(),
+          updated_at = NOW()
+      WHERE id = $2
+    `, [motivo, id]);
+  }
+
+  async markManaged(id) {
+    await this.db.query(`
+      UPDATE asignaciones_escucha
+      SET estado = 'gestionado',
+          fecha_gestion = NOW(),
+          updated_at = NOW()
+      WHERE id = $1
+    `, [id]);
+  }
+
+  async cancelManagement(id) {
+    await this.db.query(
+      "UPDATE asignaciones_escucha SET estado = 'pendiente', updated_at = NOW() WHERE id = $1",
+      [id]
+    );
+  }
+
+  async getAssignmentByTicket(ticket) {
+    const result = await this.db.query(
+      'SELECT id FROM asignaciones_escucha WHERE ticket = $1 LIMIT 1',
+      [ticket]
+    );
+    return result.rows[0] || null;
+  }
+
+  async reactivateByTicket(ticket) {
+    await this.db.query(
+      "UPDATE asignaciones_escucha SET estado = 'pendiente', updated_at = NOW() WHERE ticket = $1",
+      [ticket]
+    );
+  }
+
+  async listTicketsByTask(taskId) {
+    const result = await this.db.query(`
+      SELECT
+        id,
+        ticket,
+        auditor_asignado,
+        supervisor_responsable,
+        gestor_auditado,
+        motivos,
+        submotivos,
+        estado,
+        fecha_asignacion,
+        fecha_gestion,
+        audio_disponible,
+        motivo_incidencia,
+        tarea_id
+      FROM asignaciones_escucha
+      WHERE tarea_id = $1
+      ORDER BY id DESC
+    `, [taskId]);
+    return result.rows;
+  }
+}
+
+module.exports = ListeningsRepository;
