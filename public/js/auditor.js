@@ -5307,6 +5307,7 @@ async function cargarMisEscuchas() {
     // 4a. VALIDAR CONEXIÓN A BD
     // ======================================================
     const db = getDB();
+
     if (!db) {
         console.error('❌ Base de datos no disponible');
         return;
@@ -5316,44 +5317,89 @@ async function cargarMisEscuchas() {
         // ======================================================
         // 4b. OBTENER ESCUCHAS DEL AUDITOR
         // ======================================================
-        // ✅ IMPORTANTE: Usar 'usuario' (nombre de usuario) no 'nombre_completo'
-        const auditorUsuario = usuarioActual.usuario;
 
-        console.log('📡 Consultando asignaciones_escucha para auditor_usuario:', auditorUsuario);
+        // IMPORTANTE:
+        // usar usuario y no nombre_completo
+        const auditorUsuario = usuarioActual?.usuario;
 
-        // Obtener escuchas de la API
+        if (!auditorUsuario) {
+            throw new Error('No se pudo identificar el usuario auditor');
+        }
+
+        console.log(
+            '📡 Consultando asignaciones_escucha para auditor_usuario:',
+            auditorUsuario
+        );
+
         const data = await API.getMisEscuchas(auditorUsuario);
-        
-        console.log('📊 Resultado:', data?.length || 0, 'registros');
+
+        console.log('📦 Respuesta original getMisEscuchas:', data);
+        console.log('📦 Tipo respuesta:', typeof data);
+        console.log('📦 Es array:', Array.isArray(data));
 
         // ======================================================
-        // 4c. GUARDAR DATOS Y ACTUALIZAR UI
+        // 4c. NORMALIZAR RESPUESTA
         // ======================================================
-        misEscuchasData = data || [];
 
-        // Actualizar tarjetas de resumen (KPIs)
+        misEscuchasData = Array.isArray(data)
+            ? data
+            : Array.isArray(data?.data)
+                ? data.data
+                : Array.isArray(data?.rows)
+                    ? data.rows
+                    : [];
+
+        console.log(
+            `✅ Mis escuchas normalizadas: ${misEscuchasData.length}`,
+            misEscuchasData
+        );
+
+        // ======================================================
+        // 4d. ACTUALIZAR UI
+        // ======================================================
+
         actualizarTarjetasResumen();
-        
-        // Aplicar filtro actual y mostrar en tabla
+
         filtrarEscuchasPorEstado(filtroActual);
 
         // ======================================================
-        // 4d. MANEJAR CASO SIN ESCUCHAS
+        // 4e. CASO SIN ESCUCHAS
         // ======================================================
+
         if (misEscuchasData.length === 0) {
             const tbody = document.getElementById('tablaMisEscuchas');
+
             if (tbody) {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 40px;">
-                    📭 No tienes escuchas asignadas.
-                </td></tr>`;
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7"
+                            style="text-align: center; padding: 40px;">
+                            📭 No tienes escuchas asignadas.
+                        </td>
+                    </tr>
+                `;
             }
         }
 
     } catch (error) {
+
         console.error('❌ Error cargando escuchas:', error);
+
+        // Muy importante:
+        // garantizamos que siempre sea array.
+        misEscuchasData = [];
+
         const tbody = document.getElementById('tablaMisEscuchas');
+
         if (tbody) {
-            tbody.innerHTML = `<td><td colspan="7" style="text-align: center; color: var(--danger);">❌ Error: ${error.message}</td></tr>`;
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7"
+                        style="text-align: center; color: var(--danger);">
+                        ❌ Error: ${error.message}
+                    </td>
+                </tr>
+            `;
         }
     }
 }
@@ -5412,26 +5458,39 @@ function actualizarTarjetasResumen() {
 // ======================================================
 
 function filtrarEscuchasPorEstado(estado) {
+
     // ======================================================
-    // 2a. REDIRIGIR GESTIONADOS AL HISTORIAL
+    // 2a. NORMALIZAR DATOS
     // ======================================================
-    // 📌 Los tickets gestionados se ven en la pestaña "Historial"
+    const datos = Array.isArray(misEscuchasData)
+        ? misEscuchasData
+        : Array.isArray(misEscuchasData?.data)
+            ? misEscuchasData.data
+            : [];
+
+    console.log('🔎 Filtrando escuchas por estado:', estado);
+    console.log('📦 Total escuchas disponibles:', datos.length);
+
+    // ======================================================
+    // 2b. REDIRIGIR GESTIONADOS AL HISTORIAL
+    // ======================================================
     if (estado === 'gestionado') {
         mostrarMensajeTemporal(
-            '📋 Los tickets gestionados se encuentran en la pestaña "Historial de Evaluaciones"', 
+            '📋 Los tickets gestionados se encuentran en la pestaña "Historial de Evaluaciones"',
             'var(--accent)'
         );
+
         showTab('historial', null);
         return;
     }
 
     // ======================================================
-    // 2b. ACTUALIZAR FILTRO ACTUAL
+    // 2c. ACTUALIZAR FILTRO ACTUAL
     // ======================================================
     filtroActual = estado;
 
     // ======================================================
-    // 2c. ACTUALIZAR ESTILOS DE TABS
+    // 2d. ACTUALIZAR ESTILOS DE TABS
     // ======================================================
     document.querySelectorAll('.tab-escucha-btn').forEach(btn => {
         btn.classList.remove('active');
@@ -5439,25 +5498,59 @@ function filtrarEscuchasPorEstado(estado) {
         btn.style.color = 'var(--muted)';
     });
 
-    // Resaltar el tab activo
-    const btnActivo = document.querySelector(`.tab-escucha-btn[data-estado="${estado}"]`);
+    const btnActivo = document.querySelector(
+        `.tab-escucha-btn[data-estado="${estado}"]`
+    );
+
     if (btnActivo) {
         btnActivo.classList.add('active');
-        
-        // Colores según estado
+
         if (estado === 'pendiente') {
             btnActivo.style.borderBottom = '3px solid var(--warning)';
             btnActivo.style.color = 'var(--warning)';
         } else if (estado === 'en_proceso') {
             btnActivo.style.borderBottom = '3px solid var(--accent)';
             btnActivo.style.color = 'var(--accent)';
+        } else if (estado === 'todos') {
+            btnActivo.style.borderBottom = '3px solid var(--accent)';
+            btnActivo.style.color = 'var(--accent)';
         }
     }
 
     // ======================================================
-    // 2d. FILTRAR Y MOSTRAR ESCUCHAS
+    // 2e. FILTRAR ESCUCHAS
     // ======================================================
-    const filtrados = misEscuchasData.filter(e => e.estado === estado);
+    const filtrados = estado === 'todos'
+        ? datos
+        : datos.filter(escucha => {
+            const estadoEscucha = String(
+                escucha?.estado || ''
+            )
+                .trim()
+                .toLowerCase();
+
+            const estadoFiltro = String(
+                estado || ''
+            )
+                .trim()
+                .toLowerCase();
+
+            return estadoEscucha === estadoFiltro;
+        });
+
+    console.log(
+        `📋 Escuchas filtradas [${estado}]:`,
+        filtrados.length
+    );
+
+    console.log(
+        '📊 Estados disponibles:',
+        [...new Set(datos.map(e => e.estado))]
+    );
+
+    // ======================================================
+    // 2f. ACTUALIZAR TABLA
+    // ======================================================
     actualizarTablaMisEscuchas(filtrados);
 }
 

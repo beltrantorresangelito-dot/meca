@@ -19,11 +19,20 @@ const { createMatrixReadHandler, createMatrixWriteHandler } = require('./src/mod
 const { createReportsHandler } = require('./src/modules/reports');
 const { createAgentsHandler } = require('./src/modules/agents');
 const { createListeningsHandler } = require('./src/modules/listenings');
+const { createUsersHandler } = require('./src/modules/users');
+const { createRolesHandler } = require('./src/modules/roles');
 const handleMatrixReadRequest = createMatrixReadHandler();
 const handleMatrixWriteRequest = createMatrixWriteHandler();
 const handleReportsRequest = createReportsHandler({ db: pool });
 const handleAgentsRequest = createAgentsHandler({ db: pool });
 const handleListeningsRequest = createListeningsHandler({ db: pool });
+const handleUsersRequest = createUsersHandler({
+    db: pool,
+    hashPassword,
+    verifyPassword,
+    signToken
+});
+const handleRolesRequest = createRolesHandler({ db: pool });
 // Configuración
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -38,117 +47,6 @@ registerDomainRoutes(routes);
 // ======================================================
 
 // Validar credenciales
-async function procesarLogin(usuario, contrasena) {
-    try {
-        const result = await pool.query(`
-            SELECT 
-                u.id, 
-                u.usuario, 
-                u.nombre_completo, 
-                u.contrasena, 
-                u.rol_id, 
-                u.activo as usuario_activo, 
-                u.primer_login,
-                r.activo as rol_activo,
-                r.nombre as rol_nombre,
-                r.codigo as rol_codigo
-            FROM usuarios u
-            LEFT JOIN roles r ON u.rol_id = r.id
-            WHERE u.usuario = $1
-        `, [usuario]);
-
-        const usuarioData = result.rows[0];
-
-        if (!usuarioData) {
-            return { success: false, error: 'Usuario no encontrado' };
-        }
-
-        if (!usuarioData.usuario_activo) {
-            return { success: false, error: 'Usuario desactivado' };
-        }
-
-        if (usuarioData.rol_activo === false) {
-            return {
-                success: false,
-                error: 'El rol asignado a este usuario está desactivado'
-            };
-        }
-
-        if (!usuarioData.rol_id) {
-            return {
-                success: false,
-                error: 'Usuario sin rol asignado'
-            };
-        }
-
-        const passwordCheck = await verifyPassword(contrasena, usuarioData.contrasena);
-        if (!passwordCheck.valid) {
-            return { success: false, error: 'Contraseña incorrecta' };
-        }
-
-        // Migración progresiva: al autenticar una contraseña SHA-256 legacy,
-        // se reemplaza inmediatamente por un hash scrypt moderno.
-        if (passwordCheck.needsRehash) {
-            const migratedHash = await hashPassword(contrasena);
-            await pool.query(
-                'UPDATE usuarios SET contrasena = $1, updated_at = NOW() WHERE id = $2',
-                [migratedHash, usuarioData.id]
-            );
-        }
-
-        if (usuarioData.primer_login === true) {
-            const passwordChangeToken = signToken(
-                { id: usuarioData.id, usuario: usuarioData.usuario },
-                { purpose: 'password_change', expiresInSeconds: 10 * 60 }
-            );
-            return {
-                success: false,
-                requiereCambioPassword: true,
-                passwordChangeToken,
-                usuario: {
-                    id: usuarioData.id,
-                    usuario: usuarioData.usuario,
-                    nombre_completo: usuarioData.nombre_completo,
-                    rol_id: usuarioData.rol_id,
-                    rol_codigo: usuarioData.rol_codigo,
-                    rol_nombre: usuarioData.rol_nombre
-                }
-            };
-        }
-
-        const token = signToken({
-            id: usuarioData.id,
-            usuario: usuarioData.usuario,
-            nombre_completo: usuarioData.nombre_completo,
-            rol_id: usuarioData.rol_id,
-            rol_codigo: usuarioData.rol_codigo,
-            rol_nombre: usuarioData.rol_nombre
-        });
-
-        pool.query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1', [usuarioData.id]).catch(err => {
-            console.log('No se pudo actualizar ultimo_login:', err.message);
-        });
-
-        return {
-            success: true,
-            token: token,
-            usuario: {
-                id: usuarioData.id,
-                usuario: usuarioData.usuario,
-                nombre_completo: usuarioData.nombre_completo,
-                rol_id: usuarioData.rol_id,
-                rol: usuarioData.rol_codigo,        // ← Para compatibilidad
-                rol_codigo: usuarioData.rol_codigo,
-                rol_nombre: usuarioData.rol_nombre
-            }
-        };
-
-    } catch (error) {
-        console.error('Error en login:', error);
-        return { success: false, error: error.message };
-    }
-}
-
 // Función para registrar rutas
 function registrarRuta(metodo, ruta, manejador) {
     if (!routes[ruta]) routes[ruta] = {};
@@ -289,173 +187,32 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         return;
     }
 
+    // F6.4 - USERS/AUTH MODULE
+    if (await handleUsersRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta
+    })) {
+        return;
+    }
+
+    // F6.8 - ROLES/PERMISSIONS MODULE
+    if (await handleRolesRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta
+    })) {
+        return;
+    }
+
     // ======================================================
     // API - AUTENTICACIÓN
     // ======================================================
 
-    // Endpoint de login
-    if (ruta === '/api/auth/login' && metodo === 'POST') {
-        console.log('[API] POST /api/auth/login');
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { usuario, contrasena } = JSON.parse(body);
-                const resultado = await procesarLogin(usuario, contrasena);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify(resultado));
-
-            } catch (error) {
-                console.error('Error en login:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: false, error: error.message }));
-            }
-        });
-        return;
-    }
-
-    // Endpoint de verificación de token
-    if (ruta === '/api/auth/verify' && metodo === 'GET') {
-        console.log('[API] GET /api/auth/verify');
-
-        if (!peticion.auth) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ valid: false, error: 'Token requerido' }));
-            return;
-        }
-
-        respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-        respuesta.end(JSON.stringify({ valid: true, usuario: peticion.auth }));
-        return;
-    }
-
     // Endpoint de redirección según rol
-    if (ruta === '/api/auth/redirect' && metodo === 'GET') {
-        console.log('[API] GET /api/auth/redirect');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const payload = peticion.auth;
-            const rolCodigo = payload.rol_codigo || payload.rol || 'AUDITOR';
-
-            console.log(`🔍 Buscando redirección para rol: ${rolCodigo}`);
-
-            // ✅ CONSULTAR LA BD PARA OBTENER LA URL DE REDIRECCIÓN
-            const result = await pool.query(
-                `SELECT redirect_url, nombre, activo 
-                FROM roles 
-                WHERE codigo = $1 AND activo = true`,
-                [rolCodigo]
-            );
-
-            let redirectUrl = '/login';
-            let rolNombre = rolCodigo;
-
-            if (result.rows.length > 0) {
-                const rol = result.rows[0];
-                rolNombre = rol.nombre || rolCodigo;
-
-                // 🔴 USAR LA URL CONFIGURADA EN LA BD
-                if (rol.redirect_url) {
-                    redirectUrl = rol.redirect_url;
-                    console.log(`✅ Redirección encontrada en BD: ${rolNombre} -> ${redirectUrl}`);
-                } else {
-                    // 🔴 FALLBACK: Si no tiene redirect_url configurado
-                    console.warn(`⚠️ Rol ${rolCodigo} sin redirect_url, usando fallback`);
-                    redirectUrl = rolCodigo === 'AUDITOR' ? '/auditor' : '/supervisor';
-                }
-            } else {
-                // 🔴 ROL NO ENCONTRADO EN BD
-                console.warn(`⚠️ Rol ${rolCodigo} no encontrado en BD, usando fallback`);
-                redirectUrl = rolCodigo === 'AUDITOR' ? '/auditor' : '/supervisor';
-            }
-
-            console.log(`✅ Redirección final: ${rolNombre} -> ${redirectUrl}`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({
-                redirectUrl,
-                rol: rolCodigo,
-                rolNombre: rolNombre
-            }));
-
-        } catch (error) {
-            console.error('❌ Error en redirect:', error);
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token inválido' }));
-        }
-        return;
-    }
-
     // server.js - Endpoint para actualizar redirect_url de un rol
-    if (ruta.match(/^\/api\/roles\/\d+\/redirect$/) && metodo === 'PUT') {
-        console.log('[API] PUT /api/roles/:id/redirect');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const rolId = parseInt(ruta.split('/')[3]);
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { redirect_url } = JSON.parse(body);
-
-                if (!redirect_url) {
-                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'redirect_url es requerido' }));
-                    return;
-                }
-
-                // Validar formato de URL
-                if (!redirect_url.startsWith('/')) {
-                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'redirect_url debe comenzar con /' }));
-                    return;
-                }
-
-                const result = await pool.query(
-                    'UPDATE roles SET redirect_url = $1, updated_at = NOW() WHERE id = $2 RETURNING id, codigo, nombre, redirect_url',
-                    [redirect_url, rolId]
-                );
-
-                if (result.rows.length === 0) {
-                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
-                    return;
-                }
-
-                console.log(`✅ Redirección actualizada para ${result.rows[0].nombre}: ${redirect_url}`);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({
-                    success: true,
-                    rol: result.rows[0]
-                }));
-
-            } catch (error) {
-                console.error('Error:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
     // ======================================================
     // PROXY DE AUDIO - CONEXIÓN CON PYTHON
     // ======================================================
@@ -540,7 +297,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         } catch (error) {
             console.error(`❌ [PROXY] Error sirviendo audio:`, error.message);
 
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({
                 error: 'Error al obtener el audio',
                 details: error.message
@@ -571,41 +328,6 @@ const servidor = http.createServer(async (peticion, respuesta) => {
                 error: error.message
             }));
         }
-        return;
-    }
-
-    // ======================================================
-    // API - CAMBIO DE CONTRASEÑA
-    // ======================================================
-    if (ruta === '/api/auth/cambiar-password' && metodo === 'POST') {
-        console.log('[API] POST /api/auth/cambiar-password');
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { usuarioId, nuevaPassword } = JSON.parse(body);
-                if (!peticion.auth || peticion.auth.purpose !== 'password_change' || Number(peticion.auth.id) !== Number(usuarioId)) {
-                    respuesta.writeHead(403, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ success: false, error: 'Cambio de contraseña no autorizado' }));
-                    return;
-                }
-                const hashNuevo = await hashPassword(nuevaPassword);
-
-                await pool.query(
-                    'UPDATE usuarios SET contrasena = $1, primer_login = false, updated_at = NOW() WHERE id = $2',
-                    [hashNuevo, usuarioId]
-                );
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true, message: 'Contrasena actualizada' }));
-
-            } catch (error) {
-                console.error('Error cambiando password:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: false, error: error.message }));
-            }
-        });
         return;
     }
 
@@ -647,7 +369,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
 
         } catch (error) {
             console.error('Error en solicitudes/usuario:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: error.message }));
         }
         return;
@@ -895,673 +617,25 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         return;
     }
 
-    // ======================================================
-    // API - USUARIOS
-    // ======================================================
-
-    // Obtener auditores
-    if (ruta === '/api/usuarios/auditores' && metodo === 'GET') {
-        console.log('[API] GET auditores');
-
-        try {
-            const result = await pool.query(
-                "SELECT nombre FROM usuarios WHERE tipo = 'AUDITOR' ORDER BY nombre"
-            );
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-        } catch (error) {
-            console.error('Error en auditores:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ======================================================
-    // API - USUARIOS - Auditores Activos (VERSIÓN CORREGIDA - SIN EMAIL)
-    // ======================================================
-
-    if (ruta === '/api/usuarios/auditores-activos' && metodo === 'GET') {
-        console.log('[API] GET /api/usuarios/auditores-activos');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            // ✅ USAR rol_id EN LUGAR DE rol
-            const result = await pool.query(`
-                SELECT u.id, u.usuario, u.nombre_completo, u.activo, u.ultimo_login, u.created_at
-                FROM usuarios u
-                INNER JOIN roles r ON u.rol_id = r.id
-                WHERE r.codigo = 'AUDITOR' AND u.activo = true
-                ORDER BY u.nombre_completo
-            `);
-
-            console.log(`✅ ${result.rows.length} auditores activos encontrados`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('❌ Error en auditores-activos:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ======================================================
-    // API - USUARIOS - Obtener todos los usuarios
-    // ======================================================
-    if (ruta === '/api/usuarios' && metodo === 'GET') {
-        console.log('[API] GET /api/usuarios');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            // ✅ Usar JOIN para obtener el nombre del rol
-            const result = await pool.query(`
-                SELECT 
-                    u.id, 
-                    u.usuario, 
-                    u.nombre_completo, 
-                    u.activo, 
-                    u.created_at,
-                    u.ultimo_login,
-                    u.rol_id,
-                    r.id as rol_id,
-                    r.codigo as rol_codigo,
-                    r.nombre as rol_nombre
-                FROM usuarios u
-                LEFT JOIN roles r ON u.rol_id = r.id
-                ORDER BY u.usuario
-            `);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('Error en /api/usuarios:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ======================================================
-    // API - USUARIOS - Crear nuevo usuario
-    // ======================================================
-    if (ruta === '/api/usuarios' && metodo === 'POST') {
-        console.log('[API] POST /api/usuarios');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { usuario, nombre_completo, contrasena, rol_id, activo } = JSON.parse(body);
-
-                console.log('📝 Creando usuario:', { usuario, nombre_completo, rol_id, activo });
-
-                // Validaciones básicas
-                if (!usuario || !nombre_completo || !contrasena || !rol_id) {
-                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'Faltan campos requeridos' }));
-                    return;
-                }
-
-                // Verificar si ya existe
-                const existe = await pool.query('SELECT id FROM usuarios WHERE usuario = $1', [usuario]);
-                if (existe.rows.length > 0) {
-                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'El usuario ya existe' }));
-                    return;
-                }
-
-                // Verificar que el rol existe
-                const rolCheck = await pool.query('SELECT id FROM roles WHERE id = $1', [rol_id]);
-                if (rolCheck.rows.length === 0) {
-                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'El rol seleccionado no existe' }));
-                    return;
-                }
-
-                // Hashear contraseña
-                const passwordHash = await hashPassword(contrasena);
-
-                // Obtener siguiente ID
-                const maxId = await pool.query('SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM usuarios');
-                const nuevoId = maxId.rows[0].next_id;
-
-                // ✅ Insertar SOLO con rol_id (sin campo 'rol')
-                const result = await pool.query(`
-                    INSERT INTO usuarios (
-                        id, 
-                        usuario, 
-                        nombre_completo, 
-                        contrasena, 
-                        rol_id, 
-                        activo, 
-                        created_at, 
-                        updated_at
-                    )
-                    VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-                    RETURNING id, usuario, nombre_completo, rol_id, activo
-                `, [nuevoId, usuario, nombre_completo, passwordHash, rol_id, activo]);
-
-                console.log(`✅ Usuario creado: ${usuario} (ID: ${nuevoId}) con rol_id: ${rol_id}`);
-
-                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({
-                    success: true,
-                    usuario: result.rows[0]
-                }));
-
-            } catch (error) {
-                console.error('❌ Error creando usuario:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
     // server.js - Endpoint para obtener TODAS las pestañas (sin filtrar por rol)
-    if (ruta === '/api/pestanas/todas' && metodo === 'GET') {
-        console.log('[API] GET /api/pestanas/todas');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            // 🔴 AHORA DEVUELVE TODAS (visibles y ocultas) PARA ADMIN
-            const result = await pool.query(
-                'SELECT * FROM pestanas_sistema ORDER BY orden, id'
-                // ❌ SIN filtro WHERE visible = true
-            );
-
-            console.log(`✅ ${result.rows.length} pestañas totales (${result.rows.filter(p => p.visible).length} visibles, ${result.rows.filter(p => !p.visible).length} ocultas)`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
     // ======================================================
     // API - OBTENER PESTAÑAS DE UN ROL ESPECÍFICO
     // ======================================================
-    if (ruta.match(/^\/api\/rol-pestanas\/\d+$/) && metodo === 'GET') {
-        console.log('[API] GET /api/rol-pestanas/:rolId');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const rolId = parseInt(ruta.split('/').pop());
-
-        try {
-            const result = await pool.query(
-                'SELECT pestana_codigo FROM rol_pestanas WHERE rol_id = $1',
-                [rolId]
-            );
-
-            console.log(`✅ ${result.rows.length} pestañas asignadas al rol ${rolId}`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-
     // ======================================================
     // API - ROLES - Obtener todos los roles (GET)
     // ======================================================
-    if (ruta === '/api/roles' && metodo === 'GET') {
-        console.log('[API] GET /api/roles');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            // 🔴 AÑADIR redirect_url A LA CONSULTA
-            const result = await pool.query(`
-                SELECT id, codigo, nombre, activo, redirect_url, created_at, updated_at
-                FROM roles
-                ORDER BY id
-            `);
-
-            console.log(`✅ ${result.rows.length} roles obtenidos (con redirect_url)`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('Error obteniendo roles:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-
-
     // ======================================================
     // API - ROLES - Actualizar rol (PUT) - NUEVO
     // ======================================================
-    if (ruta.match(/^\/api\/roles\/\d+$/) && metodo === 'PUT') {
-        console.log('[API] PUT /api/roles/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/').pop());
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { codigo, nombre, activo, pestanas } = JSON.parse(body);
-
-                // 1. Validar datos
-                if (!codigo || !nombre) {
-                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'Código y nombre son requeridos' }));
-                    return;
-                }
-
-                // 2. Verificar que el rol existe
-                const check = await pool.query('SELECT id FROM roles WHERE id = $1', [id]);
-                if (check.rows.length === 0) {
-                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
-                    return;
-                }
-
-                // 3. Verificar que no exista otro rol con el mismo código
-                const duplicado = await pool.query(
-                    'SELECT id FROM roles WHERE codigo = $1 AND id != $2',
-                    [codigo.toUpperCase(), id]
-                );
-                if (duplicado.rows.length > 0) {
-                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: `Ya existe un rol con el código "${codigo}"` }));
-                    return;
-                }
-
-                // 4. Actualizar el rol
-                const result = await pool.query(`
-                    UPDATE roles 
-                    SET codigo = $1,
-                        nombre = $2,
-                        activo = $3,
-                        updated_at = NOW()
-                    WHERE id = $4
-                    RETURNING id, codigo, nombre, activo, created_at, updated_at
-                `, [codigo.toUpperCase(), nombre, activo !== false, id]);
-
-                const rolActualizado = result.rows[0];
-
-                // 5. Si se enviaron pestañas, actualizar permisos
-                if (pestanas && Array.isArray(pestanas)) {
-                    // 5a. Eliminar permisos existentes
-                    await pool.query('DELETE FROM rol_pestanas WHERE rol_id = $1', [id]);
-
-                    // 5b. Insertar nuevos permisos
-                    if (pestanas.length > 0) {
-                        const values = pestanas.map(codigo => `(${id}, '${codigo}')`).join(', ');
-                        await pool.query(
-                            `INSERT INTO rol_pestanas (rol_id, pestana_codigo) VALUES ${values}`
-                        );
-                    }
-
-                    console.log(`   ✅ ${pestanas.length} pestañas asignadas al rol ${id}`);
-                }
-
-                console.log(`✅ Rol "${nombre}" actualizado (ID: ${id})`);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({
-                    success: true,
-                    rol: rolActualizado,
-                    message: 'Rol actualizado correctamente'
-                }));
-
-            } catch (error) {
-                console.error('❌ Error actualizando rol:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
-    // ======================================================
-    // API - USUARIOS - Eliminar usuario (DELETE)
-    // ======================================================
-    if (ruta.match(/^\/api\/usuarios\/\d+$/) && metodo === 'DELETE') {
-        console.log('[API] DELETE /api/usuarios/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/').pop());
-
-        try {
-            const check = await pool.query('SELECT id FROM usuarios WHERE id = $1', [id]);
-            if (check.rows.length === 0) {
-                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'Usuario no encontrado' }));
-                return;
-            }
-
-            await pool.query('DELETE FROM usuarios WHERE id = $1', [id]);
-
-            console.log(`✅ Usuario ID ${id} eliminado`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: true, message: 'Usuario eliminado' }));
-
-        } catch (error) {
-            console.error('Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ======================================================
-    // API - USUARIOS - Exportar a CSV
-    // ======================================================
-    if (ruta === '/api/usuarios/exportar' && metodo === 'GET') {
-        console.log('[API] GET /api/usuarios/exportar');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const result = await pool.query(`
-                SELECT 
-                    u.id, 
-                    u.usuario, 
-                    u.nombre_completo, 
-                    CASE WHEN u.activo = true THEN 'Activo' ELSE 'Inactivo' END as estado,
-                    r.codigo as rol,
-                    TO_CHAR(u.created_at, 'DD/MM/YYYY') as fecha_registro,
-                    TO_CHAR(u.ultimo_login, 'DD/MM/YYYY HH24:MI') as ultimo_login
-                FROM usuarios u
-                LEFT JOIN roles r ON u.rol_id = r.id
-                ORDER BY u.id
-            `);
-
-            const usuarios = result.rows;
-
-            // Crear CSV
-            const headers = ['ID', 'Usuario', 'Nombre Completo', 'Estado', 'Rol', 'Fecha Registro', 'Último Login'];
-            const csvRows = [headers.join(',')];
-
-            for (const user of usuarios) {
-                const values = headers.map(header => {
-                    let value = '';
-                    switch (header) {
-                        case 'ID': value = user.id; break;
-                        case 'Usuario': value = user.usuario; break;
-                        case 'Nombre Completo': value = user.nombre_completo || ''; break;
-                        case 'Estado': value = user.estado; break;
-                        case 'Rol': value = user.rol || ''; break;
-                        case 'Fecha Registro': value = user.fecha_registro || ''; break;
-                        case 'Último Login': value = user.ultimo_login || ''; break;
-                    }
-                    // Escapar comillas
-                    if (typeof value === 'string') {
-                        value = value.replace(/"/g, '""');
-                    }
-                    return `"${value}"`;
-                }).join(',');
-                csvRows.push(values);
-            }
-
-            const csvContent = "\uFEFF" + csvRows.join('\n');
-
-            respuesta.writeHead(200, {
-                'Content-Type': 'text/csv; charset=utf-8',
-                'Content-Disposition': `attachment; filename="usuarios_${new Date().toISOString().slice(0, 10)}.csv"`
-            });
-            respuesta.end(csvContent);
-
-        } catch (error) {
-            console.error('Error exportando usuarios:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
     // ======================================================
     // API - ROLES - Crear nuevo rol (POST)
     // ======================================================
-    if (ruta === '/api/roles' && metodo === 'POST') {
-        console.log('[API] POST /api/roles');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { codigo, nombre, activo } = JSON.parse(body);
-
-                console.log(`📝 Creando rol: ${codigo} - ${nombre}`);
-
-                // Verificar si ya existe
-                const existe = await pool.query('SELECT id FROM roles WHERE codigo = $1', [codigo]);
-                if (existe.rows.length > 0) {
-                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'El código de rol ya existe' }));
-                    return;
-                }
-
-                // Insertar nuevo rol
-                const result = await pool.query(`
-                    INSERT INTO roles (codigo, nombre, activo, created_at, updated_at)
-                    VALUES ($1, $2, $3, NOW(), NOW())
-                    RETURNING id, codigo, nombre, activo
-                `, [codigo, nombre, activo]);
-
-                console.log(`✅ Rol "${nombre}" creado con ID ${result.rows[0].id}`);
-
-                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true, rol: result.rows[0] }));
-
-            } catch (error) {
-                console.error('Error creando rol:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
     // ======================================================
     // API - ROLES - Desactivar rol (PUT)
     // ======================================================
-    if (ruta.match(/^\/api\/roles\/\d+\/desactivar$/) && metodo === 'PUT') {
-        console.log('[API] PUT /api/roles/:id/desactivar');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/')[3]);
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { activo } = JSON.parse(body);
-
-                // Verificar que el rol existe
-                const check = await pool.query('SELECT id, nombre FROM roles WHERE id = $1', [id]);
-                if (check.rows.length === 0) {
-                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
-                    return;
-                }
-
-                const rolNombre = check.rows[0].nombre;
-
-                // Actualizar el estado
-                const result = await pool.query(`
-                    UPDATE roles 
-                    SET activo = $1, 
-                        updated_at = NOW()
-                    WHERE id = $2
-                    RETURNING id, codigo, nombre, activo, updated_at
-                `, [activo, id]);
-
-                const estadoTexto = activo ? 'reactivado' : 'desactivado';
-                console.log(`✅ Rol "${rolNombre}" ${estadoTexto} (ID: ${id})`);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({
-                    success: true,
-                    rol: result.rows[0],
-                    message: `Rol "${rolNombre}" ${estadoTexto} correctamente`
-                }));
-
-            } catch (error) {
-                console.error('❌ Error desactivando rol:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
     // ======================================================
     // API - ROLES - Reactivar rol (PUT)
     // ======================================================
-    if (ruta.match(/^\/api\/roles\/\d+\/reactivar$/) && metodo === 'PUT') {
-        console.log('[API] PUT /api/roles/:id/reactivar');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/')[3]);
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { activo } = JSON.parse(body);
-
-                // Verificar que el rol existe
-                const check = await pool.query('SELECT id, nombre FROM roles WHERE id = $1', [id]);
-                if (check.rows.length === 0) {
-                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
-                    return;
-                }
-
-                const rolNombre = check.rows[0].nombre;
-
-                // Si ya está activo, notificar
-                if (check.rows[0].activo === true) {
-                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({
-                        error: `El rol "${rolNombre}" ya está activo`
-                    }));
-                    return;
-                }
-
-                // Reactivar el rol
-                const result = await pool.query(`
-                    UPDATE roles 
-                    SET activo = true, 
-                        updated_at = NOW()
-                    WHERE id = $1
-                    RETURNING id, codigo, nombre, activo, updated_at
-                `, [id]);
-
-                console.log(`✅ Rol "${rolNombre}" reactivado (ID: ${id})`);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({
-                    success: true,
-                    rol: result.rows[0],
-                    message: `Rol "${rolNombre}" reactivado correctamente`
-                }));
-
-            } catch (error) {
-                console.error('❌ Error reactivando rol:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
     // F3.4 - REPORTS MODULE
     if (await handleReportsRequest({
         ruta,
@@ -1744,7 +818,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
             respuesta.end(JSON.stringify(pda));
         } catch (error) {
             console.error('Error en /api/pda/:id:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: error.message }));
         }
         return;
@@ -1782,7 +856,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
             respuesta.end(JSON.stringify(result.rows));
         } catch (error) {
             console.error('Error en /api/pda/exportar:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify([]));
         }
         return;
@@ -1906,12 +980,12 @@ const servidor = http.createServer(async (peticion, respuesta) => {
                     RETURNING id
                 `, [sessionToken]);
 
-                console.log(`✅ Sesión cerrada: ${result.rowCount} afectadas`);
+                console.log(`✅ Sesión cerrada: ${eliminados} afectadas`);
 
                 respuesta.writeHead(200, { 'Content-Type': 'application/json' });
                 respuesta.end(JSON.stringify({
                     success: true,
-                    afectadas: result.rowCount
+                    afectadas: eliminados
                 }));
 
             } catch (error) {
@@ -2008,187 +1082,6 @@ const servidor = http.createServer(async (peticion, respuesta) => {
 
     // ======================================================
     // API - USUARIOS - Cambiar password
-    // ======================================================
-    if (ruta.match(/^\/api\/usuarios\/\d+\/password$/) && metodo === 'PUT') {
-        console.log('[API] PUT /api/usuarios/:id/password');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/')[3]);
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { password } = JSON.parse(body);
-
-                const passwordHash = await hashPassword(password);
-
-                const result = await pool.query(`
-                    UPDATE usuarios 
-                    SET contrasena = $1, updated_at = NOW() 
-                    WHERE id = $2
-                    RETURNING id
-                `, [passwordHash, id]);
-
-                if (result.rowCount === 0) {
-                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'Usuario no encontrado' }));
-                    return;
-                }
-
-                console.log(`✅ Password actualizado para usuario ID ${id}`);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true }));
-
-            } catch (error) {
-                console.error('Error:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
-    // ======================================================
-    // API - USUARIOS - Obtener usuario por ID
-    // ======================================================
-    if (ruta.match(/^\/api\/usuarios\/\d+$/) && metodo === 'GET') {
-        console.log('[API] GET /api/usuarios/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/').pop());
-
-        try {
-            const result = await pool.query(`
-                SELECT id, usuario, nombre_completo, activo, created_at, rol_id
-                FROM usuarios 
-                WHERE id = $1
-            `, [id]);
-
-            if (result.rows.length === 0) {
-                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'Usuario no encontrado' }));
-                return;
-            }
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows[0]));
-
-        } catch (error) {
-            console.error('Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ======================================================
-    // API - USUARIOS - Actualizar usuario (PUT)
-    // ======================================================
-    if (ruta.match(/^\/api\/usuarios\/\d+$/) && metodo === 'PUT') {
-        console.log('[API] PUT /api/usuarios/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/').pop());
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { usuario, nombre_completo, rol_id, activo, contrasena } = JSON.parse(body);
-
-                console.log(`📝 Actualizando usuario ID ${id}:`, { usuario, nombre_completo, rol_id, activo });
-
-                // Construir la consulta dinámicamente
-                const updates = [];
-                const values = [];
-                let idx = 1;
-
-                if (usuario !== undefined) {
-                    updates.push(`usuario = $${idx++}`);
-                    values.push(usuario);
-                }
-
-                if (nombre_completo !== undefined) {
-                    updates.push(`nombre_completo = $${idx++}`);
-                    values.push(nombre_completo);
-                }
-
-                // ✅ Actualizar SOLO rol_id (sin campo 'rol')
-                if (rol_id !== undefined) {
-                    // Verificar que el rol existe
-                    const rolCheck = await pool.query('SELECT id FROM roles WHERE id = $1', [rol_id]);
-                    if (rolCheck.rows.length === 0) {
-                        respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                        respuesta.end(JSON.stringify({ error: 'El rol seleccionado no existe' }));
-                        return;
-                    }
-                    updates.push(`rol_id = $${idx++}`);
-                    values.push(rol_id);
-                }
-
-                if (activo !== undefined) {
-                    updates.push(`activo = $${idx++}`);
-                    values.push(activo);
-                }
-
-                if (contrasena) {
-                    const passwordHash = await hashPassword(contrasena);
-                    updates.push(`contrasena = $${idx++}`);
-                    values.push(passwordHash);
-                }
-
-                updates.push(`updated_at = NOW()`);
-
-                values.push(id);
-
-                const query = `UPDATE usuarios SET ${updates.join(', ')} WHERE id = $${idx}`;
-
-                console.log('📝 Query:', query);
-                console.log('📝 Values:', values);
-
-                const result = await pool.query(query, values);
-
-                if (result.rowCount === 0) {
-                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'Usuario no encontrado' }));
-                    return;
-                }
-
-                console.log(`✅ Usuario ID ${id} actualizado`);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true, message: 'Usuario actualizado' }));
-
-            } catch (error) {
-                console.error('❌ Error actualizando usuario:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
-
     // ======================================================
     // API - ADMINISTRACIÓN DE MATRIZ DE EVALUACIÓN
     // ======================================================
@@ -2350,7 +1243,7 @@ const servidor = http.createServer(async (peticion, respuesta) => {
 
         } catch (error) {
             console.error('❌ Error en recalcular:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
+            respuesta.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
             respuesta.end(JSON.stringify({ error: error.message }));
         }
         return;
@@ -2714,142 +1607,12 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // API - ROLES - Eliminar rol físicamente (DELETE)
     // SOLO PARA ADMINISTRADORES, CON VALIDACIÓN
     // ======================================================
-    if (ruta.match(/^\/api\/roles\/\d+$/) && metodo === 'DELETE') {
-        console.log('[API] DELETE /api/roles/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/').pop());
-
-        try {
-            // 1. Verificar que el rol existe
-            const check = await pool.query('SELECT id, nombre FROM roles WHERE id = $1', [id]);
-            if (check.rows.length === 0) {
-                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'Rol no encontrado' }));
-                return;
-            }
-
-            const rolNombre = check.rows[0].nombre;
-
-            // 2. Verificar si tiene usuarios asignados
-            const usuarios = await pool.query('SELECT COUNT(*) as total FROM usuarios WHERE rol_id = $1', [id]);
-            const cantidadUsuarios = parseInt(usuarios.rows[0].total);
-
-            if (cantidadUsuarios > 0) {
-                respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({
-                    error: `El rol "${rolNombre}" tiene ${cantidadUsuarios} usuario(s) asignado(s). No se puede eliminar.`,
-                    usuarios_asignados: cantidadUsuarios
-                }));
-                return;
-            }
-
-            // 3. Eliminar permisos de pestañas
-            await pool.query('DELETE FROM rol_pestanas WHERE rol_id = $1', [id]);
-
-            // 4. Eliminar el rol
-            await pool.query('DELETE FROM roles WHERE id = $1', [id]);
-
-            console.log(`✅ Rol "${rolNombre}" eliminado físicamente (ID: ${id})`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({
-                success: true,
-                message: `Rol "${rolNombre}" eliminado correctamente`
-            }));
-
-        } catch (error) {
-            console.error('❌ Error eliminando rol:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
     // ======================================================
     // API - ROL PESTAÑAS
     // ======================================================
 
     // Eliminar todos los permisos de un rol (DELETE)
-    if (ruta.match(/^\/api\/rol-pestanas\/\d+$/) && metodo === 'DELETE') {
-        console.log('[API] DELETE /api/rol-pestanas/:rolId');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const rolId = parseInt(ruta.split('/').pop());
-
-        try {
-            const result = await pool.query('DELETE FROM rol_pestanas WHERE rol_id = $1 RETURNING id', [rolId]);
-            console.log(`✅ Eliminados ${result.rowCount} permisos para rol ${rolId}`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: true, eliminados: result.rowCount }));
-
-        } catch (error) {
-            console.error('Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
     // Insertar nuevos permisos (POST)
-    if (ruta === '/api/rol-pestanas' && metodo === 'POST') {
-        console.log('[API] POST /api/rol-pestanas');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { rol_id, pestanas } = JSON.parse(body);
-
-                if (!rol_id || !pestanas || pestanas.length === 0) {
-                    respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'Datos inválidos' }));
-                    return;
-                }
-
-                let insertados = 0;
-                for (const codigo of pestanas) {
-                    await pool.query(
-                        'INSERT INTO rol_pestanas (rol_id, pestana_codigo) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-                        [rol_id, codigo]
-                    );
-                    insertados++;
-                }
-
-                console.log(`✅ Insertados ${insertados} permisos para rol ${rol_id}`);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true, insertados }));
-
-            } catch (error) {
-                console.error('Error:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
     // ======================================================
     // API - RPC GENÉRICO (PostgreSQL Query Layer)
     // Soporta funciones almacenadas como cerrar_mes, limpiar_sesiones_expiradas, etc.
@@ -2928,59 +1691,6 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // ======================================================
 
     // Obtener todas las pestañas disponibles (CON autenticación y filtro por rol)
-    if (ruta === '/api/pestanas' && metodo === 'GET') {
-        console.log('[API] GET pestanas - Con autenticación y filtro por rol');
-
-        // 🔐 Verificar token
-        const token = peticion.headers['authorization']?.split(' ')[1];
-
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            // Decodificar token para obtener el usuario
-            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-            const usuarioId = payload.id;
-
-            // 1. Obtener el rol del usuario
-            const userResult = await pool.query(
-                'SELECT rol_id FROM usuarios WHERE id = $1 AND activo = true',
-                [usuarioId]
-            );
-
-            if (userResult.rows.length === 0) {
-                respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'Usuario no encontrado o inactivo' }));
-                return;
-            }
-
-            const rolId = userResult.rows[0].rol_id;
-
-            // 2. Obtener pestañas permitidas para ese rol
-            const result = await pool.query(
-                `SELECT p.* FROM pestanas_sistema p
-                 INNER JOIN rol_pestanas rp ON p.codigo = rp.pestana_codigo
-                 WHERE rp.rol_id = $1 AND p.visible = true
-                 ORDER BY p.orden`,
-                [rolId]
-            );
-
-            console.log(`✅ Usuario ${payload.usuario} (rol_id: ${rolId}) - ${result.rows.length} pestañas permitidas`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('Error en pestanas con auth:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
     // ======================================================
     // API - ESTADO BD (Versión corregida)
     // ======================================================

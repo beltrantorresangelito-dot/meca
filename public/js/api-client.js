@@ -252,9 +252,39 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Array} Lista de escuchas asignadas
      */
     async function getMisEscuchas(auditor) {
-        const response = await fetch(`/api/escuchas/mis-escuchas?auditor=${auditor}`);
-        return await response.json();
+    const token = localStorage.getItem('meca_token');
+
+    if (!token) {
+        throw new Error('No hay token de autenticación disponible');
     }
+
+    const response = await fetch(
+        `/api/escuchas/mis-escuchas?auditor=${encodeURIComponent(auditor)}`,
+        {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        console.error(
+            '❌ Error getMisEscuchas:',
+            response.status,
+            data
+        );
+
+        throw new Error(
+            data?.error || `HTTP ${response.status}`
+        );
+    }
+
+    return data;
+}
     
     /**
      * iniciarGestionEscucha - Marca una escucha como "en proceso"
