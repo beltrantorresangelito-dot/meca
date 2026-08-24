@@ -1,0 +1,27 @@
+MECA F10.57 - EVALUACIÓN ARQUITECTÓNICA DEL SERVER SHELL
+
+server.js actual: 358 líneas.
+
+CONCLUSIÓN
+No se recomienda extraer un RequestPipeline en este momento.
+
+El archivo ya funciona principalmente como:
+- composition root;
+- HTTP shell;
+- bootstrap.
+
+No contiene SQL directo ni funciones de negocio declaradas inline.
+La seguridad transversal y el dispatch modular permanecen explícitos.
+
+El mayor riesgo ya no es el tamaño del archivo, sino que nuevas
+funcionalidades vuelvan a introducir lógica de negocio en server.js.
+
+DECISIÓN
+Congelar la dirección arquitectónica actual y pasar a guardrails.
+
+F10.58:
+- prohibir SQL directo en server.js;
+- prohibir funciones de negocio inline;
+- impedir regreso de routes/registerDomainRoutes;
+- exigir handlers modulares;
+- límite preventivo <450 líneas.

@@ -1,0 +1,55 @@
+F10.18 - VALIDACIÓN FUNCIONAL VERSIONES DEL SISTEMA
+
+1. LISTADO GENERAL
+   - Consultar GET /api/versiones.
+   - Confirmar HTTP 200.
+   - Confirmar orden por fecha_publicacion DESC.
+
+2. FILTRO POR TIPO
+   - Consultar GET /api/versiones?tipo=<tipo>.
+   - Confirmar que devuelve solo ese tipo.
+   - Consultar tipo=todos.
+   - Debe devolver todas las versiones.
+
+3. PUBLICAR VERSIÓN
+   - Ejecutar POST /api/versiones desde el flujo real.
+   - Confirmar HTTP 201.
+   - Confirmar respuesta:
+     { success: true, id: ... }
+   - Confirmar:
+     tamano_bytes = longitud de contenido_html
+     es_activo = false
+     fecha_publicacion = NOW()
+
+4. ACTIVAR VERSIÓN
+   - Ejecutar PUT /api/versiones/:id/activar?tipo=<tipo>.
+   - Confirmar que primero desactiva las versiones del mismo tipo.
+   - Confirmar que la seleccionada queda es_activo=true.
+   - ID inexistente debe devolver:
+     404 + { error: 'Versión no encontrada' }.
+
+5. ELIMINAR VERSIÓN
+   - Ejecutar DELETE /api/versiones/:id.
+   - Confirmar borrado físico actual.
+   - ID inexistente debe devolver 404.
+
+6. TOKEN
+   - Probar los 4 endpoints sin Authorization.
+   - Todos deben devolver 401 + { error: 'Token requerido' }.
+
+7. JSON INVÁLIDO
+   - Enviar POST con JSON inválido.
+   - Debe devolver 400.
+
+8. CONSOLA / NETWORK
+   No deben aparecer:
+   - 500 inesperados
+   - ReferenceError
+   - TypeError
+   - 404 inesperados en operaciones válidas
+
+9. AUTOMATIZADO
+   npm test
+
+Esperado:
+0 fail.

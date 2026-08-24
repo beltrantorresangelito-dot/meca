@@ -60,6 +60,75 @@ test('LISTCHAR-F55-005 fallbacks legacy de listas permanecen', () => {
 });
 
 test('LISTCHAR-F55-006 audio proxy no fue absorbido', () => {
-  assert.match(server, /\/api\/audio\/reproducir/);
-  assert.match(server, /\/api\/audio\/verificar/);
+  // F10.28.1:
+  // Audio Proxy continúa separado del dominio Listenings,
+  // pero desde F10.28 ya no debe permanecer inline en server.js.
+  const fsLocal = require('fs');
+  const pathLocal = require('path');
+
+  const serverActual = fsLocal.readFileSync(
+    pathLocal.resolve(__dirname, '../server.js'),
+    'utf8'
+  );
+
+  const listeningsRoutes = fsLocal.readFileSync(
+    pathLocal.resolve(
+      __dirname,
+      '../src/modules/listenings/listenings.routes.js'
+    ),
+    'utf8'
+  );
+
+  const audioRoutes = fsLocal.readFileSync(
+    pathLocal.resolve(
+      __dirname,
+      '../src/modules/audio-proxy/audio-proxy.routes.js'
+    ),
+    'utf8'
+  );
+
+  // server.js debe delegar Audio Proxy a su módulo independiente.
+  assert.match(
+    serverActual,
+    /createAudioProxyHandler/
+  );
+
+  assert.match(
+    serverActual,
+    /handleAudioProxyRequest/
+  );
+
+  // Listenings no debe absorber las rutas del proxy.
+  assert.doesNotMatch(
+    listeningsRoutes,
+    /\/api\/audio\/reproducir/
+  );
+
+  assert.doesNotMatch(
+    listeningsRoutes,
+    /\/api\/audio\/verificar/
+  );
+
+  // Las rutas siguen existiendo, ahora en AudioProxyRoutes.
+  assert.match(
+    audioRoutes,
+    /\/api\/audio\/reproducir\//
+  );
+
+  assert.match(
+    audioRoutes,
+    /\/api\/audio\/verificar\//
+  );
+
+  // No deben volver a quedar handlers inline en server.js.
+  assert.doesNotMatch(
+    serverActual,
+    /if \(ruta\.startsWith\('\/api\/audio\/reproducir\/'\)/
+  );
+
+  assert.doesNotMatch(
+    serverActual,
+    /if \(ruta\.startsWith\('\/api\/audio\/verificar\/'\)/
+  );
 });
+

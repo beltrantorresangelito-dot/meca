@@ -1,0 +1,48 @@
+F10.35 - VALIDACIÓN FUNCIONAL MATRIX RECALCULATION
+
+1. ARRANQUE
+   - Iniciar MECA normalmente.
+   - Sin errores de carga del módulo matrix-recalculation.
+
+2. SIN TOKEN
+   POST /api/matriz/recalcular
+   Esperado: HTTP 401 + {"error":"Token requerido"}
+
+3. CON TOKEN VÁLIDO
+   Ejecutar el recálculo real.
+   Esperado: HTTP 200 + success:true.
+
+4. DETALLES
+   - detalles_actualizados coherente.
+   - peso actualizado desde sub_motivos.peso_individual.
+   - submotivo inexistente no aborta el proceso.
+
+5. EVALUACIONES
+   Verificar actualización de:
+   - total_enc
+   - total_ecuf
+   - total_ecn
+   - nota_final
+
+6. RESILIENCIA
+   - error individual en detalle no aborta los demás.
+   - error individual en evaluación no aborta las demás.
+
+7. RESUMEN
+   Debe incluir:
+   - total_evaluaciones
+   - promedio_notas
+   - nota_min
+   - nota_max
+
+8. REGRESIÓN VISUAL
+   - abrir evaluación existente.
+   - verificar matriz y notas.
+   - confirmar funciones Matrix ya modularizadas.
+
+9. npm test
+   Esperado: 0 fail.
+
+NOTA
+No se optimiza todavía el patrón de consultas dentro de bucles.
+Eso se hará como cambio de rendimiento explícito y medible.

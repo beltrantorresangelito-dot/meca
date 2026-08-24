@@ -1,0 +1,389 @@
+TAP version 13
+# Subtest: DBSTAT-F1019-001 conserva dos contratos GET
+ok 1 - DBSTAT-F1019-001 conserva dos contratos GET
+  ---
+  duration_ms: 1.698472
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-002 Token requerido está preservado
+ok 2 - DBSTAT-F1019-002 Token requerido está preservado
+  ---
+  duration_ms: 0.228007
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-003 estado general conserva tamaño total de BD
+ok 3 - DBSTAT-F1019-003 estado general conserva tamaño total de BD
+  ---
+  duration_ms: 0.179491
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-004 conserva consulta de tablas public y tamaños
+ok 4 - DBSTAT-F1019-004 conserva consulta de tablas public y tamaños
+  ---
+  duration_ms: 0.163555
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-005 conserva conteo exacto por tabla
+ok 5 - DBSTAT-F1019-005 conserva conteo exacto por tabla
+  ---
+  duration_ms: 0.10901
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-006 conserva formatos MB GB KB
+ok 6 - DBSTAT-F1019-006 conserva formatos MB GB KB
+  ---
+  duration_ms: 0.177182
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-007 error por tabla conserva fila degradada
+ok 7 - DBSTAT-F1019-007 error por tabla conserva fila degradada
+  ---
+  duration_ms: 0.112589
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-008 respuesta general conserva contrato actual
+ok 8 - DBSTAT-F1019-008 respuesta general conserva contrato actual
+  ---
+  duration_ms: 0.126095
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-009 endpoint tablas conserva array simple
+ok 9 - DBSTAT-F1019-009 endpoint tablas conserva array simple
+  ---
+  duration_ms: 0.354977
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-010 error de tablas conserva 500 y array vacío
+ok 10 - DBSTAT-F1019-010 error de tablas conserva 500 y array vacío
+  ---
+  duration_ms: 0.361641
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-011 Estado BD sigue inline antes de extracción
+ok 11 - DBSTAT-F1019-011 Estado BD sigue inline antes de extracción
+  ---
+  duration_ms: 0.223986
+  type: 'test'
+  ...
+# Subtest: DBSTAT-F1019-012 módulos cerrados siguen registrados
+ok 12 - DBSTAT-F1019-012 módulos cerrados siguen registrados
+  ---
+  duration_ms: 0.087617
+  type: 'test'
+  ...
+# Subtest: EVALFINAL-001 único punto de entrada es handleEvaluationsRequest
+ok 13 - EVALFINAL-001 único punto de entrada es handleEvaluationsRequest
+  ---
+  duration_ms: 0.673497
+  type: 'test'
+  ...
+# Subtest: EVALFINAL-002 server ya no contiene SQL principal de Evaluaciones
+ok 14 - EVALFINAL-002 server ya no contiene SQL principal de Evaluaciones
+  ---
+  duration_ms: 0.354462
+  type: 'test'
+  ...
+# Subtest: EVALFINAL-003 routes conserva contratos GET POST DELETE
+ok 15 - EVALFINAL-003 routes conserva contratos GET POST DELETE
+  ---
+  duration_ms: 0.268226
+  type: 'test'
+  ...
+# Subtest: EVALFINAL-004 POST inválido conserva 400
+ok 16 - EVALFINAL-004 POST inválido conserva 400
+  ---
+  duration_ms: 0.356437
+  type: 'test'
+  ...
+# Subtest: EVALFINAL-005 autorización central ocurre antes del dispatcher
+ok 17 - EVALFINAL-005 autorización central ocurre antes del dispatcher
+  ---
+  duration_ms: 0.47281
+  type: 'test'
+  ...
+# Subtest: PDAFINAL-001 único punto de entrada en server es handlePdaRequest
+ok 18 - PDAFINAL-001 único punto de entrada en server es handlePdaRequest
+  ---
+  duration_ms: 2.00532
+  type: 'test'
+  ...
+# Subtest: PDAFINAL-002 server ya no instancia capas internas PDA
+ok 19 - PDAFINAL-002 server ya no instancia capas internas PDA
+  ---
+  duration_ms: 0.281905
+  type: 'test'
+  ...
+# Subtest: PDAFINAL-003 routes conserva los cinco endpoints GET
+ok 20 - PDAFINAL-003 routes conserva los cinco endpoints GET
+  ---
+  duration_ms: 0.205732
+  type: 'test'
+  ...
+# Subtest: PDAFINAL-004 Token requerido permanece en routes
+ok 21 - PDAFINAL-004 Token requerido permanece en routes
+  ---
+  duration_ms: 0.165299
+  type: 'test'
+  ...
+# Subtest: PDAFINAL-005 tolerancia legacy de listas vacías vive en Controller
+ok 22 - PDAFINAL-005 tolerancia legacy de listas vacías vive en Controller
+  ---
+  duration_ms: 0.098131
+  type: 'test'
+  ...
+# Subtest: PDAFINAL-006 404 de detalle vive en Controller
+ok 23 - PDAFINAL-006 404 de detalle vive en Controller
+  ---
+  duration_ms: 0.071418
+  type: 'test'
+  ...
+# Subtest: PDAFINAL-007 progreso vive en Service
+ok 24 - PDAFINAL-007 progreso vive en Service
+  ---
+  duration_ms: 0.135807
+  type: 'test'
+  ...
+# Subtest: PDAFINAL-008 SQL PDA está encapsulado en Repository
+ok 25 - PDAFINAL-008 SQL PDA está encapsulado en Repository
+  ---
+  duration_ms: 0.201792
+  type: 'test'
+  ...
+# Subtest: PDAFINAL-009 F7 F8 F9 siguen modularizados
+ok 26 - PDAFINAL-009 F7 F8 F9 siguen modularizados
+  ---
+  duration_ms: 0.274224
+  type: 'test'
+  ...
+# Subtest: PDAFINAL-010 autorización central precede dispatcher PDA
+ok 27 - PDAFINAL-010 autorización central precede dispatcher PDA
+  ---
+  duration_ms: 0.368366
+  type: 'test'
+  ...
+# Subtest: CQFINAL-001 único punto de entrada en server es handleQuartileCriteriaRequest
+ok 28 - CQFINAL-001 único punto de entrada en server es handleQuartileCriteriaRequest
+  ---
+  duration_ms: 2.21962
+  type: 'test'
+  ...
+# Subtest: CQFINAL-002 server ya no instancia capas internas
+ok 29 - CQFINAL-002 server ya no instancia capas internas
+  ---
+  duration_ms: 0.2973
+  type: 'test'
+  ...
+# Subtest: CQFINAL-003 routes conserva seis contratos
+ok 30 - CQFINAL-003 routes conserva seis contratos
+  ---
+  duration_ms: 0.231231
+  type: 'test'
+  ...
+# Subtest: CQFINAL-004 Token y parsing permanecen en routes
+ok 31 - CQFINAL-004 Token y parsing permanecen en routes
+  ---
+  duration_ms: 0.238347
+  type: 'test'
+  ...
+# Subtest: CQFINAL-005 HTTP de negocio vive en Controller
+ok 32 - CQFINAL-005 HTTP de negocio vive en Controller
+  ---
+  duration_ms: 0.158267
+  type: 'test'
+  ...
+# Subtest: CQFINAL-006 fecha vigente vive en Service
+ok 33 - CQFINAL-006 fecha vigente vive en Service
+  ---
+  duration_ms: 0.135418
+  type: 'test'
+  ...
+# Subtest: CQFINAL-007 desactivación lógica vive en Service y Repository
+ok 34 - CQFINAL-007 desactivación lógica vive en Service y Repository
+  ---
+  duration_ms: 0.239599
+  type: 'test'
+  ...
+# Subtest: CQFINAL-008 SQL está encapsulado en Repository
+ok 35 - CQFINAL-008 SQL está encapsulado en Repository
+  ---
+  duration_ms: 0.199781
+  type: 'test'
+  ...
+# Subtest: CQFINAL-009 legacy vigente está contenido en Repository
+ok 36 - CQFINAL-009 legacy vigente está contenido en Repository
+  ---
+  duration_ms: 0.517624
+  type: 'test'
+  ...
+# Subtest: CQFINAL-010 módulos cerrados siguen protegidos
+ok 37 - CQFINAL-010 módulos cerrados siguen protegidos
+  ---
+  duration_ms: 0.654821
+  type: 'test'
+  ...
+# Subtest: CQFINAL-011 autorización central precede dispatcher
+ok 38 - CQFINAL-011 autorización central precede dispatcher
+  ---
+  duration_ms: 0.24299
+  type: 'test'
+  ...
+# Subtest: REQFINAL-001 único punto de entrada en server es handleRequestsRequest
+ok 39 - REQFINAL-001 único punto de entrada en server es handleRequestsRequest
+  ---
+  duration_ms: 0.701549
+  type: 'test'
+  ...
+# Subtest: REQFINAL-002 server ya no instancia capas internas de Requests
+ok 40 - REQFINAL-002 server ya no instancia capas internas de Requests
+  ---
+  duration_ms: 1.098515
+  type: 'test'
+  ...
+# Subtest: REQFINAL-003 routes conserva cinco contratos principales
+ok 41 - REQFINAL-003 routes conserva cinco contratos principales
+  ---
+  duration_ms: 0.183447
+  type: 'test'
+  ...
+# Subtest: REQFINAL-004 Token requerido permanece solo donde corresponde
+ok 42 - REQFINAL-004 Token requerido permanece solo donde corresponde
+  ---
+  duration_ms: 0.09538
+  type: 'test'
+  ...
+# Subtest: REQFINAL-005 parsing JSON permanece ligado a POST y PUT
+ok 43 - REQFINAL-005 parsing JSON permanece ligado a POST y PUT
+  ---
+  duration_ms: 0.138384
+  type: 'test'
+  ...
+# Subtest: REQFINAL-006 creación dinámica legacy sigue encapsulada en Repository
+ok 44 - REQFINAL-006 creación dinámica legacy sigue encapsulada en Repository
+  ---
+  duration_ms: 0.110012
+  type: 'test'
+  ...
+# Subtest: REQFINAL-007 F7 y F8 continúan modularizados
+ok 45 - REQFINAL-007 F7 y F8 continúan modularizados
+  ---
+  duration_ms: 0.130148
+  type: 'test'
+  ...
+# Subtest: REQFINAL-008 autorización central permanece antes del dispatcher Requests
+ok 46 - REQFINAL-008 autorización central permanece antes del dispatcher Requests
+  ---
+  duration_ms: 0.079981
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-001 único punto de entrada en server es handleSessionsRequest
+ok 47 - SESSFINAL-001 único punto de entrada en server es handleSessionsRequest
+  ---
+  duration_ms: 1.294325
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-002 server ya no instancia capas internas de Sessions
+ok 48 - SESSFINAL-002 server ya no instancia capas internas de Sessions
+  ---
+  duration_ms: 0.25466
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-003 routes conserva cinco contratos principales
+ok 49 - SESSFINAL-003 routes conserva cinco contratos principales
+  ---
+  duration_ms: 1.483627
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-004 Token requerido sigue preservado
+ok 50 - SESSFINAL-004 Token requerido sigue preservado
+  ---
+  duration_ms: 0.205122
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-005 historial-login sigue tolerante a fallos
+ok 51 - SESSFINAL-005 historial-login sigue tolerante a fallos
+  ---
+  duration_ms: 0.229809
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-006 F7 Evaluations continúa modularizado
+ok 52 - SESSFINAL-006 F7 Evaluations continúa modularizado
+  ---
+  duration_ms: 0.227271
+  type: 'test'
+  ...
+# Subtest: VERFINAL-001 único punto de entrada en server es handleVersionsRequest
+ok 53 - VERFINAL-001 único punto de entrada en server es handleVersionsRequest
+  ---
+  duration_ms: 1.699746
+  type: 'test'
+  ...
+# Subtest: VERFINAL-002 server ya no instancia capas internas
+ok 54 - VERFINAL-002 server ya no instancia capas internas
+  ---
+  duration_ms: 0.224002
+  type: 'test'
+  ...
+# Subtest: VERFINAL-003 routes conserva cuatro contratos
+ok 55 - VERFINAL-003 routes conserva cuatro contratos
+  ---
+  duration_ms: 0.132384
+  type: 'test'
+  ...
+# Subtest: VERFINAL-004 Token parsing y query tipo viven en routes
+ok 56 - VERFINAL-004 Token parsing y query tipo viven en routes
+  ---
+  duration_ms: 0.151324
+  type: 'test'
+  ...
+# Subtest: VERFINAL-005 HTTP de negocio vive en Controller
+ok 57 - VERFINAL-005 HTTP de negocio vive en Controller
+  ---
+  duration_ms: 0.097584
+  type: 'test'
+  ...
+# Subtest: VERFINAL-006 activación exclusiva vive en Service
+ok 58 - VERFINAL-006 activación exclusiva vive en Service
+  ---
+  duration_ms: 0.073989
+  type: 'test'
+  ...
+# Subtest: VERFINAL-007 SQL está encapsulado en Repository
+ok 59 - VERFINAL-007 SQL está encapsulado en Repository
+  ---
+  duration_ms: 0.187032
+  type: 'test'
+  ...
+# Subtest: VERFINAL-008 legacy vigente permanece encapsulado
+ok 60 - VERFINAL-008 legacy vigente permanece encapsulado
+  ---
+  duration_ms: 0.074168
+  type: 'test'
+  ...
+# Subtest: VERFINAL-009 DELETE físico actual permanece explícito
+ok 61 - VERFINAL-009 DELETE físico actual permanece explícito
+  ---
+  duration_ms: 0.242581
+  type: 'test'
+  ...
+# Subtest: VERFINAL-010 módulos cerrados siguen protegidos
+ok 62 - VERFINAL-010 módulos cerrados siguen protegidos
+  ---
+  duration_ms: 0.288036
+  type: 'test'
+  ...
+# Subtest: VERFINAL-011 autorización central precede dispatcher
+ok 63 - VERFINAL-011 autorización central precede dispatcher
+  ---
+  duration_ms: 0.472119
+  type: 'test'
+  ...
+1..63
+# tests 63
+# suites 0
+# pass 63
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 156.0301
+

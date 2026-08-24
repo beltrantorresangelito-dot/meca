@@ -1,0 +1,329 @@
+TAP version 13
+# Subtest: AUDIOFINAL-001 server importa y crea AudioProxyHandler
+ok 1 - AUDIOFINAL-001 server importa y crea AudioProxyHandler
+  ---
+  duration_ms: 1.326425
+  type: 'test'
+  ...
+# Subtest: AUDIOFINAL-002 endpoints ya no están inline en server
+ok 2 - AUDIOFINAL-002 endpoints ya no están inline en server
+  ---
+  duration_ms: 0.224875
+  type: 'test'
+  ...
+# Subtest: AUDIOFINAL-003 PYTHON_API_URL es único y se declara antes del handler
+ok 3 - AUDIOFINAL-003 PYTHON_API_URL es único y se declara antes del handler
+  ---
+  duration_ms: 0.189422
+  type: 'test'
+  ...
+# Subtest: AUDIOFINAL-004 routes conserva dos GET y extracción ticketId
+ok 4 - AUDIOFINAL-004 routes conserva dos GET y extracción ticketId
+  ---
+  duration_ms: 1.533934
+  type: 'test'
+  ...
+# Subtest: AUDIOFINAL-005 HTTP de reproducción vive en Controller
+ok 5 - AUDIOFINAL-005 HTTP de reproducción vive en Controller
+  ---
+  duration_ms: 0.260999
+  type: 'test'
+  ...
+# Subtest: AUDIOFINAL-006 fallback verificar vive en Controller
+ok 6 - AUDIOFINAL-006 fallback verificar vive en Controller
+  ---
+  duration_ms: 0.150675
+  type: 'test'
+  ...
+# Subtest: AUDIOFINAL-007 gateway hacia Python vive en Service
+ok 7 - AUDIOFINAL-007 gateway hacia Python vive en Service
+  ---
+  duration_ms: 0.122402
+  type: 'test'
+  ...
+# Subtest: AUDIOFINAL-008 error Python conserva status y máximo 300 chars
+ok 8 - AUDIOFINAL-008 error Python conserva status y máximo 300 chars
+  ---
+  duration_ms: 0.084566
+  type: 'test'
+  ...
+# Subtest: AUDIOFINAL-009 configuración conserva override y fallbacks
+ok 9 - AUDIOFINAL-009 configuración conserva override y fallbacks
+  ---
+  duration_ms: 0.960971
+  type: 'test'
+  ...
+# Subtest: AUDIOFINAL-010 módulos cerrados siguen registrados
+ok 10 - AUDIOFINAL-010 módulos cerrados siguen registrados
+  ---
+  duration_ms: 0.497821
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-001 único punto de entrada es handleGenericQueryRequest
+ok 11 - GENQFINAL-001 único punto de entrada es handleGenericQueryRequest
+  ---
+  duration_ms: 1.300186
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-002 server no instancia capas internas
+ok 12 - GENQFINAL-002 server no instancia capas internas
+  ---
+  duration_ms: 0.271113
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-003 routes conserva POST y parsing JSON
+ok 13 - GENQFINAL-003 routes conserva POST y parsing JSON
+  ---
+  duration_ms: 12.733463
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-004 Controller concentra HTTP y payload PostgreSQL
+ok 14 - GENQFINAL-004 Controller concentra HTTP y payload PostgreSQL
+  ---
+  duration_ms: 0.223313
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-005 Service concentra cinco operaciones
+ok 15 - GENQFINAL-005 Service concentra cinco operaciones
+  ---
+  duration_ms: 0.240118
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-006 Repository concentra SQL y filtros
+ok 16 - GENQFINAL-006 Repository concentra SQL y filtros
+  ---
+  duration_ms: 0.188721
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-007 insert y upsert arrays reinician placeholders
+ok 17 - GENQFINAL-007 insert y upsert arrays reinician placeholders
+  ---
+  duration_ms: 0.256542
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-008 update y delete sin filtros están bloqueados
+ok 18 - GENQFINAL-008 update y delete sin filtros están bloqueados
+  ---
+  duration_ms: 0.159487
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-009 select conserva filtros avanzados
+ok 19 - GENQFINAL-009 select conserva filtros avanzados
+  ---
+  duration_ms: 0.446485
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-010 head count y order limit siguen soportados
+ok 20 - GENQFINAL-010 head count y order limit siguen soportados
+  ---
+  duration_ms: 0.487075
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-011 riesgos pendientes permanecen explícitos
+ok 21 - GENQFINAL-011 riesgos pendientes permanecen explícitos
+  ---
+  duration_ms: 0.352305
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-012 módulos cerrados siguen registrados
+ok 22 - GENQFINAL-012 módulos cerrados siguen registrados
+  ---
+  duration_ms: 0.235761
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-013 autorización central precede dispatcher
+ok 23 - GENQFINAL-013 autorización central precede dispatcher
+  ---
+  duration_ms: 0.199588
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-001 conserva contrato POST /api/rpc/:funcion
+ok 24 - RPCHAR-F1042-001 conserva contrato POST /api/rpc/:funcion
+  ---
+  duration_ms: 4.330259
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-002 sanitiza functionName después de extraer URL
+ok 25 - RPCHAR-F1042-002 sanitiza functionName después de extraer URL
+  ---
+  duration_ms: 1.901231
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-003 body vacío produce params {}
+ok 26 - RPCHAR-F1042-003 body vacío produce params {}
+  ---
+  duration_ms: 0.186908
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-004 cerrar_mes es caso especial
+ok 27 - RPCHAR-F1042-004 cerrar_mes es caso especial
+  ---
+  duration_ms: 0.387497
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-005 cerrar_mes conserva fallbacks de parámetros
+ok 28 - RPCHAR-F1042-005 cerrar_mes conserva fallbacks de parámetros
+  ---
+  duration_ms: 0.202371
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-006 cerrar_mes devuelve resultado directo
+ok 29 - RPCHAR-F1042-006 cerrar_mes devuelve resultado directo
+  ---
+  duration_ms: 0.157745
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-007 limpiar_sesiones_expiradas es caso especial
+ok 30 - RPCHAR-F1042-007 limpiar_sesiones_expiradas es caso especial
+  ---
+  duration_ms: 0.245496
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-008 limpiar sesiones devuelve limpiadas rowCount
+ok 31 - RPCHAR-F1042-008 limpiar sesiones devuelve limpiadas rowCount
+  ---
+  duration_ms: 0.161851
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-009 fallback genérico usa keys y values
+ok 32 - RPCHAR-F1042-009 fallback genérico usa keys y values
+  ---
+  duration_ms: 0.653453
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-010 fallback genera placeholders locales
+ok 33 - RPCHAR-F1042-010 fallback genera placeholders locales
+  ---
+  duration_ms: 0.625261
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-011 fallback llama función con parámetros
+ok 34 - RPCHAR-F1042-011 fallback llama función con parámetros
+  ---
+  duration_ms: 0.316341
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-012 fallback llama función sin parámetros
+ok 35 - RPCHAR-F1042-012 fallback llama función sin parámetros
+  ---
+  duration_ms: 0.212927
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-013 fallback éxito devuelve data y error null
+ok 36 - RPCHAR-F1042-013 fallback éxito devuelve data y error null
+  ---
+  duration_ms: 0.203353
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-014 error conserva 500 error y code
+ok 37 - RPCHAR-F1042-014 error conserva 500 error y code
+  ---
+  duration_ms: 0.203773
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-015 SQL sigue inline antes de extracción
+ok 38 - RPCHAR-F1042-015 SQL sigue inline antes de extracción
+  ---
+  duration_ms: 0.30881
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-016 autorización central precede RPC
+ok 39 - RPCHAR-F1042-016 autorización central precede RPC
+  ---
+  duration_ms: 0.20797
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-017 Generic Query permanece separado
+ok 40 - RPCHAR-F1042-017 Generic Query permanece separado
+  ---
+  duration_ms: 0.195141
+  type: 'test'
+  ...
+# Subtest: RPCHAR-F1042-018 módulos cerrados siguen registrados
+ok 41 - RPCHAR-F1042-018 módulos cerrados siguen registrados
+  ---
+  duration_ms: 0.297463
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-001 único punto de entrada es handleMatrixRecalculationRequest
+ok 42 - RECALCFINAL-001 único punto de entrada es handleMatrixRecalculationRequest
+  ---
+  duration_ms: 0.989183
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-002 server no instancia capas internas
+ok 43 - RECALCFINAL-002 server no instancia capas internas
+  ---
+  duration_ms: 0.172527
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-003 routes conserva POST y Token requerido
+ok 44 - RECALCFINAL-003 routes conserva POST y Token requerido
+  ---
+  duration_ms: 1.097744
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-004 Controller conserva HTTP 200 y error general
+ok 45 - RECALCFINAL-004 Controller conserva HTTP 200 y error general
+  ---
+  duration_ms: 0.247919
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-005 Service conserva tolerancia por detalle
+ok 46 - RECALCFINAL-005 Service conserva tolerancia por detalle
+  ---
+  duration_ms: 0.253748
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-006 Service conserva tolerancia por evaluación
+ok 47 - RECALCFINAL-006 Service conserva tolerancia por evaluación
+  ---
+  duration_ms: 0.185295
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-007 Service conserva contrato de salida
+ok 48 - RECALCFINAL-007 Service conserva contrato de salida
+  ---
+  duration_ms: 0.169693
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-008 Repository concentra SQL del recálculo
+ok 49 - RECALCFINAL-008 Repository concentra SQL del recálculo
+  ---
+  duration_ms: 0.128091
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-009 cálculo conserva ENC ECUF ECN y nota_final
+ok 50 - RECALCFINAL-009 cálculo conserva ENC ECUF ECN y nota_final
+  ---
+  duration_ms: 0.285155
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-010 resumen conserva COUNT AVG MIN MAX
+ok 51 - RECALCFINAL-010 resumen conserva COUNT AVG MIN MAX
+  ---
+  duration_ms: 0.311474
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-011 módulos cerrados siguen registrados
+ok 52 - RECALCFINAL-011 módulos cerrados siguen registrados
+  ---
+  duration_ms: 0.160218
+  type: 'test'
+  ...
+# Subtest: RECALCFINAL-012 autorización central precede dispatcher
+ok 53 - RECALCFINAL-012 autorización central precede dispatcher
+  ---
+  duration_ms: 0.133028
+  type: 'test'
+  ...
+1..53
+# tests 53
+# suites 0
+# pass 53
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 142.618093
+

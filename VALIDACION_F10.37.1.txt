@@ -1,0 +1,161 @@
+TAP version 13
+# Subtest: GENQUERY-F1037-001 endpoint sigue inline
+ok 1 - GENQUERY-F1037-001 endpoint sigue inline
+  ---
+  duration_ms: 3.04233
+  type: 'test'
+  ...
+# Subtest: GENQUERY-F1037-002 server instancia Repository
+ok 2 - GENQUERY-F1037-002 server instancia Repository
+  ---
+  duration_ms: 0.161569
+  type: 'test'
+  ...
+# Subtest: GENQUERY-F1037-003 cinco operaciones delegan Repository
+ok 3 - GENQUERY-F1037-003 cinco operaciones delegan Repository
+  ---
+  duration_ms: 0.127158
+  type: 'test'
+  ...
+# Subtest: GENQUERY-F1037-004 SQL builder salió del server
+ok 4 - GENQUERY-F1037-004 SQL builder salió del server
+  ---
+  duration_ms: 0.105871
+  type: 'test'
+  ...
+# Subtest: GENQUERY-F1037-005 parsing validaciones HTTP siguen inline
+ok 5 - GENQUERY-F1037-005 parsing validaciones HTTP siguen inline
+  ---
+  duration_ms: 0.169213
+  type: 'test'
+  ...
+# Subtest: GENQUERY-F1037-006 módulos previos protegidos
+ok 6 - GENQUERY-F1037-006 módulos previos protegidos
+  ---
+  duration_ms: 1.230684
+  type: 'test'
+  ...
+# Subtest: GENQREPO-001 sanitiza identificadores
+ok 7 - GENQREPO-001 sanitiza identificadores
+  ---
+  duration_ms: 0.819266
+  type: 'test'
+  ...
+# Subtest: GENQREPO-002 sanitiza selectFields conservando wildcard y relaciones
+ok 8 - GENQREPO-002 sanitiza selectFields conservando wildcard y relaciones
+  ---
+  duration_ms: 0.237412
+  type: 'test'
+  ...
+# Subtest: GENQREPO-003 select eq + order + limit
+ok 9 - GENQREPO-003 select eq + order + limit
+  ---
+  duration_ms: 1.304787
+  type: 'test'
+  ...
+# Subtest: GENQREPO-004 select head count devuelve data vacía
+ok 10 - GENQREPO-004 select head count devuelve data vacía
+  ---
+  duration_ms: 0.262643
+  type: 'test'
+  ...
+# Subtest: GENQREPO-005 select soporta not in contains is null
+ok 11 - GENQREPO-005 select soporta not in contains is null
+  ---
+  duration_ms: 1.209737
+  type: 'test'
+  ...
+# Subtest: GENQREPO-006 insert objeto devuelve rows
+ok 12 - GENQREPO-006 insert objeto devuelve rows
+  ---
+  duration_ms: 0.50699
+  type: 'test'
+  ...
+# Subtest: GENQREPO-007 update conserva filtros y RETURNING
+ok 13 - GENQREPO-007 update conserva filtros y RETURNING
+  ---
+  duration_ms: 0.580793
+  type: 'test'
+  ...
+# Subtest: GENQREPO-008 delete conserva in + RETURNING
+ok 14 - GENQREPO-008 delete conserva in + RETURNING
+  ---
+  duration_ms: 0.313162
+  type: 'test'
+  ...
+# Subtest: GENQREPO-009 upsert éxito insert no ejecuta update
+ok 15 - GENQREPO-009 upsert éxito insert no ejecuta update
+  ---
+  duration_ms: 0.424936
+  type: 'test'
+  ...
+# Subtest: GENQREPO-010 upsert 23505 ejecuta fallback update
+ok 16 - GENQREPO-010 upsert 23505 ejecuta fallback update
+  ---
+  duration_ms: 0.636824
+  type: 'test'
+  ...
+# Subtest: GENQREPO-011 upsert error distinto se propaga
+ok 17 - GENQREPO-011 upsert error distinto se propaga
+  ---
+  duration_ms: 0.708237
+  type: 'test'
+  ...
+# Subtest: GENQSAFE-001 insert array revela placeholders acumulativos
+ok 18 - GENQSAFE-001 insert array revela placeholders acumulativos
+  ---
+  duration_ms: 1.365049
+  type: 'test'
+  ...
+# Subtest: GENQSAFE-002 upsert array revela placeholders acumulativos
+ok 19 - GENQSAFE-002 upsert array revela placeholders acumulativos
+  ---
+  duration_ms: 0.284114
+  type: 'test'
+  ...
+# Subtest: GENQSAFE-003 update sin filtros genera mutación global
+ok 20 - GENQSAFE-003 update sin filtros genera mutación global
+  ---
+  duration_ms: 0.466675
+  type: 'test'
+  ...
+# Subtest: GENQSAFE-004 delete sin filtros genera borrado global
+ok 21 - GENQSAFE-004 delete sin filtros genera borrado global
+  ---
+  duration_ms: 0.326157
+  type: 'test'
+  ...
+# Subtest: GENQSAFE-005 isSingle no modifica respuesta actual
+ok 22 - GENQSAFE-005 isSingle no modifica respuesta actual
+  ---
+  duration_ms: 1.399887
+  type: 'test'
+  ...
+# Subtest: GENQSAFE-006 isMaybeSingle no modifica respuesta actual
+ok 23 - GENQSAFE-006 isMaybeSingle no modifica respuesta actual
+  ---
+  duration_ms: 0.222127
+  type: 'test'
+  ...
+# Subtest: GENQSAFE-007 tabla se sanitiza pero no se restringe por allowlist
+ok 24 - GENQSAFE-007 tabla se sanitiza pero no se restringe por allowlist
+  ---
+  duration_ms: 0.207421
+  type: 'test'
+  ...
+# Subtest: GENQSAFE-008 filtros mutation desconocidos caen a igualdad
+ok 25 - GENQSAFE-008 filtros mutation desconocidos caen a igualdad
+  ---
+  duration_ms: 0.163005
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 76.154336
+

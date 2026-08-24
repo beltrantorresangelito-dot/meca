@@ -1,0 +1,37 @@
+MECA F10.55 - INVENTARIO SERVER SHELL
+
+Estado actual de server.js:
+- líneas: 436
+- pool.query directo: 0
+- pool.connect directo: 0
+- funciones inline declaradas: 0
+- handlers modulares invocados: 20
+
+Responsabilidades legítimas que todavía permanecen:
+1. configuración de entorno;
+2. pool compartido;
+3. composición de módulos;
+4. PYTHON_API_URL;
+5. PORT/HOST;
+6. http.createServer;
+7. CORS;
+8. OPTIONS;
+9. parseo URL;
+10. validación Bearer;
+11. autorización central;
+12. dispatch secuencial de handlers;
+13. fallback 404;
+14. server.listen y logs de arranque.
+
+Residuos detectados:
+- fs importado y ya no usado;
+- path importado y ya no usado;
+- registerDomainRoutes importado y ya no usado;
+- comentarios legacy vacíos entre handlers.
+
+Conclusión:
+server.js ya no contiene lógica de negocio ni SQL directo.
+Actualmente funciona principalmente como composition root / HTTP shell.
+
+Siguiente:
+F10.56 - Server Shell Cleanup.

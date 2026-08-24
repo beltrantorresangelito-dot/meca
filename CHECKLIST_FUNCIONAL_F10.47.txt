@@ -1,0 +1,52 @@
+F10.47 - VALIDACIÓN FUNCIONAL GENERIC RPC
+
+1. ARRANQUE
+   - Iniciar MECA normalmente.
+   - Sin errores de carga del módulo generic-rpc.
+
+2. cerrar_mes
+   - Ejecutar únicamente en BD local/de prueba.
+   - Usar parámetros válidos.
+   - Confirmar HTTP 200.
+   - Confirmar que la respuesta mantiene el formato actual directo.
+   IMPORTANTE:
+   esta operación puede modificar estado de negocio; no ejecutar
+   sobre productivo para una prueba técnica.
+
+3. limpiar_sesiones_expiradas
+   - Ejecutar solo en local.
+   - Confirmar HTTP 200.
+   - Confirmar:
+     { data: { limpiadas: N }, error: null }
+
+4. RPC GENÉRICO
+   - Elegir una función PostgreSQL de prueba/no destructiva.
+   - Con parámetros:
+     POST /api/rpc/nombre_funcion
+   - Confirmar HTTP 200:
+     { data: [...], error: null }
+
+5. RPC SIN PARÁMETROS
+   - Usar función no destructiva que acepte 0 parámetros.
+   - Confirmar SELECT * FROM funcion() a nivel funcional.
+
+6. FUNCIÓN INEXISTENTE
+   - POST /api/rpc/funcion_que_no_existe
+   - Esperado:
+     HTTP 500
+     error + code PostgreSQL.
+
+7. JSON INVÁLIDO
+   - El comportamiento actual se conserva:
+     body inválido se interpreta como {}.
+   - La función se intentará ejecutar sin parámetros.
+
+8. npm test
+   Esperado: 0 fail.
+
+RIESGOS PENDIENTES
+- no existe allowlist funcional de funciones RPC;
+- cerrar_mes mantiene p_usuario || 'admin';
+- limpiar_sesiones_expiradas es SQL especial, no RPC real.
+
+Estos puntos quedan para hardening explícito posterior.

@@ -1,0 +1,69 @@
+F10.41 - VALIDACIÓN FUNCIONAL GENERIC QUERY
+
+OBJETIVO
+Validar POST /api/query después de la modularización completa.
+
+1. ARRANQUE
+   - Iniciar MECA normalmente.
+   - No debe haber errores de carga del módulo generic-query.
+
+2. SELECT
+   - Ejecutar consulta simple.
+   - Confirmar data + count.
+   - Probar al menos un filtro eq.
+   - Probar ORDER BY.
+   - Probar LIMIT.
+
+3. HEAD + COUNT
+   - Ejecutar isHead=true + countOption.
+   - Esperado:
+     data: []
+     count: número correcto.
+
+4. INSERT
+   - Probar un objeto.
+   - Probar un array de 2+ objetos.
+   - Confirmar que todas las filas se insertan sin error de placeholders.
+
+5. UPDATE
+   - Con filtro válido debe actualizar y devolver RETURNING *.
+   - Sin filters debe devolver:
+     HTTP 400
+     UPDATE requiere al menos un filtro
+
+6. DELETE
+   - Con filtro válido debe eliminar y devolver RETURNING *.
+   - Sin filters debe devolver:
+     HTTP 400
+     DELETE requiere al menos un filtro
+
+7. UPSERT
+   - Probar una fila nueva.
+   - Probar conflicto 23505 y confirmar fallback UPDATE.
+   - Probar array de 2+ objetos.
+
+8. JSON INVÁLIDO
+   - Enviar body inválido.
+   - Esperado:
+     HTTP 400
+     Payload inválido
+
+9. OPERACIÓN DESCONOCIDA
+   - operation=truncate
+   - Esperado:
+     HTTP 400
+     Operacion no soportada: truncate
+
+10. REGRESIÓN
+   - Validar pantallas actuales que dependan de /api/query.
+   - Confirmar sin errores 4xx/5xx inesperados en Network.
+
+11. npm test
+   Esperado: 0 fail.
+
+RIESGOS PENDIENTES REGISTRADOS
+- isSingle / isMaybeSingle aún no transforman respuesta.
+- aún no existe allowlist funcional de tablas/operaciones.
+- filtros mutation desconocidos aún caen a igualdad.
+
+Estos tres puntos quedan para hardening explícito posterior.

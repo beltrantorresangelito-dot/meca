@@ -1,0 +1,16 @@
+MECA F10.53 - INVENTARIO MINI-ROUTER LEGACY
+
+Registros registrarRuta activos encontrados: 0
+
+- ninguno
+
+Conclusión técnica:
+1. routes = {} permanece en server.js.
+2. registrarRuta() permanece en server.js.
+3. routes[ruta] permanece en el dispatcher.
+4. /api/health ya fue extraído en F10.52.
+5. No quedan llamadas activas a registrarRuta().
+6. El mini-router es infraestructura residual y puede eliminarse
+   de forma controlada en F10.54.
+
+Esta fase no modifica producción.

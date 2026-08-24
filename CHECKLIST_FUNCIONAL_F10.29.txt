@@ -1,0 +1,41 @@
+F10.29 - VALIDACIÓN FUNCIONAL AUDIO PROXY
+
+1. ARRANQUE
+   - Iniciar MECA.
+   - No debe existir ReferenceError de PYTHON_API_URL.
+
+2. CONFIGURACIÓN
+   - process.env.PYTHON_API_URL tiene prioridad.
+   - Desarrollo por defecto: http://localhost:5001
+   - Producción conserva: http://10.4.240.68:5001
+
+3. VERIFICAR
+   - GET /api/audio/verificar/:ticketId
+   - Debe propagar status y JSON de Python.
+
+4. REPRODUCIR
+   - GET /api/audio/reproducir/:ticketId
+   - Audio válido debe reproducirse.
+   - Confirmar Content-Type, Accept-Ranges, Cache-Control y Content-Length.
+   - Content-Disposition se conserva cuando existe.
+
+5. TICKET INVÁLIDO
+   - /api/audio/reproducir/abc -> HTTP 400 + Ticket ID inválido.
+
+6. ERROR PYTHON
+   - Status de Python se propaga.
+   - Detalle limitado a 300 caracteres.
+
+7. PYTHON NO DISPONIBLE
+   - reproducir -> 500 + Error al obtener el audio.
+   - verificar -> 500 + existe:false.
+
+8. ESCUCHAS
+   - Abrir una escucha real y reproducir su audio.
+   - Confirmar que Listenings continúa funcionando.
+
+9. CONSOLA / NETWORK
+   - Sin ReferenceError, TypeError, doble respuesta o 404 inesperado.
+
+10. npm test
+    Esperado: 0 fail.

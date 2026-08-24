@@ -1,512 +1,221 @@
 TAP version 13
-# Subtest: EVALFINAL-001 único punto de entrada es handleEvaluationsRequest
-ok 1 - EVALFINAL-001 único punto de entrada es handleEvaluationsRequest
+# Subtest: ARCHGUARD-001 server.js no puede contener SQL directo
+ok 1 - ARCHGUARD-001 server.js no puede contener SQL directo
   ---
-  duration_ms: 1.173637
+  duration_ms: 1.437791
   type: 'test'
   ...
-# Subtest: EVALFINAL-002 server ya no contiene SQL principal de Evaluaciones
-ok 2 - EVALFINAL-002 server ya no contiene SQL principal de Evaluaciones
+# Subtest: ARCHGUARD-002 server.js no puede declarar funciones de negocio
+ok 2 - ARCHGUARD-002 server.js no puede declarar funciones de negocio
   ---
-  duration_ms: 0.342894
+  duration_ms: 0.258786
   type: 'test'
   ...
-# Subtest: EVALFINAL-003 routes conserva contratos GET POST DELETE
-ok 3 - EVALFINAL-003 routes conserva contratos GET POST DELETE
+# Subtest: ARCHGUARD-003 mini-router legacy no puede reaparecer
+ok 3 - ARCHGUARD-003 mini-router legacy no puede reaparecer
   ---
-  duration_ms: 1.535051
+  duration_ms: 0.283532
   type: 'test'
   ...
-# Subtest: EVALFINAL-004 POST inválido conserva 400
-ok 4 - EVALFINAL-004 POST inválido conserva 400
+# Subtest: ARCHGUARD-004 nuevos dominios deben entrar por handlers
+ok 4 - ARCHGUARD-004 nuevos dominios deben entrar por handlers
   ---
-  duration_ms: 0.301563
+  duration_ms: 0.316812
   type: 'test'
   ...
-# Subtest: EVALFINAL-005 autorización central ocurre antes del dispatcher
-ok 5 - EVALFINAL-005 autorización central ocurre antes del dispatcher
+# Subtest: ARCHGUARD-005 seguridad transversal no puede desaparecer
+ok 5 - ARCHGUARD-005 seguridad transversal no puede desaparecer
   ---
-  duration_ms: 0.255064
+  duration_ms: 0.168872
   type: 'test'
   ...
-# Subtest: PDAFINAL-001 único punto de entrada en server es handlePdaRequest
-ok 6 - PDAFINAL-001 único punto de entrada en server es handlePdaRequest
+# Subtest: ARCHGUARD-006 fallback 404 debe permanecer
+ok 6 - ARCHGUARD-006 fallback 404 debe permanecer
   ---
-  duration_ms: 1.756714
+  duration_ms: 1.38318
   type: 'test'
   ...
-# Subtest: PDAFINAL-002 server ya no instancia capas internas PDA
-ok 7 - PDAFINAL-002 server ya no instancia capas internas PDA
+# Subtest: ARCHGUARD-007 server.js no debe volver a superar 450 líneas
+ok 7 - ARCHGUARD-007 server.js no debe volver a superar 450 líneas
   ---
-  duration_ms: 0.290035
+  duration_ms: 0.263162
   type: 'test'
   ...
-# Subtest: PDAFINAL-003 routes conserva los cinco endpoints GET
-ok 8 - PDAFINAL-003 routes conserva los cinco endpoints GET
+# Subtest: ARCHGUARD-008 capas críticas siguen modularizadas
+ok 8 - ARCHGUARD-008 capas críticas siguen modularizadas
   ---
-  duration_ms: 0.17281
+  duration_ms: 0.186558
   type: 'test'
   ...
-# Subtest: PDAFINAL-004 Token requerido permanece en routes
-ok 9 - PDAFINAL-004 Token requerido permanece en routes
+# Subtest: ARCHGUARD-009 mail residual no puede reaparecer
+ok 9 - ARCHGUARD-009 mail residual no puede reaparecer
   ---
-  duration_ms: 0.146481
+  duration_ms: 0.45653
   type: 'test'
   ...
-# Subtest: PDAFINAL-005 tolerancia legacy de listas vacías vive en Controller
-ok 10 - PDAFINAL-005 tolerancia legacy de listas vacías vive en Controller
+# Subtest: ARCHGUARD-010 imports muertos conocidos no pueden reaparecer
+ok 10 - ARCHGUARD-010 imports muertos conocidos no pueden reaparecer
   ---
-  duration_ms: 0.092228
+  duration_ms: 0.477982
   type: 'test'
   ...
-# Subtest: PDAFINAL-006 404 de detalle vive en Controller
-ok 11 - PDAFINAL-006 404 de detalle vive en Controller
+# Subtest: SHELLARCH-F1057-001 sin SQL directo
+ok 11 - SHELLARCH-F1057-001 sin SQL directo
   ---
-  duration_ms: 0.071503
+  duration_ms: 1.234458
   type: 'test'
   ...
-# Subtest: PDAFINAL-007 progreso vive en Service
-ok 12 - PDAFINAL-007 progreso vive en Service
+# Subtest: SHELLARCH-F1057-002 sin funciones de negocio inline
+ok 12 - SHELLARCH-F1057-002 sin funciones de negocio inline
   ---
-  duration_ms: 0.132063
+  duration_ms: 0.299967
   type: 'test'
   ...
-# Subtest: PDAFINAL-008 SQL PDA está encapsulado en Repository
-ok 13 - PDAFINAL-008 SQL PDA está encapsulado en Repository
+# Subtest: SHELLARCH-F1057-003 seguridad transversal centralizada
+ok 13 - SHELLARCH-F1057-003 seguridad transversal centralizada
   ---
-  duration_ms: 0.242714
+  duration_ms: 0.177424
   type: 'test'
   ...
-# Subtest: PDAFINAL-009 F7 F8 F9 siguen modularizados
-ok 14 - PDAFINAL-009 F7 F8 F9 siguen modularizados
+# Subtest: SHELLARCH-F1057-004 handlers están preparados antes de createServer
+ok 14 - SHELLARCH-F1057-004 handlers están preparados antes de createServer
   ---
-  duration_ms: 0.38132
+  duration_ms: 0.233357
   type: 'test'
   ...
-# Subtest: PDAFINAL-010 autorización central precede dispatcher PDA
-ok 15 - PDAFINAL-010 autorización central precede dispatcher PDA
+# Subtest: SHELLARCH-F1057-005 pipeline secuencial explícito
+ok 15 - SHELLARCH-F1057-005 pipeline secuencial explícito
   ---
-  duration_ms: 0.309946
+  duration_ms: 0.264033
   type: 'test'
   ...
-# Subtest: CQ-F1011-001 server registra dispatcher
-ok 16 - CQ-F1011-001 server registra dispatcher
+# Subtest: SHELLARCH-F1057-006 bootstrap y listen permanecen
+ok 16 - SHELLARCH-F1057-006 bootstrap y listen permanecen
   ---
-  duration_ms: 0.976834
+  duration_ms: 0.154039
   type: 'test'
   ...
-# Subtest: CQ-F1011-002 seis contratos migraron a routes
-ok 17 - CQ-F1011-002 seis contratos migraron a routes
+# Subtest: SHELLARCH-F1057-007 sin infraestructura legacy
+ok 17 - SHELLARCH-F1057-007 sin infraestructura legacy
   ---
-  duration_ms: 0.305942
+  duration_ms: 1.044436
   type: 'test'
   ...
-# Subtest: CQ-F1011-003 Token requerido migró a routes
-ok 18 - CQ-F1011-003 Token requerido migró a routes
+# Subtest: SHELLARCH-F1057-008 tamaño preventivo acotado
+ok 18 - SHELLARCH-F1057-008 tamaño preventivo acotado
   ---
-  duration_ms: 3.971986
+  duration_ms: 0.257924
   type: 'test'
   ...
-# Subtest: CQ-F1011-004 parsing JSON migró a routes
-ok 19 - CQ-F1011-004 parsing JSON migró a routes
+# Subtest: SHELL-F1055-001 no queda SQL directo en server
+ok 19 - SHELL-F1055-001 no queda SQL directo en server
   ---
-  duration_ms: 0.17012
+  duration_ms: 1.310071
   type: 'test'
   ...
-# Subtest: CQ-F1011-005 server ya no conoce capas internas
-ok 20 - CQ-F1011-005 server ya no conoce capas internas
+# Subtest: SHELL-F1055-002 no quedan funciones declaradas inline
+ok 20 - SHELL-F1055-002 no quedan funciones declaradas inline
   ---
-  duration_ms: 0.332504
+  duration_ms: 0.695166
   type: 'test'
   ...
-# Subtest: CQ-F1011-006 módulos previos permanecen protegidos
-ok 21 - CQ-F1011-006 módulos previos permanecen protegidos
+# Subtest: SHELL-F1055-003 callback HTTP conserva CORS y OPTIONS
+ok 21 - SHELL-F1055-003 callback HTTP conserva CORS y OPTIONS
   ---
-  duration_ms: 0.203423
+  duration_ms: 0.163754
   type: 'test'
   ...
-# ✅ Criterio creado: N (Q1)
-# ✅ Criterio "Uno" desactivado (ID: 7)
-# Error en /api/criterios-cuartiles: Error: bad
-#     at Object.listAll [90m(/mnt/data/f1012_check/[39mtests/quartile-criteria.controller.f1010.test.js:57:60[90m)[39m
-#     at QuartileCriteriaController.listAll [90m(/mnt/data/f1012_check/[39msrc/modules/quartile-criteria/quartile-criteria.controller.js:13:39[90m)[39m
-#     at TestContext.<anonymous> [90m(/mnt/data/f1012_check/[39mtests/quartile-criteria.controller.f1010.test.js:57:102[90m)[39m
-# [90m    at Test.runInAsyncScope (node:async_hooks:214:14)[39m
-# [90m    at Test.run (node:internal/test_runner/test:1047:25)[39m
-# [90m    at Test.processPendingSubtests (node:internal/test_runner/test:744:18)[39m
-# [90m    at Test.postRun (node:internal/test_runner/test:1173:19)[39m
-# [90m    at Test.run (node:internal/test_runner/test:1101:12)[39m
-# [90m    at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)[39m {
-#   status: [33m400[39m
-# }
-# Subtest: CQCTRL-001 listAll 200 success data
-ok 22 - CQCTRL-001 listAll 200 success data
+# Subtest: SHELL-F1055-004 parsing URL central permanece
+ok 22 - SHELL-F1055-004 parsing URL central permanece
   ---
-  duration_ms: 1.863463
+  duration_ms: 0.109353
   type: 'test'
   ...
-# Subtest: CQCTRL-002 listActive 200
-ok 23 - CQCTRL-002 listActive 200
+# Subtest: SHELL-F1055-005 validación Bearer central permanece
+ok 23 - SHELL-F1055-005 validación Bearer central permanece
   ---
-  duration_ms: 0.345867
+  duration_ms: 0.191746
   type: 'test'
   ...
-# Subtest: CQCTRL-003 create 201
-ok 24 - CQCTRL-003 create 201
+# Subtest: SHELL-F1055-006 autorización central permanece
+ok 24 - SHELL-F1055-006 autorización central permanece
   ---
-  duration_ms: 1.104047
+  duration_ms: 2.687842
   type: 'test'
   ...
-# Subtest: CQCTRL-004 update 404
-ok 25 - CQCTRL-004 update 404
+# Subtest: SHELL-F1055-007 server es orquestador de handlers
+ok 25 - SHELL-F1055-007 server es orquestador de handlers
   ---
-  duration_ms: 0.337257
+  duration_ms: 0.171035
   type: 'test'
   ...
-# Subtest: CQCTRL-005 deactivate 404
-ok 26 - CQCTRL-005 deactivate 404
+# Subtest: SHELL-F1055-008 fallback 404 permanece
+ok 26 - SHELL-F1055-008 fallback 404 permanece
   ---
-  duration_ms: 0.319673
+  duration_ms: 0.128862
   type: 'test'
   ...
-# Subtest: CQCTRL-006 deactivate conserva mensaje
-ok 27 - CQCTRL-006 deactivate conserva mensaje
+# Subtest: SHELL-F1055-009 listen permanece en bootstrap
+ok 27 - SHELL-F1055-009 listen permanece en bootstrap
   ---
-  duration_ms: 1.820738
+  duration_ms: 0.411693
   type: 'test'
   ...
-# Subtest: CQCTRL-007 activate 404
-ok 28 - CQCTRL-007 activate 404
+# Subtest: SHELL-F1056-010 imports fs y path ya fueron eliminados
+ok 28 - SHELL-F1056-010 imports fs y path ya fueron eliminados
   ---
-  duration_ms: 0.285155
+  duration_ms: 0.402639
   type: 'test'
   ...
-# Subtest: CQCTRL-008 error Service usa status
-ok 29 - CQCTRL-008 error Service usa status
+# Subtest: SHELL-F1056-011 registerDomainRoutes ya fue eliminado
+ok 29 - SHELL-F1056-011 registerDomainRoutes ya fue eliminado
   ---
-  duration_ms: 1.1066
+  duration_ms: 0.280407
   type: 'test'
   ...
-# Subtest: CQFINAL-001 único punto de entrada en server es handleQuartileCriteriaRequest
-ok 30 - CQFINAL-001 único punto de entrada en server es handleQuartileCriteriaRequest
+# Subtest: SHELL-F1055-012 no queda mini-router legacy
+ok 30 - SHELL-F1055-012 no queda mini-router legacy
   ---
-  duration_ms: 2.682776
+  duration_ms: 0.258595
   type: 'test'
   ...
-# Subtest: CQFINAL-002 server ya no instancia capas internas
-ok 31 - CQFINAL-002 server ya no instancia capas internas
+# Subtest: SHELLCLEAN-F1056-001 imports muertos eliminados
+ok 31 - SHELLCLEAN-F1056-001 imports muertos eliminados
   ---
-  duration_ms: 0.315356
+  duration_ms: 0.640825
   type: 'test'
   ...
-# Subtest: CQFINAL-003 routes conserva seis contratos
-ok 32 - CQFINAL-003 routes conserva seis contratos
+# Subtest: SHELLCLEAN-F1056-002 seguridad central intacta
+ok 32 - SHELLCLEAN-F1056-002 seguridad central intacta
   ---
-  duration_ms: 0.326892
+  duration_ms: 0.176623
   type: 'test'
   ...
-# Subtest: CQFINAL-004 Token y parsing permanecen en routes
-ok 33 - CQFINAL-004 Token y parsing permanecen en routes
+# Subtest: SHELLCLEAN-F1056-003 orden crítico preservado
+ok 33 - SHELLCLEAN-F1056-003 orden crítico preservado
   ---
-  duration_ms: 0.280184
+  duration_ms: 0.149933
   type: 'test'
   ...
-# Subtest: CQFINAL-005 HTTP de negocio vive en Controller
-ok 34 - CQFINAL-005 HTTP de negocio vive en Controller
+# Subtest: SHELLCLEAN-F1056-004 todos los handlers permanecen
+ok 34 - SHELLCLEAN-F1056-004 todos los handlers permanecen
   ---
-  duration_ms: 0.382802
+  duration_ms: 0.16788
   type: 'test'
   ...
-# Subtest: CQFINAL-006 fecha vigente vive en Service
-ok 35 - CQFINAL-006 fecha vigente vive en Service
+# Subtest: SHELLCLEAN-F1056-005 fallback y listen permanecen
+ok 35 - SHELLCLEAN-F1056-005 fallback y listen permanecen
   ---
-  duration_ms: 0.183773
+  duration_ms: 0.169302
   type: 'test'
   ...
-# Subtest: CQFINAL-007 desactivación lógica vive en Service y Repository
-ok 36 - CQFINAL-007 desactivación lógica vive en Service y Repository
-  ---
-  duration_ms: 0.440677
-  type: 'test'
-  ...
-# Subtest: CQFINAL-008 SQL está encapsulado en Repository
-ok 37 - CQFINAL-008 SQL está encapsulado en Repository
-  ---
-  duration_ms: 0.274715
-  type: 'test'
-  ...
-# Subtest: CQFINAL-009 legacy vigente está contenido en Repository
-ok 38 - CQFINAL-009 legacy vigente está contenido en Repository
-  ---
-  duration_ms: 0.456509
-  type: 'test'
-  ...
-# Subtest: CQFINAL-010 módulos cerrados siguen protegidos
-ok 39 - CQFINAL-010 módulos cerrados siguen protegidos
-  ---
-  duration_ms: 1.005379
-  type: 'test'
-  ...
-# Subtest: CQFINAL-011 autorización central precede dispatcher
-ok 40 - CQFINAL-011 autorización central precede dispatcher
-  ---
-  duration_ms: 0.202434
-  type: 'test'
-  ...
-# Subtest: CQMOD-SERVER-001 server delega al módulo
-ok 41 - CQMOD-SERVER-001 server delega al módulo
-  ---
-  duration_ms: 0.591333
-  type: 'test'
-  ...
-# Subtest: CQMOD-SERVER-002 handlers criterios ya no están inline
-ok 42 - CQMOD-SERVER-002 handlers criterios ya no están inline
-  ---
-  duration_ms: 0.2556
-  type: 'test'
-  ...
-# Subtest: CQMOD-SERVER-003 server no instancia capas internas
-ok 43 - CQMOD-SERVER-003 server no instancia capas internas
-  ---
-  duration_ms: 0.133733
-  type: 'test'
-  ...
-# Subtest: CQMOD-SERVER-004 módulos previos siguen modularizados
-ok 44 - CQMOD-SERVER-004 módulos previos siguen modularizados
-  ---
-  duration_ms: 0.953964
-  type: 'test'
-  ...
-# ✅ Criterio "Uno" desactivado (ID: 7)
-# Subtest: CQMOD-001 index exporta cuatro piezas
-ok 45 - CQMOD-001 index exporta cuatro piezas
-  ---
-  duration_ms: 1.08029
-  type: 'test'
-  ...
-# Subtest: CQMOD-002 ruta ajena devuelve false
-ok 46 - CQMOD-002 ruta ajena devuelve false
-  ---
-  duration_ms: 0.471392
-  type: 'test'
-  ...
-# Subtest: CQMOD-003 GET sin token devuelve 401
-ok 47 - CQMOD-003 GET sin token devuelve 401
-  ---
-  duration_ms: 1.041681
-  type: 'test'
-  ...
-# Subtest: CQMOD-004 POST JSON inválido devuelve 400
-ok 48 - CQMOD-004 POST JSON inválido devuelve 400
-  ---
-  duration_ms: 0.479693
-  type: 'test'
-  ...
-# Subtest: CQMOD-005 DELETE conserva desactivación lógica
-ok 49 - CQMOD-005 DELETE conserva desactivación lógica
-  ---
-  duration_ms: 1.37935
-  type: 'test'
-  ...
-# Subtest: CQMOD-006 activar reconoce id de ruta
-ok 50 - CQMOD-006 activar reconoce id de ruta
-  ---
-  duration_ms: 0.497161
-  type: 'test'
-  ...
-# Subtest: CQREPO-001 listAll conserva orden
-ok 51 - CQREPO-001 listAll conserva orden
-  ---
-  duration_ms: 1.086423
-  type: 'test'
-  ...
-# Subtest: CQREPO-002 activos conserva vigencia
-ok 52 - CQREPO-002 activos conserva vigencia
-  ---
-  duration_ms: 0.280183
-  type: 'test'
-  ...
-# Subtest: CQREPO-003 create conserva legacy
-ok 53 - CQREPO-003 create conserva legacy
-  ---
-  duration_ms: 0.196704
-  type: 'test'
-  ...
-# Subtest: CQREPO-004 update conserva posiciones actuales
-ok 54 - CQREPO-004 update conserva posiciones actuales
-  ---
-  duration_ms: 0.171425
-  type: 'test'
-  ...
-# Subtest: CQREPO-005 findBasicById null
-ok 55 - CQREPO-005 findBasicById null
-  ---
-  duration_ms: 0.178491
-  type: 'test'
-  ...
-# Subtest: CQREPO-006 deactivate lógico
-ok 56 - CQREPO-006 deactivate lógico
-  ---
-  duration_ms: 0.188859
-  type: 'test'
-  ...
-# Subtest: CQREPO-007 activate null
-ok 57 - CQREPO-007 activate null
-  ---
-  duration_ms: 0.217445
-  type: 'test'
-  ...
-# Subtest: CQSVC-001 listAll delega repository
-ok 58 - CQSVC-001 listAll delega repository
-  ---
-  duration_ms: 1.379655
-  type: 'test'
-  ...
-# Subtest: CQSVC-002 listActive calcula fecha YYYY-MM-DD
-ok 59 - CQSVC-002 listActive calcula fecha YYYY-MM-DD
-  ---
-  duration_ms: 0.522914
-  type: 'test'
-  ...
-# Subtest: CQSVC-003 create valida objeto
-ok 60 - CQSVC-003 create valida objeto
-  ---
-  duration_ms: 0.416106
-  type: 'test'
-  ...
-# Subtest: CQSVC-004 create delega repository
-ok 61 - CQSVC-004 create delega repository
-  ---
-  duration_ms: 0.153711
-  type: 'test'
-  ...
-# Subtest: CQSVC-005 update valida id
-ok 62 - CQSVC-005 update valida id
-  ---
-  duration_ms: 0.941165
-  type: 'test'
-  ...
-# Subtest: CQSVC-006 update valida body
-ok 63 - CQSVC-006 update valida body
-  ---
-  duration_ms: 0.218412
-  type: 'test'
-  ...
-# Subtest: CQSVC-007 deactivate conserva null si no existe
-ok 64 - CQSVC-007 deactivate conserva null si no existe
-  ---
-  duration_ms: 0.227421
-  type: 'test'
-  ...
-# Subtest: CQSVC-008 deactivate devuelve identidad y delega
-ok 65 - CQSVC-008 deactivate devuelve identidad y delega
-  ---
-  duration_ms: 0.200159
-  type: 'test'
-  ...
-# Subtest: CQSVC-009 activate valida id
-ok 66 - CQSVC-009 activate valida id
-  ---
-  duration_ms: 0.326403
-  type: 'test'
-  ...
-# Subtest: CQSVC-010 activate delega repository
-ok 67 - CQSVC-010 activate delega repository
-  ---
-  duration_ms: 0.323416
-  type: 'test'
-  ...
-# Subtest: REQFINAL-001 único punto de entrada en server es handleRequestsRequest
-ok 68 - REQFINAL-001 único punto de entrada en server es handleRequestsRequest
-  ---
-  duration_ms: 0.844758
-  type: 'test'
-  ...
-# Subtest: REQFINAL-002 server ya no instancia capas internas de Requests
-ok 69 - REQFINAL-002 server ya no instancia capas internas de Requests
-  ---
-  duration_ms: 1.06234
-  type: 'test'
-  ...
-# Subtest: REQFINAL-003 routes conserva cinco contratos principales
-ok 70 - REQFINAL-003 routes conserva cinco contratos principales
-  ---
-  duration_ms: 0.166267
-  type: 'test'
-  ...
-# Subtest: REQFINAL-004 Token requerido permanece solo donde corresponde
-ok 71 - REQFINAL-004 Token requerido permanece solo donde corresponde
-  ---
-  duration_ms: 0.094212
-  type: 'test'
-  ...
-# Subtest: REQFINAL-005 parsing JSON permanece ligado a POST y PUT
-ok 72 - REQFINAL-005 parsing JSON permanece ligado a POST y PUT
-  ---
-  duration_ms: 0.138007
-  type: 'test'
-  ...
-# Subtest: REQFINAL-006 creación dinámica legacy sigue encapsulada en Repository
-ok 73 - REQFINAL-006 creación dinámica legacy sigue encapsulada en Repository
-  ---
-  duration_ms: 0.112344
-  type: 'test'
-  ...
-# Subtest: REQFINAL-007 F7 y F8 continúan modularizados
-ok 74 - REQFINAL-007 F7 y F8 continúan modularizados
-  ---
-  duration_ms: 0.125441
-  type: 'test'
-  ...
-# Subtest: REQFINAL-008 autorización central permanece antes del dispatcher Requests
-ok 75 - REQFINAL-008 autorización central permanece antes del dispatcher Requests
-  ---
-  duration_ms: 0.081811
-  type: 'test'
-  ...
-# Subtest: SESSFINAL-001 único punto de entrada en server es handleSessionsRequest
-ok 76 - SESSFINAL-001 único punto de entrada en server es handleSessionsRequest
-  ---
-  duration_ms: 0.980606
-  type: 'test'
-  ...
-# Subtest: SESSFINAL-002 server ya no instancia capas internas de Sessions
-ok 77 - SESSFINAL-002 server ya no instancia capas internas de Sessions
-  ---
-  duration_ms: 0.182397
-  type: 'test'
-  ...
-# Subtest: SESSFINAL-003 routes conserva cinco contratos principales
-ok 78 - SESSFINAL-003 routes conserva cinco contratos principales
-  ---
-  duration_ms: 0.959802
-  type: 'test'
-  ...
-# Subtest: SESSFINAL-004 Token requerido sigue preservado
-ok 79 - SESSFINAL-004 Token requerido sigue preservado
-  ---
-  duration_ms: 0.119306
-  type: 'test'
-  ...
-# Subtest: SESSFINAL-005 historial-login sigue tolerante a fallos
-ok 80 - SESSFINAL-005 historial-login sigue tolerante a fallos
-  ---
-  duration_ms: 0.223218
-  type: 'test'
-  ...
-# Subtest: SESSFINAL-006 F7 Evaluations continúa modularizado
-ok 81 - SESSFINAL-006 F7 Evaluations continúa modularizado
-  ---
-  duration_ms: 0.130667
-  type: 'test'
-  ...
-1..81
-# tests 81
+1..35
+# tests 35
 # suites 0
-# pass 81
+# pass 35
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 225.195673
+# duration_ms 116.795909
 

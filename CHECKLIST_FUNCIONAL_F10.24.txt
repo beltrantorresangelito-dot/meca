@@ -1,0 +1,14 @@
+F10.24 - VALIDACIÓN FUNCIONAL ESTADO DE BASE DE DATOS
+
+1. GET /api/estado-bd: HTTP 200 y campos totalSizeMB, totalSizeFormatted,
+   totalSizeBytes, totalRows, totalTables y tablas.
+2. Formatos: base <1GB en MB; >=1GB en GB; tablas en KB/MB/GB según tamaño.
+3. Tablas: esquema public, orden descendente, tamaños total/tabla/índices y row_count.
+4. totalRows debe coincidir con la suma de row_count; totalTables con tablas.length.
+5. Si falla COUNT(*) de una tabla, el endpoint general no cae y esa tabla queda
+   degradada con tamaños 0 B y row_count=0.
+6. GET /api/estado-bd/tablas: HTTP 200 con tablename, total_size_mb, total_size_bytes.
+7. Error legacy /tablas: HTTP 500 + [].
+8. Ambos endpoints sin Authorization: 401 + { error: 'Token requerido' }.
+9. Sin 500 inesperados, ReferenceError, TypeError ni errores SQL inesperados.
+10. Ejecutar npm test. Esperado: 0 fail.

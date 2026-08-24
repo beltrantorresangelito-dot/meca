@@ -44,8 +44,26 @@ test('MATRIXSAFE-SERVER-002 reglas CRUD ya no están inline', () => {
 });
 
 test('MATRIXSAFE-SERVER-003 recalcular permanece aislado', () => {
+  const fsLocal = require('fs');
+  const pathLocal = require('path');
+
+  const serverActual = fsLocal.readFileSync(
+    pathLocal.resolve(__dirname, '../server.js'),
+    'utf8'
+  );
+
   assert.match(
-    server,
+    serverActual,
+    /createMatrixRecalculationHandler/
+  );
+
+  assert.match(
+    serverActual,
+    /handleMatrixRecalculationRequest/
+  );
+
+  assert.doesNotMatch(
+    serverActual,
     /if \(ruta === '\/api\/matriz\/recalcular' && metodo === 'POST'\)/
   );
 });

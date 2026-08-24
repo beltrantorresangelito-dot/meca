@@ -54,8 +54,26 @@ test('VERSERVER-001 lifecycle ya no está inline en server.js', () => {
 });
 
 test('VERSERVER-002 recalcular permanece aislado para fase posterior', () => {
+  const fsLocal = require('fs');
+  const pathLocal = require('path');
+
+  const serverActual = fsLocal.readFileSync(
+    pathLocal.resolve(__dirname, '../server.js'),
+    'utf8'
+  );
+
   assert.match(
-    serverSource,
+    serverActual,
+    /createMatrixRecalculationHandler/
+  );
+
+  assert.match(
+    serverActual,
+    /handleMatrixRecalculationRequest/
+  );
+
+  assert.doesNotMatch(
+    serverActual,
     /if \(ruta === '\/api\/matriz\/recalcular' && metodo === 'POST'\)/
   );
 });

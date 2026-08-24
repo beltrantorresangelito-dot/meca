@@ -1,0 +1,305 @@
+TAP version 13
+# Subtest: GENQFINAL-001 único punto de entrada es handleGenericQueryRequest
+ok 1 - GENQFINAL-001 único punto de entrada es handleGenericQueryRequest
+  ---
+  duration_ms: 0.861674
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-002 server no instancia capas internas
+ok 2 - GENQFINAL-002 server no instancia capas internas
+  ---
+  duration_ms: 0.173529
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-003 routes conserva POST y parsing JSON
+ok 3 - GENQFINAL-003 routes conserva POST y parsing JSON
+  ---
+  duration_ms: 1.164534
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-004 Controller concentra HTTP y payload PostgreSQL
+ok 4 - GENQFINAL-004 Controller concentra HTTP y payload PostgreSQL
+  ---
+  duration_ms: 0.126178
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-005 Service concentra cinco operaciones
+ok 5 - GENQFINAL-005 Service concentra cinco operaciones
+  ---
+  duration_ms: 0.131756
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-006 Repository concentra SQL y filtros
+ok 6 - GENQFINAL-006 Repository concentra SQL y filtros
+  ---
+  duration_ms: 0.122092
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-007 insert y upsert arrays reinician placeholders
+ok 7 - GENQFINAL-007 insert y upsert arrays reinician placeholders
+  ---
+  duration_ms: 0.187038
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-008 update y delete sin filtros están bloqueados
+ok 8 - GENQFINAL-008 update y delete sin filtros están bloqueados
+  ---
+  duration_ms: 0.098377
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-009 select conserva filtros avanzados
+ok 9 - GENQFINAL-009 select conserva filtros avanzados
+  ---
+  duration_ms: 0.287408
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-010 head count y order limit siguen soportados
+ok 10 - GENQFINAL-010 head count y order limit siguen soportados
+  ---
+  duration_ms: 0.316741
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-011 riesgos pendientes permanecen explícitos
+ok 11 - GENQFINAL-011 riesgos pendientes permanecen explícitos
+  ---
+  duration_ms: 0.183353
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-012 módulos cerrados siguen registrados
+ok 12 - GENQFINAL-012 módulos cerrados siguen registrados
+  ---
+  duration_ms: 0.112988
+  type: 'test'
+  ...
+# Subtest: GENQFINAL-013 autorización central precede dispatcher
+ok 13 - GENQFINAL-013 autorización central precede dispatcher
+  ---
+  duration_ms: 0.135142
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-001 único punto de entrada es handleGenericRpcRequest
+ok 14 - RPCFINAL-001 único punto de entrada es handleGenericRpcRequest
+  ---
+  duration_ms: 1.209712
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-002 server no instancia capas internas
+ok 15 - RPCFINAL-002 server no instancia capas internas
+  ---
+  duration_ms: 0.242351
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-003 routes conserva POST regex y parsing
+ok 16 - RPCFINAL-003 routes conserva POST regex y parsing
+  ---
+  duration_ms: 0.259787
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-004 routes conserva sanitización functionName
+ok 17 - RPCFINAL-004 routes conserva sanitización functionName
+  ---
+  duration_ms: 1.409279
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-005 Controller concentra HTTP y error/code
+ok 18 - RPCFINAL-005 Controller concentra HTTP y error/code
+  ---
+  duration_ms: 0.176012
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-006 Service conserva tres comportamientos
+ok 19 - RPCFINAL-006 Service conserva tres comportamientos
+  ---
+  duration_ms: 0.224965
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-007 cerrar_mes conserva contrato direct
+ok 20 - RPCFINAL-007 cerrar_mes conserva contrato direct
+  ---
+  duration_ms: 0.150635
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-008 limpiar sesiones conserva SQL especial
+ok 21 - RPCFINAL-008 limpiar sesiones conserva SQL especial
+  ---
+  duration_ms: 0.137244
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-009 fallback conserva placeholders y SELECT función
+ok 22 - RPCFINAL-009 fallback conserva placeholders y SELECT función
+  ---
+  duration_ms: 0.461487
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-010 riesgos pendientes permanecen explícitos
+ok 23 - RPCFINAL-010 riesgos pendientes permanecen explícitos
+  ---
+  duration_ms: 0.580365
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-011 Generic Query sigue separado
+ok 24 - RPCFINAL-011 Generic Query sigue separado
+  ---
+  duration_ms: 0.201159
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-012 autorización central precede dispatcher
+ok 25 - RPCFINAL-012 autorización central precede dispatcher
+  ---
+  duration_ms: 0.187138
+  type: 'test'
+  ...
+# Subtest: RPCFINAL-013 módulos cerrados siguen registrados
+ok 26 - RPCFINAL-013 módulos cerrados siguen registrados
+  ---
+  duration_ms: 0.135722
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-001 servirArchivoEstatico sigue inline
+ok 27 - HTTPSHELL-F1050-001 servirArchivoEstatico sigue inline
+  ---
+  duration_ms: 1.347937
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-002 estáticos soportan css js html png jpg svg json
+ok 28 - HTTPSHELL-F1050-002 estáticos soportan css js html png jpg svg json
+  ---
+  duration_ms: 0.329681
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-003 estáticos usan public y 404 Archivo no encontrado
+ok 29 - HTTPSHELL-F1050-003 estáticos usan public y 404 Archivo no encontrado
+  ---
+  duration_ms: 1.413334
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-004 servirVista sigue inline
+ok 30 - HTTPSHELL-F1050-004 servirVista sigue inline
+  ---
+  duration_ms: 0.156724
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-005 vistas usan views y conservan error 500
+ok 31 - HTTPSHELL-F1050-005 vistas usan views y conservan error 500
+  ---
+  duration_ms: 0.187188
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-006 health sigue registrado en mapa routes
+ok 32 - HTTPSHELL-F1050-006 health sigue registrado en mapa routes
+  ---
+  duration_ms: 0.144756
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-007 health consulta SELECT NOW directo
+ok 33 - HTTPSHELL-F1050-007 health consulta SELECT NOW directo
+  ---
+  duration_ms: 0.13423
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-008 health conserva version y timestamp
+ok 34 - HTTPSHELL-F1050-008 health conserva version y timestamp
+  ---
+  duration_ms: 0.14109
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-009 rutas HTML principales existen en bloque temprano
+ok 35 - HTTPSHELL-F1050-009 rutas HTML principales existen en bloque temprano
+  ---
+  duration_ms: 0.428989
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-010 rutas HTML están duplicadas al final
+ok 36 - HTTPSHELL-F1050-010 rutas HTML están duplicadas al final
+  ---
+  duration_ms: 0.646212
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-011 estáticos y partials se sirven antes de módulos negocio posteriores
+ok 37 - HTTPSHELL-F1050-011 estáticos y partials se sirven antes de módulos negocio posteriores
+  ---
+  duration_ms: 0.268039
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-012 fallback 404 permanece al final
+ok 38 - HTTPSHELL-F1050-012 fallback 404 permanece al final
+  ---
+  duration_ms: 0.165606
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-013 registrarRuta sigue siendo helper inline
+ok 39 - HTTPSHELL-F1050-013 registrarRuta sigue siendo helper inline
+  ---
+  duration_ms: 0.129112
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-014 autorización central sigue antes de dispatchers de negocio
+ok 40 - HTTPSHELL-F1050-014 autorización central sigue antes de dispatchers de negocio
+  ---
+  duration_ms: 0.130314
+  type: 'test'
+  ...
+# Subtest: HTTPSHELL-F1050-015 módulos cerrados siguen registrados
+ok 41 - HTTPSHELL-F1050-015 módulos cerrados siguen registrados
+  ---
+  duration_ms: 0.165476
+  type: 'test'
+  ...
+# Subtest: MAILREMOVE-001 nodemailer ya no existe en server.js
+ok 42 - MAILREMOVE-001 nodemailer ya no existe en server.js
+  ---
+  duration_ms: 1.674754
+  type: 'test'
+  ...
+# Subtest: MAILREMOVE-002 createTransport ya no existe
+ok 43 - MAILREMOVE-002 createTransport ya no existe
+  ---
+  duration_ms: 0.198726
+  type: 'test'
+  ...
+# Subtest: MAILREMOVE-003 no quedan variables SMTP del residual
+ok 44 - MAILREMOVE-003 no quedan variables SMTP del residual
+  ---
+  duration_ms: 0.132297
+  type: 'test'
+  ...
+# Subtest: MAILREMOVE-004 no quedan credenciales placeholder
+ok 45 - MAILREMOVE-004 no quedan credenciales placeholder
+  ---
+  duration_ms: 0.10101
+  type: 'test'
+  ...
+# Subtest: MAILREMOVE-005 no existe transporter huérfano
+ok 46 - MAILREMOVE-005 no existe transporter huérfano
+  ---
+  duration_ms: 0.276291
+  type: 'test'
+  ...
+# Subtest: MAILREMOVE-006 vistas HTML siguen presentes
+ok 47 - MAILREMOVE-006 vistas HTML siguen presentes
+  ---
+  duration_ms: 1.06735
+  type: 'test'
+  ...
+# Subtest: MAILREMOVE-007 módulos cerrados siguen registrados
+ok 48 - MAILREMOVE-007 módulos cerrados siguen registrados
+  ---
+  duration_ms: 0.613438
+  type: 'test'
+  ...
+# Subtest: MAILREMOVE-008 server sigue sintácticamente limpio de residual mail
+ok 49 - MAILREMOVE-008 server sigue sintácticamente limpio de residual mail
+  ---
+  duration_ms: 0.119528
+  type: 'test'
+  ...
+1..49
+# tests 49
+# suites 0
+# pass 49
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 105.339759
+
