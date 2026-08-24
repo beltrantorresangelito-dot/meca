@@ -24,6 +24,8 @@ const { createRolesHandler } = require('./src/modules/roles');
 const { createEvaluationsHandler } = require('./src/modules/evaluations');
 const { createSessionsHandler } = require('./src/modules/sessions');
 const { createRequestsHandler } = require('./src/modules/requests');
+const { createPdaHandler } = require('./src/modules/pda');
+const { createQuartileCriteriaHandler } = require('./src/modules/quartile-criteria');
 const handleMatrixReadRequest = createMatrixReadHandler();
 const handleMatrixWriteRequest = createMatrixWriteHandler();
 const handleReportsRequest = createReportsHandler({ db: pool });
@@ -39,6 +41,8 @@ const handleRolesRequest = createRolesHandler({ db: pool });
 const handleEvaluationsRequest = createEvaluationsHandler({ db: pool });
 const handleSessionsRequest = createSessionsHandler({ db: pool });
 const handleRequestsRequest = createRequestsHandler({ db: pool });
+const handlePdaRequest = createPdaHandler({ db: pool });
+const handleQuartileCriteriaRequest = createQuartileCriteriaHandler({ db: pool });
 // Configuración
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -430,223 +434,17 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         return;
     }
 
-    // ======================================================
-    // API - PDA (Plan de Desarrollo y Acción)
-    // ======================================================
-
-    // Obtener PDA pendientes
-    if (ruta === '/api/pda/pendientes' && metodo === 'GET') {
-        console.log('[API] GET /api/pda/pendientes');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            // Verificar si la tabla existe
-            const checkTable = await pool.query(`
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'pda_cabecera'
-                );
-            `);
-
-            if (!checkTable.rows[0].exists) {
-                console.log('⚠️ Tabla pda_cabecera no existe, devolviendo array vacío');
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify([]));
-                return;
-            }
-
-            const result = await pool.query(
-                `SELECT * FROM pda_cabecera 
-                 WHERE estado IN ('pendiente', 'notificado', 'en_gestion') 
-                 ORDER BY created_at DESC`
-            );
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-        } catch (error) {
-            console.error('Error en /api/pda/pendientes:', error);
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify([]));
-        }
+    // F10.5 - PDA MODULE
+    if (await handlePdaRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta
+    })) {
         return;
     }
 
-    // Obtener PDA en seguimiento
-    if (ruta === '/api/pda/seguimiento' && metodo === 'GET') {
-        console.log('[API] GET /api/pda/seguimiento');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const checkTable = await pool.query(`
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'pda_cabecera'
-                );
-            `);
-
-            if (!checkTable.rows[0].exists) {
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify([]));
-                return;
-            }
-
-            const result = await pool.query(
-                `SELECT * FROM pda_cabecera 
-                 WHERE estado = 'en_seguimiento' 
-                 ORDER BY created_at DESC`
-            );
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-        } catch (error) {
-            console.error('Error en /api/pda/seguimiento:', error);
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify([]));
-        }
-        return;
-    }
-
-    // Obtener historial de PDA
-    if (ruta === '/api/pda/historial' && metodo === 'GET') {
-        console.log('[API] GET /api/pda/historial');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const checkTable = await pool.query(`
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'pda_cabecera'
-                );
-            `);
-
-            if (!checkTable.rows[0].exists) {
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify([]));
-                return;
-            }
-
-            const result = await pool.query(
-                `SELECT * FROM pda_cabecera 
-                 WHERE estado IN ('completado', 'escalado', 'corregido') 
-                 ORDER BY created_at DESC 
-                 LIMIT 50`
-            );
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-        } catch (error) {
-            console.error('Error en /api/pda/historial:', error);
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify([]));
-        }
-        return;
-    }
-
-    // Obtener detalle de un PDA específico
-    if (ruta.match(/^\/api\/pda\/\d+$/) && metodo === 'GET') {
-        console.log('[API] GET /api/pda/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const pdaId = ruta.split('/').pop();
-
-        try {
-            // Obtener cabecera
-            const headerResult = await pool.query(
-                'SELECT * FROM pda_cabecera WHERE id = $1',
-                [pdaId]
-            );
-
-            if (headerResult.rows.length === 0) {
-                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'PDA no encontrado' }));
-                return;
-            }
-
-            // Obtener acciones
-            const accionesResult = await pool.query(
-                'SELECT * FROM pda_acciones WHERE pda_id = $1 ORDER BY id',
-                [pdaId]
-            );
-
-            const pda = headerResult.rows[0];
-            pda.acciones = accionesResult.rows;
-
-            // Calcular progreso
-            const totalAcciones = accionesResult.rows.length;
-            const completadas = accionesResult.rows.filter(a => a.completado === true).length;
-            pda.progreso = totalAcciones > 0 ? Math.round((completadas / totalAcciones) * 100) : 0;
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(pda));
-        } catch (error) {
-            console.error('Error en /api/pda/:id:', error);
-            respuesta.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // Exportar reporte PDA
-    if (ruta === '/api/pda/exportar' && metodo === 'GET') {
-        console.log('[API] GET /api/pda/exportar');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const result = await pool.query(`
-                SELECT 
-                    pc.id,
-                    pc.agente,
-                    pc.fecha_deteccion,
-                    pc.estado,
-                    pc.promedio_basal,
-                    pc.cuartil_basal,
-                    COUNT(pa.id) as total_acciones,
-                    SUM(CASE WHEN pa.completado = true THEN 1 ELSE 0 END) as acciones_completadas
-                FROM pda_cabecera pc
-                LEFT JOIN pda_acciones pa ON pc.id = pa.pda_id
-                GROUP BY pc.id, pc.agente, pc.fecha_deteccion, pc.estado, pc.promedio_basal, pc.cuartil_basal
-                ORDER BY pc.created_at DESC
-            `);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-        } catch (error) {
-            console.error('Error en /api/pda/exportar:', error);
-            respuesta.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify([]));
-        }
-        return;
-    }
-
-    // ======================================================
-    // API - SESIONES ACTIVAS (migración de funciones de supervisor.js)
+// API - SESIONES ACTIVAS (migración de funciones de supervisor.js)
     // ======================================================
 
     // Crear sesión activa
@@ -1626,262 +1424,17 @@ const servidor = http.createServer(async (peticion, respuesta) => {
 
     // F2.13: CRUD de reglas de evaluación delegado a MatrixModule.
 
-    // ======================================================
-    // API - CRITERIOS DE CUARTILES (CRUD)
-    // ======================================================
-
-    // 1. OBTENER TODOS LOS CRITERIOS
-    if (ruta === '/api/criterios-cuartiles' && metodo === 'GET') {
-        console.log('[API] GET /api/criterios-cuartiles');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const result = await pool.query(
-                'SELECT * FROM criterios_cuartiles ORDER BY fecha_vigencia_desde DESC, orden ASC'
-            );
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: true, data: result.rows }));
-        } catch (error) {
-            console.error('Error en /api/criterios-cuartiles:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: false, error: error.message }));
-        }
+    // F10.11 - QUARTILE CRITERIA MODULE
+    if (await handleQuartileCriteriaRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta
+    })) {
         return;
     }
 
-    // 2. OBTENER CRITERIOS ACTIVOS
-    if (ruta === '/api/criterios-cuartiles/activos' && metodo === 'GET') {
-        console.log('[API] GET /api/criterios-cuartiles/activos');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const hoy = new Date().toISOString().split('T')[0];
-            const result = await pool.query(
-                `SELECT * FROM criterios_cuartiles 
-                 WHERE activo = true 
-                   AND fecha_vigencia_desde <= $1 
-                   AND (fecha_vigencia_hasta IS NULL OR fecha_vigencia_hasta >= $1)
-                 ORDER BY orden ASC`,
-                [hoy]
-            );
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: true, data: result.rows }));
-        } catch (error) {
-            console.error('Error en /api/criterios-cuartiles/activos:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: false, error: error.message }));
-        }
-        return;
-    }
-
-    // 3. CREAR NUEVO CRITERIO
-    if (ruta === '/api/criterios-cuartiles' && metodo === 'POST') {
-        console.log('[API] POST /api/criterios-cuartiles');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const {
-                    cuartil,
-                    nombre,
-                    limite_inferior,
-                    limite_superior,
-                    color_hex,
-                    icono,
-                    orden,
-                    fecha_vigencia_desde,
-                    fecha_vigencia_hasta,
-                    activo
-                } = JSON.parse(body);
-
-                const fechaHasta = fecha_vigencia_hasta || null;
-
-                const result = await pool.query(
-                    `INSERT INTO criterios_cuartiles 
-                     (cuartil, nombre, limite_inferior, limite_superior, color_hex, icono, orden, 
-                      fecha_vigencia_desde, fecha_vigencia_hasta, creado_por, activo)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                     RETURNING *`,
-                    [
-                        cuartil, nombre, limite_inferior, limite_superior,
-                        color_hex, icono, orden, fecha_vigencia_desde,
-                        fechaHasta, 'admin', activo !== false
-                    ]
-                );
-
-                console.log(`✅ Criterio creado: ${nombre} (${cuartil})`);
-                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true, data: result.rows[0] }));
-            } catch (error) {
-                console.error('❌ Error creando criterio:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: false, error: error.message }));
-            }
-        });
-        return;
-    }
-
-    // 4. ACTUALIZAR CRITERIO
-    if (ruta.match(/^\/api\/criterios-cuartiles\/\d+$/) && metodo === 'PUT') {
-        console.log('[API] PUT /api/criterios-cuartiles/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/').pop());
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const {
-                    cuartil, nombre, limite_inferior, limite_superior,
-                    color_hex, icono, orden, fecha_vigencia_desde,
-                    fecha_vigencia_hasta, activo
-                } = JSON.parse(body);
-
-                const fechaHasta = fecha_vigencia_hasta || null;
-
-                const result = await pool.query(
-                    `UPDATE criterios_cuartiles 
-                     SET cuartil = $1, nombre = $2, limite_inferior = $3, limite_superior = $4, 
-                         color_hex = $5, icono = $6, orden = $7, activo = $8,
-                         fecha_vigencia_desde = $9, fecha_vigencia_hasta = $10,
-                         updated_at = CURRENT_TIMESTAMP
-                     WHERE id = $11
-                     RETURNING *`,
-                    [
-                        cuartil, nombre, limite_inferior, limite_superior,
-                        color_hex, icono, orden, activo !== false,
-                        fecha_vigencia_desde, fechaHasta, id
-                    ]
-                );
-
-                if (result.rows.length === 0) {
-                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
-                    return;
-                }
-
-                console.log(`✅ Criterio actualizado: ${nombre} (${cuartil})`);
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true, data: result.rows[0] }));
-            } catch (error) {
-                console.error('❌ Error actualizando criterio:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: false, error: error.message }));
-            }
-        });
-        return;
-    }
-
-    // 5. DESACTIVAR CRITERIO (DELETE)
-    if (ruta.match(/^\/api\/criterios-cuartiles\/\d+$/) && metodo === 'DELETE') {
-        console.log('[API] DELETE /api/criterios-cuartiles/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/').pop());
-
-        try {
-            const check = await pool.query(
-                'SELECT id, nombre FROM criterios_cuartiles WHERE id = $1',
-                [id]
-            );
-
-            if (check.rows.length === 0) {
-                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
-                return;
-            }
-
-            const nombre = check.rows[0].nombre;
-
-            await pool.query(
-                'UPDATE criterios_cuartiles SET activo = false, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-                [id]
-            );
-
-            console.log(`✅ Criterio "${nombre}" desactivado (ID: ${id})`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({
-                success: true,
-                message: `Criterio "${nombre}" desactivado correctamente`
-            }));
-        } catch (error) {
-            console.error('❌ Error desactivando criterio:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: false, error: error.message }));
-        }
-        return;
-    }
-
-    // 6. ACTIVAR CRITERIO
-    if (ruta.match(/^\/api\/criterios-cuartiles\/\d+\/activar$/) && metodo === 'POST') {
-        console.log('[API] POST /api/criterios-cuartiles/:id/activar');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const id = parseInt(ruta.split('/')[3]);
-
-        try {
-            const result = await pool.query(
-                'UPDATE criterios_cuartiles SET activo = true, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
-                [id]
-            );
-
-            if (result.rows.length === 0) {
-                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: false, error: 'Criterio no encontrado' }));
-                return;
-            }
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: true, data: result.rows[0] }));
-        } catch (error) {
-            console.error('Error activando criterio:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: false, error: error.message }));
-        }
-        return;
-    }
-
-    // ======================================================
-    // API - ESCUCHAS - Obtener tickets por lote
+// API - ESCUCHAS - Obtener tickets por lote
     // ======================================================
     // server.js - ENDPOINT PARA ENVIAR CORREO
     // ======================================================

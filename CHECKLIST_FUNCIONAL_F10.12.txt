@@ -1,0 +1,57 @@
+F10.12 - VALIDACIÓN FUNCIONAL CRITERIOS DE CUARTILES
+
+1. LISTADO GENERAL
+   - Abrir la pantalla/flujo que consume GET /api/criterios-cuartiles.
+   - Confirmar HTTP 200.
+   - Confirmar orden:
+     fecha_vigencia_desde DESC, orden ASC.
+
+2. CRITERIOS ACTIVOS
+   - Consultar GET /api/criterios-cuartiles/activos.
+   - Confirmar solo activo=true.
+   - Confirmar vigencia según fecha actual.
+   - Confirmar orden ASC.
+
+3. CREAR CRITERIO
+   - Crear un criterio desde la UI real.
+   - Confirmar HTTP 201.
+   - Confirmar respuesta:
+     { success: true, data: {...} }
+   - Confirmar fecha_vigencia_hasta nullable.
+   - Confirmar activo por defecto cuando no se envía false.
+
+4. ACTUALIZAR CRITERIO
+   - Actualizar un criterio existente.
+   - Confirmar HTTP 200.
+   - Confirmar campos actualizados.
+   - Con ID inexistente debe devolver:
+     404 + { success: false, error: 'Criterio no encontrado' }.
+
+5. DESACTIVAR
+   - Ejecutar DELETE /api/criterios-cuartiles/:id.
+   - Confirmar que NO elimina físicamente.
+   - Confirmar activo=false.
+   - Confirmar mensaje "desactivado correctamente".
+   - ID inexistente debe devolver 404.
+
+6. ACTIVAR
+   - Ejecutar POST /api/criterios-cuartiles/:id/activar.
+   - Confirmar activo=true.
+   - ID inexistente debe devolver 404.
+
+7. TOKEN
+   - Probar los 6 endpoints sin Authorization.
+   - Todos deben devolver 401 + { error: 'Token requerido' }.
+
+8. CONSOLA / NETWORK
+   No deben aparecer:
+   - 500 inesperados
+   - ReferenceError
+   - TypeError
+   - 404 inesperados para operaciones válidas
+
+9. AUTOMATIZADO
+   npm test
+
+Esperado:
+0 fail.

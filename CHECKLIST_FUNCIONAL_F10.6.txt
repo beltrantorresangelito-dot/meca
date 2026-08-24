@@ -1,0 +1,46 @@
+F10.6 - VALIDACIÓN FUNCIONAL PDA
+
+1. PENDIENTES
+   - Abrir la vista/flujo que consume /api/pda/pendientes.
+   - Confirmar HTTP 200.
+   - Confirmar estados: pendiente, notificado, en_gestion.
+   - Si pda_cabecera no existe, debe devolver [] y no romper la UI.
+
+2. SEGUIMIENTO
+   - Consultar /api/pda/seguimiento.
+   - Confirmar solo estado en_seguimiento.
+   - Si la tabla no existe, debe devolver [].
+
+3. HISTORIAL
+   - Consultar /api/pda/historial.
+   - Confirmar estados completado, escalado y corregido.
+   - Confirmar límite de 50 registros.
+   - Si la tabla no existe, debe devolver [].
+
+4. DETALLE
+   - Consultar un PDA existente.
+   - Debe devolver cabecera + acciones.
+   - Confirmar porcentaje progreso correcto.
+   - Con ID inexistente debe devolver 404 + { error: 'PDA no encontrado' }.
+
+5. EXPORTACIÓN
+   - Consultar /api/pda/exportar.
+   - Confirmar total_acciones y acciones_completadas.
+   - Confirmar HTTP 200 cuando funciona.
+
+6. TOKEN
+   - Probar cada endpoint PDA sin Authorization.
+   - Todos deben devolver 401 + { error: 'Token requerido' }.
+
+7. CONSOLA / NETWORK
+   No deben aparecer:
+   - 500 inesperados
+   - ReferenceError
+   - TypeError
+   - 404 inesperados en endpoints válidos
+
+8. AUTOMATIZADO
+   npm test
+
+Esperado:
+0 fail.
