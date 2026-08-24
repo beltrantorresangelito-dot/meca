@@ -1,0 +1,48 @@
+F9.6 - VALIDACIÓN FUNCIONAL DE SOLICITUDES / REQUERIMIENTOS
+
+1. LISTADO GENERAL
+   - Abrir la funcionalidad que lista solicitudes.
+   - Confirmar que devuelve registros ordenados por created_at DESC.
+
+2. LISTADO POR USUARIO
+   - Consultar /api/solicitudes/usuario/:id.
+   - Confirmar que solo devuelve solicitudes del solicitante indicado.
+
+3. CREAR SOLICITUD
+   - Crear una solicitud desde la UI real.
+   - Confirmar HTTP 201.
+   - Confirmar respuesta:
+     { success: true, solicitud: {...} }
+
+4. CONSULTAR POR ID
+   - Consultar una solicitud existente con Authorization.
+   - Debe devolver 200 + objeto.
+   - Consultar una inexistente.
+   - Debe devolver 404 + { error: 'Solicitud no encontrada' }.
+
+5. ACTUALIZAR ESTADO
+   - Ejecutar PUT /api/solicitudes/:id con Authorization.
+   - Confirmar que actualiza estado y campos opcionales vinculados.
+   - Si el ID no existe, debe devolver 404.
+
+6. TOKEN
+   - Probar GET /api/solicitudes/:id sin Authorization.
+   - Probar PUT /api/solicitudes/:id sin Authorization.
+   - Ambos deben devolver 401 + { error: 'Token requerido' }.
+
+7. CREACIÓN DINÁMICA LEGACY
+   - Confirmar que la UI actual sigue creando solicitudes con los campos que hoy envía.
+   - No modificar todavía ese contrato en esta fase.
+
+8. CONSOLA / NETWORK
+   No deben aparecer:
+   - 500 inesperados
+   - ReferenceError
+   - TypeError
+   - 404 inesperados en endpoints válidos
+
+9. AUTOMATIZADO
+   npm test
+
+Esperado:
+0 fail.

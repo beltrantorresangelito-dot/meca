@@ -23,6 +23,7 @@ const { createUsersHandler } = require('./src/modules/users');
 const { createRolesHandler } = require('./src/modules/roles');
 const { createEvaluationsHandler } = require('./src/modules/evaluations');
 const { createSessionsHandler } = require('./src/modules/sessions');
+const { createRequestsHandler } = require('./src/modules/requests');
 const handleMatrixReadRequest = createMatrixReadHandler();
 const handleMatrixWriteRequest = createMatrixWriteHandler();
 const handleReportsRequest = createReportsHandler({ db: pool });
@@ -37,6 +38,7 @@ const handleUsersRequest = createUsersHandler({
 const handleRolesRequest = createRolesHandler({ db: pool });
 const handleEvaluationsRequest = createEvaluationsHandler({ db: pool });
 const handleSessionsRequest = createSessionsHandler({ db: pool });
+const handleRequestsRequest = createRequestsHandler({ db: pool });
 // Configuración
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -354,76 +356,14 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // ======================================================
 
     // Obtener solicitudes de un usuario
-    if (ruta.match(/^\/api\/solicitudes\/usuario\/\d+$/) && metodo === 'GET') {
-        console.log('[API] GET solicitudes por usuario');
-
-        const usuarioId = parseInt(ruta.split('/').pop());
-
-        try {
-            const result = await pool.query(
-                'SELECT * FROM solicitudes_requerimientos WHERE solicitante_id = $1 ORDER BY created_at DESC',
-                [usuarioId]
-            );
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows || []));
-
-        } catch (error) {
-            console.error('Error en solicitudes/usuario:', error);
-            respuesta.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // Obtener todas las solicitudes
-    if (ruta === '/api/solicitudes' && metodo === 'GET') {
-        console.log('[API] GET todas las solicitudes');
-
-        try {
-            const result = await pool.query(
-                'SELECT * FROM solicitudes_requerimientos ORDER BY created_at DESC'
-            );
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows || []));
-
-        } catch (error) {
-            console.error('Error en solicitudes:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // Crear nueva solicitud
-    if (ruta === '/api/solicitudes' && metodo === 'POST') {
-        console.log('[API] POST nueva solicitud');
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const nueva = JSON.parse(body);
-                const keys = Object.keys(nueva);
-                const values = Object.values(nueva);
-                const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-                const colNames = keys.join(', ');
-
-                const result = await pool.query(
-                    `INSERT INTO solicitudes_requerimientos (${colNames}) VALUES (${placeholders}) RETURNING *`,
-                    values
-                );
-
-                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true, solicitud: result.rows[0] }));
-
-            } catch (error) {
-                console.error('Error creando solicitud:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
+    // F9.5 - REQUESTS MODULE
+    if (await handleRequestsRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta,
+        query: urlParseada.query
+    })) {
         return;
     }
 
@@ -1659,117 +1599,6 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // ======================================================
     // API - SOLICITUDES - Obtener una solicitud por ID
     // ======================================================
-    if (ruta.match(/^\/api\/solicitudes\/\d+$/) && metodo === 'GET') {
-        console.log('[API] GET /api/solicitudes/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        const id = parseInt(ruta.split('/').pop());
-
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        try {
-            const result = await pool.query(
-                'SELECT * FROM solicitudes_requerimientos WHERE id = $1',
-                [id]
-            );
-
-            if (result.rows.length === 0) {
-                respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: 'Solicitud no encontrada' }));
-                return;
-            }
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows[0]));
-
-        } catch (error) {
-            console.error('Error obteniendo solicitud:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ======================================================
-    // API - SOLICITUDES - Actualizar estado
-    // ======================================================
-    if (ruta.match(/^\/api\/solicitudes\/\d+$/) && metodo === 'PUT') {
-        console.log('[API] PUT /api/solicitudes/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        const id = parseInt(ruta.split('/').pop());
-
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { estado, fecha_aprobacion, fecha_inicio_desarrollo, fecha_entrega,
-                    responsable_asignado, tiempo_estimado_horas, motivo_rechazo } = JSON.parse(body);
-
-                let query = 'UPDATE solicitudes_requerimientos SET estado = $1, updated_at = NOW()';
-                const values = [estado];
-                let idx = 2;
-
-                if (fecha_aprobacion) {
-                    query += `, fecha_aprobacion = $${idx++}`;
-                    values.push(fecha_aprobacion);
-                }
-                if (fecha_inicio_desarrollo) {
-                    query += `, fecha_inicio_desarrollo = $${idx++}`;
-                    values.push(fecha_inicio_desarrollo);
-                }
-                if (fecha_entrega) {
-                    query += `, fecha_entrega = $${idx++}`;
-                    values.push(fecha_entrega);
-                }
-                if (responsable_asignado !== undefined) {
-                    query += `, responsable_asignado = $${idx++}`;
-                    values.push(responsable_asignado);
-                }
-                if (tiempo_estimado_horas !== undefined) {
-                    query += `, tiempo_estimado_horas = $${idx++}`;
-                    values.push(tiempo_estimado_horas);
-                }
-                if (motivo_rechazo !== undefined) {
-                    query += `, motivo_rechazo = $${idx++}`;
-                    values.push(motivo_rechazo);
-                }
-
-                query += ` WHERE id = $${idx}`;
-                values.push(id);
-
-                const result = await pool.query(query, values);
-
-                if (result.rowCount === 0) {
-                    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
-                    respuesta.end(JSON.stringify({ error: 'Solicitud no encontrada' }));
-                    return;
-                }
-
-                console.log(`✅ Solicitud ${id} actualizada a estado: ${estado}`);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true }));
-
-            } catch (error) {
-                console.error('Error:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
     // F2.13: /api/evaluacion/estructura delegado a MatrixModule.
 
     // ======================================================
