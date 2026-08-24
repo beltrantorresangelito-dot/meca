@@ -1,0 +1,12 @@
+F7.6 - VALIDACIÓN FUNCIONAL
+
+1. Login con usuario autorizado.
+2. Cargar listado de evaluaciones.
+3. Probar filtros usados por la UI.
+4. Validar ticket existente e inexistente.
+5. Crear una evaluación de prueba: esperar HTTP 201.
+6. Confirmar cabecera + detalles persistidos.
+7. Abrir detalles de una evaluación.
+8. Eliminar una evaluación de prueba.
+9. Revisar Console/Network: sin 500, ReferenceError, TypeError ni 404 inesperados.
+10. Ejecutar npm test: esperado 0 fail.

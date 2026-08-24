@@ -1,0 +1,358 @@
+TAP version 13
+# Subtest: EVALFINAL-001 único punto de entrada es handleEvaluationsRequest
+ok 1 - EVALFINAL-001 único punto de entrada es handleEvaluationsRequest
+  ---
+  duration_ms: 0.706242
+  type: 'test'
+  ...
+# Subtest: EVALFINAL-002 server ya no contiene SQL principal de Evaluaciones
+ok 2 - EVALFINAL-002 server ya no contiene SQL principal de Evaluaciones
+  ---
+  duration_ms: 0.306687
+  type: 'test'
+  ...
+# Subtest: EVALFINAL-003 routes conserva contratos GET POST DELETE
+ok 3 - EVALFINAL-003 routes conserva contratos GET POST DELETE
+  ---
+  duration_ms: 0.16752
+  type: 'test'
+  ...
+# Subtest: EVALFINAL-004 POST inválido conserva 400
+ok 4 - EVALFINAL-004 POST inválido conserva 400
+  ---
+  duration_ms: 0.150113
+  type: 'test'
+  ...
+# Subtest: EVALFINAL-005 autorización central ocurre antes del dispatcher
+ok 5 - EVALFINAL-005 autorización central ocurre antes del dispatcher
+  ---
+  duration_ms: 0.156243
+  type: 'test'
+  ...
+# Subtest: EVALMOD-SERVER-001 server delega al módulo
+ok 6 - EVALMOD-SERVER-001 server delega al módulo
+  ---
+  duration_ms: 0.965489
+  type: 'test'
+  ...
+# Subtest: EVALMOD-SERVER-002 server no contiene SQL de evaluaciones
+ok 7 - EVALMOD-SERVER-002 server no contiene SQL de evaluaciones
+  ---
+  duration_ms: 0.345194
+  type: 'test'
+  ...
+# Subtest: EVALMOD-SERVER-003 server no contiene handlers inline
+ok 8 - EVALMOD-SERVER-003 server no contiene handlers inline
+  ---
+  duration_ms: 0.196182
+  type: 'test'
+  ...
+# Subtest: SESSCHAR-F85-001 server registra dispatcher
+ok 9 - SESSCHAR-F85-001 server registra dispatcher
+  ---
+  duration_ms: 0.942354
+  type: 'test'
+  ...
+# Subtest: SESSCHAR-F85-002 rutas migraron
+ok 10 - SESSCHAR-F85-002 rutas migraron
+  ---
+  duration_ms: 0.15468
+  type: 'test'
+  ...
+# Subtest: SESSCHAR-F85-003 parsing migró a routes
+ok 11 - SESSCHAR-F85-003 parsing migró a routes
+  ---
+  duration_ms: 0.244714
+  type: 'test'
+  ...
+# Subtest: SESSCHAR-F85-004 Token requerido preservado
+ok 12 - SESSCHAR-F85-004 Token requerido preservado
+  ---
+  duration_ms: 0.150975
+  type: 'test'
+  ...
+# Subtest: SESSCHAR-F85-005 server ya no conoce capas internas
+ok 13 - SESSCHAR-F85-005 server ya no conoce capas internas
+  ---
+  duration_ms: 0.331474
+  type: 'test'
+  ...
+# Subtest: SESSCHAR-F85-006 F7 permanece modularizado
+ok 14 - SESSCHAR-F85-006 F7 permanece modularizado
+  ---
+  duration_ms: 0.14125
+  type: 'test'
+  ...
+# Subtest: SESSFIX-811-001 closeSession delega controller
+ok 15 - SESSFIX-811-001 closeSession delega controller
+  ---
+  duration_ms: 0.788645
+  type: 'test'
+  ...
+# Subtest: SESSFIX-811-002 afectadas permanece en Controller
+ok 16 - SESSFIX-811-002 afectadas permanece en Controller
+  ---
+  duration_ms: 0.206627
+  type: 'test'
+  ...
+# Subtest: SESSFIX-811-003 historial conserva 200 tolerante
+ok 17 - SESSFIX-811-003 historial conserva 200 tolerante
+  ---
+  duration_ms: 0.129883
+  type: 'test'
+  ...
+# ✅ 1 sesiones encontradas para usuario 1
+# ✅ Sesión cerrada: 3 afectadas
+# ✅ Cerradas 4 sesiones para usuario 1
+# Error cerrando sesión: Error: Token requerido
+#     at Object.closeSession [90m(/mnt/data/f86_check_retry/[39mtests/sessions.controller.f84.test.js:109:21[90m)[39m
+#     at SessionsController.closeSession [90m(/mnt/data/f86_check_retry/[39msrc/modules/sessions/sessions.controller.js:57:28[90m)[39m
+#     at TestContext.<anonymous> [90m(/mnt/data/f86_check_retry/[39mtests/sessions.controller.f84.test.js:117:14[90m)[39m
+# [90m    at Test.runInAsyncScope (node:async_hooks:214:14)[39m
+# [90m    at Test.run (node:internal/test_runner/test:1047:25)[39m
+# [90m    at Test.processPendingSubtests (node:internal/test_runner/test:744:18)[39m
+# [90m    at Test.postRun (node:internal/test_runner/test:1173:19)[39m
+# [90m    at Test.run (node:internal/test_runner/test:1101:12)[39m
+# [90m    at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)[39m {
+#   status: [33m400[39m
+# }
+# Error registrando historial login: Error: historial down
+#     at Object.registerLoginHistory [90m(/mnt/data/f86_check_retry/[39mtests/sessions.controller.f84.test.js:131:13[90m)[39m
+#     at SessionsController.registerLoginHistory [90m(/mnt/data/f86_check_retry/[39msrc/modules/sessions/sessions.controller.js:109:26[90m)[39m
+#     at TestContext.<anonymous> [90m(/mnt/data/f86_check_retry/[39mtests/sessions.controller.f84.test.js:137:14[90m)[39m
+# [90m    at Test.runInAsyncScope (node:async_hooks:214:14)[39m
+# [90m    at Test.run (node:internal/test_runner/test:1047:25)[39m
+# [90m    at Test.processPendingSubtests (node:internal/test_runner/test:744:18)[39m
+# [90m    at Test.postRun (node:internal/test_runner/test:1173:19)[39m
+# [90m    at Test.run (node:internal/test_runner/test:1101:12)[39m
+# [90m    at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)[39m
+# Error obteniendo sesiones: Error: boom
+#     at Object.listUserSessions [90m(/mnt/data/f86_check_retry/[39mtests/sessions.controller.f84.test.js:151:13[90m)[39m
+#     at SessionsController.listUserSessions [90m(/mnt/data/f86_check_retry/[39msrc/modules/sessions/sessions.controller.js:33:39[90m)[39m
+#     at TestContext.<anonymous> [90m(/mnt/data/f86_check_retry/[39mtests/sessions.controller.f84.test.js:157:14[90m)[39m
+# [90m    at Test.runInAsyncScope (node:async_hooks:214:14)[39m
+# [90m    at Test.run (node:internal/test_runner/test:1047:25)[39m
+# [90m    at Test.processPendingSubtests (node:internal/test_runner/test:744:18)[39m
+# [90m    at Test.postRun (node:internal/test_runner/test:1173:19)[39m
+# [90m    at Test.run (node:internal/test_runner/test:1101:12)[39m
+# [90m    at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)[39m
+# Subtest: SESSCTRL-001 createSession conserva 200 success true
+ok 18 - SESSCTRL-001 createSession conserva 200 success true
+  ---
+  duration_ms: 1.686623
+  type: 'test'
+  ...
+# Subtest: SESSCTRL-002 listUserSessions devuelve array
+ok 19 - SESSCTRL-002 listUserSessions devuelve array
+  ---
+  duration_ms: 1.00683
+  type: 'test'
+  ...
+# Subtest: SESSCTRL-003 closeSession conserva afectadas
+ok 20 - SESSCTRL-003 closeSession conserva afectadas
+  ---
+  duration_ms: 0.453035
+  type: 'test'
+  ...
+# Subtest: SESSCTRL-004 closeAll conserva cerradas
+ok 21 - SESSCTRL-004 closeAll conserva cerradas
+  ---
+  duration_ms: 0.318394
+  type: 'test'
+  ...
+# Subtest: SESSCTRL-005 status de error del Service se respeta
+ok 22 - SESSCTRL-005 status de error del Service se respeta
+  ---
+  duration_ms: 1.62393
+  type: 'test'
+  ...
+# Subtest: SESSCTRL-006 historial conserva 200 aun con error
+ok 23 - SESSCTRL-006 historial conserva 200 aun con error
+  ---
+  duration_ms: 0.491152
+  type: 'test'
+  ...
+# Subtest: SESSCTRL-007 error sin status cae en 500
+ok 24 - SESSCTRL-007 error sin status cae en 500
+  ---
+  duration_ms: 0.520476
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-001 único punto de entrada en server es handleSessionsRequest
+ok 25 - SESSFINAL-001 único punto de entrada en server es handleSessionsRequest
+  ---
+  duration_ms: 1.057847
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-002 server ya no instancia capas internas de Sessions
+ok 26 - SESSFINAL-002 server ya no instancia capas internas de Sessions
+  ---
+  duration_ms: 0.233898
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-003 routes conserva cinco contratos principales
+ok 27 - SESSFINAL-003 routes conserva cinco contratos principales
+  ---
+  duration_ms: 0.243924
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-004 Token requerido sigue preservado
+ok 28 - SESSFINAL-004 Token requerido sigue preservado
+  ---
+  duration_ms: 0.153328
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-005 historial-login sigue tolerante a fallos
+ok 29 - SESSFINAL-005 historial-login sigue tolerante a fallos
+  ---
+  duration_ms: 0.234169
+  type: 'test'
+  ...
+# Subtest: SESSFINAL-006 F7 Evaluations continúa modularizado
+ok 30 - SESSFINAL-006 F7 Evaluations continúa modularizado
+  ---
+  duration_ms: 0.189022
+  type: 'test'
+  ...
+# Subtest: SESSMOD-SERVER-001 server delega al módulo
+ok 31 - SESSMOD-SERVER-001 server delega al módulo
+  ---
+  duration_ms: 0.719532
+  type: 'test'
+  ...
+# Subtest: SESSMOD-SERVER-002 handlers ya no están inline
+ok 32 - SESSMOD-SERVER-002 handlers ya no están inline
+  ---
+  duration_ms: 0.189523
+  type: 'test'
+  ...
+# Subtest: SESSMOD-SERVER-003 server no instancia capas internas
+ok 33 - SESSMOD-SERVER-003 server no instancia capas internas
+  ---
+  duration_ms: 0.169984
+  type: 'test'
+  ...
+# Subtest: SESSMOD-SERVER-004 F7 sigue modularizado
+ok 34 - SESSMOD-SERVER-004 F7 sigue modularizado
+  ---
+  duration_ms: 0.098406
+  type: 'test'
+  ...
+# Subtest: SESSMOD-001 index exporta cuatro piezas
+ok 35 - SESSMOD-001 index exporta cuatro piezas
+  ---
+  duration_ms: 0.631151
+  type: 'test'
+  ...
+# Subtest: SESSMOD-002 ruta ajena devuelve false
+ok 36 - SESSMOD-002 ruta ajena devuelve false
+  ---
+  duration_ms: 0.313106
+  type: 'test'
+  ...
+# Subtest: SESSMOD-003 GET sin token devuelve 401
+ok 37 - SESSMOD-003 GET sin token devuelve 401
+  ---
+  duration_ms: 0.731009
+  type: 'test'
+  ...
+# Subtest: SESSMOD-004 historial inválido conserva 200
+ok 38 - SESSMOD-004 historial inválido conserva 200
+  ---
+  duration_ms: 0.297583
+  type: 'test'
+  ...
+# Subtest: SESSREPO-001 upsert conserva ON CONFLICT
+ok 39 - SESSREPO-001 upsert conserva ON CONFLICT
+  ---
+  duration_ms: 1.213037
+  type: 'test'
+  ...
+# Subtest: SESSREPO-002 listado conserva columnas y filtro
+ok 40 - SESSREPO-002 listado conserva columnas y filtro
+  ---
+  duration_ms: 0.211475
+  type: 'test'
+  ...
+# Subtest: SESSREPO-003 closeSession devuelve rowCount
+ok 41 - SESSREPO-003 closeSession devuelve rowCount
+  ---
+  duration_ms: 0.151966
+  type: 'test'
+  ...
+# Subtest: SESSREPO-004 closeAllForUser devuelve rowCount
+ok 42 - SESSREPO-004 closeAllForUser devuelve rowCount
+  ---
+  duration_ms: 0.144635
+  type: 'test'
+  ...
+# Subtest: SESSREPO-005 historial conserva NOW
+ok 43 - SESSREPO-005 historial conserva NOW
+  ---
+  duration_ms: 0.197745
+  type: 'test'
+  ...
+# Subtest: SESSSVC-001 createSession valida objeto
+ok 44 - SESSSVC-001 createSession valida objeto
+  ---
+  duration_ms: 1.493795
+  type: 'test'
+  ...
+# Subtest: SESSSVC-002 createSession exige usuarioId y tokenSesion
+ok 45 - SESSSVC-002 createSession exige usuarioId y tokenSesion
+  ---
+  duration_ms: 0.195772
+  type: 'test'
+  ...
+# Subtest: SESSSVC-003 createSession delega al repository
+ok 46 - SESSSVC-003 createSession delega al repository
+  ---
+  duration_ms: 0.500116
+  type: 'test'
+  ...
+# Subtest: SESSSVC-004 listUserSessions valida id
+ok 47 - SESSSVC-004 listUserSessions valida id
+  ---
+  duration_ms: 0.165156
+  type: 'test'
+  ...
+# Subtest: SESSSVC-005 listUserSessions delega opciones
+ok 48 - SESSSVC-005 listUserSessions delega opciones
+  ---
+  duration_ms: 0.157194
+  type: 'test'
+  ...
+# Subtest: SESSSVC-006 closeSession valida token
+ok 49 - SESSSVC-006 closeSession valida token
+  ---
+  duration_ms: 0.30815
+  type: 'test'
+  ...
+# Subtest: SESSSVC-007 closeSession delega repository
+ok 50 - SESSSVC-007 closeSession delega repository
+  ---
+  duration_ms: 0.248861
+  type: 'test'
+  ...
+# Subtest: SESSSVC-008 closeAllForUser valida id
+ok 51 - SESSSVC-008 closeAllForUser valida id
+  ---
+  duration_ms: 0.220448
+  type: 'test'
+  ...
+# Subtest: SESSSVC-009 registerLoginHistory delega repository
+ok 52 - SESSSVC-009 registerLoginHistory delega repository
+  ---
+  duration_ms: 0.480286
+  type: 'test'
+  ...
+1..52
+# tests 52
+# suites 0
+# pass 52
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 165.070856
+

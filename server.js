@@ -21,6 +21,8 @@ const { createAgentsHandler } = require('./src/modules/agents');
 const { createListeningsHandler } = require('./src/modules/listenings');
 const { createUsersHandler } = require('./src/modules/users');
 const { createRolesHandler } = require('./src/modules/roles');
+const { createEvaluationsHandler } = require('./src/modules/evaluations');
+const { createSessionsHandler } = require('./src/modules/sessions');
 const handleMatrixReadRequest = createMatrixReadHandler();
 const handleMatrixWriteRequest = createMatrixWriteHandler();
 const handleReportsRequest = createReportsHandler({ db: pool });
@@ -33,6 +35,8 @@ const handleUsersRequest = createUsersHandler({
     signToken
 });
 const handleRolesRequest = createRolesHandler({ db: pool });
+const handleEvaluationsRequest = createEvaluationsHandler({ db: pool });
+const handleSessionsRequest = createSessionsHandler({ db: pool });
 // Configuración
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -52,9 +56,6 @@ function registrarRuta(metodo, ruta, manejador) {
     if (!routes[ruta]) routes[ruta] = {};
     routes[ruta][metodo] = manejador;
 }
-
-
-
 
 // ======================================================
 // BLOQUE 0: Servir archivos estáticos y vistas
@@ -426,174 +427,16 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         return;
     }
 
-    // ======================================================
-    // API - EVALUACIONES
-    // ======================================================
-
-    // Obtener evaluaciones con filtros
-    if (ruta === '/api/evaluaciones' && metodo === 'GET') {
-        console.log('[API] GET evaluaciones');
-
-        try {
-            const { agente, evaluador, ticket, limite } = urlParseada.query;
-            let query = 'SELECT * FROM evaluaciones WHERE 1=1';
-            const params = [];
-            let idx = 1;
-
-            if (agente) { query += ` AND agente = $${idx++}`; params.push(agente); }
-            if (evaluador) { query += ` AND evaluador = $${idx++}`; params.push(evaluador); }
-            if (ticket) { query += ` AND ticket_psi = $${idx++}`; params.push(ticket); }
-
-            query += ' ORDER BY timestamp DESC';
-
-            if (limite) { query += ` LIMIT $${idx++}`; params.push(parseInt(limite)); }
-
-            const result = await pool.query(query, params);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('Error en evaluaciones:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
+    // F7.5 - EVALUATIONS MODULE
+    if (await handleEvaluationsRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta,
+        query: urlParseada.query
+    })) {
         return;
     }
-
-    // Guardar evaluación (con detalles)
-    if (ruta === '/api/evaluaciones' && metodo === 'POST') {
-        console.log('[API] POST evaluacion');
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            const client = await pool.connect();
-            try {
-                await client.query('BEGIN');
-                const evaluacion = JSON.parse(body);
-
-                // 1. Insertar evaluación principal
-                await client.query(`
-                    INSERT INTO evaluaciones (id, timestamp, fecha, fecha_formateada, ticket_psi, agente, evaluador,
-                        id_llamada, fecha_descarga, total_enc, total_ecuf, total_ecn, nota_final, rango,
-                        tiempo_auditoria, tiempo_auditoria_formateado, fecha_registro, version_matriz_id)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
-                `, [
-                    evaluacion.id, evaluacion.timestamp, evaluacion.fecha, evaluacion.fechaFormateada,
-                    evaluacion.ticketPSI, evaluacion.agente, evaluacion.evaluador, evaluacion.idLlamada,
-                    evaluacion.fechaDescarga || null, evaluacion.totalENC, evaluacion.totalECUF,
-                    evaluacion.totalECN, evaluacion.notaFinal, evaluacion.rango, evaluacion.tiempoAuditoria,
-                    evaluacion.tiempoAuditoriaFormateado, evaluacion.fechaRegistro,
-                    evaluacion.versionMatrizId || null  // 🔴 NUEVO CAMPO
-                ]);
-
-                // 2. Insertar detalles
-                if (evaluacion.detalles && evaluacion.detalles.length > 0) {
-                    for (const d of evaluacion.detalles) {
-                        if (!d.submotivo) continue;
-                        await client.query(`
-                            INSERT INTO detalles_evaluacion (evaluacion_id, bloque, atributo, submotivo, peso, cumple)
-                            VALUES ($1, $2, $3, $4, $5, $6)
-                        `, [
-                            evaluacion.id, String(d.bloque || ''), String(d.atributo || ''),
-                            String(d.submotivo), Number(d.peso) || 0,
-                            d.cumple === true || d.cumple === 'true' || d.cumple === 1 || d.cumple === '1'
-                        ]);
-                    }
-                }
-
-                await client.query('COMMIT');
-
-                respuesta.writeHead(201, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify(result));
-
-            } catch (error) {
-                await client.query('ROLLBACK');
-                console.error('Error guardando evaluacion:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            } finally {
-                client.release();
-            }
-        });
-        return;
-    }
-
-    // Eliminar evaluación
-    if (ruta.match(/^\/api\/evaluaciones\/[\w-]+$/) && metodo === 'DELETE') {
-        console.log('[API] DELETE evaluacion');
-
-        const evalId = ruta.split('/').pop();
-
-        const client = await pool.connect();
-        try {
-            await client.query('BEGIN');
-            await client.query('DELETE FROM detalles_evaluacion WHERE evaluacion_id = $1', [evalId]);
-            await client.query('DELETE FROM evaluaciones WHERE id = $1', [evalId]);
-            await client.query('COMMIT');
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ success: true }));
-
-        } catch (error) {
-            await client.query('ROLLBACK');
-            console.error('Error eliminando evaluacion:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        } finally {
-            client.release();
-        }
-        return;
-    }
-
-    // Validar ticket duplicado
-    if (ruta === '/api/evaluaciones/validar-ticket' && metodo === 'GET') {
-        console.log('[API] GET validar-ticket');
-
-        const ticket = urlParseada.query.ticket;
-
-        try {
-            const result = await pool.query(
-                'SELECT id, ticket_psi, agente, nota_final, fecha_formateada FROM evaluaciones WHERE ticket_psi = $1 LIMIT 1',
-                [ticket]
-            );
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows[0] || null));
-
-        } catch (error) {
-            console.error('Error validando ticket:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // Obtener detalles de evaluación
-    if (ruta.match(/^\/api\/evaluaciones\/[\w-]+\/detalles$/) && metodo === 'GET') {
-        console.log('[API] GET detalles evaluacion');
-
-        const parts = ruta.split('/');
-        const evaluacionId = parts[3];
-
-        try {
-            const result = await pool.query(
-                'SELECT * FROM detalles_evaluacion WHERE evaluacion_id = $1',
-                [evaluacionId]
-            );
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('Error obteniendo detalles:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
 
     // F4.4 - AGENTS MODULE
     if (await handleAgentsRequest({
@@ -867,220 +710,17 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     // ======================================================
 
     // Crear sesión activa
-    if (ruta === '/api/sesiones/crear' && metodo === 'POST') {
-        console.log('[API] POST crear sesion');
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { usuario_id, token_sesion, ip, dispositivo } = JSON.parse(body);
-
-                await pool.query(`
-                    INSERT INTO sesiones_activas (usuario_id, token_sesion, ip, dispositivo, fecha_login, estado)
-                    VALUES ($1, $2, $3, $4, NOW(), 'activa')
-                    ON CONFLICT (usuario_id) DO UPDATE
-                    SET token_sesion = $2, ip = $3, dispositivo = $4, fecha_login = NOW(), estado = 'activa'
-                `, [usuario_id, token_sesion, ip, dispositivo]);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true }));
-
-            } catch (error) {
-                console.error('Error creando sesion:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: false, error: error.message }));
-            }
-        });
+    // F8.5 - SESSIONS MODULE
+    if (await handleSessionsRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta,
+        query: urlParseada.query
+    })) {
         return;
     }
 
-    // ======================================================
-    // API - SESIONES - Obtener sesiones de un usuario
-    // ======================================================
-    if (ruta.match(/^\/api\/sesiones\/usuarios\/\d+$/) && metodo === 'GET') {
-        console.log('[API] GET /api/sesiones/usuarios/:id');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        const usuarioId = parseInt(ruta.split('/').pop());
-        const { activas } = urlParseada.query;
-
-        try {
-            // 🔴 CONSULTA SIN motivo_cierre (no existe en la tabla)
-            let query = `
-                SELECT 
-                    id, 
-                    usuario_id, 
-                    session_token, 
-                    ip_address, 
-                    user_agent, 
-                    dispositivo, 
-                    fecha_inicio, 
-                    ultima_actividad, 
-                    fecha_fin, 
-                    estado,
-                    created_at
-                FROM sesiones_activas 
-                WHERE usuario_id = $1
-            `;
-            const params = [usuarioId];
-
-            if (activas === 'true') {
-                query += ` AND estado = 'activa'`;
-            }
-
-            query += ` ORDER BY fecha_inicio DESC`;
-
-            const result = await pool.query(query, params);
-
-            console.log(`✅ ${result.rows.length} sesiones encontradas para usuario ${usuarioId}`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify(result.rows));
-
-        } catch (error) {
-            console.error('❌ Error obteniendo sesiones:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // ======================================================
-    // API - SESIONES - Cerrar sesión específica
-    // ======================================================
-    if (ruta === '/api/sesiones/cerrar' && metodo === 'POST') {
-        console.log('[API] POST /api/sesiones/cerrar');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { sessionToken } = JSON.parse(body);
-
-                // 🔴 SIN motivo_cierre
-                const result = await pool.query(`
-                    UPDATE sesiones_activas 
-                    SET estado = 'cerrada', 
-                        fecha_fin = NOW()
-                    WHERE session_token = $1 AND estado = 'activa'
-                    RETURNING id
-                `, [sessionToken]);
-
-                console.log(`✅ Sesión cerrada: ${eliminados} afectadas`);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({
-                    success: true,
-                    afectadas: eliminados
-                }));
-
-            } catch (error) {
-                console.error('Error cerrando sesión:', error);
-                respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ error: error.message }));
-            }
-        });
-        return;
-    }
-
-    // ======================================================
-    // API - SESIONES - Cerrar todas las sesiones de un usuario
-    // ======================================================
-    if (ruta.startsWith('/api/sesiones/usuarios/') && ruta.endsWith('/cerrar-todas') && metodo === 'POST') {
-        console.log('[API] POST /api/sesiones/usuarios/:id/cerrar-todas');
-
-        const token = peticion.headers['authorization']?.split(' ')[1];
-        if (!token) {
-            respuesta.writeHead(401, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'Token requerido' }));
-            return;
-        }
-
-        // 🔴 EXTRAER ID DE FORMA ROBUSTA
-        // Ejemplo: /api/sesiones/usuarios/5/cerrar-todas
-        const partes = ruta.split('/');
-        // partes = ['', 'api', 'sesiones', 'usuarios', '5', 'cerrar-todas']
-        const usuarioId = parseInt(partes[4]); // El ID está en la posición 4
-
-        console.log('URL:', ruta);
-        console.log('Partes:', partes);
-        console.log('ID extraído:', usuarioId);
-
-        if (isNaN(usuarioId)) {
-            console.error('❌ No se pudo extraer el ID');
-            respuesta.writeHead(400, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: 'ID de usuario inválido', ruta: ruta }));
-            return;
-        }
-
-        try {
-            const result = await pool.query(`
-                UPDATE sesiones_activas 
-                SET estado = 'cerrada', 
-                    fecha_fin = NOW()
-                WHERE usuario_id = $1 AND estado = 'activa'
-                RETURNING id
-            `, [usuarioId]);
-
-            console.log(`✅ Cerradas ${result.rowCount} sesiones para usuario ${usuarioId}`);
-
-            respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({
-                success: true,
-                cerradas: result.rowCount
-            }));
-
-        } catch (error) {
-            console.error('❌ Error:', error);
-            respuesta.writeHead(500, { 'Content-Type': 'application/json' });
-            respuesta.end(JSON.stringify({ error: error.message }));
-        }
-        return;
-    }
-
-    // Registrar historial de login
-    if (ruta === '/api/historial-login' && metodo === 'POST') {
-        console.log('[API] POST historial-login');
-
-        let body = '';
-        peticion.on('data', chunk => body += chunk);
-        peticion.on('end', async () => {
-            try {
-                const { usuario_id, usuario, tipo, ip, dispositivo } = JSON.parse(body);
-
-                await pool.query(`
-                    INSERT INTO historial_login (usuario_id, usuario, tipo, ip, dispositivo, fecha)
-                    VALUES ($1, $2, $3, $4, $5, NOW())
-                `, [usuario_id, usuario, tipo, ip, dispositivo]);
-
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: true }));
-
-            } catch (error) {
-                console.error('Error registrando historial login:', error);
-                // No fallar el login por esto
-                respuesta.writeHead(200, { 'Content-Type': 'application/json' });
-                respuesta.end(JSON.stringify({ success: false, error: error.message }));
-            }
-        });
-        return;
-    }
-
-    // ======================================================
     // API - USUARIOS - Cambiar password
     // ======================================================
     // API - ADMINISTRACIÓN DE MATRIZ DE EVALUACIÓN
@@ -2462,9 +2102,6 @@ const servidor = http.createServer(async (peticion, respuesta) => {
     respuesta.end(JSON.stringify({ error: 'Ruta no encontrada', ruta: ruta }));
 
 }); // Fin createServer
-
-
-
 
 servidor.listen(PORT, HOST, () => {
     console.log('');

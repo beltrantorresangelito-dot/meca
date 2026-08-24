@@ -1,0 +1,18 @@
+F8.6 - VALIDACIÓN FUNCIONAL DE SESIONES
+
+1. Login normal.
+2. Confirmar que historial-login no rompe el acceso.
+3. Confirmar creación/actualización en sesiones_activas.
+4. Consultar sesiones del usuario.
+5. Probar ?activas=true.
+6. Cerrar una sesión y verificar:
+   { success: true, afectadas: N }
+7. Cerrar todas y verificar:
+   { success: true, cerradas: N }
+8. Probar GET /api/sesiones/usuarios/:id sin Authorization:
+   401 + { error: 'Token requerido' }
+9. Revisar Console/Network: sin 500, ReferenceError, TypeError ni 404 inesperados.
+10. Ejecutar npm test.
+
+Esperado:
+0 fail.
