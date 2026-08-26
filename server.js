@@ -31,6 +31,7 @@ const { createGenericQueryHandler } = require('./src/modules/generic-query');
 const { createGenericRpcHandler } = require('./src/modules/generic-rpc');
 const { createHttpStaticViewsHandler } = require('./src/modules/http-shell/http-static-views');
 const { createHealthHandler } = require('./src/modules/health');
+const { createDomainHandler } = require('./src/modules/domain/domain.routes');
 // Configuración del servidor Python de audio.
 // Debe inicializarse antes de crear AudioProxyHandler.
 const PYTHON_API_URL = process.env.PYTHON_API_URL ||
@@ -64,6 +65,7 @@ const handleGenericQueryRequest = createGenericQueryHandler({ db: pool });
 const handleGenericRpcRequest = createGenericRpcHandler({ db: pool });
 const handleHttpStaticViewsRequest = createHttpStaticViewsHandler({ baseDir: __dirname });
 const handleHealthRequest = createHealthHandler({ db: pool });
+const handleDomainRequest = createDomainHandler();
 // Configuración
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -126,7 +128,17 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         return;
     }
 
-    // F6.4 - USERS/AUTH MODULE
+    if (await handleDomainRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta,
+        query: urlParseada.query
+    })) {
+        return;
+    }
+
+// F6.4 - USERS/AUTH MODULE
     if (await handleUsersRequest({
         ruta,
         metodo,

@@ -181,12 +181,13 @@
 
             </div>
             <!-- CIERRE Mensaje sin datos -->
-            
+
             <!-- Contenido con datos (oculto por defecto) -->
             <div id="reportesConDatos" style="display: none;">
                 <div>
                     <label for="filtroCampanaReportes" style="font-weight: 600; font-size: 12px;">📌 Campaña:</label>
-                    <select id="filtroCampanaReportes" style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; min-width: 140px;">
+                    <select id="filtroCampanaReportes"
+                        style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; min-width: 140px;">
                         <option value="todos">📊 Todas</option>
                         <!-- Las campañas se cargarán dinámicamente -->
                     </select>
@@ -196,7 +197,7 @@
                 <!-- ====================================================== -->
                 <div class="card"
                     style="margin-bottom: 20px; padding: 16px 20px; background: linear-gradient(135deg, #ffffff, #f8fafc); border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
-                    
+
                     <!-- Cabecera -->
                     <div
                         style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px;">
@@ -255,12 +256,13 @@
                     </div>
 
                 </div>
-                <div id="kpiTituloCampaña" style="display: none; background: #7b1fa2; color: white; padding: 4px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; margin-bottom: 15px; text-align: center;">
+                <div id="kpiTituloCampaña"
+                    style="display: none; background: #7b1fa2; color: white; padding: 4px 16px; border-radius: 20px; font-size: 13px; font-weight: bold; margin-bottom: 15px; text-align: center;">
                     📌 Campaña: <span id="kpiTituloCampañaNombre"></span>
                 </div>
                 <!-- KPIs PRINCIPALES - FILA 1 (6 tarjetas) -->
                 <div class="kpi-row kpi-row-primary">
-                    
+
                     <div class="kpi-card"
                         style="background: linear-gradient(135deg, #074769, #0071ad); padding: 10px 8px;">
                         <div class="kpi-label">📋 Q Llamadas evaluadas</div>
@@ -642,7 +644,7 @@
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Gestor</th>                                    
+                                    <th>Gestor</th>
                                     <th>👥 Líder</th>
                                     <th>Promedio</th>
                                     <th>Rendimiento</th>
@@ -887,7 +889,8 @@
                         <!-- 🔴 NUEVO: Filtro de campaña -->
                         <div style="min-width: 140px;">
                             <label style="font-size: 12px;">📌 Campaña</label>
-                            <select id="filtroCampanaGP" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--line);">
+                            <select id="filtroCampanaGP"
+                                style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--line);">
                                 <option value="todos">Todas las campañas</option>
                             </select>
                         </div>
@@ -1513,7 +1516,7 @@
                     </div>
                 </div>
 
-                
+
                 <!-- ============================================================ -->
                 <!-- SECCIÓN: MONITOREO DE AUDITORES (IGUAL QUE ANTES)             -->
                 <!-- ============================================================ -->
@@ -1556,49 +1559,73 @@
                             <option value="activo">📦 Lote Activo</option>
                             <option value="todos">📦 Todos los lotes</option>
                         </select>
-                        <input type="text" id="buscarTicketEscucha" placeholder="🔍 Buscar ticket..."
-                            style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px;">
-                        <button onclick="aplicarFiltrosEscuchas()"
-                            style="background: var(--accent); padding: 6px 12px; border: none; border-radius: 6px; color: white; cursor: pointer;">
-                            🔍 Aplicar
-                        </button>
-                        <button onclick="limpiarFiltrosEscuchas()"
-                            style="background: #6c757d; padding: 6px 12px; border: none; border-radius: 6px; color: white; cursor: pointer;">
-                            🧹 Limpiar
-                        </button>
-                    </div>
+                        <div style="min-width: 160px;">
+                            <label style="font-size: 12px; font-weight: 600;">
+                                📌 Campaña
+                            </label>
 
-                    <!-- Tabla de monitoreo -->
-                    <div
-                        style="overflow-x: auto; margin-top: 15px; border: 1px solid var(--line); border-radius: 8px; max-height: 400px; overflow-y: auto;">
-                        <table style="width: 100%; min-width: 900px; font-size: 12px; border-collapse: collapse;">
-                            <thead style="position: sticky; top: 0; z-index: 10; background: #f8f9fa;">
-                                <tr style="background: #f8f9fa; border-bottom: 2px solid #e0e0e0;">
-                                    <th style="padding: 8px 10px; text-align: left; min-width: 120px;">🎫 Ticket</th>
-                                    <th style="padding: 8px 10px; text-align: left; min-width: 100px;">👤 Auditor</th>
-                                    <th style="padding: 8px 10px; text-align: left; min-width: 100px;">👔 Supervisor
-                                    </th>
-                                    <th style="padding: 8px 10px; text-align: left; min-width: 100px;">👤 Gestor</th>
-                                    <th style="padding: 8px 10px; text-align: center; min-width: 80px;">📌 Campaña</th>
-                                    <th style="padding: 8px 10px; text-align: left; min-width: 80px;">📌 Motivos</th>
-                                    <th style="padding: 8px 10px; text-align: center; min-width: 80px;">📊 Estado</th>
-                                    <th style="padding: 8px 10px; text-align: center; min-width: 80px;">📅 Asignación
-                                    </th>
-                                    <th style="padding: 8px 10px; text-align: center; min-width: 80px;">📅 Gestión</th>
-                                    <th style="padding: 8px 10px; text-align: center; min-width: 80px;">⚙️ Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tablaMonitoreoEscuchas">
-                                <tr>
-                                    <td colspan="9" style="text-align: center; padding: 30px;">⏳ Cargando
-                                        asignaciones...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                            <select id="filtroCampanaEscuchas" style="
+                                width: 100%;
+                                padding: 8px;
+                                border-radius: 8px;
+                                border: 1px solid var(--line);
+                            ">
+                                <option value="">
+                                    📊 Todas las campañas
+                                </option>
+                            </select>
+                            <input type="text" id="buscarTicketEscucha" placeholder="🔍 Buscar ticket..."
+                                style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px;">
+                            <button onclick="aplicarFiltrosEscuchas()"
+                                style="background: var(--accent); padding: 6px 12px; border: none; border-radius: 6px; color: white; cursor: pointer;">
+                                🔍 Aplicar
+                            </button>
+                            <button onclick="limpiarFiltrosEscuchas()"
+                                style="background: #6c757d; padding: 6px 12px; border: none; border-radius: 6px; color: white; cursor: pointer;">
+                                🧹 Limpiar
+                            </button>
+                        </div>
 
-                
+                        <!-- Tabla de monitoreo -->
+                        <div
+                            style="overflow-x: auto; margin-top: 15px; border: 1px solid var(--line); border-radius: 8px; max-height: 400px; overflow-y: auto;">
+                            <table style="width: 100%; min-width: 900px; font-size: 12px; border-collapse: collapse;">
+                                <thead style="position: sticky; top: 0; z-index: 10; background: #f8f9fa;">
+                                    <tr style="background: #f8f9fa; border-bottom: 2px solid #e0e0e0;">
+                                        <th style="padding: 8px 10px; text-align: left; min-width: 120px;">🎫 Ticket
+                                        </th>
+                                        <th style="padding: 8px 10px; text-align: left; min-width: 100px;">👤 Auditor
+                                        </th>
+                                        <th style="padding: 8px 10px; text-align: left; min-width: 100px;">👔 Supervisor
+                                        </th>
+                                        <th style="padding: 8px 10px; text-align: left; min-width: 100px;">👤 Gestor
+                                        </th>
+                                        <th style="padding: 8px 10px; text-align: center; min-width: 80px;">📌 Campaña
+                                        </th>
+                                        <th style="padding: 8px 10px; text-align: left; min-width: 80px;">📌 Motivos
+                                        </th>
+                                        <th style="padding: 8px 10px; text-align: center; min-width: 80px;">📊 Estado
+                                        </th>
+                                        <th style="padding: 8px 10px; text-align: center; min-width: 80px;">📅
+                                            Asignación
+                                        </th>
+                                        <th style="padding: 8px 10px; text-align: center; min-width: 80px;">📅 Gestión
+                                        </th>
+                                        <th style="padding: 8px 10px; text-align: center; min-width: 80px;">⚙️ Acciones
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaMonitoreoEscuchas">
+                                    <tr>
+                                        <td colspan="9" style="text-align: center; padding: 30px;">⏳ Cargando
+                                            asignaciones...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div> <!-- CIERRE CARD MONITOREO DE ESCUCHAS -->
+
                 <!-- ============================================================ -->
                 <!-- SECCIÓN: REASIGNACIÓN MASIVA (IGUAL QUE ANTES)               -->
                 <!-- ============================================================ -->
@@ -3093,7 +3120,7 @@
                                 <th style="padding: 8px 10px; text-align: center; min-width: 70px; color: #6c757d;">🔇
                                     Sin Aud.</th>
                                 <th style="padding: 8px 10px; text-align: center; min-width: 70px; color: #6c757d;">📦
-                                Campaña.</th>
+                                    Campaña.</th>
                                 <th style="padding: 8px 10px; text-align: center; min-width: 80px;">📊 Progreso</th>
                                 <th style="padding: 8px 10px; text-align: center; min-width: 80px;">📌 Estado</th>
                                 <th style="padding: 8px 10px; text-align: center; min-width: 120px;">⚙️ Acciones</th>
@@ -3514,15 +3541,14 @@
                 <div style="padding: 20px;">
                     <input type="hidden" id="campanaId" value="">
                     <div style="margin-bottom: 15px;">
-                        <label style="font-size: 12px; font-weight: 600;">Código (ej: T, ST, F) *</label>
-                        <input type="text" id="campanaCodigo" placeholder="Ej: T, ST, F" maxlength="5"
+                        <label style="font-size: 12px; font-weight: 600;">Código de campaña *</label>
+                        <input type="text" id="campanaCodigo" placeholder="Ej: CAMP01" maxlength="5"
                             style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
                         <small style="color: var(--muted);">Máximo 5 caracteres alfanuméricos</small>
                     </div>
                     <div style="margin-bottom: 15px;">
                         <label style="font-size: 12px; font-weight: 600;">Descripción *</label>
-                        <input type="text" id="campanaDescripcion"
-                            placeholder="Ej: Temprana, Super Temprana, Fraccionamiento"
+                        <input type="text" id="campanaDescripcion" placeholder="Ej: Campaña principal"
                             style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
                     </div>
                     <div style="margin-bottom: 15px;">

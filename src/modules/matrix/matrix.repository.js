@@ -5,40 +5,48 @@ class MatrixRepository {
     this.db = db || require('../../../models/database').pool;
   }
 
-  async getLegacyActiveMatrixVersion() {
+  async getLegacyActiveMatrixVersion(matrizId) {
     const result = await this.db.query(`
-      SELECT *
-      FROM versiones_matriz
-      WHERE activa = TRUE
-      LIMIT 1
-    `);
+        SELECT *
+        FROM versiones_matriz
+        WHERE matriz_id = $1
+          AND activa = TRUE
+        ORDER BY fecha_vigencia DESC, id DESC
+        LIMIT 1
+    `, [matrizId]);
 
     return result.rows[0] || null;
-  }
+}
 
-  async getLegacyEvaluationActiveVersion() {
+
+  async getLegacyEvaluationActiveVersion(matrizId) {
     const result = await this.db.query(`
-      SELECT id, version, descripcion, activa, created_at
-      FROM versiones_matriz
-      WHERE activa = TRUE
-      LIMIT 1
-    `);
+        SELECT *
+        FROM versiones_matriz
+        WHERE matriz_id = $1
+          AND activa = TRUE
+        ORDER BY fecha_vigencia DESC, id DESC
+        LIMIT 1
+    `, [matrizId]);
 
     return result.rows[0] || null;
-  }
+}
 
-  async getLegacyMatrixVersionByDate(date) {
+async getLegacyMatrixVersionByDate(matrizId, date) {
     const result = await this.db.query(`
-      SELECT *
-      FROM versiones_matriz
-      WHERE fecha_vigencia <= $1
-      ORDER BY fecha_vigencia DESC
-      LIMIT 1
-    `, [date]);
+        SELECT *
+        FROM versiones_matriz
+        WHERE matriz_id = $1
+          AND fecha_vigencia <= $2
+        ORDER BY fecha_vigencia DESC, id DESC
+        LIMIT 1
+    `, [
+        matrizId,
+        date
+    ]);
 
     return result.rows[0] || null;
-  }
-
+}  
 async getLegacyMatrixStructure(versionId) {
   const versionResult = await this.db.query(
     'SELECT * FROM versiones_matriz WHERE id = $1',
@@ -109,10 +117,13 @@ async matrixVersionsTableExists() {
   return Boolean(result.rows[0]?.exists);
 }
 
-async listLegacyMatrixVersions() {
-  const result = await this.db.query(`
+async listLegacyMatrixVersions(matrizId = null) {
+  const params = [];
+
+  let sql = `
     SELECT
       id,
+      matriz_id,
       version,
       descripcion,
       fecha_vigencia,
@@ -122,8 +133,27 @@ async listLegacyMatrixVersions() {
       publicado_por,
       publicado_en
     FROM versiones_matriz
-    ORDER BY creado_en DESC
-  `);
+  `;
+
+  if (matrizId !== null && matrizId !== undefined) {
+    params.push(matrizId);
+
+    sql += `
+      WHERE matriz_id = $1
+      ORDER BY fecha_vigencia DESC, creado_en DESC, id DESC
+    `;
+  } else {
+    /*
+     * Compatibilidad legacy:
+     * el endpoint histórico sin matriz conserva
+     * exactamente su orden original.
+     */
+    sql += `
+      ORDER BY creado_en DESC
+    `;
+  }
+
+  const result = await this.db.query(sql, params);
 
   return result.rows;
 }
@@ -164,8 +194,15 @@ async getLegacyEvaluationRulesByVersion(versionId) {
 }
 
 
-async listLegacyFrentes() {
-  const result = await this.db.query(`
+async listLegacyFrentes(matrizId = null) {
+  const hasMatrizId =
+    matrizId !== null &&
+    matrizId !== undefined &&
+    matrizId !== '';
+
+  const params = [];
+
+  let sql = `
     SELECT
       vf.id,
       vf.codigo,
@@ -174,15 +211,28 @@ async listLegacyFrentes() {
       vf.orden,
       vf.activo
     FROM version_frentes vf
-    JOIN versiones_matriz vm ON vm.id = vf.version_id
+    JOIN versiones_matriz vm
+      ON vm.id = vf.version_id
     WHERE vm.activa = TRUE
-    ORDER BY vf.orden
-  `);
+  `;
+
+  if (hasMatrizId) {
+    params.push(Number(matrizId));
+    sql += ` AND vm.matriz_id = $1`;
+  }
+
+  sql += ` ORDER BY vf.orden`;
+
+  const result =
+    await this.db.query(sql, params);
 
   return result.rows;
 }
 
-async listLegacyAtributos(frenteId = null) {
+async listLegacyAtributos(
+  frenteId = null,
+  matrizId = null
+) {
   let sql = `
     SELECT
       va.id,
@@ -192,24 +242,54 @@ async listLegacyAtributos(frenteId = null) {
       va.orden,
       va.activo
     FROM version_atributos va
-    JOIN version_frentes vf ON vf.id = va.version_frente_id
-    JOIN versiones_matriz vm ON vm.id = vf.version_id
+    JOIN version_frentes vf
+      ON vf.id = va.version_frente_id
+    JOIN versiones_matriz vm
+      ON vm.id = vf.version_id
     WHERE vm.activa = TRUE
   `;
+
   const params = [];
 
-  if (frenteId) {
-    sql += ' AND va.version_frente_id = $1 ORDER BY va.orden';
-    params.push(frenteId);
-  } else {
-    sql += ' ORDER BY va.version_frente_id, va.orden';
+  const hasMatrizId =
+    matrizId !== null &&
+    matrizId !== undefined &&
+    matrizId !== '';
+
+  if (hasMatrizId) {
+    params.push(Number(matrizId));
+
+    sql +=
+      ` AND vm.matriz_id = $${params.length}`;
   }
 
-  const result = await this.db.query(sql, params);
+  if (frenteId) {
+    params.push(frenteId);
+
+    sql +=
+      ` AND va.version_frente_id = $${params.length}`;
+  }
+
+  if (frenteId) {
+    sql += ` ORDER BY va.orden`;
+  } else {
+    sql +=
+      ` ORDER BY va.version_frente_id, va.orden`;
+  }
+
+  const result =
+    await this.db.query(
+      sql,
+      params
+    );
+
   return result.rows;
 }
 
-async listLegacySubMotivos(atributoId = null) {
+async listLegacySubMotivos(
+  atributoId = null,
+  matrizId = null
+) {
   let sql = `
     SELECT
       vsm.id,
@@ -220,33 +300,81 @@ async listLegacySubMotivos(atributoId = null) {
       vsm.orden,
       vsm.activo
     FROM version_sub_motivos vsm
-    JOIN version_atributos va ON va.id = vsm.version_atributo_id
-    JOIN version_frentes vf ON vf.id = va.version_frente_id
-    JOIN versiones_matriz vm ON vm.id = vf.version_id
+    JOIN version_atributos va
+      ON va.id = vsm.version_atributo_id
+    JOIN version_frentes vf
+      ON vf.id = va.version_frente_id
+    JOIN versiones_matriz vm
+      ON vm.id = vf.version_id
     WHERE vm.activa = TRUE
   `;
+
   const params = [];
 
-  if (atributoId) {
-    sql += ' AND vsm.version_atributo_id = $1 ORDER BY vsm.orden';
-    params.push(atributoId);
-  } else {
-    sql += ' ORDER BY vsm.version_atributo_id, vsm.orden';
+  const hasMatrizId =
+    matrizId !== null &&
+    matrizId !== undefined &&
+    matrizId !== '';
+
+  if (hasMatrizId) {
+    params.push(Number(matrizId));
+
+    sql +=
+      ` AND vm.matriz_id = $${params.length}`;
   }
 
-  const result = await this.db.query(sql, params);
+  if (atributoId) {
+    params.push(atributoId);
+
+    sql +=
+      ` AND vsm.version_atributo_id = $${params.length}`;
+  }
+
+  if (atributoId) {
+    sql += ` ORDER BY vsm.orden`;
+  } else {
+    sql +=
+      ` ORDER BY vsm.version_atributo_id, vsm.orden`;
+  }
+
+  const result =
+    await this.db.query(
+      sql,
+      params
+    );
+
   return result.rows;
 }
 
-async listLegacyEvaluationRulesAdmin() {
-  const result = await this.db.query(`
+async listLegacyEvaluationRulesAdmin(matrizId = null) {
+  const params = [];
+
+  let sql = `
     SELECT
       re.*,
-      vm.version as version_nombre
+      vm.version AS version_nombre
     FROM reglas_evaluacion re
-    JOIN versiones_matriz vm ON re.version_id = vm.id
+    JOIN versiones_matriz vm
+      ON re.version_id = vm.id
+  `;
+
+  if (
+    matrizId !== null &&
+    matrizId !== undefined &&
+    matrizId !== ''
+  ) {
+    params.push(Number(matrizId));
+
+    sql += `
+      WHERE vm.matriz_id = $1
+    `;
+  }
+
+  sql += `
     ORDER BY vm.id, re.orden
-  `);
+  `;
+
+  const result = await this.db.query(sql, params);
 
   return result.rows;
 }
@@ -740,13 +868,55 @@ async deleteSubReason(client, id, versionId) {
 }
 
 
-async getActiveVersionSource(client) {
+async getActiveVersionSource(client, matrizId = null) {
+  const hasMatrizId =
+    matrizId !== null &&
+    matrizId !== undefined &&
+    matrizId !== '';
+
+  if (hasMatrizId) {
+    const parsedMatrizId = Number(matrizId);
+
+    if (
+      !Number.isInteger(parsedMatrizId) ||
+      parsedMatrizId <= 0
+    ) {
+      return null;
+    }
+
+    const result = await client.query(
+      `
+        SELECT
+          id,
+          matriz_id,
+          version
+        FROM versiones_matriz
+        WHERE matriz_id = $1
+          AND activa = TRUE
+        ORDER BY fecha_vigencia DESC, id DESC
+        LIMIT 1
+      `,
+      [parsedMatrizId]
+    );
+
+    return result.rows[0] || null;
+  }
+
+  /*
+   * Compatibilidad legacy temporal.
+   * Mientras existan consumidores que todavía no transportan
+   * matriz_id, se conserva el comportamiento histórico.
+   */
   const result = await client.query(`
-    SELECT id, matriz_id, version
+    SELECT
+      id,
+      matriz_id,
+      version
     FROM versiones_matriz
     WHERE activa = TRUE
     LIMIT 1
   `);
+
   return result.rows[0] || null;
 }
 
@@ -937,20 +1107,58 @@ async copyVersionTree(client, sourceVersionId, targetVersionId) {
 }
 
 async activateVersion(client, id) {
-  const target = await this.getVersionById(client, id);
-  if (!target) return null;
+  const target = await this.getVersionById(
+    client,
+    id
+  );
 
-  // Contrato actual de MECA: una sola versión activa global.
-  // La activación por matriz se hará cuando el frontend transporte matriz_id.
-  await client.query('UPDATE versiones_matriz SET activa = FALSE WHERE activa = TRUE');
-  const result = await client.query(`
-    UPDATE versiones_matriz
-    SET activa = TRUE,
-        publicado_por = COALESCE(publicado_por, $2),
+  if (!target) {
+    return null;
+  }
+
+  /*
+   * F11.7.5
+   *
+   * La exclusividad de versión activa es POR MATRIZ,
+   * no global para todo MECA.
+   *
+   * Activar una versión de Matriz A no puede afectar
+   * la versión activa de Matriz B.
+   */
+  await client.query(
+    `
+      UPDATE versiones_matriz
+      SET activa = FALSE
+      WHERE matriz_id = $1
+        AND activa = TRUE
+        AND id <> $2
+    `,
+    [
+      target.matriz_id,
+      id
+    ]
+  );
+
+  const result = await client.query(
+    `
+      UPDATE versiones_matriz
+      SET
+        activa = TRUE,
+        publicado_por = COALESCE(
+          publicado_por,
+          $2
+        ),
         publicado_en = NOW()
-    WHERE id = $1
-    RETURNING *
-  `, [id, 'Sistema']);
+      WHERE id = $1
+        AND matriz_id = $3
+      RETURNING *
+    `,
+    [
+      id,
+      'Sistema',
+      target.matriz_id
+    ]
+  );
 
   return result.rows[0] || null;
 }
@@ -1030,84 +1238,253 @@ async getVersionIntegrity(client, versionId) {
   };
 }
 
-async validateFrontWeight(client, { frenteId, nuevoPeso, excluirId }) {
-  const source = await this.getActiveVersionSource(client);
-  if (!source) return { notFound: 'No hay versión activa' };
+async validateFrontWeight(client, {
+  frenteId,
+  nuevoPeso,
+  excluirId,
+  versionId = null
+}) {
+  let resolvedVersionId = versionId;
 
-  const params = [source.id];
+  // Compatibilidad legacy temporal
+  if (!resolvedVersionId) {
+    const source =
+      await this.getActiveVersionSource(client);
+
+    if (!source) {
+      return {
+        notFound: 'No hay versión activa'
+      };
+    }
+
+    resolvedVersionId = source.id;
+  }
+
+  const params = [resolvedVersionId];
+
   let sql = `
     SELECT COALESCE(SUM(peso_maximo), 0) AS total
     FROM version_frentes
-    WHERE version_id = $1 AND activo = TRUE
+    WHERE version_id = $1
+      AND activo = TRUE
   `;
+
   if (excluirId) {
     params.push(excluirId);
     sql += ` AND id != $2`;
   }
 
-  const sum = await client.query(sql, params);
-  const total = Number(sum.rows[0]?.total || 0) + Number(nuevoPeso || 0);
+  const sum = await client.query(
+    sql,
+    params
+  );
 
-  return { total, max: 100 };
+  const total =
+    Number(sum.rows[0]?.total || 0) +
+    Number(nuevoPeso || 0);
+
+  return {
+    total,
+    max: 100
+  };
 }
 
-async validateAttributeWeight(client, { frenteId, nuevoPeso, excluirId }) {
-  const source = await this.getActiveVersionSource(client);
-  if (!source) return { notFound: 'No hay versión activa' };
+async validateAttributeWeight(client, {
+  frenteId,
+  nuevoPeso,
+  excluirId,
+  versionId = null
+}) {
+  let resolvedVersionId = versionId;
 
-  const front = await this.getActiveFront(client, frenteId, source.id);
-  if (!front) return { notFound: 'Frente no encontrado' };
+  if (!resolvedVersionId) {
+    const source =
+      await this.getActiveVersionSource(client);
 
-  const params = [source.id, frenteId];
+    if (!source) {
+      return {
+        notFound: 'No hay versión activa'
+      };
+    }
+
+    resolvedVersionId = source.id;
+  }
+
+  const front =
+    await this.getActiveFront(
+      client,
+      frenteId,
+      resolvedVersionId
+    );
+
+  if (!front) {
+    return {
+      notFound: 'Frente no encontrado'
+    };
+  }
+
+  const params = [
+    resolvedVersionId,
+    frenteId
+  ];
+
   let sql = `
-    SELECT COALESCE(SUM(va.peso_maximo), 0) AS total
+    SELECT
+      COALESCE(SUM(va.peso_maximo), 0) AS total
     FROM version_atributos va
-    JOIN version_frentes vf ON vf.id = va.version_frente_id
+    JOIN version_frentes vf
+      ON vf.id = va.version_frente_id
     WHERE vf.version_id = $1
       AND va.version_frente_id = $2
       AND va.activo = TRUE
   `;
+
   if (excluirId) {
     params.push(excluirId);
     sql += ` AND va.id != $3`;
   }
 
-  const sum = await client.query(sql, params);
+  const sum = await client.query(
+    sql,
+    params
+  );
+
   return {
-    total: Number(sum.rows[0]?.total || 0) + Number(nuevoPeso || 0),
+    total:
+      Number(sum.rows[0]?.total || 0) +
+      Number(nuevoPeso || 0),
+
     max: Number(front.peso_maximo)
   };
 }
 
-async validateSubReasonWeight(client, { atributoId, nuevoPeso, excluirId }) {
-  const source = await this.getActiveVersionSource(client);
-  if (!source) return { notFound: 'No hay versión activa' };
+async validateSubReasonWeight(client, {
+  atributoId,
+  nuevoPeso,
+  excluirId,
+  versionId = null
+}) {
+  let resolvedVersionId = versionId;
 
-  const attr = await this.getActiveAttribute(client, atributoId, source.id);
-  if (!attr) return { notFound: 'Atributo no encontrado' };
+  if (!resolvedVersionId) {
+    const source =
+      await this.getActiveVersionSource(client);
 
-  const params = [source.id, atributoId];
+    if (!source) {
+      return {
+        notFound: 'No hay versión activa'
+      };
+    }
+
+    resolvedVersionId = source.id;
+  }
+
+  const attr =
+    await this.getActiveAttribute(
+      client,
+      atributoId,
+      resolvedVersionId
+    );
+
+  if (!attr) {
+    return {
+      notFound: 'Atributo no encontrado'
+    };
+  }
+
+  const params = [
+    resolvedVersionId,
+    atributoId
+  ];
+
   let sql = `
-    SELECT COALESCE(SUM(vsm.peso_individual), 0) AS total
+    SELECT
+      COALESCE(SUM(vsm.peso_individual), 0) AS total
     FROM version_sub_motivos vsm
-    JOIN version_atributos va ON va.id = vsm.version_atributo_id
-    JOIN version_frentes vf ON vf.id = va.version_frente_id
+    JOIN version_atributos va
+      ON va.id = vsm.version_atributo_id
+    JOIN version_frentes vf
+      ON vf.id = va.version_frente_id
     WHERE vf.version_id = $1
       AND vsm.version_atributo_id = $2
       AND vsm.activo = TRUE
   `;
+
   if (excluirId) {
     params.push(excluirId);
     sql += ` AND vsm.id != $3`;
   }
 
-  const sum = await client.query(sql, params);
+  const sum = await client.query(
+    sql,
+    params
+  );
+
   return {
-    total: Number(sum.rows[0]?.total || 0) + Number(nuevoPeso || 0),
+    total:
+      Number(sum.rows[0]?.total || 0) +
+      Number(nuevoPeso || 0),
+
     max: Number(attr.peso_maximo)
   };
 }
 
+async getEvaluationRuleById(client, id) {
+  const result = await client.query(
+    `
+      SELECT
+        id,
+        version_id,
+        submotivo_origen,
+        bloque_origen,
+        atributo_origen,
+        valor_condicion,
+        accion_tipo,
+        accion_valor,
+        submotivos_afectados,
+        excepciones,
+        orden,
+        activo
+      FROM reglas_evaluacion
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [id]
+  );
+
+  return result.rows[0] || null;
+}
+
+async getEvaluationRuleByIdAndVersion(
+  client,
+  id,
+  versionId
+) {
+  const result = await client.query(
+    `
+      SELECT
+        id,
+        version_id,
+        submotivo_origen,
+        bloque_origen,
+        atributo_origen,
+        valor_condicion,
+        accion_tipo,
+        accion_valor,
+        submotivos_afectados,
+        excepciones,
+        orden,
+        activo
+      FROM reglas_evaluacion
+      WHERE id = $1
+        AND version_id = $2
+      LIMIT 1
+    `,
+    [id, versionId]
+  );
+
+  return result.rows[0] || null;
+}
 
 async createEvaluationRule(client, data) {
   const affected = data.submotivos_afectados == null
@@ -1204,34 +1581,112 @@ async deleteEvaluationRule(client, id) {
   return result.rows[0] || null;
 }
 
-async getActiveEvaluationStructure() {
-  const tableExists = await this.matrixVersionsTableExists();
+async getActiveEvaluationStructure(versionId = null) {
+  const tableExists =
+    await this.matrixVersionsTableExists();
+
   if (!tableExists) {
     return {
       version: 'default',
       frentes: [],
       reglas: [],
-      message: 'Tablas de estructura no configuradas aún'
+      message:
+        'Tablas de estructura no configuradas aún'
     };
   }
 
-  const active = await this.getLegacyActiveMatrixVersion();
-  if (!active) {
+  let selectedVersion = null;
+
+  // ========================================================
+  // NUEVO CONTRATO
+  // ========================================================
+  if (
+    versionId !== null &&
+    versionId !== undefined &&
+    versionId !== ''
+  ) {
+    const parsedVersionId =
+      Number(versionId);
+
+    if (
+      !Number.isInteger(parsedVersionId) ||
+      parsedVersionId <= 0
+    ) {
+      return null;
+    }
+
+    const result = await this.db.query(
+      `
+        SELECT
+          id,
+          matriz_id,
+          version,
+          fecha_vigencia,
+          activa
+        FROM versiones_matriz
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [parsedVersionId]
+    );
+
+    selectedVersion =
+      result.rows[0] || null;
+  }
+
+  // ========================================================
+  // FALLBACK LEGACY
+  // ========================================================
+  if (!selectedVersion) {
+    /*
+    * Compatibilidad legacy:
+    * sin version_matriz_id explícita conservamos
+    * la resolución histórica de una versión activa global.
+    *
+    * getActiveVersionSource() ya encapsula ese fallback.
+    */
+    selectedVersion =
+      await this.getActiveVersionSource(
+        this.db
+      );
+  }
+
+  if (!selectedVersion) {
     return {
       version: 'default',
       frentes: [],
       reglas: [],
-      message: 'No hay versión activa configurada'
+      message:
+        'No hay versión activa configurada'
     };
   }
 
-  const structure = await this.getLegacyMatrixStructure(active.id);
-  const rules = await this.getLegacyEvaluationRulesByVersion(active.id);
+  const structure =
+    await this.getLegacyMatrixStructure(
+      selectedVersion.id
+    );
+
+  const rules =
+    await this.getLegacyEvaluationRulesByVersion(
+      selectedVersion.id
+    );
 
   return {
-    version: active.version || 'default',
-    frentes: structure?.frentes || [],
-    reglas: rules || []
+    version:
+      selectedVersion.version ||
+      'default',
+
+    version_matriz_id:
+      selectedVersion.id,
+
+    matriz_id:
+      selectedVersion.matriz_id || null,
+
+    frentes:
+      structure?.frentes || [],
+
+    reglas:
+      rules || []
   };
 }
 

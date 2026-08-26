@@ -54,11 +54,13 @@ class EvaluationsRepository {
         tiempo_auditoria,
         tiempo_auditoria_formateado,
         fecha_registro,
+        campana_id,
+        matriz_id,
         version_matriz_id
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,
-        $10,$11,$12,$13,$14,$15,$16,$17,$18
+        $10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
       )
     `, [
       evaluacion.id,
@@ -78,7 +80,15 @@ class EvaluationsRepository {
       evaluacion.tiempoAuditoria,
       evaluacion.tiempoAuditoriaFormateado,
       evaluacion.fechaRegistro,
-      evaluacion.versionMatrizId || null
+      evaluacion.campana_id ??
+        evaluacion.campanaId ??
+        null,
+      evaluacion.matriz_id ??
+        evaluacion.matrizId ??
+        null,
+      evaluacion.version_matriz_id ??
+        evaluacion.versionMatrizId ??
+        null
     ]);
   }
 

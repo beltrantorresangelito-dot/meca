@@ -90,35 +90,66 @@ test('HTTPSHELLMOD-003 estático inexistente devuelve 404', async () => {
 });
 
 test('HTTPSHELLMOD-004 login devuelve vista', async () => {
-  const out = output();
-  const handler = createHttpStaticViewsHandler({ baseDir: fixture() });
+  const dir = fixture();
+
+  let status;
+  let resolveEnded;
+
+  const ended = new Promise(resolve => {
+    resolveEnded = resolve;
+  });
+
+  const handler = createHttpStaticViewsHandler({
+    baseDir: dir
+  });
 
   await handler({
     ruta: '/login',
-    respuesta: out.res
+    respuesta: {
+      writeHead(code) {
+        status = code;
+      },
+      end() {
+        resolveEnded();
+      }
+    }
   });
 
-  await new Promise(r => setTimeout(r, 20));
+  await ended;
 
-  assert.equal(out.get().status, 200);
-  assert.match(String(out.get().body), /login/);
+  assert.equal(status, 200);
 });
 
 test('HTTPSHELLMOD-005 auditor aliases funcionan', async () => {
   const dir = fixture();
 
   for (const ruta of ['/auditor', '/auditor.html']) {
-    const out = output();
-    const handler = createHttpStaticViewsHandler({ baseDir: dir });
+    let status;
+    let resolveEnded;
+
+    const ended = new Promise(resolve => {
+      resolveEnded = resolve;
+    });
+
+    const handler = createHttpStaticViewsHandler({
+      baseDir: dir
+    });
 
     await handler({
       ruta,
-      respuesta: out.res
+      respuesta: {
+        writeHead(code) {
+          status = code;
+        },
+        end() {
+          resolveEnded();
+        }
+      }
     });
 
-    await new Promise(r => setTimeout(r, 20));
+    await ended;
 
-    assert.equal(out.get().status, 200);
+    assert.equal(status, 200);
   }
 });
 

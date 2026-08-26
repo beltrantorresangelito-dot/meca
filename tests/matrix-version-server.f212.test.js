@@ -19,8 +19,32 @@ test('VERREPO-001 snapshot conserva matriz_id y clasificacion', () => {
 });
 
 test('VERREPO-002 activación usa UPDATEs dentro del repository', () => {
-  assert.match(repoSource, /UPDATE versiones_matriz SET activa = FALSE/i);
-  assert.match(repoSource, /SET activa = TRUE/i);
+  const repositorySource = fs.readFileSync(
+    path.join(
+      __dirname,
+      '..',
+      'src',
+      'modules',
+      'matrix',
+      'matrix.repository.js'
+    ),
+    'utf8'
+  );
+
+  assert.match(
+    repositorySource,
+    /UPDATE\s+versiones_matriz\s+SET\s+activa\s*=\s*FALSE/i
+  );
+
+  assert.match(
+    repositorySource,
+    /WHERE\s+matriz_id\s*=\s*\$1/i
+  );
+
+  assert.match(
+    repositorySource,
+    /SET\s+activa\s*=\s*TRUE/i
+  );
 });
 
 test('VERSERVER-001 lifecycle ya no está inline en server.js', () => {

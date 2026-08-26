@@ -5,33 +5,87 @@ class MatrixService {
     this.repository = repository;
   }
 
-  async getActiveVersion() {
-    return this.repository.getLegacyActiveMatrixVersion();
-  }
+  async getActiveVersion(matrizId) {
+    const parsedMatrizId = Number(matrizId);
 
-  async getEvaluationActiveVersion() {
-    const row = await this.repository.getLegacyEvaluationActiveVersion();
+    if (
+        !Number.isInteger(parsedMatrizId) ||
+        parsedMatrizId <= 0
+    ) {
+        const error =
+            new Error('matrizId requerido y debe ser un entero positivo');
+
+        error.code = 'VALIDATION_ERROR';
+        throw error;
+    }
+
+    return this.repository
+        .getLegacyActiveMatrixVersion(
+            parsedMatrizId
+        );
+}
+
+  async getEvaluationActiveVersion(matrizId) {
+    const parsedMatrizId = Number(matrizId);
+
+    if (
+        !Number.isInteger(parsedMatrizId) ||
+        parsedMatrizId <= 0
+    ) {
+        const error =
+            new Error('matrizId requerido y debe ser un entero positivo');
+
+        error.code = 'VALIDATION_ERROR';
+        throw error;
+    }
+
+    const row =
+        await this.repository
+            .getLegacyEvaluationActiveVersion(
+                parsedMatrizId
+            );
 
     if (!row) {
-      return {
-        version: 'default',
-        activa: false,
-        message: 'No hay versión activa configurada'
-      };
+        return {
+            version: 'default',
+            activa: false,
+            matriz_id: parsedMatrizId,
+            message:
+                'No hay versión activa configurada para la matriz'
+        };
     }
 
     return row;
-  }
+}
 
-  async getVersionByDate(date) {
-    if (!date) {
-      const error = new Error('Fecha requerida');
-      error.code = 'VALIDATION_ERROR';
-      throw error;
+async getVersionByDate(matrizId, date) {
+    const parsedMatrizId = Number(matrizId);
+
+    if (
+        !Number.isInteger(parsedMatrizId) ||
+        parsedMatrizId <= 0
+    ) {
+        const error =
+            new Error('matrizId requerido y debe ser un entero positivo');
+
+        error.code = 'VALIDATION_ERROR';
+        throw error;
     }
 
-    return this.repository.getLegacyMatrixVersionByDate(date);
-  }
+    if (!date) {
+        const error =
+            new Error('Fecha requerida');
+
+        error.code = 'VALIDATION_ERROR';
+        throw error;
+    }
+
+    return this.repository
+        .getLegacyMatrixVersionByDate(
+            parsedMatrizId,
+            date
+        );
+}
 
 async getStructure(versionId) {
   const parsed = Number(versionId);
@@ -46,19 +100,49 @@ async getStructure(versionId) {
 }
 
 
-async listVersions() {
+async listVersions(matrizId = null) {
+  let parsedMatrixId = null;
+
+  if (
+    matrizId !== null &&
+    matrizId !== undefined &&
+    matrizId !== ''
+  ) {
+    parsedMatrixId = Number(matrizId);
+
+    if (!Number.isInteger(parsedMatrixId) || parsedMatrixId <= 0) {
+      const error = new Error('matrizId inválido');
+      error.code = 'VALIDATION_ERROR';
+      throw error;
+    }
+  }
+
   try {
-    if (typeof this.repository.matrixVersionsTableExists === 'function') {
-      const exists = await this.repository.matrixVersionsTableExists();
+    if (
+      typeof this.repository.matrixVersionsTableExists === 'function'
+    ) {
+      const exists =
+        await this.repository.matrixVersionsTableExists();
+
       if (!exists) return [];
     }
 
-    return await this.repository.listLegacyMatrixVersions();
+    return await this.repository.listLegacyMatrixVersions(
+      parsedMatrixId
+    );
   } catch (error) {
+    /*
+     * Los errores de validación sí deben conservarse.
+     * Los errores de infraestructura mantienen
+     * el comportamiento resiliente legacy.
+     */
+    if (error.code === 'VALIDATION_ERROR') {
+      throw error;
+    }
+
     return [];
   }
 }
-
 
 async getEvaluationRulesByVersion(versionId) {
   const parsed = Number(versionId);
@@ -79,22 +163,174 @@ async getEvaluationRulesByVersion(versionId) {
 }
 
 
-async listFrentes() {
-  return this.repository.listLegacyFrentes();
+async listFrentes(matrizId = null) {
+  return this.repository.listLegacyFrentes(
+    matrizId
+  );
 }
 
-async listAtributos(frenteId = null) {
-  return this.repository.listLegacyAtributos(frenteId || null);
+async listAtributos(
+  frenteId = null,
+  matrizId = null
+) {
+  return this.repository.listLegacyAtributos(
+    frenteId || null,
+    matrizId
+  );
 }
 
-async listSubMotivos(atributoId = null) {
-  return this.repository.listLegacySubMotivos(atributoId || null);
+async listSubMotivos(
+  atributoId = null,
+  matrizId = null
+) {
+  return this.repository.listLegacySubMotivos(
+    atributoId || null,
+    matrizId
+  );
 }
 
-async listEvaluationRulesAdmin() {
-  return this.repository.listLegacyEvaluationRulesAdmin();
+async listEvaluationRulesAdmin(matrizId = null) {
+  if (
+    matrizId === null ||
+    matrizId === undefined ||
+    matrizId === ''
+  ) {
+    return this.repository.listLegacyEvaluationRulesAdmin();
+  }
+
+  const parsedMatrizId = Number(matrizId);
+
+  if (
+    !Number.isInteger(parsedMatrizId) ||
+    parsedMatrizId <= 0
+  ) {
+    throw MatrixService.writeError(
+      'matriz_id inválido',
+      400
+    );
+  }
+
+  return this.repository.listLegacyEvaluationRulesAdmin(
+    parsedMatrizId
+  );
 }
 
+async resolveWriteVersion(
+  client,
+  matrizId = null,
+  versionId = null
+) {
+  const hasMatrizId =
+    matrizId !== null &&
+    matrizId !== undefined &&
+    matrizId !== '';
+
+  const hasVersionId =
+    versionId !== null &&
+    versionId !== undefined &&
+    versionId !== '';
+
+  // ==================================================
+  // COMPATIBILIDAD LEGACY
+  // ==================================================
+  // Los CRUD históricos no enviaban matriz_id ni
+  // version_matriz_id. En ese caso conservamos el
+  // comportamiento original: usar la versión activa.
+  // ==================================================
+  if (!hasMatrizId && !hasVersionId) {
+    const activeVersionId =
+      await this.repository.getActiveVersionId(client);
+
+    if (!activeVersionId) {
+      throw MatrixService.writeError(
+        'No hay versión activa',
+        404
+      );
+    }
+
+    return {
+      matrizId: null,
+      versionId: Number(activeVersionId),
+      version: null,
+      legacy: true
+    };
+  }
+
+  // ==================================================
+  // CONTEXTO EXPLÍCITO NUEVO
+  // ==================================================
+  // Si se usa el contrato multi-matriz deben venir
+  // ambos identificadores.
+  // ==================================================
+  const parsedMatrizId = Number(matrizId);
+  const parsedVersionId = Number(versionId);
+
+  if (
+    !Number.isInteger(parsedMatrizId) ||
+    parsedMatrizId <= 0
+  ) {
+    throw MatrixService.writeError(
+      'matriz_id inválido',
+      400
+    );
+  }
+
+  if (
+    !Number.isInteger(parsedVersionId) ||
+    parsedVersionId <= 0
+  ) {
+    throw MatrixService.writeError(
+      'version_matriz_id inválido',
+      400
+    );
+  }
+
+  const result = await client.query(
+    `
+      SELECT
+        id,
+        matriz_id,
+        version,
+        activa
+      FROM versiones_matriz
+      WHERE id = $1
+        AND matriz_id = $2
+      LIMIT 1
+    `,
+    [
+      parsedVersionId,
+      parsedMatrizId
+    ]
+  );
+
+  const version = result.rows[0] || null;
+
+  if (!version) {
+    throw MatrixService.writeError(
+      'La versión indicada no pertenece a la matriz seleccionada',
+      400
+    );
+  }
+
+  /*
+   * Los CRUD solo pueden modificar la versión activa.
+   * Las versiones históricas/inactivas permanecen
+   * de solo lectura.
+   */
+  if (version.activa !== true) {
+    throw MatrixService.writeError(
+      'La versión seleccionada no está activa y es de solo lectura',
+      400
+    );
+  }
+
+  return {
+    matrizId: parsedMatrizId,
+    versionId: parsedVersionId,
+    version: version.version,
+    legacy: false
+  };
+}
 
 static writeError(message, status = 400, payload = null) {
   const error = new Error(message);
@@ -104,54 +340,106 @@ static writeError(message, status = 400, payload = null) {
 }
 
 async createFront(input = {}) {
-  const { codigo, nombre, peso_maximo, orden, activo } = input;
+  const {
+    codigo,
+    nombre,
+    peso_maximo,
+    orden,
+    activo,
+    matriz_id,
+    version_matriz_id
+  } = input;
 
   if (!codigo || !nombre || !peso_maximo) {
-    throw MatrixService.writeError('Faltan campos obligatorios', 400);
+    throw MatrixService.writeError(
+      'Faltan campos obligatorios',
+      400
+    );
   }
 
-  const nuevoPeso = parseFloat(peso_maximo);
-  if (!Number.isFinite(nuevoPeso) || nuevoPeso <= 0 || nuevoPeso > 100) {
+  const nuevoPeso =
+    parseFloat(peso_maximo);
+
+  if (
+    !Number.isFinite(nuevoPeso) ||
+    nuevoPeso <= 0 ||
+    nuevoPeso > 100
+  ) {
     throw MatrixService.writeError(
       'El peso debe ser mayor a 0 y menor o igual a 100',
       400
     );
   }
 
-  return this.repository.withTransaction(async client => {
-    const versionId = await this.repository.getActiveVersionId(client);
-    if (!versionId) {
-      throw MatrixService.writeError('No hay versión activa', 404);
-    }
+  return this.repository.withTransaction(
+    async client => {
 
-    const existing = await this.repository.findFrontByCode(
-      client, versionId, codigo
-    );
-    if (existing) {
-      throw MatrixService.writeError(
-        `Ya existe un frente con el código "${codigo}" en esta versión`,
-        400
-      );
-    }
+      // ==================================================
+      // CONTEXTO EXPLÍCITO DE ESCRITURA
+      // ==================================================
+      const contexto =
+        await this.resolveWriteVersion(
+          client,
+          matriz_id,
+          version_matriz_id
+        );
 
-    const sumaActual = await this.repository.sumActiveFrontWeights(
-      client, versionId
-    );
-    const nuevaSuma = sumaActual + nuevoPeso;
+      const versionId =
+        contexto.versionId;
 
-    if (nuevaSuma > 100) {
-      throw MatrixService.writeError(
-        `La suma total de los frentes en la versión activa excede el 100%. Actual: ${sumaActual}% + ${nuevoPeso}% = ${nuevaSuma}%`,
-        400,
-        {
-          error: `La suma total de los frentes en la versión activa excede el 100%. Actual: ${sumaActual}% + ${nuevoPeso}% = ${nuevaSuma}%`,
-          suma_actual: sumaActual,
-          nuevo_peso: nuevoPeso,
-          peso_maximo: 100,
-          suma_total: nuevaSuma
-        }
-      );
-    }
+      // ==================================================
+      // VALIDAR CÓDIGO DUPLICADO EN ESTA VERSIÓN
+      // ==================================================
+      const existing =
+        await this.repository.findFrontByCode(
+          client,
+          versionId,
+          codigo
+        );
+
+      if (existing) {
+        throw MatrixService.writeError(
+          `Ya existe un frente con el código "${codigo}" en esta versión`,
+          400
+        );
+      }
+
+      // ==================================================
+      // VALIDAR PESO TOTAL DE ESTA VERSIÓN
+      // ==================================================
+      const sumaActual =
+        await this.repository.sumActiveFrontWeights(
+          client,
+          versionId
+        );
+
+      const nuevaSuma =
+        sumaActual + nuevoPeso;
+
+      if (nuevaSuma > 100) {
+        throw MatrixService.writeError(
+          `La suma total de los frentes en la versión activa excede el 100%. ` +
+          `Actual: ${sumaActual}% + ${nuevoPeso}% = ${nuevaSuma}%`,
+          400,
+          {
+            error:
+              `La suma total de los frentes en la versión activa excede el 100%. ` +
+              `Actual: ${sumaActual}% + ${nuevoPeso}% = ${nuevaSuma}%`,
+
+            suma_actual:
+              sumaActual,
+
+            nuevo_peso:
+              nuevoPeso,
+
+            peso_maximo:
+              100,
+
+            suma_total:
+              nuevaSuma
+          }
+        );
+      }
 
     return this.repository.insertFront(client, {
       versionId,
@@ -166,15 +454,29 @@ async createFront(input = {}) {
 
 async updateFront(id, input = {}) {
   const parsedId = Number(id);
+
   if (!Number.isInteger(parsedId) || parsedId <= 0) {
-    throw MatrixService.writeError('ID de frente inválido', 400);
+    throw MatrixService.writeError(
+      'ID de frente inválido',
+      400
+    );
   }
 
+  const {
+    matriz_id,
+    version_matriz_id
+  } = input;
+
   return this.repository.withTransaction(async client => {
-    const versionId = await this.repository.getActiveVersionId(client);
-    if (!versionId) {
-      throw MatrixService.writeError('No hay versión activa', 404);
-    }
+    const contexto =
+      await this.resolveWriteVersion(
+        client,
+        matriz_id,
+        version_matriz_id
+      );
+
+    const versionId =
+      contexto.versionId;
 
     const actual = await this.repository.getFrontByIdAndVersion(
       client, parsedId, versionId
@@ -240,31 +542,71 @@ async updateFront(id, input = {}) {
   });
 }
 
-async deleteFront(id) {
+async deleteFront(id, input = {}) {
   const parsedId = Number(id);
-  if (!Number.isInteger(parsedId) || parsedId <= 0) {
-    throw MatrixService.writeError('ID de frente inválido', 400);
+
+  if (
+    !Number.isInteger(parsedId) ||
+    parsedId <= 0
+  ) {
+    throw MatrixService.writeError(
+      'ID de frente inválido',
+      400
+    );
   }
 
-  return this.repository.withTransaction(async client => {
-    const versionId = await this.repository.getActiveVersionId(client);
-    if (!versionId) {
-      throw MatrixService.writeError('No hay versión activa', 404);
+  const {
+    matriz_id,
+    version_matriz_id
+  } = input;
+
+  return this.repository.withTransaction(
+    async client => {
+
+      // ==================================================
+      // CONTEXTO EXPLÍCITO DE ESCRITURA
+      // ==================================================
+      const contexto =
+        await this.resolveWriteVersion(
+          client,
+          matriz_id,
+          version_matriz_id
+        );
+
+      const versionId =
+        contexto.versionId;
+
+      // ==================================================
+      // ELIMINAR SOLO DENTRO DE ESA VERSIÓN
+      // ==================================================
+      const front =
+        await this.repository.deleteFrontTree(
+          client,
+          parsedId,
+          versionId
+        );
+
+      if (!front) {
+        throw MatrixService.writeError(
+          'Frente no encontrado en la versión seleccionada',
+          404
+        );
+      }
+
+      return {
+        success: true,
+
+        message:
+          `✅ Frente "${front.nombre}" eliminado correctamente.`,
+
+        matriz_id:
+          contexto.matrizId,
+
+        version_matriz_id:
+          contexto.versionId
+      };
     }
-
-    const front = await this.repository.deleteFrontTree(
-      client, parsedId, versionId
-    );
-
-    if (!front) {
-      throw MatrixService.writeError('Frente no encontrado', 404);
-    }
-
-    return {
-      success: true,
-      message: `✅ Frente "${front.nombre}" eliminado correctamente.`
-    };
-  });
+  );
 }
 
 
@@ -274,7 +616,9 @@ async createAttribute(input = {}) {
     nombre,
     peso_maximo,
     orden,
-    activo
+    activo,
+    matriz_id,
+    version_matriz_id
   } = input;
 
   if (
@@ -288,6 +632,7 @@ async createAttribute(input = {}) {
   }
 
   const peso = parseFloat(peso_maximo);
+
   if (!Number.isFinite(peso) || peso <= 0) {
     throw MatrixService.writeError(
       'El peso debe ser mayor a 0',
@@ -296,10 +641,25 @@ async createAttribute(input = {}) {
   }
 
   return this.repository.withTransaction(async client => {
-    const versionId = await this.repository.getActiveVersionId(client);
-    if (!versionId) {
-      throw MatrixService.writeError('No hay versión activa', 404);
-    }
+
+    // ========================================================
+    // F11.7.3
+    // Resolver versión dentro del contexto de matriz.
+    //
+    // - Nuevo contrato:
+    //      matriz_id + version_matriz_id
+    //
+    // - Compatibilidad:
+    //      si no llegan, resolveWriteVersion conserva
+    //      el comportamiento legacy durante la transición.
+    // ========================================================
+    const contexto = await this.resolveWriteVersion(
+      client,
+      matriz_id,
+      version_matriz_id
+    );
+
+    const versionId = contexto.versionId;
 
     const front = await this.repository.getActiveFront(
       client,
@@ -328,18 +688,20 @@ async createAttribute(input = {}) {
       );
     }
 
-    const sumaActual = await this.repository.sumActiveAttributeWeights(
-      client,
-      versionId,
-      frente_id
-    );
+    const sumaActual =
+      await this.repository.sumActiveAttributeWeights(
+        client,
+        versionId,
+        frente_id
+      );
 
     const pesoMaximoFrente = parseFloat(front.peso_maximo);
     const nuevaSuma = sumaActual + peso;
 
     if (nuevaSuma > pesoMaximoFrente) {
       const message =
-        `La suma de los atributos en la versión activa excede el peso del frente (${pesoMaximoFrente}%). Actual: ${sumaActual}% + ${peso}% = ${nuevaSuma}%`;
+        `La suma de los atributos en la versión activa excede el peso del frente ` +
+        `(${pesoMaximoFrente}%). Actual: ${sumaActual}% + ${peso}% = ${nuevaSuma}%`;
 
       throw MatrixService.writeError(message, 400, {
         error: message,
@@ -362,21 +724,36 @@ async createAttribute(input = {}) {
 
 async updateAttribute(id, input = {}) {
   const parsedId = Number(id);
+
   if (!Number.isInteger(parsedId) || parsedId <= 0) {
-    throw MatrixService.writeError('ID de atributo inválido', 400);
+    throw MatrixService.writeError(
+      'ID de atributo inválido',
+      400
+    );
   }
 
-  return this.repository.withTransaction(async client => {
-    const versionId = await this.repository.getActiveVersionId(client);
-    if (!versionId) {
-      throw MatrixService.writeError('No hay versión activa', 404);
-    }
+  const {
+    matriz_id,
+    version_matriz_id
+  } = input;
 
-    const current = await this.repository.getAttributeInActiveVersion(
+  return this.repository.withTransaction(async client => {
+
+    // F11.7.3 - contexto multi-matriz
+    const contexto = await this.resolveWriteVersion(
       client,
-      parsedId,
-      versionId
+      matriz_id,
+      version_matriz_id
     );
+
+    const versionId = contexto.versionId;
+
+    const current =
+      await this.repository.getAttributeInActiveVersion(
+        client,
+        parsedId,
+        versionId
+      );
 
     if (!current) {
       throw MatrixService.writeError(
@@ -385,7 +762,9 @@ async updateAttribute(id, input = {}) {
       );
     }
 
-    const frontId = input.frente_id || current.frente_id;
+    const frontId =
+      input.frente_id || current.frente_id;
+
     const front = await this.repository.getActiveFront(
       client,
       frontId,
@@ -399,10 +778,13 @@ async updateAttribute(id, input = {}) {
       );
     }
 
-    const nombre = input.nombre || current.nombre;
-    const peso = input.peso_maximo !== undefined
-      ? parseFloat(input.peso_maximo)
-      : parseFloat(current.peso_maximo);
+    const nombre =
+      input.nombre || current.nombre;
+
+    const peso =
+      input.peso_maximo !== undefined
+        ? parseFloat(input.peso_maximo)
+        : parseFloat(current.peso_maximo);
 
     if (!Number.isFinite(peso) || peso <= 0) {
       throw MatrixService.writeError(
@@ -411,13 +793,14 @@ async updateAttribute(id, input = {}) {
       );
     }
 
-    const duplicate = await this.repository.findAttributeByName(
-      client,
-      versionId,
-      frontId,
-      nombre,
-      parsedId
-    );
+    const duplicate =
+      await this.repository.findAttributeByName(
+        client,
+        versionId,
+        frontId,
+        nombre,
+        parsedId
+      );
 
     if (duplicate) {
       throw MatrixService.writeError(
@@ -426,19 +809,24 @@ async updateAttribute(id, input = {}) {
       );
     }
 
-    const sumaOtros = await this.repository.sumActiveAttributeWeights(
-      client,
-      versionId,
-      frontId,
-      parsedId
-    );
+    const sumaOtros =
+      await this.repository.sumActiveAttributeWeights(
+        client,
+        versionId,
+        frontId,
+        parsedId
+      );
 
-    const pesoMaximoFrente = parseFloat(front.peso_maximo);
-    const nuevaSuma = sumaOtros + peso;
+    const pesoMaximoFrente =
+      parseFloat(front.peso_maximo);
+
+    const nuevaSuma =
+      sumaOtros + peso;
 
     if (nuevaSuma > pesoMaximoFrente) {
       const message =
-        `La suma de los atributos en la versión activa excede el peso del frente (${pesoMaximoFrente}%). Actual: ${sumaOtros}% + ${peso}% = ${nuevaSuma}%`;
+        `La suma de los atributos en la versión activa excede el peso del frente ` +
+        `(${pesoMaximoFrente}%). Actual: ${sumaOtros}% + ${peso}% = ${nuevaSuma}%`;
 
       throw MatrixService.writeError(message, 400, {
         error: message,
@@ -449,33 +837,58 @@ async updateAttribute(id, input = {}) {
       });
     }
 
-    return this.repository.updateAttribute(client, parsedId, {
-      frontId,
-      nombre,
-      pesoMaximo: peso,
-      orden: input.orden !== undefined ? input.orden : current.orden || 0,
-      activo: input.activo !== undefined ? input.activo : current.activo
-    });
+    return this.repository.updateAttribute(
+      client,
+      parsedId,
+      {
+        frontId,
+        nombre,
+        pesoMaximo: peso,
+        orden:
+          input.orden !== undefined
+            ? input.orden
+            : current.orden || 0,
+        activo:
+          input.activo !== undefined
+            ? input.activo
+            : current.activo
+      }
+    );
   });
 }
 
-async deleteAttribute(id) {
+async deleteAttribute(id, input = {}) {
   const parsedId = Number(id);
+
   if (!Number.isInteger(parsedId) || parsedId <= 0) {
-    throw MatrixService.writeError('ID de atributo inválido', 400);
+    throw MatrixService.writeError(
+      'ID de atributo inválido',
+      400
+    );
   }
 
-  return this.repository.withTransaction(async client => {
-    const versionId = await this.repository.getActiveVersionId(client);
-    if (!versionId) {
-      throw MatrixService.writeError('No hay versión activa', 404);
-    }
+  const {
+    matriz_id,
+    version_matriz_id
+  } = input;
 
-    const deleted = await this.repository.deleteAttributeTree(
+  return this.repository.withTransaction(async client => {
+
+    // F11.7.3 - contexto multi-matriz
+    const contexto = await this.resolveWriteVersion(
       client,
-      parsedId,
-      versionId
+      matriz_id,
+      version_matriz_id
     );
+
+    const versionId = contexto.versionId;
+
+    const deleted =
+      await this.repository.deleteAttributeTree(
+        client,
+        parsedId,
+        versionId
+      );
 
     if (!deleted) {
       throw MatrixService.writeError(
@@ -501,7 +914,9 @@ async createSubReason(input = {}) {
     descripcion,
     peso_individual,
     orden,
-    activo
+    activo,
+    matriz_id,
+    version_matriz_id
   } = input;
 
   if (
@@ -521,10 +936,13 @@ async createSubReason(input = {}) {
   }
 
   return this.repository.withTransaction(async client => {
-    const versionId = await this.repository.getActiveVersionId(client);
-    if (!versionId) {
-      throw MatrixService.writeError('No hay versión activa', 404);
-    }
+    const contexto = await this.resolveWriteVersion(
+      client,
+      matriz_id,
+      version_matriz_id
+    );
+
+    const versionId = contexto.versionId;
 
     const attribute = await this.repository.getAttributeInActiveVersion(
       client,
@@ -592,11 +1010,19 @@ async updateSubReason(id, input = {}) {
     throw MatrixService.writeError('ID de sub-motivo inválido', 400);
   }
 
+  const {
+    matriz_id,
+    version_matriz_id
+  } = input;
+
   return this.repository.withTransaction(async client => {
-    const versionId = await this.repository.getActiveVersionId(client);
-    if (!versionId) {
-      throw MatrixService.writeError('No hay versión activa', 404);
-    }
+    const contexto = await this.resolveWriteVersion(
+      client,
+      matriz_id,
+      version_matriz_id
+    );
+
+    const versionId = contexto.versionId;
 
     const current = await this.repository.getSubReasonInActiveVersion(
       client,
@@ -684,17 +1110,30 @@ async updateSubReason(id, input = {}) {
   });
 }
 
-async deleteSubReason(id) {
+async deleteSubReason(id, input = {}) {
   const parsedId = Number(id);
+
   if (!Number.isInteger(parsedId) || parsedId <= 0) {
-    throw MatrixService.writeError('ID de sub-motivo inválido', 400);
+    throw MatrixService.writeError(
+      'ID de sub-motivo inválido',
+      400
+    );
   }
 
+  const {
+    matriz_id,
+    version_matriz_id
+  } = input;
+
   return this.repository.withTransaction(async client => {
-    const versionId = await this.repository.getActiveVersionId(client);
-    if (!versionId) {
-      throw MatrixService.writeError('No hay versión activa', 404);
-    }
+
+    const contexto = await this.resolveWriteVersion(
+      client,
+      matriz_id,
+      version_matriz_id
+    );
+
+    const versionId = contexto.versionId;
 
     const deleted = await this.repository.deleteSubReason(
       client,
@@ -703,7 +1142,10 @@ async deleteSubReason(id) {
     );
 
     if (!deleted) {
-      throw MatrixService.writeError('Sub-motivo no encontrado', 404);
+      throw MatrixService.writeError(
+        'Sub-motivo no encontrado',
+        404
+      );
     }
 
     return {
@@ -715,7 +1157,12 @@ async deleteSubReason(id) {
 
 
 async freezeVersion(input = {}) {
-  const { version, descripcion, fecha_vigencia } = input;
+  const {
+    version,
+    descripcion,
+    fecha_vigencia,
+    matriz_id
+  } = input;
 
   if (!version || !fecha_vigencia) {
     throw MatrixService.writeError(
@@ -725,7 +1172,11 @@ async freezeVersion(input = {}) {
   }
 
   return this.repository.withTransaction(async client => {
-    const source = await this.repository.getActiveVersionSource(client);
+    const source =
+    await this.repository.getActiveVersionSource(
+      client,
+      matriz_id
+    );
     if (!source) {
       throw MatrixService.writeError(
         'No hay una versión activa para congelar',
@@ -765,13 +1216,21 @@ async freezeVersion(input = {}) {
 }
 
 async createEmptyVersion(input = {}) {
-  const { version, descripcion } = input;
+  const {
+    version,
+    descripcion,
+    matriz_id
+  } = input;
   if (!version) {
     throw MatrixService.writeError('Versión requerida', 400);
   }
 
   return this.repository.withTransaction(async client => {
-    const source = await this.repository.getActiveVersionSource(client);
+    const source =
+    await this.repository.getActiveVersionSource(
+      client,
+      matriz_id
+    );
     if (!source) {
       throw MatrixService.writeError(
         'No hay versión activa para resolver la matriz',
@@ -837,141 +1296,473 @@ async activateVersion(versionId) {
 }
 
 async validateFrontWeight(input = {}) {
-  return this.repository.withTransaction(async client => {
-    const result = await this.repository.validateFrontWeight(client, {
-      frenteId: input.frente_id,
-      nuevoPeso: input.nuevo_peso,
-      excluirId: input.excluir_id
-    });
+  return this.repository.withTransaction(
+    async client => {
 
-    if (result.notFound) {
-      throw MatrixService.writeError(result.notFound, 404);
-    }
+      let versionId = null;
 
-    if (result.total > result.max) {
-      const message =
-        `La suma total de los frentes (${result.total}%) excede el 100%`;
-      throw MatrixService.writeError(message, 400, {
-        valid: false,
-        error: message,
-        total_actual: result.total,
+      const hasContext =
+        input.matriz_id !== undefined ||
+        input.version_matriz_id !== undefined;
+
+      if (hasContext) {
+        const contexto =
+          await this.resolveWriteVersion(
+            client,
+            input.matriz_id,
+            input.version_matriz_id
+          );
+
+        versionId = contexto.versionId;
+      }
+
+      const result =
+        await this.repository.validateFrontWeight(
+          client,
+          {
+            frenteId: input.frente_id,
+            nuevoPeso: input.nuevo_peso,
+            excluirId: input.excluir_id,
+            versionId
+          }
+        );
+
+      if (result.notFound) {
+        throw MatrixService.writeError(
+          result.notFound,
+          404
+        );
+      }
+
+      if (result.total > result.max) {
+        const message =
+          `La suma total de los frentes (${result.total}%) excede el 100%`;
+
+        throw MatrixService.writeError(
+          message,
+          400,
+          {
+            valid: false,
+            error: message,
+            total_actual: result.total,
+            peso_maximo: result.max
+          }
+        );
+      }
+
+      return {
+        valid: true,
+        total: result.total,
         peso_maximo: result.max
-      });
+      };
     }
-
-    return { valid: true, total: result.total, peso_maximo: result.max };
-  });
+  );
 }
 
 async validateAttributeWeight(input = {}) {
-  return this.repository.withTransaction(async client => {
-    const result = await this.repository.validateAttributeWeight(client, {
-      frenteId: input.frente_id,
-      nuevoPeso: input.nuevo_peso,
-      excluirId: input.excluir_id || input.atributo_id
-    });
+  return this.repository.withTransaction(
+    async client => {
 
-    if (result.notFound) {
-      throw MatrixService.writeError(result.notFound, 404);
-    }
+      let versionId = null;
 
-    if (result.total > result.max) {
-      const message =
-        `La suma de los atributos (${result.total}%) excede el peso máximo del frente (${result.max}%)`;
-      throw MatrixService.writeError(message, 400, {
-        valid: false,
-        error: message,
-        total_actual: result.total,
+      const hasContext =
+        input.matriz_id !== undefined ||
+        input.version_matriz_id !== undefined;
+
+      if (hasContext) {
+        const contexto =
+          await this.resolveWriteVersion(
+            client,
+            input.matriz_id,
+            input.version_matriz_id
+          );
+
+        versionId = contexto.versionId;
+      }
+
+      const result =
+        await this.repository.validateAttributeWeight(
+          client,
+          {
+            frenteId: input.frente_id,
+            nuevoPeso: input.nuevo_peso,
+            excluirId:
+              input.excluir_id ||
+              input.atributo_id,
+            versionId
+          }
+        );
+
+      if (result.notFound) {
+        throw MatrixService.writeError(
+          result.notFound,
+          404
+        );
+      }
+
+      if (result.total > result.max) {
+        const message =
+          `La suma de los atributos (${result.total}%) excede el peso máximo del frente (${result.max}%)`;
+
+        throw MatrixService.writeError(
+          message,
+          400,
+          {
+            valid: false,
+            error: message,
+            total_actual: result.total,
+            peso_maximo: result.max
+          }
+        );
+      }
+
+      return {
+        valid: true,
+        total: result.total,
         peso_maximo: result.max
-      });
+      };
     }
-
-    return { valid: true, total: result.total, peso_maximo: result.max };
-  });
+  );
 }
 
 async validateSubReasonWeight(input = {}) {
-  return this.repository.withTransaction(async client => {
-    const result = await this.repository.validateSubReasonWeight(client, {
-      atributoId: input.atributo_id,
-      nuevoPeso: input.nuevo_peso,
-      excluirId: input.excluir_id || input.sub_motivo_id
-    });
+  return this.repository.withTransaction(
+    async client => {
 
-    if (result.notFound) {
-      throw MatrixService.writeError(result.notFound, 404);
-    }
+      let versionId = null;
 
-    if (result.total > result.max) {
-      const message =
-        `La suma de los sub-motivos (${result.total}%) excede el peso máximo del atributo (${result.max}%)`;
-      throw MatrixService.writeError(message, 400, {
-        valid: false,
-        error: message,
-        total_actual: result.total,
+      const hasContext =
+        input.matriz_id !== undefined ||
+        input.version_matriz_id !== undefined;
+
+      if (hasContext) {
+        const contexto =
+          await this.resolveWriteVersion(
+            client,
+            input.matriz_id,
+            input.version_matriz_id
+          );
+
+        versionId = contexto.versionId;
+      }
+
+      const result =
+        await this.repository.validateSubReasonWeight(
+          client,
+          {
+            atributoId: input.atributo_id,
+            nuevoPeso: input.nuevo_peso,
+            excluirId:
+              input.excluir_id ||
+              input.sub_motivo_id,
+            versionId
+          }
+        );
+
+      if (result.notFound) {
+        throw MatrixService.writeError(
+          result.notFound,
+          404
+        );
+      }
+
+      if (result.total > result.max) {
+        const message =
+          `La suma de los sub-motivos (${result.total}%) excede el peso máximo del atributo (${result.max}%)`;
+
+        throw MatrixService.writeError(
+          message,
+          400,
+          {
+            valid: false,
+            error: message,
+            total_actual: result.total,
+            peso_maximo: result.max
+          }
+        );
+      }
+
+      return {
+        valid: true,
+        total: result.total,
         peso_maximo: result.max
-      });
+      };
     }
-
-    return { valid: true, total: result.total, peso_maximo: result.max };
-  });
+  );
 }
 
 
-async getActiveEvaluationStructure() {
-  return this.repository.getActiveEvaluationStructure();
+async getActiveEvaluationStructure(
+  input = {}
+) {
+  const matrizId =
+    input.matriz_id ??
+    input.matrizId ??
+    null;
+
+  const versionId =
+    input.version_matriz_id ??
+    input.versionId ??
+    null;
+
+  // ========================================================
+  // LEGACY
+  // ========================================================
+  if (
+    versionId === null ||
+    versionId === undefined ||
+    versionId === ''
+  ) {
+    return this.repository
+      .getActiveEvaluationStructure();
+  }
+
+  const parsedVersionId =
+    Number(versionId);
+
+  if (
+    !Number.isInteger(parsedVersionId) ||
+    parsedVersionId <= 0
+  ) {
+    throw MatrixService.writeError(
+      'version_matriz_id inválido',
+      400
+    );
+  }
+
+  let parsedMatrizId = null;
+
+  if (
+    matrizId !== null &&
+    matrizId !== undefined &&
+    matrizId !== ''
+  ) {
+    parsedMatrizId = Number(matrizId);
+
+    if (
+      !Number.isInteger(parsedMatrizId) ||
+      parsedMatrizId <= 0
+    ) {
+      throw MatrixService.writeError(
+        'matriz_id inválido',
+        400
+      );
+    }
+
+    // ======================================================
+    // Validar que la versión realmente pertenece a la matriz
+    // ======================================================
+    const validation =
+      await this.repository.withTransaction(
+        async client => {
+          return this.repository.getVersionById(
+            client,
+            parsedVersionId
+          );
+        }
+      );
+
+    if (
+      !validation ||
+      Number(validation.matriz_id) !==
+        parsedMatrizId
+    ) {
+      throw MatrixService.writeError(
+        'La versión indicada no pertenece a la matriz seleccionada',
+        400
+      );
+    }
+  }
+
+  const result =
+    await this.repository
+      .getActiveEvaluationStructure(
+        parsedVersionId
+      );
+
+  if (!result) {
+    throw MatrixService.writeError(
+      'Versión no encontrada',
+      404
+    );
+  }
+
+  return result;
 }
 
 async createEvaluationRule(input = {}) {
-  if (!input.version_id || !input.submotivo_origen) {
-    throw MatrixService.writeError('Faltan campos obligatorios', 400);
+  if (!input.submotivo_origen) {
+    throw MatrixService.writeError(
+      'Faltan campos obligatorios',
+      400
+    );
   }
 
-  return this.repository.withTransaction(client =>
-    this.repository.createEvaluationRule(client, input)
+  return this.repository.withTransaction(
+    async client => {
+
+      let versionId = input.version_id || null;
+
+      const hasContext =
+        input.matriz_id !== undefined ||
+        input.version_matriz_id !== undefined;
+
+      if (hasContext) {
+        const contexto =
+          await this.resolveWriteVersion(
+            client,
+            input.matriz_id,
+            input.version_matriz_id
+          );
+
+        versionId = contexto.versionId;
+      }
+
+      if (!versionId) {
+        throw MatrixService.writeError(
+          'Faltan campos obligatorios',
+          400
+        );
+      }
+
+      return this.repository.createEvaluationRule(
+        client,
+        {
+          ...input,
+          version_id: versionId
+        }
+      );
+    }
   );
 }
 
 async updateEvaluationRule(id, input = {}) {
   const parsedId = Number(id);
-  if (!Number.isInteger(parsedId) || parsedId <= 0) {
-    throw MatrixService.writeError('ID de regla inválido', 400);
+
+  if (
+    !Number.isInteger(parsedId) ||
+    parsedId <= 0
+  ) {
+    throw MatrixService.writeError(
+      'ID de regla inválido',
+      400
+    );
   }
 
-  return this.repository.withTransaction(async client => {
-    const row = await this.repository.updateEvaluationRule(
-      client,
-      parsedId,
-      input
-    );
+  return this.repository.withTransaction(
+    async client => {
 
-    if (!row) {
-      throw MatrixService.writeError('Regla no encontrada', 404);
+      const hasContext =
+        input.matriz_id !== undefined ||
+        input.version_matriz_id !== undefined;
+
+      if (hasContext) {
+        const contexto =
+          await this.resolveWriteVersion(
+            client,
+            input.matriz_id,
+            input.version_matriz_id
+          );
+
+        const existing =
+          await this.repository
+            .getEvaluationRuleByIdAndVersion(
+              client,
+              parsedId,
+              contexto.versionId
+            );
+
+        if (!existing) {
+          throw MatrixService.writeError(
+            'Regla no encontrada en la versión seleccionada',
+            404
+          );
+        }
+      }
+
+      const row =
+        await this.repository.updateEvaluationRule(
+          client,
+          parsedId,
+          input
+        );
+
+      if (!row) {
+        throw MatrixService.writeError(
+          'Regla no encontrada',
+          404
+        );
+      }
+
+      return row;
     }
-
-    return row;
-  });
+  );
 }
 
-async deleteEvaluationRule(id) {
+async deleteEvaluationRule(id, input = {}) {
   const parsedId = Number(id);
-  if (!Number.isInteger(parsedId) || parsedId <= 0) {
-    throw MatrixService.writeError('ID de regla inválido', 400);
+
+  if (
+    !Number.isInteger(parsedId) ||
+    parsedId <= 0
+  ) {
+    throw MatrixService.writeError(
+      'ID de regla inválido',
+      400
+    );
   }
 
-  return this.repository.withTransaction(async client => {
-    const row = await this.repository.deleteEvaluationRule(client, parsedId);
+  return this.repository.withTransaction(
+    async client => {
 
-    if (!row) {
-      throw MatrixService.writeError('Regla no encontrada', 404);
+      const hasContext =
+        input.matriz_id !== undefined ||
+        input.version_matriz_id !== undefined;
+
+      if (hasContext) {
+        const contexto =
+          await this.resolveWriteVersion(
+            client,
+            input.matriz_id,
+            input.version_matriz_id
+          );
+
+        const existing =
+          await this.repository
+            .getEvaluationRuleByIdAndVersion(
+              client,
+              parsedId,
+              contexto.versionId
+            );
+
+        if (!existing) {
+          throw MatrixService.writeError(
+            'Regla no encontrada en la versión seleccionada',
+            404
+          );
+        }
+      }
+
+      const row =
+        await this.repository.deleteEvaluationRule(
+          client,
+          parsedId
+        );
+
+      if (!row) {
+        throw MatrixService.writeError(
+          'Regla no encontrada',
+          404
+        );
+      }
+
+      return {
+        success: true,
+        message: 'Regla eliminada correctamente',
+        id: parsedId
+      };
     }
-
-    return {
-      success: true,
-      message: 'Regla eliminada correctamente',
-      id: parsedId
-    };
-  });
+  );
 }
 
 }

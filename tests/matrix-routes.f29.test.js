@@ -4,19 +4,25 @@ const { createMatrixReadHandler } = require('../src/modules/matrix');
 
 function fakeService(overrides = {}) {
   return {
-    getEvaluationActiveVersion: async () => ({
-      id: 4,
-      version: 'v2.0.0',
+    getEvaluationActiveVersion: async matrizId => ({
+      id: 7,
+      matriz_id: Number(matrizId),
+      version: 'v2.1.0',
       activa: true
     }),
-    getActiveVersion: async () => ({
-      id: 4,
-      version: 'v2.0.0',
+
+    getActiveVersion: async matrizId => ({
+      id: 7,
+      matriz_id: Number(matrizId),
+      version: 'v2.1.0',
       activa: true
     }),
-    getVersionByDate: async () => ({
-      id: 4,
-      version: 'v2.0.0'
+
+    getVersionByDate: async (matrizId, fecha) => ({
+      id: 7,
+      matriz_id: Number(matrizId),
+      version: 'v2.1.0',
+      fecha
     }),
     getStructure: async () => ({
       version: { id: 4, version: 'v2.0.0' },
@@ -73,12 +79,33 @@ test('MATRIXROUTE-002 captura las seis lecturas consolidadas', async () => {
   });
 
   const cases = [
-    ['/api/evaluacion/version-activa', {}],
-    ['/api/matriz/versiones/activa', {}],
-    ['/api/matriz/versiones/por-fecha', { fecha: '2026-08-22' }],
-    ['/api/matriz/versiones/4/estructura', {}],
-    ['/api/matriz/versiones', {}],
-    ['/api/reglas-evaluacion/version/4', {}]
+    [
+      '/api/evaluacion/version-activa',
+      { matrizId: '1' }
+    ],
+    [
+      '/api/matriz/versiones/activa',
+      { matrizId: '1' }
+    ],
+    [
+      '/api/matriz/versiones/por-fecha',
+      {
+        matrizId: '1',
+        fecha: '2026-08-22'
+      }
+    ],
+    [
+      '/api/matriz/versiones/4/estructura',
+      {}
+    ],
+    [
+      '/api/matriz/versiones',
+      {}
+    ],
+    [
+      '/api/reglas-evaluacion/version/4',
+      {}
+    ]
   ];
 
   for (const [ruta, query] of cases) {
@@ -115,33 +142,95 @@ test('MATRIXROUTE-003 conserva 401 sin token', async () => {
   assert.equal(res.body.error, 'Token requerido');
 });
 
-test('MATRIXROUTE-004 conserva contratos especiales', async () => {
-  const handler = createMatrixReadHandler({
-    service: fakeService({
-      getActiveVersion: async () => null,
-      getVersionByDate: async () => null
-    })
-  });
+test(
+  'MATRIXROUTE-004 conserva contratos especiales contextualizados',
+  async () => {
 
-  let res = response();
-  await handler({
-    ruta: '/api/matriz/versiones/activa',
-    metodo: 'GET',
-    peticion: req,
-    respuesta: res,
-    query: {}
-  });
-  assert.equal(res.status, 404);
-  assert.equal(res.body.error, 'No hay versión activa');
+    const handler =
+      createMatrixReadHandler({
+        service: fakeService({
+          getActiveVersion:
+            async () => null,
 
-  res = response();
-  await handler({
-    ruta: '/api/matriz/versiones/por-fecha',
-    metodo: 'GET',
-    peticion: req,
-    respuesta: res,
-    query: {}
-  });
-  assert.equal(res.status, 400);
-  assert.equal(res.body.error, 'Fecha requerida');
-});
+          getVersionByDate:
+            async () => null
+        })
+      });
+
+    // ==========================================
+    // Matriz válida pero sin versión activa
+    // ==========================================
+
+    let res = response();
+
+    await handler({
+      ruta:
+        '/api/matriz/versiones/activa',
+      metodo: 'GET',
+      peticion: req,
+      respuesta: res,
+      query: {
+        matrizId: '99'
+      }
+    });
+
+    assert.equal(
+      res.status,
+      404
+    );
+
+    assert.equal(
+      res.body.error,
+      'No hay versión activa para la matriz indicada'
+    );
+
+
+    // ==========================================
+    // Falta matrizId
+    // ==========================================
+
+    res = response();
+
+    await handler({
+      ruta:
+        '/api/matriz/versiones/activa',
+      metodo: 'GET',
+      peticion: req,
+      respuesta: res,
+      query: {}
+    });
+
+    assert.equal(
+      res.status,
+      400
+    );
+
+
+    // ==========================================
+    // Falta fecha
+    // ==========================================
+
+    res = response();
+
+    await handler({
+      ruta:
+        '/api/matriz/versiones/por-fecha',
+      metodo: 'GET',
+      peticion: req,
+      respuesta: res,
+      query: {
+        matrizId: '1'
+      }
+    });
+
+    assert.equal(
+      res.status,
+      400
+    );
+
+    assert.equal(
+      res.body.error,
+      'Fecha requerida'
+    );
+  }
+);

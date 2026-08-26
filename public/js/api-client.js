@@ -292,9 +292,45 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} Resultado de la operación
      */
     async function iniciarGestionEscucha(id) {
-        const response = await fetch(`/api/escuchas/${id}/iniciar`, { method: 'POST' });
-        return await response.json();
+    const token =
+        localStorage.getItem('meca_token');
+
+    if (!token) {
+        throw new Error(
+            'Token de autenticación no disponible'
+        );
     }
+
+    const response = await fetch(
+        `/api/escuchas/${id}/iniciar`,
+        {
+            method: 'POST',
+            headers: {
+                'Authorization':
+                    `Bearer ${token}`,
+                'Content-Type':
+                    'application/json'
+            }
+        }
+    );
+
+    if (!response.ok) {
+        let error = {};
+
+        try {
+            error =
+                await response.json();
+        } catch (_) {}
+
+        throw new Error(
+            error.error ||
+            error.message ||
+            `Error al iniciar gestión (${response.status})`
+        );
+    }
+
+    return await response.json();
+}
     
     /**
      * reportarIncidencia - Reporta una incidencia en una escucha
@@ -303,13 +339,47 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} Resultado de la operación
      */
     async function reportarIncidencia(id, motivo) {
-        const response = await fetch(`/api/escuchas/${id}/incidencia`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ motivo })
-        });
-        return await response.json();
+    const token =
+        localStorage.getItem('meca_token');
+
+    if (!token) {
+        throw new Error(
+            'Token de autenticación no disponible'
+        );
     }
+
+    const response = await fetch(
+        `/api/escuchas/${id}/incidencia`,
+        {
+            method: 'POST',
+            headers: {
+                'Authorization':
+                    `Bearer ${token}`,
+                'Content-Type':
+                    'application/json'
+            },
+            body: JSON.stringify({
+                motivo
+            })
+        }
+    );
+
+    if (!response.ok) {
+        let error = {};
+
+        try {
+            error = await response.json();
+        } catch (_) {}
+
+        throw new Error(
+            error.error ||
+            error.message ||
+            `Error al reportar incidencia (${response.status})`
+        );
+    }
+
+    return await response.json();
+}
     
     // ======================================================
     // Módulo: Auditor - Historial de Evaluaciones
@@ -400,7 +470,9 @@ async function loginConAPI(usuario, contrasena) {
     async function guardarEvaluacion(evaluacion) {
         const response = await fetch('/api/evaluaciones', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
                 id: evaluacion.id,
                 timestamp: evaluacion.timestamp,
@@ -411,24 +483,58 @@ async function loginConAPI(usuario, contrasena) {
                 evaluador: evaluacion.evaluador,
                 idLlamada: evaluacion.idLlamada,
                 fechaDescarga: evaluacion.fechaDescarga,
+
                 totalENC: evaluacion.totalENC,
                 totalECUF: evaluacion.totalECUF,
                 totalECN: evaluacion.totalECN,
+
                 notaFinal: evaluacion.notaFinal,
                 rango: evaluacion.rango,
+
                 detalles: evaluacion.detalles,
+
                 fechaRegistro: evaluacion.fechaRegistro,
                 tiempoAuditoria: evaluacion.tiempoAuditoria,
-                tiempoAuditoriaFormateado: evaluacion.tiempoAuditoriaFormateado,
-                
-                // 🔴 NUEVO: Enviar el ID de la versión
-                versionMatrizId: evaluacion.versionMatrizId
+                tiempoAuditoriaFormateado:
+                    evaluacion.tiempoAuditoriaFormateado,
+
+                // Contexto histórico de la evaluación
+                campana_id:
+                    evaluacion.campana_id ??
+                    evaluacion.campanaId ??
+                    null,
+
+                matriz_id:
+                    evaluacion.matriz_id ??
+                    evaluacion.matrizId ??
+                    null,
+
+                // Mantener ambos contratos mientras terminamos
+                // la migración del flujo legacy.
+                versionMatrizId:
+                    evaluacion.versionMatrizId ??
+                    evaluacion.version_matriz_id ??
+                    null,
+
+                version_matriz_id:
+                    evaluacion.version_matriz_id ??
+                    evaluacion.versionMatrizId ??
+                    null
             })
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || 'Error al guardar');
+            let error = {};
+
+            try {
+                error = await response.json();
+            } catch (_) {}
+
+            throw new Error(
+                error.error ||
+                error.message ||
+                `Error al guardar evaluación (${response.status})`
+            );
         }
 
         return await response.json();
@@ -444,14 +550,35 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} Resultado de la operación
      */
     async function marcarEscuchaGestionada(id) {
-        const response = await fetch(`/api/escuchas/${id}/gestionar`, { 
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' }
-        });
+        const token = localStorage.getItem('meca_token');
+
+        if (!token) {
+            throw new Error('Token de autenticación no disponible');
+        }
+
+        const response = await fetch(
+            `/api/escuchas/${id}/gestionar`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            }
+        );
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || 'Error al marcar escucha');
+            let error = {};
+
+            try {
+                error = await response.json();
+            } catch (_) {}
+
+            throw new Error(
+                error.error ||
+                error.message ||
+                `Error al marcar escucha (${response.status})`
+            );
         }
 
         return await response.json();
@@ -501,18 +628,46 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} Resultado de la operación
      */
     async function reactivarEscuchaPorTicket(ticketPSI) {
-        const response = await fetch(`/api/escuchas/reactivar?ticket=${encodeURIComponent(ticketPSI)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' }
-        });
+    const token =
+        localStorage.getItem('meca_token');
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || 'Error al reactivar escucha');
-        }
-
-        return await response.json();
+    if (!token) {
+        throw new Error(
+            'Token de autenticación no disponible'
+        );
     }
+
+    const response = await fetch(
+        `/api/escuchas/reactivar?ticket=${
+            encodeURIComponent(ticketPSI)
+        }`,
+        {
+            method: 'PUT',
+            headers: {
+                'Authorization':
+                    `Bearer ${token}`,
+                'Content-Type':
+                    'application/json'
+            }
+        }
+    );
+
+    if (!response.ok) {
+        let error = {};
+
+        try {
+            error = await response.json();
+        } catch (_) {}
+
+        throw new Error(
+            error.error ||
+            error.message ||
+            `Error al reactivar escucha (${response.status})`
+        );
+    }
+
+    return await response.json();
+}
 
     // ======================================================
     // Módulo: Auditor - Detalles de Evaluación
@@ -1356,9 +1511,44 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Array} Lista de lotes
      */
     async function getLotesEscuchas() {
-        const response = await fetch('/api/escuchas/lotes');
-        return await response.json();
+    const token =
+        localStorage.getItem('meca_token');
+
+    if (!token) {
+        throw new Error(
+            'Token de autenticación no disponible'
+        );
     }
+
+    const response = await fetch(
+        '/api/escuchas/lotes',
+        {
+            method: 'GET',
+            headers: {
+                'Authorization':
+                    `Bearer ${token}`,
+                'Content-Type':
+                    'application/json'
+            }
+        }
+    );
+
+    if (!response.ok) {
+        let error = {};
+
+        try {
+            error = await response.json();
+        } catch (_) {}
+
+        throw new Error(
+            error.error ||
+            error.message ||
+            `Error al obtener lotes (${response.status})`
+        );
+    }
+
+    return await response.json();
+}
 
     /**
      * getTicketsPorLote - Obtiene tickets de un lote específico
@@ -1395,9 +1585,44 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} Resultado de la operación
      */
     async function activarLote(loteId) {
-        const response = await fetch(`/api/escuchas/lotes/${loteId}/activar`, { method: 'PUT' });
-        return await response.json();
+    const token =
+        localStorage.getItem('meca_token');
+
+    if (!token) {
+        throw new Error(
+            'Token de autenticación no disponible'
+        );
     }
+
+    const response = await fetch(
+        `/api/escuchas/lotes/${loteId}/activar`,
+        {
+            method: 'PUT',
+            headers: {
+                'Authorization':
+                    `Bearer ${token}`,
+                'Content-Type':
+                    'application/json'
+            }
+        }
+    );
+
+    if (!response.ok) {
+        let error = {};
+
+        try {
+            error = await response.json();
+        } catch (_) {}
+
+        throw new Error(
+            error.error ||
+            error.message ||
+            `Error al activar lote (${response.status})`
+        );
+    }
+
+    return await response.json();
+}
 
     /**
      * eliminarLote - Elimina un lote de escuchas
@@ -1405,9 +1630,44 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} Resultado de la operación
      */
     async function eliminarLote(loteId) {
-        const response = await fetch(`/api/escuchas/lotes/${loteId}`, { method: 'DELETE' });
-        return await response.json();
+    const token =
+        localStorage.getItem('meca_token');
+
+    if (!token) {
+        throw new Error(
+            'Token de autenticación no disponible'
+        );
     }
+
+    const response = await fetch(
+        `/api/escuchas/lotes/${loteId}`,
+        {
+            method: 'DELETE',
+            headers: {
+                'Authorization':
+                    `Bearer ${token}`,
+                'Content-Type':
+                    'application/json'
+            }
+        }
+    );
+
+    if (!response.ok) {
+        let error = {};
+
+        try {
+            error = await response.json();
+        } catch (_) {}
+
+        throw new Error(
+            error.error ||
+            error.message ||
+            `Error al eliminar lote (${response.status})`
+        );
+    }
+
+    return await response.json();
+}
 
     // ======================================================
     // Módulo: Supervisor - Solicitudes y Requerimientos
@@ -1656,43 +1916,99 @@ async function loginConAPI(usuario, contrasena) {
     // ======================================================
     // ELIMINAR FRENTE - USAR VERSION_FRENTES
     // ======================================================
-    async function eliminarFrente(id) {
-        const token = localStorage.getItem('meca_token');
-        
-        const response = await fetch('/api/query', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                table: 'version_frentes',
-                operation: 'delete',
-                filters: [
-                    { type: 'eq', column: 'id', value: parseInt(id) }
-                ]
-            })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al eliminar frente');
-        }
-        
-        const result = await response.json();
-        
-        if (result.error) {
-            throw new Error(result.error);
-        }
-        
-        return {
-            success: true,
-            message: 'Frente eliminado correctamente',
-            data: result.data,
-            count: result.count
-        };
+    async function eliminarFrente(
+    id,
+    contexto = {}
+) {
+    const token =
+        localStorage.getItem(
+            'meca_token'
+        );
+
+    const frenteId =
+        Number(id);
+
+    const matrizId =
+        Number(
+            contexto.matriz_id
+        );
+
+    const versionId =
+        Number(
+            contexto.version_matriz_id
+        );
+
+    if (
+        !Number.isInteger(frenteId) ||
+        frenteId <= 0
+    ) {
+        throw new Error(
+            'ID de frente inválido'
+        );
     }
 
+    if (
+        !Number.isInteger(matrizId) ||
+        matrizId <= 0
+    ) {
+        throw new Error(
+            'matriz_id requerido para eliminar frente'
+        );
+    }
+
+    if (
+        !Number.isInteger(versionId) ||
+        versionId <= 0
+    ) {
+        throw new Error(
+            'version_matriz_id requerido para eliminar frente'
+        );
+    }
+
+    const response =
+        await fetch(
+            `/api/matriz/frentes/${frenteId}`,
+            {
+                method:
+                    'DELETE',
+
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+
+                    'Content-Type':
+                        'application/json'
+                },
+
+                body:
+                    JSON.stringify({
+                        matriz_id:
+                            matrizId,
+
+                        version_matriz_id:
+                            versionId
+                    })
+            }
+        );
+
+    let result = null;
+
+    try {
+        result =
+            await response.json();
+    } catch (_) {
+        result = null;
+    }
+
+    if (!response.ok) {
+        throw new Error(
+            result?.error ||
+            `HTTP ${response.status}`
+        );
+    }
+
+    return result;
+}
 
     // ======================================================
     // GET ATRIBUTOS - SOLO VERSIÓN ACTIVA (SIN JOIN)
@@ -2501,17 +2817,75 @@ async function loginConAPI(usuario, contrasena) {
      * getVersionesMatriz - Obtiene todas las versiones de la matriz
      * @returns {Array} Lista de versiones
      */
-    async function getVersionesMatriz() {
-        const token = localStorage.getItem('meca_token');
-        const response = await fetch('/api/matriz/versiones', {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return await response.json();
+    async function getVersionesMatriz(matrizId) {
+    const token =
+        localStorage.getItem('meca_token');
+
+    const parsedMatrizId =
+        Number(matrizId);
+
+    if (
+        !Number.isInteger(parsedMatrizId) ||
+        parsedMatrizId <= 0
+    ) {
+        throw new Error(
+            'matrizId requerido para obtener versiones de matriz'
+        );
     }
+
+    const response = await fetch(
+        `/api/matriz/versiones?matrizId=${encodeURIComponent(parsedMatrizId)}`,
+        {
+            headers: {
+                'Authorization':
+                    `Bearer ${token}`,
+
+                'Content-Type':
+                    'application/json'
+            }
+        }
+    );
+
+    if (!response.ok) {
+        let errorBody = {};
+
+        try {
+            errorBody =
+                await response.json();
+        } catch (_) {}
+
+        throw new Error(
+            errorBody.error ||
+            `HTTP ${response.status}`
+        );
+    }
+
+    const versiones =
+        await response.json();
+
+    if (!Array.isArray(versiones)) {
+        return [];
+    }
+
+    // Protección adicional:
+    // ninguna versión debe pertenecer a otra matriz.
+    const invalidas =
+        versiones.filter(
+            v =>
+                v?.matriz_id != null &&
+                Number(v.matriz_id) !==
+                    parsedMatrizId
+        );
+
+    if (invalidas.length > 0) {
+        throw new Error(
+            `La API devolvió ${invalidas.length} ` +
+            `versiones ajenas a matriz ${parsedMatrizId}`
+        );
+    }
+
+    return versiones;
+}
 
     /**
      * crearVersionMatriz - Crea una nueva versión con estructura
@@ -2559,34 +2933,138 @@ async function loginConAPI(usuario, contrasena) {
     // ======================================================
     // GET VERSIÓN ACTIVA
     // ======================================================
-    async function getVersionActiva() {
+    async function getVersionActiva(matrizId) {
         const token = localStorage.getItem('meca_token');
+
+        const parsedMatrizId = Number(matrizId);
+
+        if (
+            !Number.isInteger(parsedMatrizId) ||
+            parsedMatrizId <= 0
+        ) {
+            throw new Error(
+                'matrizId requerido para obtener la versión activa'
+            );
+        }
+
         try {
-            const response = await fetch('/api/matriz/versiones/activa', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await fetch(
+                `/api/matriz/versiones/activa?matrizId=${encodeURIComponent(parsedMatrizId)}`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
+
             if (!response.ok) {
-                if (response.status === 404) return null;
-                throw new Error(`Error ${response.status}`);
+                if (response.status === 404) {
+                    return null;
+                }
+
+                let errorBody = {};
+
+                try {
+                    errorBody = await response.json();
+                } catch (_) {}
+
+                throw new Error(
+                    errorBody.error ||
+                    `Error ${response.status} obteniendo versión activa`
+                );
             }
-            return await response.json();
+
+            const version = await response.json();
+
+            // Protección adicional:
+            // nunca aceptar una versión perteneciente a otra matriz.
+            if (
+                version?.matriz_id != null &&
+                Number(version.matriz_id) !== parsedMatrizId
+            ) {
+                throw new Error(
+                    `La API devolvió una versión de matriz ${version.matriz_id} ` +
+                    `cuando se solicitó matriz ${parsedMatrizId}`
+                );
+            }
+
+            return version;
+
         } catch (error) {
-            console.error('Error obteniendo versión activa:', error);
-            return null;
+            console.error(
+                `❌ Error obteniendo versión activa de matriz ${parsedMatrizId}:`,
+                error
+            );
+
+            throw error;
         }
     }
 
     // Obtener versión de matriz para una fecha específica
-    async function getVersionPorFecha(fecha) {
+    async function getVersionPorFecha(matrizId, fecha) {
         const token = localStorage.getItem('meca_token');
-        const response = await fetch(`/api/matriz/versiones/por-fecha?fecha=${fecha}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!response.ok) {
-            if (response.status === 404) return null;
-            throw new Error('Error al obtener versión por fecha');
+
+        const parsedMatrizId = Number(matrizId);
+
+        if (
+            !Number.isInteger(parsedMatrizId) ||
+            parsedMatrizId <= 0
+        ) {
+            throw new Error(
+                'matrizId requerido para obtener versión por fecha'
+            );
         }
-        return await response.json();
+
+        if (
+            !fecha ||
+            !/^\d{4}-\d{2}-\d{2}$/.test(String(fecha))
+        ) {
+            throw new Error(
+                'fecha requerida con formato YYYY-MM-DD'
+            );
+        }
+
+        const response = await fetch(
+            '/api/matriz/versiones/por-fecha' +
+            `?matrizId=${encodeURIComponent(parsedMatrizId)}` +
+            `&fecha=${encodeURIComponent(fecha)}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            }
+        );
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                return null;
+            }
+
+            let errorBody = {};
+
+            try {
+                errorBody = await response.json();
+            } catch (_) {}
+
+            throw new Error(
+                errorBody.error ||
+                `Error ${response.status} al obtener versión por fecha`
+            );
+        }
+
+        const version = await response.json();
+
+        if (
+            version?.matriz_id != null &&
+            Number(version.matriz_id) !== parsedMatrizId
+        ) {
+            throw new Error(
+                `La API devolvió una versión de matriz ${version.matriz_id} ` +
+                `cuando se solicitó matriz ${parsedMatrizId}`
+            );
+        }
+
+        return version;
     }
 
     // Obtener estructura completa de una versión

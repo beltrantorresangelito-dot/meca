@@ -1670,29 +1670,114 @@ async function finalizarAuditoria() {
     // 3. VALIDACIONES INICIALES
     // ======================================================
     let evaluador;
+
     if (usuarioActual && usuarioActual.rol === 'AUDITOR') {
-        const hiddenAuditor = document.getElementById('hiddenAuditor');
+        const hiddenAuditor =
+            document.getElementById('hiddenAuditor');
+
         if (hiddenAuditor && hiddenAuditor.value) {
             evaluador = hiddenAuditor.value;
         } else {
             evaluador = usuarioActual.nombre_completo;
         }
     } else {
-        evaluador = document.getElementById('evalEvaluador')?.value;
+        evaluador =
+            document.getElementById('evalEvaluador')?.value;
     }
 
-    const ticketPSI = document.getElementById('evalTicketPSI')?.value;
-    const agenteInput = document.getElementById('evalAgenteInput');
-    const agente = agenteInput?.value || document.getElementById('evalAgente')?.value;
-    const fechaRaw = document.getElementById('evalFecha')?.value;
-    const idLlamada = document.getElementById('evalIdLlamada')?.value;
+    const ticketPSI =
+        document.getElementById('evalTicketPSI')?.value;
 
-    if (!evaluador || !ticketPSI || !agente || !fechaRaw || !idLlamada) {
-        alert('⚠️ Complete todos los campos obligatorios: Auditor, Ticket PSI, Agente, Fecha e ID Llamada');
+    const agenteInput =
+        document.getElementById('evalAgenteInput');
+
+    const agente =
+        agenteInput?.value ||
+        document.getElementById('evalAgente')?.value;
+
+    const fechaRaw =
+        document.getElementById('evalFecha')?.value;
+
+    const idLlamada =
+        document.getElementById('evalIdLlamada')?.value;
+
+    if (
+        !evaluador ||
+        !ticketPSI ||
+        !agente ||
+        !fechaRaw ||
+        !idLlamada
+    ) {
+        alert(
+            '⚠️ Complete todos los campos obligatorios: ' +
+            'Auditor, Ticket PSI, Agente, Fecha e ID Llamada'
+        );
         return;
     }
 
-    const fechaObj = new Date(fechaRaw);
+    // ======================================================
+    // 3.1 RESOLVER ESCUCHA REAL Y CAMPAÑA
+    // ======================================================
+    const escuchaActual =
+        Array.isArray(misEscuchasData)
+            ? misEscuchasData.find(escucha =>
+                String(escucha.ticket || '').trim() ===
+                String(ticketPSI || '').trim()
+            )
+            : null;
+
+    if (!escuchaActual) {
+        console.error(
+            '❌ No se encontró la escucha en misEscuchasData:',
+            ticketPSI
+        );
+
+        alert(
+            '❌ No se pudo identificar la escucha asociada ' +
+            'al Ticket PSI.'
+        );
+
+        return;
+    }
+
+    const campanaId =
+        escuchaActual.campana_id ??
+        escuchaActual.campanaId ??
+        null;
+
+    const campana =
+        escuchaActual.campana ??
+        null;
+
+    if (!campanaId) {
+        console.error(
+            '❌ La escucha no tiene campana_id:',
+            escuchaActual
+        );
+
+        alert(
+            '❌ La escucha seleccionada no tiene una campaña asociada.'
+        );
+
+        return;
+    }
+
+    console.log(
+        '✅ Contexto de escucha identificado:',
+        {
+            ticket: ticketPSI,
+            escucha_id: escuchaActual.id,
+            campana_id: campanaId,
+            campana: campana
+        }
+    );
+
+    // ======================================================
+    // 3.2 VALIDAR FECHA
+    // ======================================================
+    const fechaObj =
+        new Date(fechaRaw);
+
     if (isNaN(fechaObj.getTime())) {
         alert('❌ La fecha seleccionada no es válida.');
         return;
@@ -1701,33 +1786,55 @@ async function finalizarAuditoria() {
     // ======================================================
     // 4. VALIDAR SELECTS COMPLETOS
     // ======================================================
-    const todosLosSelects = document.querySelectorAll('.cumple-select');
+    const todosLosSelects =
+        document.querySelectorAll('.cumple-select');
+
     const selectsVacios = [];
 
     todosLosSelects.forEach(select => {
-        if (!select.disabled && (!select.value || select.value === '')) {
+        if (
+            !select.disabled &&
+            (!select.value || select.value === '')
+        ) {
             selectsVacios.push(select);
-            select.style.border = '2px solid var(--danger)';
-            select.style.backgroundColor = '#fff0f0';
+
+            select.style.border =
+                '2px solid var(--danger)';
+
+            select.style.backgroundColor =
+                '#fff0f0';
         }
     });
 
     if (selectsVacios.length > 0) {
-        alert(`⚠️ Faltan ${selectsVacios.length} campos por evaluar. Complete todos los campos.`);
-        selectsVacios[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        alert(
+            `⚠️ Faltan ${selectsVacios.length} campos por evaluar. ` +
+            'Complete todos los campos.'
+        );
+
+        selectsVacios[0].scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+
         return;
     }
 
     // ======================================================
     // 5. VALIDAR TICKET DUPLICADO
     // ======================================================
-    const esDuplicado = await validarTicketNoDuplicado(ticketPSI);
+    const esDuplicado =
+        await validarTicketNoDuplicado(ticketPSI);
+
     if (esDuplicado) {
-        const btnAuditarFinal = document.getElementById('btnAuditar');
+        const btnAuditarFinal =
+            document.getElementById('btnAuditar');
+
         if (btnAuditarFinal) {
             btnAuditarFinal.disabled = false;
             btnAuditarFinal.style.opacity = '1';
         }
+
         return;
     }
 
@@ -1740,153 +1847,429 @@ async function finalizarAuditoria() {
     }
 
     tiempoFin = new Date();
-    const tiempoTotalSegundos = Math.floor((tiempoFin - tiempoInicio) / 1000);
-    const tiempoFormateado = formatearTiempo(tiempoTotalSegundos);
+
+    const tiempoTotalSegundos =
+        Math.floor(
+            (tiempoFin - tiempoInicio) / 1000
+        );
+
+    const tiempoFormateado =
+        formatearTiempo(tiempoTotalSegundos);
 
     // ======================================================
-    // 7. CALCULAR RESULTADOS (DINÁMICO)
+    // 7. CALCULAR RESULTADOS DINÁMICAMENTE
     // ======================================================
-    // 🔴 🔴 🔴 CLAVE: Recalcular TODOS los frentes dinámicamente
-    const frentes = document.querySelectorAll('.frente-container');
+    const frentes =
+        document.querySelectorAll('.frente-container');
+
     let totalGeneral = 0;
     const detalles = [];
 
     frentes.forEach(frenteContainer => {
-        const frenteCodigo = frenteContainer.dataset.frente;
-        if (!frenteCodigo) return;
-        
-        // Recalcular el frente y obtener su total
-        const totalFrente = recalcularFrente(frenteCodigo);
+        const frenteCodigo =
+            frenteContainer.dataset.frente;
+
+        if (!frenteCodigo) {
+            return;
+        }
+
+        const totalFrente =
+            recalcularFrente(frenteCodigo);
+
         totalGeneral += totalFrente;
-        
-        // Recolectar detalles de este frente
-        const selects = frenteContainer.querySelectorAll('.cumple-select');
+
+        const selects =
+            frenteContainer.querySelectorAll(
+                '.cumple-select'
+            );
+
         selects.forEach(select => {
             if (select.value) {
                 detalles.push({
-                    bloque: select.dataset.bloque,
-                    atributo: select.dataset.atributo,
-                    submotivo: select.dataset.submotivo,
-                    peso: parseFloat(select.dataset.peso),
-                    cumple: select.value === '1' || select.value === 'NA'
+                    bloque:
+                        select.dataset.bloque,
+
+                    atributo:
+                        select.dataset.atributo,
+
+                    submotivo:
+                        select.dataset.submotivo,
+
+                    peso:
+                        parseFloat(
+                            select.dataset.peso
+                        ),
+
+                    cumple:
+                        select.value === '1' ||
+                        select.value === 'NA'
                 });
             }
         });
     });
 
-    // Determinar rango (SOLO para guardar en BD, NO se muestra al auditor)
+    // ======================================================
+    // 7.1 DETERMINAR RANGO
+    // ======================================================
     let rango = '';
-    if (totalGeneral >= 97) rango = 'Excelente';
-    else if (totalGeneral >= 90) rango = 'Bien';
-    else if (totalGeneral >= 85) rango = 'Regular';
-    else rango = 'Bajo';
+
+    if (totalGeneral >= 97) {
+        rango = 'Excelente';
+    } else if (totalGeneral >= 90) {
+        rango = 'Bien';
+    } else if (totalGeneral >= 85) {
+        rango = 'Regular';
+    } else {
+        rango = 'Bajo';
+    }
 
     // ======================================================
-    // 8. CONSTRUIR DETALLES DE EVALUACIÓN
+    // 8. FORMATEAR FECHA PARA PRESENTACIÓN
     // ======================================================
-    const fechaFormateada = `${fechaObj.getDate().toString().padStart(2, '0')}/${(fechaObj.getMonth() + 1).toString().padStart(2, '0')}/${fechaObj.getFullYear()} ${fechaObj.getHours().toString().padStart(2, '0')}:${fechaObj.getMinutes().toString().padStart(2, '0')}`;
+    const fechaFormateada =
+        `${fechaObj
+            .getDate()
+            .toString()
+            .padStart(2, '0')}/` +
+        `${(fechaObj.getMonth() + 1)
+            .toString()
+            .padStart(2, '0')}/` +
+        `${fechaObj.getFullYear()} ` +
+        `${fechaObj
+            .getHours()
+            .toString()
+            .padStart(2, '0')}:` +
+        `${fechaObj
+            .getMinutes()
+            .toString()
+            .padStart(2, '0')}:` +
+        `${fechaObj
+            .getSeconds()
+            .toString()
+            .padStart(2, '0')}`;
 
     // ======================================================
     // 9. CONSTRUIR OBJETO EVALUACIÓN
     // ======================================================
     const evaluacion = {
         id: Date.now(),
-        timestamp: fechaObj.getTime(),
-        evaluador: evaluador,
-        ticketPSI: ticketPSI,
-        agente: agente,
-        fecha: fechaRaw,
-        fechaFormateada: fechaFormateada,
-        idLlamada: idLlamada,
-        fechaDescarga: convertirFecha(document.getElementById('evalFechaDescargaAudio')?.value),
-        
-        // 🔴 NUEVOS CAMPOS DE CAMPAÑA
-        campana: document.getElementById('evalCampana')?.value || null,
-        campana_id: document.getElementById('evalCampanaId')?.value || null,
-        
-        totalENC: 0,
-        totalECUF: 0,
-        totalECN: 0,
-        notaFinal: totalGeneral.toFixed(1),
-        rango: rango,
-        detalles: detalles,
-        fechaRegistro: new Date().toLocaleString('es-ES'),
-        tiempoAuditoria: tiempoTotalSegundos,
-        tiempoAuditoriaFormateado: tiempoFormateado,
-        fechaInicioAuditoria: tiempoInicio.toISOString(),
-        fechaFinAuditoria: tiempoFin.toISOString(),
-        versionMatrizId: window.versionMatrizActualId || null
+
+        timestamp:
+            fechaObj.getTime(),
+
+        evaluador:
+            evaluador,
+
+        ticketPSI:
+            ticketPSI,
+
+        agente:
+            agente,
+
+        // Se conserva la fecha/hora original completa
+        fecha:
+            fechaRaw,
+
+        fechaFormateada:
+            fechaFormateada,
+
+        idLlamada:
+            idLlamada,
+
+        fechaDescarga:
+            convertirFecha(
+                document.getElementById(
+                    'evalFechaDescargaAudio'
+                )?.value
+            ),
+
+        // ==================================================
+        // CONTEXTO REAL DE LA ESCUCHA
+        // ==================================================
+        campana:
+            campana,
+
+        campana_id:
+            Number(campanaId),
+
+        // Se completará en enriquecerEvaluacionConContexto
+        matriz_id:
+            window.matrizActualId ??
+            null,
+
+        totalENC:
+            0,
+
+        totalECUF:
+            0,
+
+        totalECN:
+            0,
+
+        notaFinal:
+            totalGeneral.toFixed(1),
+
+        rango:
+            rango,
+
+        detalles:
+            detalles,
+
+        fechaRegistro:
+            new Date().toLocaleString(
+                'es-ES'
+            ),
+
+        tiempoAuditoria:
+            tiempoTotalSegundos,
+
+        tiempoAuditoriaFormateado:
+            tiempoFormateado,
+
+        fechaInicioAuditoria:
+            tiempoInicio.toISOString(),
+
+        fechaFinAuditoria:
+            tiempoFin.toISOString(),
+
+        versionMatrizId:
+            window.versionMatrizActualId ??
+            null,
+
+        version_matriz_id:
+            window.versionMatrizActualId ??
+            null
     };
 
     // ======================================================
-    // 10. GUARDAR EN LA BASE DE DATOS
+    // 10. GUARDAR EN BASE DE DATOS
     // ======================================================
-    const btnFinalizar = document.getElementById('btnFinalizar');
+    const btnFinalizar =
+        document.getElementById('btnFinalizar');
+
     let evaluacionGuardada = false;
 
     try {
-        console.log('💾 Guardando evaluación en API...');
-        await API.guardarEvaluacion(evaluacion);
-        console.log('✅ Evaluación guardada correctamente');
+        console.log(
+            '💾 Guardando evaluación en API...'
+        );
+
+        // ==================================================
+        // RESOLVER CONTEXTO HISTÓRICO
+        // ==================================================
+        const evaluacionConContexto =
+            await enriquecerEvaluacionConContexto(
+                evaluacion,
+                escuchaActual
+            );
+
+        console.log(
+            '✅ Evaluación enriquecida con contexto:',
+            {
+                ticket:
+                    evaluacionConContexto.ticketPSI,
+
+                campana_id:
+                    evaluacionConContexto.campana_id,
+
+                matriz_id:
+                    evaluacionConContexto.matriz_id,
+
+                version_matriz_id:
+                    evaluacionConContexto.version_matriz_id
+            }
+        );
+
+        // ==================================================
+        // VALIDAR CONTEXTO ANTES DEL POST
+        // ==================================================
+        const validacionContexto =
+            validarContextoPersistenciaEvaluacion(
+                evaluacionConContexto
+            );
+
+        if (!validacionContexto.ok) {
+            throw new Error(
+                'Contexto de evaluación inválido: ' +
+                validacionContexto.error
+            );
+        }
+
+        // ==================================================
+        // GUARDADO REAL
+        // ==================================================
+        await API.guardarEvaluacion(
+            evaluacionConContexto
+        );
+
+        console.log(
+            '✅ Evaluación guardada correctamente'
+        );
+
         evaluacionGuardada = true;
 
-        // Mostrar mensaje de éxito (SOLO números, sin rango)
-        let mensajeExito = `📊 RESULTADOS DE EVALUACIÓN:\n\n`;
-        mensajeExito += `📅 Fecha: ${fechaFormateada}\n`;
-        mensajeExito += `🎫 Ticket PSI: ${ticketPSI}\n`;
-        
-        // Mostrar cada frente con su puntaje
+        // ==================================================
+        // MENSAJE DE ÉXITO
+        // ==================================================
+        let mensajeExito =
+            '📊 RESULTADOS DE EVALUACIÓN:\n\n';
+
+        mensajeExito +=
+            `📅 Fecha: ${fechaFormateada}\n`;
+
+        mensajeExito +=
+            `🎫 Ticket PSI: ${ticketPSI}\n`;
+
         frentes.forEach(frenteContainer => {
-            const frenteCodigo = frenteContainer.dataset.frente;
-            if (!frenteCodigo) return;
-            const header = frenteContainer.querySelector('.frente-titulo span');
-            const nombreFrente = header ? header.textContent.trim() : frenteCodigo;
-            const resultadoElement = document.getElementById(`resultadoFrente_${frenteCodigo}`);
-            const total = resultadoElement ? parseFloat(resultadoElement.textContent?.replace('%', '') || 0) : 0;
-            const badge = frenteContainer.querySelector('.frente-badge');
-            const pesoMaximo = badge ? parseFloat(badge.textContent?.replace('%', '') || 100) : 100;
-            mensajeExito += `📌 ${nombreFrente}: ${total}/${pesoMaximo}%\n`;
+            const frenteCodigo =
+                frenteContainer.dataset.frente;
+
+            if (!frenteCodigo) {
+                return;
+            }
+
+            const header =
+                frenteContainer.querySelector(
+                    '.frente-titulo span'
+                );
+
+            const nombreFrente =
+                header
+                    ? header.textContent.trim()
+                    : frenteCodigo;
+
+            const resultadoElement =
+                document.getElementById(
+                    `resultadoFrente_${frenteCodigo}`
+                );
+
+            const total =
+                resultadoElement
+                    ? parseFloat(
+                        resultadoElement.textContent
+                            ?.replace('%', '') || 0
+                    )
+                    : 0;
+
+            const badge =
+                frenteContainer.querySelector(
+                    '.frente-badge'
+                );
+
+            const pesoMaximo =
+                badge
+                    ? parseFloat(
+                        badge.textContent
+                            ?.replace('%', '') || 100
+                    )
+                    : 100;
+
+            mensajeExito +=
+                `📌 ${nombreFrente}: ` +
+                `${total}/${pesoMaximo}%\n`;
         });
-        
-        mensajeExito += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        mensajeExito += `🎯 NOTA FINAL: ${totalGeneral.toFixed(1)}%\n`;
-        mensajeExito += `⏱️ TIEMPO: ${tiempoFormateado}\n`;
-        mensajeExito += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        mensajeExito += `✅ GUARDADO CORRECTAMENTE`;
+
+        mensajeExito +=
+            '━━━━━━━━━━━━━━━━━━━━━━━━\n';
+
+        mensajeExito +=
+            `🎯 NOTA FINAL: ` +
+            `${totalGeneral.toFixed(1)}%\n`;
+
+        mensajeExito +=
+            `⏱️ TIEMPO: ${tiempoFormateado}\n`;
+
+        mensajeExito +=
+            '━━━━━━━━━━━━━━━━━━━━━━━━\n';
+
+        mensajeExito +=
+            '✅ GUARDADO CORRECTAMENTE';
 
         alert(mensajeExito);
 
     } catch (error) {
-        console.error('❌ Error al guardar en la base de datos:', error);
-        let mensajeError = `❌ ERROR AL GUARDAR LA EVALUACIÓN\n\n`;
-        mensajeError += `Motivo: ${error.message}\n\n`;
-        mensajeError += `La evaluación NO se ha guardado.\n`;
-        mensajeError += `Complete todos los campos y vuelva a intentar.`;
+        console.error(
+            '❌ Error al guardar en la base de datos:',
+            error
+        );
+
+        let mensajeError =
+            '❌ ERROR AL GUARDAR LA EVALUACIÓN\n\n';
+
+        mensajeError +=
+            `Motivo: ${error.message}\n\n`;
+
+        mensajeError +=
+            'La evaluación NO se ha guardado.\n';
+
+        mensajeError +=
+            'Complete todos los campos y vuelva a intentar.';
 
         alert(mensajeError);
+
         resetearAuditoria();
-        const btnAuditarFinal = document.getElementById('btnAuditar');
+
+        const btnAuditarFinal =
+            document.getElementById('btnAuditar');
+
         if (btnAuditarFinal) {
             btnAuditarFinal.disabled = false;
             btnAuditarFinal.style.opacity = '1';
-            btnAuditarFinal.style.cursor = 'pointer';
+            btnAuditarFinal.style.cursor =
+                'pointer';
         }
+
         if (btnFinalizar) {
-            btnFinalizar.innerHTML = '⏱️ Finalizar y Guardar';
+            btnFinalizar.innerHTML =
+                '⏱️ Finalizar y Guardar';
         }
+
         return;
     }
 
     // ======================================================
-    // 11. ACTUALIZAR ESCUCHA SI FUE GESTIONADA
+    // 11. MARCAR ESCUCHA COMO GESTIONADA
     // ======================================================
-    if (evaluacionGuardada && window.gestionEscuchaActiva && window.idEscuchaGestionando) {
-        await API.marcarEscuchaGestionada(window.idEscuchaGestionando);
-        console.log('✅ Escucha marcada como gestionada');
-        window.gestionEscuchaActiva = false;
-        window.idEscuchaGestionando = null;
-        await cargarMisEscuchas();
-        showTab('misEscuchas', null);
+    if (
+        evaluacionGuardada &&
+        window.gestionEscuchaActiva &&
+        window.idEscuchaGestionando
+    ) {
+        try {
+            await API.marcarEscuchaGestionada(
+                window.idEscuchaGestionando
+            );
+
+            console.log(
+                '✅ Escucha marcada como gestionada'
+            );
+
+            window.gestionEscuchaActiva = false;
+            window.idEscuchaGestionando = null;
+
+            await cargarMisEscuchas();
+
+            showTab(
+                'misEscuchas',
+                null
+            );
+
+        } catch (error) {
+            // La evaluación YA fue guardada.
+            // No debe indicarse al usuario que se perdió.
+            console.error(
+                '⚠️ La evaluación se guardó, ' +
+                'pero no se pudo marcar la escucha ' +
+                'como gestionada:',
+                error
+            );
+
+            alert(
+                '⚠️ La evaluación fue guardada correctamente, ' +
+                'pero no se pudo actualizar el estado de la escucha.\n\n' +
+                `Detalle: ${error.message}`
+            );
+        }
     }
 
     // ======================================================
@@ -1894,27 +2277,42 @@ async function finalizarAuditoria() {
     // ======================================================
     limpiarFormularioCompleto();
     resetearAuditoria();
+
     await actualizarContadorHeader();
 
-    const btnAuditarFinal = document.getElementById('btnAuditar');
+    const btnAuditarFinal =
+        document.getElementById('btnAuditar');
+
     if (btnAuditarFinal) {
         btnAuditarFinal.disabled = true;
         btnAuditarFinal.style.opacity = '0.5';
-        btnAuditarFinal.style.cursor = 'not-allowed';
+        btnAuditarFinal.style.cursor =
+            'not-allowed';
     }
 
     if (btnFinalizar) {
-        btnFinalizar.innerHTML = '⏱️ Finalizar y Guardar';
+        btnFinalizar.innerHTML =
+            '⏱️ Finalizar y Guardar';
     }
 
-    const btnCancelarGestion = document.getElementById('btnCancelarGestion');
+    const btnCancelarGestion =
+        document.getElementById(
+            'btnCancelarGestion'
+        );
+
     if (btnCancelarGestion) {
-        btnCancelarGestion.style.display = 'none';
+        btnCancelarGestion.style.display =
+            'none';
     }
 
-    const seccionPSI = document.getElementById('seccionDatosPSI');
+    const seccionPSI =
+        document.getElementById(
+            'seccionDatosPSI'
+        );
+
     if (seccionPSI) {
-        seccionPSI.style.display = 'none';
+        seccionPSI.style.display =
+            'none';
     }
 
     window.gestionEscuchaActiva = false;
@@ -2240,9 +2638,9 @@ function limpiarFormularioCompleto() {
     // 📌 Esto asegura que cualquier dato residual desaparezca
     // 📌 Recalcular resultados (dejarán de mostrar datos viejos)
     setTimeout(() => {
-        recalcularTotalENC();
-        actualizarResultadoECUF();
-        actualizarResultadoECN();
+        if (typeof recalcularTodosLosFrentes === 'function') {
+            recalcularTodosLosFrentes();
+        }
     }, 50);
 
     console.log('✅ Formulario limpiado completamente');
@@ -4838,28 +5236,92 @@ let reglasEvaluacionGlobal = [];
 
 async function cargarReglasEvaluacion() {
     try {
-        console.log('📋 Cargando reglas de evaluación...');
-        reglasEvaluacionGlobal = await API.getReglasEvaluacion();
-        console.log(`✅ ${reglasEvaluacionGlobal.length} reglas cargadas`);
-        
-        if (reglasEvaluacionGlobal.length > 0) {
-            console.log('📋 Reglas cargadas:');
-            reglasEvaluacionGlobal.forEach((r, i) => {
-                console.log(`   ${i+1}. ${r.submotivo_origen} → ${r.accion_tipo} (${r.bloque_origen})`);
-                if (r.excepciones) {
-                    console.log(`      Excepciones: ${JSON.stringify(r.excepciones)}`);
-                }
-                if (r.submotivos_afectados) {
-                    console.log(`      Afectados: ${JSON.stringify(r.submotivos_afectados)}`);
-                }
-            });
+        console.log(
+            '📋 Cargando reglas de evaluación por versión...'
+        );
+
+        const contexto =
+            window.contextoAuditoriaActual ||
+            null;
+
+        const versionMatrizId =
+            contexto?.version_matriz_id ??
+            contexto?.matriz_version_id ??
+            contexto?.matrizVersionId ??
+            window.versionMatrizActualId ??
+            null;
+
+        const versionIdNumero =
+            Number(versionMatrizId);
+
+        if (
+            !Number.isInteger(versionIdNumero) ||
+            versionIdNumero <= 0
+        ) {
+            throw new Error(
+                'No existe version_matriz_id válida ' +
+                'para cargar reglas de evaluación'
+            );
         }
-        
+
+        reglasEvaluacionGlobal =
+            await API.getReglasByVersion(
+                versionIdNumero
+            );
+
+        if (
+            !Array.isArray(
+                reglasEvaluacionGlobal
+            )
+        ) {
+            reglasEvaluacionGlobal = [];
+        }
+
+        console.log(
+            `✅ ${reglasEvaluacionGlobal.length} ` +
+            `reglas cargadas para versión ${versionIdNumero}`
+        );
+
+        if (
+            reglasEvaluacionGlobal.length >
+            0
+        ) {
+            console.log(
+                '📋 Reglas cargadas:'
+            );
+
+            reglasEvaluacionGlobal.forEach(
+                (r, i) => {
+
+                    console.log(
+                        `   ${i + 1}. ` +
+                        `${r.submotivo_origen} → ` +
+                        `${r.accion_tipo} ` +
+                        `(${r.bloque_origen})`
+                    );
+
+                    if (r.excepciones) {
+                        console.log(
+                            '      Excepciones:',
+                            r.excepciones
+                        );
+                    }
+                }
+            );
+        }
+
         return reglasEvaluacionGlobal;
+
     } catch (error) {
-        console.error('❌ Error cargando reglas:', error);
+
+        console.error(
+            '❌ Error cargando reglas de evaluación:',
+            error
+        );
+
         reglasEvaluacionGlobal = [];
-        return [];
+
+        throw error;
     }
 }
 
@@ -4923,21 +5385,19 @@ window.onload = async function () {
     if (typeof cargarMisEscuchas === 'function') await cargarMisEscuchas();
     
     // ======================================================
-    // 4g. GENERAR FORMULARIO DINÁMICO
+    // 4g. FORMULARIO DINÁMICO
     // ======================================================
-    if (typeof generarFormularioDinamico === 'function') {
-        await generarFormularioDinamico();
-    }
-    
-    // ======================================================
-    // 🔴 NUEVO: CARGAR REGLAS DE EVALUACIÓN
-    // ======================================================
-    if (typeof cargarReglasEvaluacion === 'function') {
-        await cargarReglasEvaluacion();
-        console.log('✅ Reglas de evaluación cargadas');
-    } else {
-        console.warn('⚠️ cargarReglasEvaluacion no está definida');
-    }
+    // F11.6.3D:
+    // Ya no se carga al iniciar Auditor.
+    // La estructura y las reglas deben cargarse únicamente
+    // después de resolver el contexto de una escucha.
+    //
+    // Esto evita utilizar una matriz/version global cuando
+    // todavía no existe una auditoría activa.
+
+    console.log(
+        'ℹ️ Estructura y reglas pendientes de contexto de escucha'
+    );
     
     // ======================================================
     // 4h. CONFIGURAR PESTAÑA INICIAL (Mis Escuchas)
@@ -5816,6 +6276,59 @@ async function iniciarGestionEscucha(id) {
         console.log('📅 Fecha audio:', escucha.fecha_descarga);
 
         // ======================================================
+        // F11.6.3D - RESOLVER CONTEXTO ANTES DE INICIAR
+        // ======================================================
+
+        // Resolver campaña → quiebre → matriz → versión
+        const contexto =
+            await resolverContextoDesdeEscucha(
+                escucha
+            );
+
+        if (
+            !contexto ||
+            !window.matrizActualId ||
+            !window.versionMatrizActualId
+        ) {
+            throw new Error(
+                'No se pudo resolver el contexto de matriz para la escucha'
+            );
+        }
+
+        console.log(
+            '🎯 Contexto resuelto para escucha:',
+            {
+                escucha_id: escucha.id,
+                ticket: escucha.ticket,
+
+                campana_id:
+                    contexto.campana_id,
+
+                matriz_id:
+                    window.matrizActualId,
+
+                version_matriz_id:
+                    window.versionMatrizActualId,
+
+                quiebre:
+                    contexto.quiebre_codigo
+            }
+        );
+
+        // Evitar reutilizar reglas de una escucha/version anterior
+        reglasEvaluacionGlobal = [];
+
+        // Generar el formulario usando EXACTAMENTE
+        // la versión resuelta por el contexto
+        const formularioGenerado =
+            await generarFormularioDinamico();
+
+        if (!formularioGenerado) {
+            throw new Error(
+                'No se pudo generar el formulario para la matriz de la escucha'
+            );
+        }
+        // ======================================================
         // 1b. CAMBIAR ESTADO A "EN PROCESO"
         // ======================================================
         await API.iniciarGestionEscucha(id);
@@ -5935,6 +6448,59 @@ async function continuarGestionEscucha(id) {
         // ======================================================
         window.gestionEscuchaActiva = true;
         window.idEscuchaGestionando = id;
+
+        // ======================================================
+        // F11.6.3D - RESTAURAR CONTEXTO DE LA ESCUCHA
+        // ======================================================
+
+        const contexto =
+            await resolverContextoDesdeEscucha(
+                escucha
+            );
+
+        if (
+            !contexto ||
+            !window.matrizActualId ||
+            !window.versionMatrizActualId
+        ) {
+            throw new Error(
+                'No se pudo resolver el contexto de matriz para la escucha'
+            );
+        }
+
+        console.log(
+            '🎯 Contexto restaurado para escucha:',
+            {
+                escucha_id:
+                    escucha.id,
+
+                ticket:
+                    escucha.ticket,
+
+                campana_id:
+                    contexto.campana_id,
+
+                matriz_id:
+                    window.matrizActualId,
+
+                version_matriz_id:
+                    window.versionMatrizActualId,
+
+                quiebre:
+                    contexto.quiebre_codigo
+            }
+        );
+
+        reglasEvaluacionGlobal = [];
+
+        const formularioGenerado =
+            await generarFormularioDinamico();
+
+        if (!formularioGenerado) {
+            throw new Error(
+                'No se pudo generar el formulario para la matriz de la escucha'
+            );
+        }
 
         // ======================================================
         // 1c. CARGAR DATOS EN FORMULARIO
@@ -8487,67 +9053,202 @@ let estructuraEvaluacionCache = null;  // Cache en memoria
 
 async function cargarEstructuraEvaluacion() {
     try {
-        console.log('📋 Cargando estructura de evaluación con versionado...');
-        
-        // 1. Obtener la fecha actual
-        const hoy = new Date();
-        const fechaISO = hoy.toISOString().split('T')[0]; // '2026-06-24'
-        
-        // 2. Obtener la versión activa para esta fecha
-        const version = await API.getVersionPorFecha(fechaISO);
-        
-        if (!version) {
-            console.warn('⚠️ No hay versión para la fecha actual, usando versión activa por defecto');
-            const versionActiva = await API.getVersionActiva();
-            if (!versionActiva) {
-                throw new Error('No hay versión activa configurada en el sistema');
+        console.log(
+            '📋 Cargando estructura desde contexto de auditoría...'
+        );
+
+        // ==================================================
+        // 1. OBTENER CONTEXTO YA RESUELTO
+        // ==================================================
+        const contexto =
+            window.contextoAuditoriaActual ||
+            null;
+
+        const matrizId =
+            contexto?.matriz_id ??
+            contexto?.matrizId ??
+            window.matrizActualId ??
+            null;
+
+        const versionMatrizId =
+            contexto?.version_matriz_id ??
+            contexto?.matriz_version_id ??
+            contexto?.matrizVersionId ??
+            window.versionMatrizActualId ??
+            null;
+
+        const matrizIdNumero =
+            Number(matrizId);
+
+        const versionIdNumero =
+            Number(versionMatrizId);
+
+        // ==================================================
+        // 2. VALIDAR CONTEXTO
+        // ==================================================
+        if (
+            !Number.isInteger(matrizIdNumero) ||
+            matrizIdNumero <= 0
+        ) {
+            throw new Error(
+                'No existe matriz_id válida en el contexto de auditoría'
+            );
+        }
+
+        if (
+            !Number.isInteger(versionIdNumero) ||
+            versionIdNumero <= 0
+        ) {
+            throw new Error(
+                'No existe version_matriz_id válida en el contexto de auditoría'
+            );
+        }
+
+        // Mantener globals sincronizados
+        window.matrizActualId =
+            matrizIdNumero;
+
+        window.versionMatrizActualId =
+            versionIdNumero;
+
+        console.log(
+            '🎯 Contexto de estructura:',
+            {
+                matriz_id:
+                    matrizIdNumero,
+
+                version_matriz_id:
+                    versionIdNumero,
+
+                campana_id:
+                    contexto?.campana_id ??
+                    contexto?.campanaId ??
+                    null,
+
+                quiebre:
+                    contexto?.quiebre_codigo ??
+                    null
             }
-            window.versionMatrizActualId = versionActiva.id;
-            const estructura = await API.getEstructuraVersion(versionActiva.id);
-            guardarEstructuraEnCache(versionActiva.id, estructura);
-            return estructura;
+        );
+
+        // ==================================================
+        // 3. CACHE ESPECÍFICO POR VERSIÓN
+        // ==================================================
+        const cacheKey =
+            `estructura_evaluacion_v${versionIdNumero}`;
+
+        const cacheTimeKey =
+            `estructura_evaluacion_v${versionIdNumero}_time`;
+
+        const cached =
+            localStorage.getItem(
+                cacheKey
+            );
+
+        const cachedTime =
+            localStorage.getItem(
+                cacheTimeKey
+            );
+
+        // Cache válida durante 1 hora
+        if (
+            cached &&
+            cachedTime &&
+            (
+                Date.now() -
+                Number(cachedTime)
+            ) < 3600000
+        ) {
+            try {
+                const estructuraCache =
+                    JSON.parse(cached);
+
+                console.log(
+                    `📦 Estructura cargada desde caché ` +
+                    `(versión ID ${versionIdNumero})`
+                );
+
+                return estructuraCache;
+
+            } catch (cacheError) {
+
+                console.warn(
+                    '⚠️ Caché de estructura inválida. ' +
+                    'Se descargará nuevamente.',
+                    cacheError
+                );
+
+                localStorage.removeItem(
+                    cacheKey
+                );
+
+                localStorage.removeItem(
+                    cacheTimeKey
+                );
+            }
         }
-        
-        // 3. Guardar el ID de la versión para usarlo al guardar la evaluación
-        window.versionMatrizActualId = version.id;
-        
-        // 4. Intentar cargar desde caché local
-        const cacheKey = `estructura_evaluacion_v${version.id}`;
-        const cacheTimeKey = `estructura_evaluacion_v${version.id}_time`;
-        const cached = localStorage.getItem(cacheKey);
-        const cachedTime = localStorage.getItem(cacheTimeKey);
-        
-        // Caché válido por 1 hora (3600000 ms)
-        if (cached && cachedTime && (Date.now() - parseInt(cachedTime)) < 3600000) {
-            console.log(`📦 Estructura cargada desde caché local (versión ${version.version})`);
-            return JSON.parse(cached);
+
+        // ==================================================
+        // 4. CARGAR EXACTAMENTE LA VERSIÓN RESUELTA
+        // ==================================================
+        console.log(
+            `📡 Descargando estructura de ` +
+            `version_matriz_id=${versionIdNumero}`
+        );
+
+        const estructura =
+            await API.getEstructuraVersion(
+                versionIdNumero
+            );
+
+        if (
+            !estructura ||
+            !Array.isArray(
+                estructura.frentes
+            )
+        ) {
+            throw new Error(
+                `La versión ${versionIdNumero} ` +
+                'no devolvió una estructura válida'
+            );
         }
-        
-        // 5. Obtener la estructura completa de la versión desde el servidor
-        console.log(`📡 Descargando estructura de versión ${version.version} (ID: ${version.id})`);
-        const estructura = await API.getEstructuraVersion(version.id);
-        
-        // 6. Guardar en caché
-        guardarEstructuraEnCache(version.id, estructura);
-        
-        console.log(`✅ Estructura cargada de versión: ${version.version} (ID: ${version.id})`);
-        console.log(`   Frentes: ${estructura.frentes?.length || 0}`);
+
+        // ==================================================
+        // 5. GUARDAR CACHE
+        // ==================================================
+        guardarEstructuraEnCache(
+            versionIdNumero,
+            estructura
+        );
+
+        console.log(
+            '✅ Estructura cargada desde contexto:',
+            {
+                matriz_id:
+                    matrizIdNumero,
+
+                version_matriz_id:
+                    versionIdNumero,
+
+                frentes:
+                    estructura.frentes.length
+            }
+        );
+
         return estructura;
-        
+
     } catch (error) {
-        console.error('❌ Error cargando estructura:', error);
-        // Fallback: intentar cargar estructura de la versión activa
-        try {
-            const versionActiva = await API.getVersionActiva();
-            if (versionActiva) {
-                const estructura = await API.getEstructuraVersion(versionActiva.id);
-                guardarEstructuraEnCache(versionActiva.id, estructura);
-                return estructura;
-            }
-        } catch (fallbackError) {
-            console.error('❌ Fallback también falló:', fallbackError);
-        }
-        return null;
+
+        console.error(
+            '❌ Error cargando estructura ' +
+            'desde contexto de auditoría:',
+            error
+        );
+
+        // IMPORTANTE:
+        // No existe fallback a versión activa global.
+        // Fallar es preferible a cargar una matriz incorrecta.
+        throw error;
     }
 }
 
@@ -10487,3 +11188,479 @@ window.cerrarPanelTranscripcion = cerrarPanelTranscripcion;
 window.copiarTranscripcionPanel = copiarTranscripcionPanel;
 window.renderizarTranscripcionChat = renderizarTranscripcionChat;
 window.parsearTranscripcion = parsearTranscripcion;
+
+
+
+function normalizarFechaParaContexto(
+    valor
+) {
+    if (
+        valor === null ||
+        valor === undefined ||
+        valor === ''
+    ) {
+        return null;
+    }
+
+    if (valor instanceof Date) {
+        if (Number.isNaN(valor.getTime())) {
+            return null;
+        }
+
+        const y = valor.getFullYear();
+        const m = String(
+            valor.getMonth() + 1
+        ).padStart(2, '0');
+        const d = String(
+            valor.getDate()
+        ).padStart(2, '0');
+
+        return `${y}-${m}-${d}`;
+    }
+
+    const texto =
+        String(valor).trim();
+
+    // ISO / timestamp:
+    // 2026-08-24
+    // 2026-08-24T18:35:42
+    // 2026-08-24 18:35:42
+    const iso =
+        texto.match(
+            /^(\d{4})-(\d{2})-(\d{2})/
+        );
+
+    if (iso) {
+        return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    }
+
+    // Formato visual habitual:
+    // 24/08/2026
+    // 24/08/2026 18:35:42
+    const latam =
+        texto.match(
+            /^(\d{2})\/(\d{2})\/(\d{4})/
+        );
+
+    if (latam) {
+        return `${latam[3]}-${latam[2]}-${latam[1]}`;
+    }
+
+    return null;
+}
+
+async function resolverContextoAuditoria(
+    campanaId,
+    fecha = null
+) {
+    if (!campanaId) {
+        throw new Error(
+            'campanaId es obligatorio para resolver el contexto de auditoría'
+        );
+    }
+
+    const params = new URLSearchParams();
+
+    const fechaContexto =
+        normalizarFechaParaContexto(
+            fecha
+        );
+
+    params.set(
+        'campanaId',
+        String(campanaId)
+    );
+
+    if (fechaContexto) {
+        params.set(
+            'fecha',
+            fechaContexto
+        );
+    }
+
+    const token =
+        localStorage.getItem('meca_token');
+
+    const response = await fetch(
+        '/api/domain/contexto-evaluacion?' +
+        params.toString(),
+        {
+            headers: token
+                ? {
+                    Authorization:
+                        'Bearer ' + token
+                }
+                : {}
+        }
+    );
+
+    const raw = await response.text();
+
+    let payload = null;
+
+    try {
+        payload =
+            raw
+                ? JSON.parse(raw)
+                : null;
+    } catch (_) {
+        payload = raw;
+    }
+
+    if (!response.ok) {
+        const message =
+            payload &&
+            typeof payload === 'object' &&
+            payload.error
+                ? payload.error
+                : raw ||
+                  'No se pudo resolver el contexto de auditoría';
+
+        const error = new Error(message);
+        error.status = response.status;
+        error.payload = payload;
+
+        throw error;
+    }
+
+    if (
+        payload &&
+        typeof payload === 'object' &&
+        'data' in payload
+    ) {
+        return payload.data;
+    }
+
+    return payload;
+}
+
+async function aplicarContextoAuditoria(
+    campanaId,
+    fecha = null
+) {
+    const contexto =
+        await resolverContextoAuditoria(
+            campanaId,
+            fecha
+        );
+
+    window.contextoAuditoriaActual =
+        contexto || null;
+
+    window.matrizActualId =
+        contexto?.matriz_id ??
+        contexto?.matrizId ??
+        null;
+
+    window.versionMatrizActualId =
+        contexto?.matriz_version_id ??
+        contexto?.version_matriz_id ??
+        contexto?.matrizVersionId ??
+        null;
+
+    return contexto;
+}
+
+async function resolverContextoDesdeEscucha(
+    escucha
+) {
+    if (!escucha) {
+        throw new Error(
+            'La escucha es obligatoria'
+        );
+    }
+
+    const campanaId =
+        escucha.campana_id ??
+        escucha.campanaId ??
+        null;
+
+    const fecha =
+        escucha.fecha ??
+        escucha.fecha_escucha ??
+        escucha.fecha_gestion ??
+        escucha.fecha_asignacion ??
+        null;
+
+    return aplicarContextoAuditoria(
+        campanaId,
+        fecha
+    );
+}
+
+window.resolverContextoAuditoria =
+    resolverContextoAuditoria;
+
+window.aplicarContextoAuditoria =
+    aplicarContextoAuditoria;
+
+window.resolverContextoDesdeEscucha =
+    resolverContextoDesdeEscucha;
+
+
+
+async function resolverCampanaDesdeAsignacion(
+    ticketPSI
+) {
+    if (!ticketPSI) {
+        return null;
+    }
+
+    const ticketBuscado =
+        String(ticketPSI).trim();
+
+    // 1) Primero intentar con la colección ya cargada en Auditor.
+    const locales =
+        Array.isArray(misEscuchasData)
+            ? misEscuchasData
+            : [];
+
+    let escucha =
+        locales.find(item => {
+            const ticketItem =
+                item?.ticket ??
+                item?.ticket_psi ??
+                item?.ticketPSI ??
+                null;
+
+            return ticketItem !== null &&
+                String(ticketItem).trim() === ticketBuscado;
+        }) || null;
+
+    // 2) Fallback: consultar asignaciones reales.
+    if (!escucha) {
+        const token =
+            localStorage.getItem('meca_token');
+
+        const response = await fetch(
+            '/api/escuchas/asignaciones',
+            {
+                headers: token
+                    ? {
+                        Authorization:
+                            'Bearer ' + token
+                    }
+                    : {}
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                'No se pudieron consultar las asignaciones para resolver la campaña'
+            );
+        }
+
+        const payload = await response.json();
+
+        const asignaciones =
+            Array.isArray(payload)
+                ? payload
+                : Array.isArray(payload?.data)
+                    ? payload.data
+                    : [];
+
+        escucha =
+            asignaciones.find(item => {
+                const ticketItem =
+                    item?.ticket ??
+                    item?.ticket_psi ??
+                    item?.ticketPSI ??
+                    null;
+
+                return ticketItem !== null &&
+                    String(ticketItem).trim() === ticketBuscado;
+            }) || null;
+    }
+
+    if (!escucha) {
+        return null;
+    }
+
+    const campanaId =
+        escucha.campana_id ??
+        escucha.campanaId ??
+        null;
+
+    return campanaId
+        ? {
+            campana_id: Number(campanaId),
+            escucha
+        }
+        : null;
+}
+
+async function enriquecerEvaluacionConContexto(
+    evaluacion,
+    escucha = null
+) {
+    if (!evaluacion || typeof evaluacion !== 'object') {
+        throw new Error(
+            'La evaluación es obligatoria'
+        );
+    }
+
+    let contexto =
+        window.contextoAuditoriaActual ||
+        null;
+
+    let campanaId =
+        evaluacion.campana_id ??
+        evaluacion.campanaId ??
+        escucha?.campana_id ??
+        escucha?.campanaId ??
+        contexto?.campana_id ??
+        contexto?.campanaId ??
+        null;
+
+    const ticketPSI =
+        evaluacion.ticketPSI ??
+        evaluacion.ticket_psi ??
+        escucha?.ticket ??
+        escucha?.ticket_psi ??
+        escucha?.ticketPSI ??
+        null;
+
+    if (!campanaId && ticketPSI) {
+        const resuelta =
+            await resolverCampanaDesdeAsignacion(
+                ticketPSI
+            );
+
+        if (resuelta?.campana_id) {
+            campanaId =
+                resuelta.campana_id;
+
+            if (!escucha) {
+                escucha =
+                    resuelta.escucha;
+            }
+        }
+    }
+
+    const fecha =
+        evaluacion.fecha ??
+        escucha?.fecha ??
+        escucha?.fecha_escucha ??
+        escucha?.fecha_gestion ??
+        null;
+
+    const campanaIdNormalizado =
+        campanaId !== null &&
+        campanaId !== undefined &&
+        String(campanaId).trim() !== ''
+            ? Number(campanaId)
+            : null;
+
+    if (!contexto && campanaIdNormalizado) {
+        contexto =
+            await aplicarContextoAuditoria(
+                campanaIdNormalizado,
+                fecha
+            );
+    }
+
+    const matrizId =
+        contexto?.matriz_id ??
+        contexto?.matrizId ??
+        window.matrizActualId ??
+        null;
+
+    const versionMatrizId =
+        contexto?.matriz_version_id ??
+        contexto?.version_matriz_id ??
+        contexto?.matrizVersionId ??
+        window.versionMatrizActualId ??
+        null;
+
+    if (!campanaIdNormalizado) {
+        throw new Error(
+            'No se puede guardar la evaluación sin campana_id'
+        );
+    }
+
+    if (!matrizId) {
+        throw new Error(
+            'No se puede guardar la evaluación sin matriz_id'
+        );
+    }
+
+    if (!versionMatrizId) {
+        throw new Error(
+            'No se puede guardar la evaluación sin version_matriz_id'
+        );
+    }
+
+    return {
+        ...evaluacion,
+        campana_id: campanaIdNormalizado,
+        matriz_id: matrizId,
+        versionMatrizId: versionMatrizId,
+        version_matriz_id: versionMatrizId
+    };
+}
+
+function validarContextoPersistenciaEvaluacion(
+    evaluacion
+) {
+    if (!evaluacion) {
+        return {
+            ok: false,
+            error: 'evaluacion requerida'
+        };
+    }
+
+    const campanaId =
+        evaluacion.campana_id ??
+        evaluacion.campanaId ??
+        null;
+
+    const matrizId =
+        evaluacion.matriz_id ??
+        evaluacion.matrizId ??
+        null;
+
+    const versionMatrizId =
+        evaluacion.version_matriz_id ??
+        evaluacion.versionMatrizId ??
+        null;
+
+    if (!campanaId) {
+        return {
+            ok: false,
+            error: 'campana_id requerido'
+        };
+    }
+
+    if (!matrizId) {
+        return {
+            ok: false,
+            error: 'matriz_id requerido'
+        };
+    }
+
+    if (!versionMatrizId) {
+        return {
+            ok: false,
+            error: 'version_matriz_id requerido'
+        };
+    }
+
+    return {
+        ok: true,
+        campana_id: campanaId,
+        matriz_id: matrizId,
+        version_matriz_id: versionMatrizId
+    };
+}
+
+window.enriquecerEvaluacionConContexto =
+    enriquecerEvaluacionConContexto;
+
+window.validarContextoPersistenciaEvaluacion =
+    validarContextoPersistenciaEvaluacion;
+
+window.resolverCampanaDesdeAsignacion =
+    resolverCampanaDesdeAsignacion;
+
+window.normalizarFechaParaContexto =
+    normalizarFechaParaContexto;

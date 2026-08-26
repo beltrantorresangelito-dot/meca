@@ -19,65 +19,220 @@ class MatrixController {
     return true;
   }
 
-  async evaluationActiveVersion(req, res) {
+  async evaluationActiveVersion(
+    req,
+    res,
+    query = {}
+) {
     if (!this.requireToken(req, res)) return;
 
-    try {
-      const versionActiva = await this.service.getEvaluationActiveVersion();
+    const matrizId =
+        query.matrizId ||
+        query.matriz_id;
 
-      if (versionActiva.version !== 'default') {
-        console.log(`✅ Versión activa: ${versionActiva.version}`);
-      }
-
-      MatrixController.json(res, 200, versionActiva);
-    } catch (error) {
-      console.error('❌ Error en /api/evaluacion/version-activa:', error);
-      MatrixController.json(res, 500, { error: error.message });
-    }
-  }
-
-  async activeVersion(req, res) {
-    if (!this.requireToken(req, res)) return;
-
-    try {
-      const versionActiva = await this.service.getActiveVersion();
-
-      if (!versionActiva) {
-        MatrixController.json(res, 404, { error: 'No hay versión activa' });
+    if (!matrizId) {
+        MatrixController.json(
+            res,
+            400,
+            {
+                error:
+                    'matrizId requerido'
+            }
+        );
         return;
-      }
-
-      MatrixController.json(res, 200, versionActiva);
-    } catch (error) {
-      console.error('Error en /api/matriz/versiones/activa:', error);
-      MatrixController.json(res, 500, { error: error.message });
     }
-  }
 
-  async versionByDate(req, res, query = {}) {
+    try {
+        const versionActiva =
+            await this.service
+                .getEvaluationActiveVersion(
+                    matrizId
+                );
+
+        if (
+            versionActiva.version !==
+            'default'
+        ) {
+            console.log(
+                `✅ Versión activa matriz ${matrizId}: ` +
+                `${versionActiva.version}`
+            );
+        }
+
+        MatrixController.json(
+            res,
+            200,
+            versionActiva
+        );
+
+    } catch (error) {
+        console.error(
+            '❌ Error en /api/evaluacion/version-activa:',
+            error
+        );
+
+        const status =
+            error.code === 'VALIDATION_ERROR'
+                ? 400
+                : 500;
+
+        MatrixController.json(
+            res,
+            status,
+            { error: error.message }
+        );
+    }
+}
+
+async activeVersion(
+    req,
+    res,
+    query = {}
+) {
     if (!this.requireToken(req, res)) return;
 
-    const { fecha } = query;
+    const matrizId =
+        query.matrizId ||
+        query.matriz_id;
+
+    if (!matrizId) {
+        MatrixController.json(
+            res,
+            400,
+            {
+                error:
+                    'matrizId requerido'
+            }
+        );
+        return;
+    }
+
+    try {
+        const versionActiva =
+            await this.service
+                .getActiveVersion(
+                    matrizId
+                );
+
+        if (!versionActiva) {
+            MatrixController.json(
+                res,
+                404,
+                {
+                    error:
+                        'No hay versión activa para la matriz indicada'
+                }
+            );
+            return;
+        }
+
+        MatrixController.json(
+            res,
+            200,
+            versionActiva
+        );
+
+    } catch (error) {
+        console.error(
+            'Error en /api/matriz/versiones/activa:',
+            error
+        );
+
+        const status =
+            error.code === 'VALIDATION_ERROR'
+                ? 400
+                : 500;
+
+        MatrixController.json(
+            res,
+            status,
+            { error: error.message }
+        );
+    }}  
+
+async versionByDate(
+    req,
+    res,
+    query = {}
+) {
+    if (!this.requireToken(req, res)) return;
+
+    const {
+        fecha
+    } = query;
+
+    const matrizId =
+        query.matrizId ||
+        query.matriz_id;
+
+    if (!matrizId) {
+        MatrixController.json(
+            res,
+            400,
+            {
+                error:
+                    'matrizId requerido'
+            }
+        );
+        return;
+    }
 
     if (!fecha) {
-      MatrixController.json(res, 400, { error: 'Fecha requerida' });
-      return;
+        MatrixController.json(
+            res,
+            400,
+            {
+                error:
+                    'Fecha requerida'
+            }
+        );
+        return;
     }
 
     try {
-      const version = await this.service.getVersionByDate(fecha);
+        const version =
+            await this.service
+                .getVersionByDate(
+                    matrizId,
+                    fecha
+                );
 
-      if (!version) {
-        MatrixController.json(res, 404, { error: 'No hay versión para esta fecha' });
-        return;
-      }
+        if (!version) {
+            MatrixController.json(
+                res,
+                404,
+                {
+                    error:
+                        'No hay versión para esta matriz y fecha'
+                }
+            );
+            return;
+        }
 
-      MatrixController.json(res, 200, version);
+        MatrixController.json(
+            res,
+            200,
+            version
+        );
+
     } catch (error) {
-      console.error('Error en /api/matriz/versiones/por-fecha:', error);
-      MatrixController.json(res, 500, { error: error.message });
+        console.error(
+            'Error en /api/matriz/versiones/por-fecha:',
+            error
+        );
+
+        const status =
+            error.code === 'VALIDATION_ERROR'
+                ? 400
+                : 500;
+
+        MatrixController.json(
+            res,
+            status,
+            { error: error.message }
+        );
     }
-  }
+}
 
   async structure(req, res, versionId) {
     if (!this.requireToken(req, res)) return;
@@ -109,17 +264,41 @@ class MatrixController {
     }
   }
 
-  async listVersions(req, res) {
-    if (!this.requireToken(req, res)) return;
+  async listVersions(req, res, query = {}) {
+  if (!this.requireToken(req, res)) return;
 
-    try {
-      const versiones = await this.service.listVersions();
-      MatrixController.json(res, 200, versiones);
-    } catch (error) {
-      console.error('Error en /api/matriz/versiones:', error);
-      MatrixController.json(res, 500, { error: error.message });
-    }
+  try {
+    const matrizId =
+      query.matrizId ??
+      query.matriz_id ??
+      null;
+
+    const versiones =
+      await this.service.listVersions(matrizId);
+
+    MatrixController.json(
+      res,
+      200,
+      versiones
+    );
+  } catch (error) {
+    console.error(
+      'Error en /api/matriz/versiones:',
+      error
+    );
+
+    const status =
+      error.code === 'VALIDATION_ERROR'
+        ? 400
+        : 500;
+
+    MatrixController.json(
+      res,
+      status,
+      { error: error.message }
+    );
   }
+}
 
   async rulesByVersion(req, res, versionId) {
     if (!this.requireToken(req, res)) return;
@@ -146,54 +325,125 @@ class MatrixController {
     }
   }
 
-async listFrentes(req, res) {
-  if (!this.requireToken(req, res)) return;
+async listFrentes(req, res, query = {}) {
+  if (!this.requireToken(req, res)) {
+    return;
+  }
 
   try {
-    const rows = await this.service.listFrentes();
-    MatrixController.json(res, 200, rows);
+    const rows =
+      await this.service.listFrentes(
+        query.matriz_id || null
+      );
+
+    MatrixController.json(
+      res,
+      200,
+      rows
+    );
   } catch (error) {
     console.error('Error:', error);
-    MatrixController.json(res, 500, { error: error.message });
+
+    MatrixController.json(
+      res,
+      500,
+      { error: error.message }
+    );
   }
 }
 
 async listAtributos(req, res, query = {}) {
-  if (!this.requireToken(req, res)) return;
+  if (!this.requireToken(req, res)) {
+    return;
+  }
 
   try {
-    const rows = await this.service.listAtributos(query.frente_id || null);
-    MatrixController.json(res, 200, rows);
+    const rows =
+      await this.service.listAtributos(
+        query.frente_id || null,
+        query.matriz_id || null
+      );
+
+    MatrixController.json(
+      res,
+      200,
+      rows
+    );
   } catch (error) {
     console.error('Error:', error);
-    MatrixController.json(res, 500, { error: error.message });
+
+    MatrixController.json(
+      res,
+      500,
+      { error: error.message }
+    );
   }
 }
 
 async listSubMotivos(req, res, query = {}) {
-  if (!this.requireToken(req, res)) return;
+  if (!this.requireToken(req, res)) {
+    return;
+  }
 
   try {
-    const rows = await this.service.listSubMotivos(query.atributo_id || null);
-    MatrixController.json(res, 200, rows);
+    const rows =
+      await this.service.listSubMotivos(
+        query.atributo_id || null,
+        query.matriz_id || null
+      );
+
+    MatrixController.json(
+      res,
+      200,
+      rows
+    );
   } catch (error) {
     console.error('Error:', error);
-    MatrixController.json(res, 500, { error: error.message });
+
+    MatrixController.json(
+      res,
+      500,
+      { error: error.message }
+    );
   }
 }
 
-async listEvaluationRulesAdmin(req, res) {
+async listEvaluationRulesAdmin(req, res, query = {}) {
   if (!this.requireToken(req, res)) return;
 
   try {
-    const rows = await this.service.listEvaluationRulesAdmin();
-    MatrixController.json(res, 200, rows);
+    const rows =
+      await this.service.listEvaluationRulesAdmin(
+        query.matriz_id || null
+      );
+
+    MatrixController.json(
+      res,
+      200,
+      rows
+    );
+
   } catch (error) {
     console.error('Error:', error);
 
+    if (error.status) {
+      MatrixController.json(
+        res,
+        error.status,
+        error.payload || {
+          error: error.message
+        }
+      );
+      return;
+    }
+
     // Contrato legacy real:
-    // error interno -> HTTP 500, pero body [].
-    MatrixController.json(res, 500, []);
+    // error interno -> HTTP 500, body [].
+    MatrixController.json(
+      res,
+      500,
+      []
+    );
   }
 }
 
@@ -230,22 +480,39 @@ async updateFront(req, res, id, body) {
   }
 }
 
-async deleteFront(req, res, id) {
-  if (!this.requireToken(req, res)) return;
+async deleteFront(req, res, id, body = {}) {
+  if (!this.requireToken(req, res)) {
+    return;
+  }
 
   try {
-    const result = await this.service.deleteFront(id);
-    MatrixController.json(res, 200, result);
+    const result =
+      await this.service.deleteFront(
+        id,
+        body
+      );
+
+    MatrixController.json(
+      res,
+      200,
+      result
+    );
+
   } catch (error) {
-    console.error('Error eliminando frente:', error);
+    console.error(
+      'Error eliminando frente:',
+      error
+    );
+
     MatrixController.json(
       res,
       error.status || 500,
-      error.payload || { error: error.message }
+      error.payload || {
+        error: error.message
+      }
     );
   }
 }
-
 
 async createAttribute(req, res, body) {
   if (!this.requireToken(req, res)) return;
@@ -279,18 +546,29 @@ async updateAttribute(req, res, id, body) {
   }
 }
 
-async deleteAttribute(req, res, id) {
+async deleteAttribute(req, res, id, body = {}) {
   if (!this.requireToken(req, res)) return;
 
   try {
-    const result = await this.service.deleteAttribute(id);
+    const result = await this.service.deleteAttribute(
+      id,
+      body
+    );
+
     MatrixController.json(res, 200, result);
+
   } catch (error) {
-    console.error('Error eliminando atributo:', error);
+    console.error(
+      'Error eliminando atributo:',
+      error
+    );
+
     MatrixController.json(
       res,
       error.status || 500,
-      error.payload || { error: error.message }
+      error.payload || {
+        error: error.message
+      }
     );
   }
 }
@@ -328,18 +606,29 @@ async updateSubReason(req, res, id, body) {
   }
 }
 
-async deleteSubReason(req, res, id) {
+async deleteSubReason(req, res, id, body = {}) {
   if (!this.requireToken(req, res)) return;
 
   try {
-    const result = await this.service.deleteSubReason(id);
+    const result = await this.service.deleteSubReason(
+      id,
+      body
+    );
+
     MatrixController.json(res, 200, result);
+
   } catch (error) {
-    console.error('Error eliminando sub-motivo:', error);
+    console.error(
+      'Error eliminando sub-motivo:',
+      error
+    );
+
     MatrixController.json(
       res,
       error.status || 500,
-      error.payload || { error: error.message }
+      error.payload || {
+        error: error.message
+      }
     );
   }
 }
@@ -441,15 +730,41 @@ async validateSubReasonWeight(req, res, body) {
 }
 
 
-async getActiveEvaluationStructure(req, res) {
-  if (!this.requireToken(req, res)) return;
+async getActiveEvaluationStructure(
+  req,
+  res,
+  query = {}
+) {
+  if (!this.requireToken(req, res)) {
+    return;
+  }
 
   try {
-    const result = await this.service.getActiveEvaluationStructure();
-    MatrixController.json(res, 200, result);
+    const result =
+      await this.service
+        .getActiveEvaluationStructure(
+          query
+        );
+
+    MatrixController.json(
+      res,
+      200,
+      result
+    );
+
   } catch (error) {
-    console.error('Error en /api/evaluacion/estructura:', error);
-    MatrixController.json(res, 500, { error: error.message });
+    console.error(
+      'Error en /api/evaluacion/estructura:',
+      error
+    );
+
+    MatrixController.json(
+      res,
+      error.status || 500,
+      error.payload || {
+        error: error.message
+      }
+    );
   }
 }
 
@@ -483,17 +798,34 @@ async updateEvaluationRule(req, res, id, body) {
   }
 }
 
-async deleteEvaluationRule(req, res, id) {
+async deleteEvaluationRule(
+  req,
+  res,
+  id,
+  body = {}
+) {
   if (!this.requireToken(req, res)) return;
 
   try {
-    const result = await this.service.deleteEvaluationRule(id);
-    MatrixController.json(res, 200, result);
+    const result =
+      await this.service.deleteEvaluationRule(
+        id,
+        body
+      );
+
+    MatrixController.json(
+      res,
+      200,
+      result
+    );
+
   } catch (error) {
     MatrixController.json(
       res,
       error.status || 500,
-      error.payload || { error: error.message }
+      error.payload || {
+        error: error.message
+      }
     );
   }
 }

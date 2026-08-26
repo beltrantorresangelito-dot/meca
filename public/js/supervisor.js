@@ -2056,7 +2056,75 @@ async function showTab(tabName, event) {
         }
 
         if (tabName === 'matriz') {
-            if (typeof cargarMatrizCompleta === 'function') await cargarMatrizCompleta();
+            console.log(
+                '📊 Inicializando administración de matriz por contexto...'
+            );
+
+            // ======================================================
+            // 1. SIEMPRE MOSTRAR EL SELECTOR DE CONTEXTO
+            // ======================================================
+            if (
+                typeof inicializarSelectorContextoMatriz === 'function'
+            ) {
+                await inicializarSelectorContextoMatriz();
+            }
+
+            // ======================================================
+            // 2. OBTENER CONTENEDOR DEL ÁRBOL
+            // ======================================================
+            const container =
+                document.getElementById(
+                    'matrizTreeContainer'
+                );
+
+            if (!container) {
+                console.warn(
+                    '⚠️ No existe matrizTreeContainer'
+                );
+                return;
+            }
+
+            // ======================================================
+            // 3. SI YA EXISTE CONTEXTO, CARGAR MATRIZ
+            // ======================================================
+            const matrizId =
+                Number(
+                    window.matrizActualId ??
+                    window.contextoEvaluacionActual?.matriz_id ??
+                    0
+                );
+
+            if (
+                Number.isInteger(matrizId) &&
+                matrizId > 0
+            ) {
+                if (
+                    typeof cargarMatrizCompleta === 'function'
+                ) {
+                    await cargarMatrizCompleta();
+                }
+
+                return;
+            }
+
+            // ======================================================
+            // 4. SIN CONTEXTO: MOSTRAR INSTRUCCIÓN
+            // ======================================================
+            container.innerHTML = `
+                <div
+                    style="
+                        text-align:center;
+                        padding:40px;
+                        color:var(--muted);
+                    "
+                >
+                    🧭 Seleccione un
+                    <strong>quiebre</strong>
+                    y una
+                    <strong>campaña</strong>
+                    para administrar su matriz.
+                </div>
+            `;
         }
 
         if (tabName === 'reportes') {
@@ -3085,29 +3153,149 @@ function inicializarFiltroReportes() {
 // ======================================================
 
 async function cargarCampanasEnFiltroReportes() {
-    const select = document.getElementById('filtroCampanaReportes');
-    if (!select) return;
+    const select =
+        document.getElementById('filtroCampanaReportes');
+
+    if (!select) {
+        return;
+    }
 
     try {
         const campanas = await obtenerCampanas();
-        const valorActual = select.value;
 
-        select.innerHTML = '<option value="todos">📊 Todas las campañas</option>';
+        const activas =
+            Array.isArray(campanas)
+                ? campanas.filter(c => c.activa)
+                : [];
 
-        const activas = campanas.filter(c => c.activa);
-        activas.forEach(c => {
-            select.innerHTML += `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.codigo)} - ${escapeHtml(c.descripcion)}</option>`;
-        });
+        // ======================================================
+        // 1. CONSERVAR SELECCIÓN ACTUAL
+        // ======================================================
+        // El selector puede encontrarse temporalmente en uno de
+        // estos dos estados:
+        //
+        // LEGACY:
+        // value = T / ST / F
+        //
+        // NUEVO:
+        // value = campana_id
+        // ======================================================
 
-        if (valorActual && activas.some(c => c.codigo === valorActual)) {
-            select.value = valorActual;
+        const valorAnterior =
+            String(select.value || 'todos');
+
+        let idSeleccionado = 'todos';
+
+        if (valorAnterior !== 'todos') {
+
+            // Primero asumimos que ya contiene campana_id
+            const encontradaPorId =
+                activas.find(
+                    c =>
+                        String(c.id) ===
+                        valorAnterior
+                );
+
+            if (encontradaPorId) {
+                idSeleccionado =
+                    String(encontradaPorId.id);
+
+            } else {
+
+                // Compatibilidad temporal con selector legacy
+                const encontradaPorCodigo =
+                    activas.find(
+                        c =>
+                            String(c.codigo) ===
+                            valorAnterior
+                    );
+
+                if (encontradaPorCodigo) {
+                    idSeleccionado =
+                        String(encontradaPorCodigo.id);
+                }
+            }
         }
 
-        console.log(`✅ ${activas.length} campañas cargadas en filtro de reportes`);
+        // ======================================================
+        // 2. RECONSTRUIR SELECT
+        //    CONTRATO NUEVO:
+        //
+        //    value        = campana_id
+        //    data-codigo  = código de campaña
+        // ======================================================
+
+        select.innerHTML = '';
+
+        const opcionTodos =
+            document.createElement('option');
+
+        opcionTodos.value = 'todos';
+        opcionTodos.textContent =
+            '📊 Todas las campañas';
+
+        select.appendChild(opcionTodos);
+
+        activas.forEach(campana => {
+
+            const option =
+                document.createElement('option');
+
+            // Fuente real para lógica/filtros
+            option.value =
+                String(campana.id);
+
+            // Código solamente como metadato/UI
+            option.dataset.codigo =
+                String(campana.codigo || '');
+
+            option.dataset.descripcion =
+                String(campana.descripcion || '');
+
+            option.textContent =
+                `${campana.codigo} - ${campana.descripcion}`;
+
+            select.appendChild(option);
+        });
+
+        // ======================================================
+        // 3. RESTAURAR SELECCIÓN
+        // ======================================================
+
+        const existeSeleccion =
+            [...select.options].some(
+                option =>
+                    option.value ===
+                    idSeleccionado
+            );
+
+        select.value =
+            existeSeleccion
+                ? idSeleccionado
+                : 'todos';
+
+        console.log(
+            `✅ ${activas.length} campañas cargadas ` +
+            'en filtro de reportes usando campana_id'
+        );
 
     } catch (error) {
-        console.error('❌ Error cargando campañas en filtro:', error);
-        select.innerHTML = '<option value="todos">⚠️ Error cargando campañas</option>';
+
+        console.error(
+            '❌ Error cargando campañas en filtro:',
+            error
+        );
+
+        select.innerHTML = '';
+
+        const option =
+            document.createElement('option');
+
+        option.value = 'todos';
+        option.textContent =
+            '⚠️ Error cargando campañas';
+
+        select.appendChild(option);
     }
 }
 
@@ -4483,249 +4671,883 @@ function actualizarCardPorcentajeQuiebres(evaluaciones) {
 }
 
 async function actualizarKPIsConFiltro(evaluacionesFiltradas) {
-    console.log('📊 actualizarKPIsConFiltro - VERSIÓN DINÁMICA POR PERÍODO');
-    console.log('   Evaluaciones:', evaluacionesFiltradas?.length || 0);
-    
-    if (!evaluacionesFiltradas || evaluacionesFiltradas.length === 0) {
+    console.log(
+        '📊 actualizarKPIsConFiltro - VERSIÓN DINÁMICA POR PERÍODO'
+    );
+    console.log(
+        '   Evaluaciones recibidas:',
+        evaluacionesFiltradas?.length || 0
+    );
+
+    // ======================================================
+    // 0. VALIDACIÓN INICIAL
+    // ======================================================
+    if (
+        !evaluacionesFiltradas ||
+        evaluacionesFiltradas.length === 0
+    ) {
         resetearKPIs();
         return;
     }
 
     // ======================================================
-    // 🔴 NUEVO: OBTENER CAMPAÑA SELECCIONADA
+    // 0.1 OBTENER CAMPAÑA SELECCIONADA
+    //     El value ahora contiene campana_id
     // ======================================================
-    const selectCampana = document.getElementById('filtroCampanaReportes');
-    const campanaFiltro = selectCampana?.value || 'todos';
-    
-    // 🔴 NUEVO: FILTRAR EVALUACIONES POR CAMPAÑA (si no está en 'todos')
-    let evaluacionesBase = evaluacionesFiltradas;
+    const selectCampana =
+        document.getElementById(
+            'filtroCampanaReportes'
+        );
+
+    const campanaFiltro =
+        selectCampana?.value || 'todos';
+
+    const opcionCampana =
+        selectCampana?.selectedOptions?.[0];
+
+    const campanaCodigo =
+        opcionCampana?.dataset?.codigo ||
+        'todos';
+
+    const campanaTexto =
+        opcionCampana?.textContent?.trim() ||
+        campanaCodigo;
+
+    // ======================================================
+    // 0.2 FILTRAR POR campana_id
+    // ======================================================
+    let evaluacionesBase =
+        evaluacionesFiltradas;
+
     if (campanaFiltro !== 'todos') {
-        evaluacionesBase = evaluacionesFiltradas.filter(e => e.campana === campanaFiltro);
-        console.log(`   📌 KPIs filtrados por campaña "${campanaFiltro}": ${evaluacionesBase.length} evaluaciones`);
+        const campanaId =
+            Number(campanaFiltro);
+
+        if (
+            !Number.isInteger(campanaId) ||
+            campanaId <= 0
+        ) {
+            console.error(
+                '❌ campana_id inválido en filtro:',
+                campanaFiltro
+            );
+
+            resetearKPIs();
+            return;
+        }
+
+        evaluacionesBase =
+            evaluacionesFiltradas.filter(
+                e =>
+                    Number(e.campana_id) ===
+                    campanaId
+            );
+
+        console.log(
+            `📌 KPIs filtrados por campaña ` +
+            `${campanaCodigo} [ID ${campanaId}]: ` +
+            `${evaluacionesBase.length} evaluaciones`
+        );
+
         if (evaluacionesBase.length === 0) {
             resetearKPIs();
-            // Mostrar mensaje de no datos
-            const kpiTotalEval = document.getElementById('kpiTotalEval');
-            if (kpiTotalEval) kpiTotalEval.textContent = '0';
+
+            const kpiTotalEval =
+                document.getElementById(
+                    'kpiTotalEval'
+                );
+
+            if (kpiTotalEval) {
+                kpiTotalEval.textContent = '0';
+            }
+
             return;
         }
     }
 
-    const totalEval = evaluacionesBase.length;
-    
     // ======================================================
-    // 1. AGRUPAR POR PERÍODO (MES) Y CALCULAR PESOS POR PERÍODO
+    // 1. AGRUPAR POR PERÍODO (MES)
     // ======================================================
     const periodo = 'mes';
-    // 🔴 MODIFICADO: Usar evaluacionesBase en lugar de evaluacionesFiltradas
-    const datosAgrupados = agruparEvaluacionesPorPeriodoConPesos(evaluacionesBase, periodo);
-    
-    if (datosAgrupados.length === 0) {
+
+    const datosAgrupados =
+        agruparEvaluacionesPorPeriodoConPesos(
+            evaluacionesBase,
+            periodo
+        );
+
+    if (
+        !datosAgrupados ||
+        datosAgrupados.length === 0
+    ) {
         resetearKPIs();
         return;
     }
-    
+
     // ======================================================
     // 2. CALCULAR PROMEDIOS PONDERADOS POR PERÍODO
     // ======================================================
     let totalEvaluaciones = 0;
+
     let sumaNotasPonderada = 0;
     let sumaENCPonderada = 0;
     let sumaECUFPonderada = 0;
     let sumaECNPonderada = 0;
+
     let totalQuiebres = 0;
-    let totalConENC = 0, totalConECUF = 0, totalConECN = 0;
+
+    let totalConENC = 0;
+    let totalConECUF = 0;
+    let totalConECN = 0;
+
     let countMatrizAntigua = 0;
     let countMatrizNueva = 0;
-    
+
     for (const grupo of datosAgrupados) {
-        const count = grupo.count || 0;
-        const pesos = grupo.pesos || { ENC: 30, ECUF: 30, ECN: 40 };
-        
-        const promNota = count > 0 ? grupo.sumaNotas / count : 0;
-        const promENC = count > 0 ? grupo.sumENC / count : 0;
-        const promECUF = count > 0 ? grupo.sumECUF / count : 0;
-        const promECN = count > 0 ? grupo.sumECN / count : 0;
-        
-        const pctENC = Math.min((promENC / pesos.ENC) * 100, 100);
-        const pctECUF = Math.min((promECUF / pesos.ECUF) * 100, 100);
-        const pctECN = Math.min((promECN / pesos.ECN) * 100, 100);
-        
+        const count =
+            grupo.count || 0;
+
+        const pesos =
+            grupo.pesos || {
+                ENC: 30,
+                ECUF: 30,
+                ECN: 40
+            };
+
+        // Promedios RAW del grupo
+        const promNota =
+            count > 0
+                ? grupo.sumaNotas / count
+                : 0;
+
+        const promENC =
+            count > 0
+                ? grupo.sumENC / count
+                : 0;
+
+        const promECUF =
+            count > 0
+                ? grupo.sumECUF / count
+                : 0;
+
+        const promECN =
+            count > 0
+                ? grupo.sumECN / count
+                : 0;
+
+        // Porcentajes considerando pesos
+        const pctENC =
+            Math.min(
+                (promENC / pesos.ENC) * 100,
+                100
+            );
+
+        const pctECUF =
+            Math.min(
+                (promECUF / pesos.ECUF) * 100,
+                100
+            );
+
+        const pctECN =
+            Math.min(
+                (promECN / pesos.ECN) * 100,
+                100
+            );
+
+        // Ponderar por cantidad de evaluaciones
         totalEvaluaciones += count;
-        sumaNotasPonderada += promNota * count;
-        sumaENCPonderada += pctENC * count;
-        sumaECUFPonderada += pctECUF * count;
-        sumaECNPonderada += pctECN * count;
-        
-        for (const e of grupo.evaluaciones) {
-            if ((e.notaFinal || 0) < 85) totalQuiebres++;
-        }
-        
-        for (const e of grupo.evaluaciones) {
-            const fecha = obtenerFechaEvaluacion(e);
-            if (fecha) {
-                const matriz = getMatrizByFecha(fecha);
-                if (matriz.nombre === MATRIZ_ANTIGUA.nombre) {
-                    countMatrizAntigua++;
-                } else {
-                    countMatrizNueva++;
-                }
-                if ((e.totalENC || 0) < matriz.pesos.ENC) totalConENC++;
-                if ((e.totalECUF || 0) < matriz.pesos.ECUF) totalConECUF++;
-                if ((e.totalECN || 0) < matriz.pesos.ECN) totalConECN++;
+
+        sumaNotasPonderada +=
+            promNota * count;
+
+        sumaENCPonderada +=
+            pctENC * count;
+
+        sumaECUFPonderada +=
+            pctECUF * count;
+
+        sumaECNPonderada +=
+            pctECN * count;
+
+        // ==================================================
+        // CONTAR QUIEBRES
+        // ==================================================
+        for (
+            const evaluacion of
+            grupo.evaluaciones
+        ) {
+            if (
+                Number(
+                    evaluacion.notaFinal || 0
+                ) < 85
+            ) {
+                totalQuiebres++;
             }
         }
-    }
-    
-    // ======================================================
-    // 3. CALCULAR PROMEDIOS FINALES
-    // ======================================================
-    const promedioGeneral = totalEvaluaciones > 0 ? Math.round(sumaNotasPonderada / totalEvaluaciones) : 0;
-    const promedioENC = totalEvaluaciones > 0 ? Math.round(sumaENCPonderada / totalEvaluaciones) : 0;
-    const promedioECUF = totalEvaluaciones > 0 ? Math.round(sumaECUFPonderada / totalEvaluaciones) : 0;
-    const promedioECN = totalEvaluaciones > 0 ? Math.round(sumaECNPonderada / totalEvaluaciones) : 0;
-    const pctQuiebres = totalEvaluaciones > 0 ? Math.round((totalQuiebres / totalEvaluaciones) * 100) : 0;
-    const pctConENC = totalEvaluaciones > 0 ? Math.round((totalConENC / totalEvaluaciones) * 100) : 0;
-    const pctConECUF = totalEvaluaciones > 0 ? Math.round((totalConECUF / totalEvaluaciones) * 100) : 0;
-    const pctConECN = totalEvaluaciones > 0 ? Math.round((totalConECN / totalEvaluaciones) * 100) : 0;
-    
-    // ======================================================
-    // 4. ACTUALIZAR KPIs
-    // ======================================================
-    const kpiTotalEval = document.getElementById('kpiTotalEval');
-    const kpiPromedio = document.getElementById('kpiPromedio');
-    if (kpiTotalEval) kpiTotalEval.textContent = totalEvaluaciones;
-    if (kpiPromedio) kpiPromedio.textContent = promedioGeneral + '%';
-    
-    // KPIs de motivos bajos
-    const kpiConENC = document.getElementById('kpiConENC');
-    const kpiConECUF = document.getElementById('kpiConECUF');
-    const kpiConECN = document.getElementById('kpiConECN');
-    const kpiConENCDetalle = document.getElementById('kpiConENCDetalle');
-    const kpiConECUFDetalle = document.getElementById('kpiConECUFDetalle');
-    const kpiConECNDetalle = document.getElementById('kpiConECNDetalle');
-    if (kpiConENC) kpiConENC.textContent = pctConENC + '%';
-    if (kpiConECUF) kpiConECUF.textContent = pctConECUF + '%';
-    if (kpiConECN) kpiConECN.textContent = pctConECN + '%';
-    if (kpiConENCDetalle) kpiConENCDetalle.textContent = `${totalConENC} de ${totalEvaluaciones} llamadas`;
-    if (kpiConECUFDetalle) kpiConECUFDetalle.textContent = `${totalConECUF} de ${totalEvaluaciones} llamadas`;
-    if (kpiConECNDetalle) kpiConECNDetalle.textContent = `${totalConECN} de ${totalEvaluaciones} llamadas`;
-    
-    // Promedios de motivos
-    const kpiPromedioENC = document.getElementById('kpiPromedioENC');
-    const kpiPromedioECUF = document.getElementById('kpiPromedioECUF');
-    const kpiPromedioECN = document.getElementById('kpiPromedioECN');
-    const kpiPromedioENCDetalle = document.getElementById('kpiPromedioENCDetalle');
-    const kpiPromedioECUFDetalle = document.getElementById('kpiPromedioECUFDetalle');
-    const kpiPromedioECNDetalle = document.getElementById('kpiPromedioECNDetalle');
-    if (kpiPromedioENC) kpiPromedioENC.textContent = promedioENC + '%';
-    if (kpiPromedioECUF) kpiPromedioECUF.textContent = promedioECUF + '%';
-    if (kpiPromedioECN) kpiPromedioECN.textContent = promedioECN + '%';
-    if (kpiPromedioENCDetalle) kpiPromedioENCDetalle.textContent = `${(sumaENCPonderada / totalEvaluaciones).toFixed(1)}%`;
-    if (kpiPromedioECUFDetalle) kpiPromedioECUFDetalle.textContent = `${(sumaECUFPonderada / totalEvaluaciones).toFixed(1)}%`;
-    if (kpiPromedioECNDetalle) kpiPromedioECNDetalle.textContent = `${(sumaECNPonderada / totalEvaluaciones).toFixed(1)}%`;
-    
-    // Porcentaje de quiebres
-    const kpiPorcentajeQuiebres = document.getElementById('kpiPorcentajeQuiebres');
-    const kpiPorcentajeQuiebresDetalle = document.getElementById('kpiPorcentajeQuiebresDetalle');
-    if (kpiPorcentajeQuiebres) kpiPorcentajeQuiebres.textContent = pctQuiebres + '%';
-    if (kpiPorcentajeQuiebresDetalle) kpiPorcentajeQuiebresDetalle.textContent = `${totalQuiebres} de ${totalEvaluaciones} evaluaciones`;
-    
-    // Total Gestores
-    const gestoresUnicos = new Set();
-    // 🔴 MODIFICADO: Usar evaluacionesBase
-    evaluacionesBase.forEach(e => { if (e.agente) gestoresUnicos.add(e.agente); });
-    const totalGestores = gestoresUnicos.size;
-    const kpiTotalGestores = document.getElementById('kpiTotalGestores');
-    const kpiTotalGestoresDetalle = document.getElementById('kpiTotalGestoresDetalle');
-    if (kpiTotalGestores) kpiTotalGestores.textContent = totalGestores;
-    if (kpiTotalGestoresDetalle) kpiTotalGestoresDetalle.textContent = totalGestores === 1 ? '1 gestor único' : `${totalGestores} gestores únicos`;
-    
-    // ======================================================
-    // 5. RANKING Y CUARTILES (con datos filtrados por campaña)
-    // ======================================================
-    // 🔴 MODIFICADO: Usar evaluacionesBase
-    const ranking = await construirRankingAgentes(evaluacionesBase);
-    const totalAgentes = ranking.length || 0;
-    const q1 = ranking.filter(a => a.cuartil === 'Q1').length || 0;
-    const q2 = ranking.filter(a => a.cuartil === 'Q2').length || 0;
-    const q3 = ranking.filter(a => a.cuartil === 'Q3').length || 0;
-    const q4 = ranking.filter(a => a.cuartil === 'Q4').length || 0;
-    const pctQ1 = totalAgentes > 0 ? Math.round((q1 / totalAgentes) * 100) : 0;
-    const pctQ2 = totalAgentes > 0 ? Math.round((q2 / totalAgentes) * 100) : 0;
-    const pctQ3 = totalAgentes > 0 ? Math.round((q3 / totalAgentes) * 100) : 0;
-    const pctQ4 = totalAgentes > 0 ? Math.round((q4 / totalAgentes) * 100) : 0;
-    
-    const kpiPorcentajeQ1 = document.getElementById('kpiPorcentajeQ1');
-    const kpiPorcentajeQ2 = document.getElementById('kpiPorcentajeQ2');
-    const kpiPorcentajeQ3 = document.getElementById('kpiPorcentajeQ3');
-    const kpiTasaQuiebre = document.getElementById('kpiTasaQuiebre');
-    const kpiPorcentajeQ1Detalle = document.getElementById('kpiPorcentajeQ1Detalle');
-    const kpiPorcentajeQ2Detalle = document.getElementById('kpiPorcentajeQ2Detalle');
-    const kpiPorcentajeQ3Detalle = document.getElementById('kpiPorcentajeQ3Detalle');
-    const kpiTasaQuiebreDetalle = document.getElementById('kpiTasaQuiebreDetalle');
-    if (kpiPorcentajeQ1) kpiPorcentajeQ1.textContent = pctQ1 + '%';
-    if (kpiPorcentajeQ2) kpiPorcentajeQ2.textContent = pctQ2 + '%';
-    if (kpiPorcentajeQ3) kpiPorcentajeQ3.textContent = pctQ3 + '%';
-    if (kpiTasaQuiebre) kpiTasaQuiebre.textContent = pctQ4 + '%';
-    if (kpiPorcentajeQ1Detalle) kpiPorcentajeQ1Detalle.textContent = `${q1} gestores`;
-    if (kpiPorcentajeQ2Detalle) kpiPorcentajeQ2Detalle.textContent = `${q2} gestores`;
-    if (kpiPorcentajeQ3Detalle) kpiPorcentajeQ3Detalle.textContent = `${q3} gestores`;
-    if (kpiTasaQuiebreDetalle) kpiTasaQuiebreDetalle.textContent = `${q4} gestores`;
-    
-    // ======================================================
-    // 6. PRODUCTIVIDAD (con datos filtrados por campaña)
-    // ======================================================
-    // 🔴 MODIFICADO: Usar evaluacionesBase
-    const productividad = await calcularProductividadAuditor(evaluacionesBase);
-    const kpiProductividad = document.getElementById('kpiProductividad');
-    const kpiCapacidadTotal = document.getElementById('kpiCapacidadTotal');
-    if (kpiProductividad) kpiProductividad.textContent = productividad.porAuditor;
-    if (kpiCapacidadTotal) kpiCapacidadTotal.textContent = productividad.capacidadTotal;
-    
-    // ======================================================
-    // 7. MATRIZ INFO
-    // ======================================================
-    const matrizInfo = document.getElementById('kpiMatrizInfo');
-    const matrizNombre = document.getElementById('kpiMatrizNombre');
-    if (matrizInfo && matrizNombre) {
-        const totalConMatriz = countMatrizAntigua + countMatrizNueva;
-        if (totalConMatriz > 0) {
-            const pctAntigua = Math.round((countMatrizAntigua / totalConMatriz) * 100);
-            const pctNueva = Math.round((countMatrizNueva / totalConMatriz) * 100);
-            if (countMatrizAntigua > 0 && countMatrizNueva > 0) {
-                matrizNombre.textContent = `⚠️ Mezcla de matrices`;
-                matrizInfo.innerHTML = `
-                    📊 <span id="kpiMatrizNombre" style="color: #f39c12;">⚠️ Mezcla de matrices</span>
-                    <span style="font-size: 11px; color: var(--muted); margin-left: 10px;">
-                        (${countMatrizAntigua} eval - 30/30/40 = ${pctAntigua}% | 
-                        ${countMatrizNueva} eval - 15/15/70 = ${pctNueva}%)
-                    </span>
-                `;
-            } else if (countMatrizAntigua > 0) {
-                matrizNombre.textContent = MATRIZ_ANTIGUA.nombre;
-                matrizInfo.innerHTML = `📊 <span id="kpiMatrizNombre">${MATRIZ_ANTIGUA.nombre}</span>`;
+
+        // ==================================================
+        // CONTAR MOTIVOS BAJOS Y MATRICES
+        // ==================================================
+        for (
+            const evaluacion of
+            grupo.evaluaciones
+        ) {
+            const fecha =
+                obtenerFechaEvaluacion(
+                    evaluacion
+                );
+
+            if (!fecha) {
+                continue;
+            }
+
+            const matriz =
+                getMatrizByFecha(fecha);
+
+            if (
+                matriz.nombre ===
+                MATRIZ_ANTIGUA.nombre
+            ) {
+                countMatrizAntigua++;
             } else {
-                matrizNombre.textContent = MATRIZ_NUEVA.nombre;
-                matrizInfo.innerHTML = `📊 <span id="kpiMatrizNombre">${MATRIZ_NUEVA.nombre}</span>`;
+                countMatrizNueva++;
+            }
+
+            if (
+                Number(
+                    evaluacion.totalENC || 0
+                ) < matriz.pesos.ENC
+            ) {
+                totalConENC++;
+            }
+
+            if (
+                Number(
+                    evaluacion.totalECUF || 0
+                ) < matriz.pesos.ECUF
+            ) {
+                totalConECUF++;
+            }
+
+            if (
+                Number(
+                    evaluacion.totalECN || 0
+                ) < matriz.pesos.ECN
+            ) {
+                totalConECN++;
             }
         }
     }
 
     // ======================================================
-    // 🔴 NUEVO: 8. MOSTRAR CAMPAÑA EN EL TÍTULO DE KPIs
+    // 3. CALCULAR PROMEDIOS FINALES
     // ======================================================
-    const kpiTitulo = document.getElementById('kpiTituloCampaña');
-    if (kpiTitulo) {
-        if (campanaFiltro !== 'todos') {
-            kpiTitulo.textContent = `📌 Campaña: ${campanaFiltro}`;
-            kpiTitulo.style.display = 'block';
-        } else {
-            kpiTitulo.style.display = 'none';
+    const promedioGeneral =
+        totalEvaluaciones > 0
+            ? Math.round(
+                sumaNotasPonderada /
+                totalEvaluaciones
+            )
+            : 0;
+
+    const promedioENC =
+        totalEvaluaciones > 0
+            ? Math.round(
+                sumaENCPonderada /
+                totalEvaluaciones
+            )
+            : 0;
+
+    const promedioECUF =
+        totalEvaluaciones > 0
+            ? Math.round(
+                sumaECUFPonderada /
+                totalEvaluaciones
+            )
+            : 0;
+
+    const promedioECN =
+        totalEvaluaciones > 0
+            ? Math.round(
+                sumaECNPonderada /
+                totalEvaluaciones
+            )
+            : 0;
+
+    const pctQuiebres =
+        totalEvaluaciones > 0
+            ? Math.round(
+                (
+                    totalQuiebres /
+                    totalEvaluaciones
+                ) * 100
+            )
+            : 0;
+
+    const pctConENC =
+        totalEvaluaciones > 0
+            ? Math.round(
+                (
+                    totalConENC /
+                    totalEvaluaciones
+                ) * 100
+            )
+            : 0;
+
+    const pctConECUF =
+        totalEvaluaciones > 0
+            ? Math.round(
+                (
+                    totalConECUF /
+                    totalEvaluaciones
+                ) * 100
+            )
+            : 0;
+
+    const pctConECN =
+        totalEvaluaciones > 0
+            ? Math.round(
+                (
+                    totalConECN /
+                    totalEvaluaciones
+                ) * 100
+            )
+            : 0;
+
+    // ======================================================
+    // 4. ACTUALIZAR KPIs
+    // ======================================================
+    const kpiTotalEval =
+        document.getElementById(
+            'kpiTotalEval'
+        );
+
+    const kpiPromedio =
+        document.getElementById(
+            'kpiPromedio'
+        );
+
+    if (kpiTotalEval) {
+        kpiTotalEval.textContent =
+            totalEvaluaciones;
+    }
+
+    if (kpiPromedio) {
+        kpiPromedio.textContent =
+            promedioGeneral + '%';
+    }
+
+    // ======================================================
+    // KPIs DE MOTIVOS BAJOS
+    // ======================================================
+    const kpiConENC =
+        document.getElementById(
+            'kpiConENC'
+        );
+
+    const kpiConECUF =
+        document.getElementById(
+            'kpiConECUF'
+        );
+
+    const kpiConECN =
+        document.getElementById(
+            'kpiConECN'
+        );
+
+    const kpiConENCDetalle =
+        document.getElementById(
+            'kpiConENCDetalle'
+        );
+
+    const kpiConECUFDetalle =
+        document.getElementById(
+            'kpiConECUFDetalle'
+        );
+
+    const kpiConECNDetalle =
+        document.getElementById(
+            'kpiConECNDetalle'
+        );
+
+    if (kpiConENC) {
+        kpiConENC.textContent =
+            pctConENC + '%';
+    }
+
+    if (kpiConECUF) {
+        kpiConECUF.textContent =
+            pctConECUF + '%';
+    }
+
+    if (kpiConECN) {
+        kpiConECN.textContent =
+            pctConECN + '%';
+    }
+
+    if (kpiConENCDetalle) {
+        kpiConENCDetalle.textContent =
+            `${totalConENC} de ` +
+            `${totalEvaluaciones} llamadas`;
+    }
+
+    if (kpiConECUFDetalle) {
+        kpiConECUFDetalle.textContent =
+            `${totalConECUF} de ` +
+            `${totalEvaluaciones} llamadas`;
+    }
+
+    if (kpiConECNDetalle) {
+        kpiConECNDetalle.textContent =
+            `${totalConECN} de ` +
+            `${totalEvaluaciones} llamadas`;
+    }
+
+    // ======================================================
+    // PROMEDIOS DE MOTIVOS
+    // ======================================================
+    const kpiPromedioENC =
+        document.getElementById(
+            'kpiPromedioENC'
+        );
+
+    const kpiPromedioECUF =
+        document.getElementById(
+            'kpiPromedioECUF'
+        );
+
+    const kpiPromedioECN =
+        document.getElementById(
+            'kpiPromedioECN'
+        );
+
+    const kpiPromedioENCDetalle =
+        document.getElementById(
+            'kpiPromedioENCDetalle'
+        );
+
+    const kpiPromedioECUFDetalle =
+        document.getElementById(
+            'kpiPromedioECUFDetalle'
+        );
+
+    const kpiPromedioECNDetalle =
+        document.getElementById(
+            'kpiPromedioECNDetalle'
+        );
+
+    if (kpiPromedioENC) {
+        kpiPromedioENC.textContent =
+            promedioENC + '%';
+    }
+
+    if (kpiPromedioECUF) {
+        kpiPromedioECUF.textContent =
+            promedioECUF + '%';
+    }
+
+    if (kpiPromedioECN) {
+        kpiPromedioECN.textContent =
+            promedioECN + '%';
+    }
+
+    if (
+        kpiPromedioENCDetalle &&
+        totalEvaluaciones > 0
+    ) {
+        kpiPromedioENCDetalle.textContent =
+            `${
+                (
+                    sumaENCPonderada /
+                    totalEvaluaciones
+                ).toFixed(1)
+            }%`;
+    }
+
+    if (
+        kpiPromedioECUFDetalle &&
+        totalEvaluaciones > 0
+    ) {
+        kpiPromedioECUFDetalle.textContent =
+            `${
+                (
+                    sumaECUFPonderada /
+                    totalEvaluaciones
+                ).toFixed(1)
+            }%`;
+    }
+
+    if (
+        kpiPromedioECNDetalle &&
+        totalEvaluaciones > 0
+    ) {
+        kpiPromedioECNDetalle.textContent =
+            `${
+                (
+                    sumaECNPonderada /
+                    totalEvaluaciones
+                ).toFixed(1)
+            }%`;
+    }
+
+    // ======================================================
+    // PORCENTAJE DE QUIEBRES
+    // ======================================================
+    const kpiPorcentajeQuiebres =
+        document.getElementById(
+            'kpiPorcentajeQuiebres'
+        );
+
+    const kpiPorcentajeQuiebresDetalle =
+        document.getElementById(
+            'kpiPorcentajeQuiebresDetalle'
+        );
+
+    if (kpiPorcentajeQuiebres) {
+        kpiPorcentajeQuiebres.textContent =
+            pctQuiebres + '%';
+    }
+
+    if (kpiPorcentajeQuiebresDetalle) {
+        kpiPorcentajeQuiebresDetalle.textContent =
+            `${totalQuiebres} de ` +
+            `${totalEvaluaciones} evaluaciones`;
+    }
+
+    // ======================================================
+    // TOTAL GESTORES
+    // IMPORTANTE: usar evaluacionesBase
+    // ======================================================
+    const gestoresUnicos =
+        new Set();
+
+    evaluacionesBase.forEach(
+        evaluacion => {
+            if (evaluacion.agente) {
+                gestoresUnicos.add(
+                    evaluacion.agente
+                );
+            }
+        }
+    );
+
+    const totalGestores =
+        gestoresUnicos.size;
+
+    const kpiTotalGestores =
+        document.getElementById(
+            'kpiTotalGestores'
+        );
+
+    const kpiTotalGestoresDetalle =
+        document.getElementById(
+            'kpiTotalGestoresDetalle'
+        );
+
+    if (kpiTotalGestores) {
+        kpiTotalGestores.textContent =
+            totalGestores;
+    }
+
+    if (kpiTotalGestoresDetalle) {
+        kpiTotalGestoresDetalle.textContent =
+            totalGestores === 1
+                ? '1 gestor único'
+                : `${totalGestores} gestores únicos`;
+    }
+
+    // ======================================================
+    // 5. RANKING Y CUARTILES
+    // IMPORTANTE: usar evaluacionesBase
+    // ======================================================
+    const ranking =
+        await construirRankingAgentes(
+            evaluacionesBase
+        );
+
+    const totalAgentes =
+        ranking.length || 0;
+
+    const q1 =
+        ranking.filter(
+            a => a.cuartil === 'Q1'
+        ).length || 0;
+
+    const q2 =
+        ranking.filter(
+            a => a.cuartil === 'Q2'
+        ).length || 0;
+
+    const q3 =
+        ranking.filter(
+            a => a.cuartil === 'Q3'
+        ).length || 0;
+
+    const q4 =
+        ranking.filter(
+            a => a.cuartil === 'Q4'
+        ).length || 0;
+
+    const pctQ1 =
+        totalAgentes > 0
+            ? Math.round(
+                (q1 / totalAgentes) * 100
+            )
+            : 0;
+
+    const pctQ2 =
+        totalAgentes > 0
+            ? Math.round(
+                (q2 / totalAgentes) * 100
+            )
+            : 0;
+
+    const pctQ3 =
+        totalAgentes > 0
+            ? Math.round(
+                (q3 / totalAgentes) * 100
+            )
+            : 0;
+
+    const pctQ4 =
+        totalAgentes > 0
+            ? Math.round(
+                (q4 / totalAgentes) * 100
+            )
+            : 0;
+
+    const kpiPorcentajeQ1 =
+        document.getElementById(
+            'kpiPorcentajeQ1'
+        );
+
+    const kpiPorcentajeQ2 =
+        document.getElementById(
+            'kpiPorcentajeQ2'
+        );
+
+    const kpiPorcentajeQ3 =
+        document.getElementById(
+            'kpiPorcentajeQ3'
+        );
+
+    const kpiTasaQuiebre =
+        document.getElementById(
+            'kpiTasaQuiebre'
+        );
+
+    const kpiPorcentajeQ1Detalle =
+        document.getElementById(
+            'kpiPorcentajeQ1Detalle'
+        );
+
+    const kpiPorcentajeQ2Detalle =
+        document.getElementById(
+            'kpiPorcentajeQ2Detalle'
+        );
+
+    const kpiPorcentajeQ3Detalle =
+        document.getElementById(
+            'kpiPorcentajeQ3Detalle'
+        );
+
+    const kpiTasaQuiebreDetalle =
+        document.getElementById(
+            'kpiTasaQuiebreDetalle'
+        );
+
+    if (kpiPorcentajeQ1) {
+        kpiPorcentajeQ1.textContent =
+            pctQ1 + '%';
+    }
+
+    if (kpiPorcentajeQ2) {
+        kpiPorcentajeQ2.textContent =
+            pctQ2 + '%';
+    }
+
+    if (kpiPorcentajeQ3) {
+        kpiPorcentajeQ3.textContent =
+            pctQ3 + '%';
+    }
+
+    if (kpiTasaQuiebre) {
+        kpiTasaQuiebre.textContent =
+            pctQ4 + '%';
+    }
+
+    if (kpiPorcentajeQ1Detalle) {
+        kpiPorcentajeQ1Detalle.textContent =
+            `${q1} gestores`;
+    }
+
+    if (kpiPorcentajeQ2Detalle) {
+        kpiPorcentajeQ2Detalle.textContent =
+            `${q2} gestores`;
+    }
+
+    if (kpiPorcentajeQ3Detalle) {
+        kpiPorcentajeQ3Detalle.textContent =
+            `${q3} gestores`;
+    }
+
+    if (kpiTasaQuiebreDetalle) {
+        kpiTasaQuiebreDetalle.textContent =
+            `${q4} gestores`;
+    }
+
+    // ======================================================
+    // 6. PRODUCTIVIDAD
+    // IMPORTANTE: usar evaluacionesBase
+    // ======================================================
+    const productividad =
+        await calcularProductividadAuditor(
+            evaluacionesBase
+        );
+
+    const kpiProductividad =
+        document.getElementById(
+            'kpiProductividad'
+        );
+
+    const kpiCapacidadTotal =
+        document.getElementById(
+            'kpiCapacidadTotal'
+        );
+
+    if (kpiProductividad) {
+        kpiProductividad.textContent =
+            productividad.porAuditor;
+    }
+
+    if (kpiCapacidadTotal) {
+        kpiCapacidadTotal.textContent =
+            productividad.capacidadTotal;
+    }
+
+    // ======================================================
+    // 7. MATRIZ INFO
+    // ======================================================
+    const matrizInfo =
+        document.getElementById(
+            'kpiMatrizInfo'
+        );
+
+    const matrizNombre =
+        document.getElementById(
+            'kpiMatrizNombre'
+        );
+
+    if (
+        matrizInfo &&
+        matrizNombre
+    ) {
+        const totalConMatriz =
+            countMatrizAntigua +
+            countMatrizNueva;
+
+        if (totalConMatriz > 0) {
+            const pctAntigua =
+                Math.round(
+                    (
+                        countMatrizAntigua /
+                        totalConMatriz
+                    ) * 100
+                );
+
+            const pctNueva =
+                Math.round(
+                    (
+                        countMatrizNueva /
+                        totalConMatriz
+                    ) * 100
+                );
+
+            if (
+                countMatrizAntigua > 0 &&
+                countMatrizNueva > 0
+            ) {
+                matrizNombre.textContent =
+                    '⚠️ Mezcla de matrices';
+
+                matrizInfo.innerHTML = `
+                    📊 <span
+                        id="kpiMatrizNombre"
+                        style="color: #f39c12;"
+                    >
+                        ⚠️ Mezcla de matrices
+                    </span>
+                    <span
+                        style="
+                            font-size: 11px;
+                            color: var(--muted);
+                            margin-left: 10px;
+                        "
+                    >
+                        (${countMatrizAntigua} eval -
+                        30/30/40 = ${pctAntigua}% |
+                        ${countMatrizNueva} eval -
+                        15/15/70 = ${pctNueva}%)
+                    </span>
+                `;
+
+            } else if (
+                countMatrizAntigua > 0
+            ) {
+                matrizNombre.textContent =
+                    MATRIZ_ANTIGUA.nombre;
+
+                matrizInfo.innerHTML =
+                    `📊 <span id="kpiMatrizNombre">` +
+                    `${MATRIZ_ANTIGUA.nombre}` +
+                    `</span>`;
+
+            } else {
+                matrizNombre.textContent =
+                    MATRIZ_NUEVA.nombre;
+
+                matrizInfo.innerHTML =
+                    `📊 <span id="kpiMatrizNombre">` +
+                    `${MATRIZ_NUEVA.nombre}` +
+                    `</span>`;
+            }
         }
     }
-    
-    console.log(`✅ KPIs actualizados - ${totalEvaluaciones} evaluaciones, ${datosAgrupados.length} períodos${campanaFiltro !== 'todos' ? `, Campaña: ${campanaFiltro}` : ''}`);
+
+    // ======================================================
+    // 8. MOSTRAR CAMPAÑA EN TÍTULO
+    // ======================================================
+    const kpiTitulo =
+        document.getElementById(
+            'kpiTituloCampaña'
+        );
+
+    if (kpiTitulo) {
+        if (
+            campanaFiltro !== 'todos'
+        ) {
+            kpiTitulo.textContent =
+                `📌 Campaña: ${campanaTexto}`;
+
+            kpiTitulo.style.display =
+                'block';
+        } else {
+            kpiTitulo.style.display =
+                'none';
+        }
+    }
+
+    console.log(
+        `✅ KPIs actualizados - ` +
+        `${totalEvaluaciones} evaluaciones, ` +
+        `${datosAgrupados.length} períodos` +
+        (
+            campanaFiltro !== 'todos'
+                ? `, Campaña: ${campanaCodigo} ` +
+                  `[ID ${campanaFiltro}]`
+                : ''
+        )
+    );
 }
 
 function actualizarCardsPromedioMotivosAgrupados(datosAgrupados) {
@@ -15731,225 +16553,652 @@ async function renderizarControlesPeriodo() {
 // ======================================================
 // FUNCIÓN: obtenerEvaluacionesFiltradasPorPeriodo (COMPLETA)
 // ======================================================
-function obtenerEvaluacionesFiltradasPorPeriodo(evaluaciones) {
-    console.log('📅 obtenerEvaluacionesFiltradasPorPeriodo - INICIO');
-    console.log(`   Período actual: ${filtroPeriodoActual}`);
-    console.log(`   Evaluaciones disponibles: ${evaluaciones?.length || 0}`);
+function obtenerEvaluacionesFiltradasPorPeriodo(
+    evaluaciones
+) {
+    console.log(
+        '📅 obtenerEvaluacionesFiltradasPorPeriodo - INICIO'
+    );
 
-    // 🔴 VALIDACIÓN INICIAL
-    if (!evaluaciones || evaluaciones.length === 0) {
-        console.log('⚠️ No hay evaluaciones para filtrar');
+    console.log(
+        `   Período actual: ${filtroPeriodoActual}`
+    );
+
+    console.log(
+        `   Evaluaciones disponibles: ` +
+        `${evaluaciones?.length || 0}`
+    );
+
+    // ======================================================
+    // 0. VALIDACIÓN INICIAL
+    // ======================================================
+    if (
+        !evaluaciones ||
+        evaluaciones.length === 0
+    ) {
+        console.log(
+            '⚠️ No hay evaluaciones para filtrar'
+        );
+
         return [];
     }
 
     // ======================================================
-    // 🔴 NUEVO: FILTRAR POR CAMPAÑA (PRIMERO)
+    // 1. FILTRAR PRIMERO POR CAMPAÑA
+    //    value = campana_id
     // ======================================================
-    const selectCampana = document.getElementById('filtroCampanaReportes');
-    const campanaFiltro = selectCampana?.value || 'todos';
+    const selectCampana =
+        document.getElementById(
+            'filtroCampanaReportes'
+        );
 
-    let evaluacionesBase = evaluaciones;
+    const campanaFiltro =
+        selectCampana?.value || 'todos';
+
+    const opcionCampana =
+        selectCampana?.selectedOptions?.[0];
+
+    const campanaCodigo =
+        opcionCampana?.dataset?.codigo ||
+        'todos';
+
+    let evaluacionesBase =
+        evaluaciones;
+
     if (campanaFiltro !== 'todos') {
-        evaluacionesBase = evaluaciones.filter(e => e.campana === campanaFiltro);
-        console.log(`   📌 Filtro campaña "${campanaFiltro}": ${evaluacionesBase.length} evaluaciones`);
+        const campanaId =
+            Number(campanaFiltro);
+
+        if (
+            !Number.isInteger(campanaId) ||
+            campanaId <= 0
+        ) {
+            console.error(
+                '❌ campana_id inválido:',
+                campanaFiltro
+            );
+
+            return [];
+        }
+
+        evaluacionesBase =
+            evaluaciones.filter(
+                evaluacion =>
+                    Number(
+                        evaluacion.campana_id
+                    ) === campanaId
+            );
+
+        console.log(
+            `📌 Filtro campaña ` +
+            `${campanaCodigo} ` +
+            `[ID ${campanaId}]: ` +
+            `${evaluacionesBase.length} evaluaciones`
+        );
     }
 
-    const periodo = filtroPeriodoActual;
+    const periodo =
+        filtroPeriodoActual;
 
     // ======================================================
-    // MODO 1: "TODOS LOS DATOS" - Sin ningún filtro
+    // MODO 1: TODOS
+    // Mantener filtro de campaña
     // ======================================================
     if (periodo === 'todos') {
-        console.log('📊 Mostrando TODOS los datos históricos (sin filtros)');
-        return evaluaciones;
+        console.log(
+            '📊 Mostrando todos los datos ' +
+            'con filtro de campaña aplicado'
+        );
+
+        return evaluacionesBase;
     }
 
     // ======================================================
-    // MODO 2: PERÍODO "DÍA" - Rango de fechas específico
+    // MODO 2: DÍA
     // ======================================================
     if (periodo === 'dia') {
-        const fechaInicio = document.getElementById('filtroFechaInicioReportes')?.value;
-        const fechaFin = document.getElementById('filtroFechaFinReportes')?.value;
+        const fechaInicio =
+            document.getElementById(
+                'filtroFechaInicioReportes'
+            )?.value;
 
-        if (fechaInicio && fechaFin) {
-            console.log(`📅 Filtrando por rango de fechas: ${fechaInicio} → ${fechaFin}`);
-            const filtradas = filtrarEvaluacionesPorRangoFechas(evaluaciones, fechaInicio, fechaFin);
-            console.log(`   ✅ ${filtradas.length} evaluaciones en el rango`);
+        const fechaFin =
+            document.getElementById(
+                'filtroFechaFinReportes'
+            )?.value;
+
+        if (
+            fechaInicio &&
+            fechaFin
+        ) {
+            console.log(
+                `📅 Filtrando por rango de fechas: ` +
+                `${fechaInicio} → ${fechaFin}`
+            );
+
+            const filtradas =
+                filtrarEvaluacionesPorRangoFechas(
+                    evaluacionesBase,
+                    fechaInicio,
+                    fechaFin
+                );
+
+            console.log(
+                `   ✅ ${filtradas.length} ` +
+                `evaluaciones en el rango`
+            );
+
             return filtradas;
         }
 
-        console.log('⚠️ No hay fechas seleccionadas para el período "dia", devolviendo TODAS');
-        return evaluaciones;
+        console.log(
+            '⚠️ No hay fechas seleccionadas ' +
+            'para período "dia"; ' +
+            'se conserva filtro de campaña'
+        );
+
+        return evaluacionesBase;
     }
 
     // ======================================================
-    // MODO 3: PERÍODO "MES" - Mes específico
+    // MODO 3: MES
     // ======================================================
     if (periodo === 'mes') {
-        const mesSelect = document.getElementById('filtroMesSelect');
-        const mesVal = mesSelect?.value;
+        const mesSelect =
+            document.getElementById(
+                'filtroMesSelect'
+            );
+
+        const mesVal =
+            mesSelect?.value;
 
         if (mesVal) {
-            const [anio, mes] = mesVal.split('-');
-            console.log(`📅 Filtrando por mes: ${mes}/${anio}`);
-            const filtradas = filtrarEvaluacionesPorMesEspecifico(evaluaciones, parseInt(anio), parseInt(mes));
-            console.log(`   ✅ ${filtradas.length} evaluaciones en el mes`);
+            const [anio, mes] =
+                mesVal.split('-');
+
+            console.log(
+                `📅 Filtrando por mes: ` +
+                `${mes}/${anio}`
+            );
+
+            const filtradas =
+                filtrarEvaluacionesPorMesEspecifico(
+                    evaluacionesBase,
+                    parseInt(anio, 10),
+                    parseInt(mes, 10)
+                );
+
+            console.log(
+                `   ✅ ${filtradas.length} ` +
+                `evaluaciones en el mes`
+            );
+
             return filtradas;
         }
 
-        console.log('⚠️ No hay mes seleccionado para el período "mes", devolviendo TODAS');
-        return evaluaciones;
+        console.log(
+            '⚠️ No hay mes seleccionado; ' +
+            'se conserva filtro de campaña'
+        );
+
+        return evaluacionesBase;
     }
 
     // ======================================================
-    // MODO 4: PERÍODO "SEMANA" - Semana específica
+    // MODO 4: SEMANA
     // ======================================================
     if (periodo === 'semana') {
-        const anioSelect = document.getElementById('filtroSemanaAnio');
-        const semanaSelect = document.getElementById('filtroSemanaNumero');
+        const anioSelect =
+            document.getElementById(
+                'filtroSemanaAnio'
+            );
 
-        const anio = anioSelect?.value;
-        const semana = semanaSelect?.value;
+        const semanaSelect =
+            document.getElementById(
+                'filtroSemanaNumero'
+            );
 
-        if (anio && semana) {
-            console.log(`📅 Filtrando por semana: Semana ${semana} de ${anio}`);
-            const filtradas = filtrarEvaluacionesPorSemana(evaluaciones, parseInt(anio), parseInt(semana));
-            console.log(`   ✅ ${filtradas.length} evaluaciones en la semana`);
+        const anio =
+            anioSelect?.value;
+
+        const semana =
+            semanaSelect?.value;
+
+        if (
+            anio &&
+            semana
+        ) {
+            console.log(
+                `📅 Filtrando por semana: ` +
+                `Semana ${semana} de ${anio}`
+            );
+
+            const filtradas =
+                filtrarEvaluacionesPorSemana(
+                    evaluacionesBase,
+                    parseInt(anio, 10),
+                    parseInt(semana, 10)
+                );
+
+            console.log(
+                `   ✅ ${filtradas.length} ` +
+                `evaluaciones en la semana`
+            );
+
             return filtradas;
         }
 
-        console.log('⚠️ No hay semana seleccionada, devolviendo TODAS');
-        return evaluaciones;
+        console.log(
+            '⚠️ No hay semana seleccionada; ' +
+            'se conserva filtro de campaña'
+        );
+
+        return evaluacionesBase;
     }
 
     // ======================================================
-    // MODO 5: PERÍODO "TRIMESTRE" - Trimestre específico
+    // MODO 5: TRIMESTRE
     // ======================================================
     if (periodo === 'trimestre') {
-        const trimSelect = document.getElementById('filtroTrimSelect');
-        const trimVal = trimSelect?.value;
+        const trimSelect =
+            document.getElementById(
+                'filtroTrimSelect'
+            );
+
+        const trimVal =
+            trimSelect?.value;
 
         if (trimVal) {
-            const [anio, q] = trimVal.split('-Q');
-            console.log(`📅 Filtrando por trimestre: Q${q} de ${anio}`);
-            const filtradas = filtrarEvaluacionesPorTrimestre(evaluaciones, parseInt(anio), parseInt(q));
-            console.log(`   ✅ ${filtradas.length} evaluaciones en el trimestre`);
+            const [anio, q] =
+                trimVal.split('-Q');
+
+            console.log(
+                `📅 Filtrando por trimestre: ` +
+                `Q${q} de ${anio}`
+            );
+
+            const filtradas =
+                filtrarEvaluacionesPorTrimestre(
+                    evaluacionesBase,
+                    parseInt(anio, 10),
+                    parseInt(q, 10)
+                );
+
+            console.log(
+                `   ✅ ${filtradas.length} ` +
+                `evaluaciones en el trimestre`
+            );
+
             return filtradas;
         }
 
-        console.log('⚠️ No hay trimestre seleccionado, devolviendo TODAS');
-        return evaluaciones;
+        console.log(
+            '⚠️ No hay trimestre seleccionado; ' +
+            'se conserva filtro de campaña'
+        );
+
+        return evaluacionesBase;
     }
 
     // ======================================================
-    // MODO 6: PERÍODO "AÑO" - Año específico
+    // MODO 6: AÑO
     // ======================================================
     if (periodo === 'anio') {
-        const anioSelect = document.getElementById('filtroAnioSelect');
-        const anioVal = anioSelect?.value;
+        const anioSelect =
+            document.getElementById(
+                'filtroAnioSelect'
+            );
+
+        const anioVal =
+            anioSelect?.value;
 
         if (anioVal) {
-            console.log(`📅 Filtrando por año: ${anioVal}`);
-            const filtradas = filtrarEvaluacionesPorAnio(evaluaciones, parseInt(anioVal));
-            console.log(`   ✅ ${filtradas.length} evaluaciones en el año`);
+            console.log(
+                `📅 Filtrando por año: ${anioVal}`
+            );
+
+            const filtradas =
+                filtrarEvaluacionesPorAnio(
+                    evaluacionesBase,
+                    parseInt(anioVal, 10)
+                );
+
+            console.log(
+                `   ✅ ${filtradas.length} ` +
+                `evaluaciones en el año`
+            );
+
             return filtradas;
         }
 
-        console.log('⚠️ No hay año seleccionado, devolviendo TODAS');
-        return evaluaciones;
+        console.log(
+            '⚠️ No hay año seleccionado; ' +
+            'se conserva filtro de campaña'
+        );
+
+        return evaluacionesBase;
     }
 
     // ======================================================
-    // MODO 7: PERÍODO "RANGO" - Rango de períodos (meses, trimestres, años, días)
+    // MODO 7: RANGO
     // ======================================================
     if (periodo === 'rango') {
-        const tipoRango = document.getElementById('filtroRangoTipo')?.value;
-        console.log(`📊 Filtrando por RANGO de tipo: ${tipoRango || 'no seleccionado'}`);
+        const tipoRango =
+            document.getElementById(
+                'filtroRangoTipo'
+            )?.value;
 
+        console.log(
+            `📊 Filtrando por RANGO de tipo: ` +
+            `${tipoRango || 'no seleccionado'}`
+        );
+
+        // ==================================================
+        // RANGO DE DÍAS
+        // ==================================================
         if (tipoRango === 'dia') {
-            const inicio = document.getElementById('filtroRangoDiaInicio')?.value;
-            const fin = document.getElementById('filtroRangoDiaFin')?.value;
-            if (inicio && fin) {
-                console.log(`   📅 Días: ${inicio} → ${fin}`);
-                const filtradas = filtrarEvaluacionesPorRangoFechas(evaluaciones, inicio, fin);
-                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de días`);
-                return filtradas;
-            }
-        } else if (tipoRango === 'mes') {
-            const inicio = document.getElementById('filtroRangoMesInicio')?.value;
-            const fin = document.getElementById('filtroRangoMesFin')?.value;
-            if (inicio && fin) {
-                const [anioI, mesI] = inicio.split('-');
-                const [anioF, mesF] = fin.split('-');
-                console.log(`   📅 Meses: ${mesI}/${anioI} → ${mesF}/${anioF}`);
-                const filtradas = filtrarEvaluacionesPorRangoMeses(evaluaciones, parseInt(anioI), parseInt(mesI), parseInt(anioF), parseInt(mesF));
-                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de meses`);
-                return filtradas;
-            }
-        } else if (tipoRango === 'trimestre') {
-            const inicio = document.getElementById('filtroRangoTrimInicio')?.value;
-            const fin = document.getElementById('filtroRangoTrimFin')?.value;
-            if (inicio && fin) {
-                const [anioI, qI] = inicio.split('-Q');
-                const [anioF, qF] = fin.split('-Q');
-                console.log(`   📅 Trimestres: Q${qI} ${anioI} → Q${qF} ${anioF}`);
-                const filtradas = filtrarEvaluacionesPorRangoTrimestres(evaluaciones, parseInt(anioI), parseInt(qI), parseInt(anioF), parseInt(qF));
-                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de trimestres`);
-                return filtradas;
-            }
-        } else if (tipoRango === 'anio') {
-            const inicio = document.getElementById('filtroRangoAnioInicio')?.value;
-            const fin = document.getElementById('filtroRangoAnioFin')?.value;
-            if (inicio && fin) {
-                console.log(`   📅 Años: ${inicio} → ${fin}`);
-                const filtradas = filtrarEvaluacionesPorRangoAnios(evaluaciones, parseInt(inicio), parseInt(fin));
-                console.log(`   ✅ ${filtradas.length} evaluaciones en el rango de años`);
+            const inicio =
+                document.getElementById(
+                    'filtroRangoDiaInicio'
+                )?.value;
+
+            const fin =
+                document.getElementById(
+                    'filtroRangoDiaFin'
+                )?.value;
+
+            if (
+                inicio &&
+                fin
+            ) {
+                console.log(
+                    `   📅 Días: ` +
+                    `${inicio} → ${fin}`
+                );
+
+                const filtradas =
+                    filtrarEvaluacionesPorRangoFechas(
+                        evaluacionesBase,
+                        inicio,
+                        fin
+                    );
+
+                console.log(
+                    `   ✅ ${filtradas.length} ` +
+                    `evaluaciones en rango de días`
+                );
+
                 return filtradas;
             }
         }
 
-        console.log('⚠️ No hay rango seleccionado o tipo no válido, devolviendo TODAS');
-        return evaluaciones;
+        // ==================================================
+        // RANGO DE MESES
+        // ==================================================
+        else if (tipoRango === 'mes') {
+            const inicio =
+                document.getElementById(
+                    'filtroRangoMesInicio'
+                )?.value;
+
+            const fin =
+                document.getElementById(
+                    'filtroRangoMesFin'
+                )?.value;
+
+            if (
+                inicio &&
+                fin
+            ) {
+                const [anioI, mesI] =
+                    inicio.split('-');
+
+                const [anioF, mesF] =
+                    fin.split('-');
+
+                console.log(
+                    `   📅 Meses: ` +
+                    `${mesI}/${anioI} → ` +
+                    `${mesF}/${anioF}`
+                );
+
+                const filtradas =
+                    filtrarEvaluacionesPorRangoMeses(
+                        evaluacionesBase,
+                        parseInt(anioI, 10),
+                        parseInt(mesI, 10),
+                        parseInt(anioF, 10),
+                        parseInt(mesF, 10)
+                    );
+
+                console.log(
+                    `   ✅ ${filtradas.length} ` +
+                    `evaluaciones en rango de meses`
+                );
+
+                return filtradas;
+            }
+        }
+
+        // ==================================================
+        // RANGO DE TRIMESTRES
+        // ==================================================
+        else if (
+            tipoRango ===
+            'trimestre'
+        ) {
+            const inicio =
+                document.getElementById(
+                    'filtroRangoTrimInicio'
+                )?.value;
+
+            const fin =
+                document.getElementById(
+                    'filtroRangoTrimFin'
+                )?.value;
+
+            if (
+                inicio &&
+                fin
+            ) {
+                const [anioI, qI] =
+                    inicio.split('-Q');
+
+                const [anioF, qF] =
+                    fin.split('-Q');
+
+                console.log(
+                    `   📅 Trimestres: ` +
+                    `Q${qI} ${anioI} → ` +
+                    `Q${qF} ${anioF}`
+                );
+
+                const filtradas =
+                    filtrarEvaluacionesPorRangoTrimestres(
+                        evaluacionesBase,
+                        parseInt(anioI, 10),
+                        parseInt(qI, 10),
+                        parseInt(anioF, 10),
+                        parseInt(qF, 10)
+                    );
+
+                console.log(
+                    `   ✅ ${filtradas.length} ` +
+                    `evaluaciones en rango ` +
+                    `de trimestres`
+                );
+
+                return filtradas;
+            }
+        }
+
+        // ==================================================
+        // RANGO DE AÑOS
+        // ==================================================
+        else if (tipoRango === 'anio') {
+            const inicio =
+                document.getElementById(
+                    'filtroRangoAnioInicio'
+                )?.value;
+
+            const fin =
+                document.getElementById(
+                    'filtroRangoAnioFin'
+                )?.value;
+
+            if (
+                inicio &&
+                fin
+            ) {
+                console.log(
+                    `   📅 Años: ` +
+                    `${inicio} → ${fin}`
+                );
+
+                const filtradas =
+                    filtrarEvaluacionesPorRangoAnios(
+                        evaluacionesBase,
+                        parseInt(inicio, 10),
+                        parseInt(fin, 10)
+                    );
+
+                console.log(
+                    `   ✅ ${filtradas.length} ` +
+                    `evaluaciones en rango de años`
+                );
+
+                return filtradas;
+            }
+        }
+
+        console.log(
+            '⚠️ No hay rango seleccionado ' +
+            'o tipo no válido; ' +
+            'se conserva filtro de campaña'
+        );
+
+        return evaluacionesBase;
     }
 
     // ======================================================
-    // MODO 8: PERÍODO "MÚLTIPLES" - Múltiples períodos seleccionados
+    // MODO 8: MÚLTIPLES
     // ======================================================
     if (periodo === 'multiples') {
-        const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
-        console.log(`📊 Filtrando por MÚLTIPLES de tipo: ${tipoMultiples || 'no seleccionado'}`);
+        const tipoMultiples =
+            document.getElementById(
+                'filtroMultiplesTipo'
+            )?.value;
 
-        if (filtroMultiples && filtroMultiples.length > 0) {
-            console.log(`   📋 Elementos seleccionados: ${filtroMultiples.length}`);
+        console.log(
+            `📊 Filtrando por MÚLTIPLES ` +
+            `de tipo: ` +
+            `${tipoMultiples || 'no seleccionado'}`
+        );
 
+        if (
+            filtroMultiples &&
+            filtroMultiples.length > 0
+        ) {
+            console.log(
+                `   📋 Elementos seleccionados: ` +
+                `${filtroMultiples.length}`
+            );
+
+            // ==============================================
+            // DÍAS
+            // ==============================================
             if (tipoMultiples === 'dia') {
-                const filtradas = filtrarEvaluacionesPorMultiplesDias(evaluaciones, filtroMultiples);
-                console.log(`   ✅ ${filtradas.length} evaluaciones en los días seleccionados`);
+                const filtradas =
+                    filtrarEvaluacionesPorMultiplesDias(
+                        evaluacionesBase,
+                        filtroMultiples
+                    );
+
+                console.log(
+                    `   ✅ ${filtradas.length} ` +
+                    `evaluaciones en días seleccionados`
+                );
+
                 return filtradas;
-            } else if (tipoMultiples === 'mes') {
-                const filtradas = filtrarEvaluacionesPorMultiplesMeses(evaluaciones, filtroMultiples);
-                console.log(`   ✅ ${filtradas.length} evaluaciones en los meses seleccionados`);
+            }
+
+            // ==============================================
+            // MESES
+            // ==============================================
+            if (tipoMultiples === 'mes') {
+                const filtradas =
+                    filtrarEvaluacionesPorMultiplesMeses(
+                        evaluacionesBase,
+                        filtroMultiples
+                    );
+
+                console.log(
+                    `   ✅ ${filtradas.length} ` +
+                    `evaluaciones en meses seleccionados`
+                );
+
                 return filtradas;
-            } else if (tipoMultiples === 'trimestre') {
-                const filtradas = filtrarEvaluacionesPorMultiplesTrimestres(evaluaciones, filtroMultiples);
-                console.log(`   ✅ ${filtradas.length} evaluaciones en los trimestres seleccionados`);
+            }
+
+            // ==============================================
+            // TRIMESTRES
+            // ==============================================
+            if (
+                tipoMultiples ===
+                'trimestre'
+            ) {
+                const filtradas =
+                    filtrarEvaluacionesPorMultiplesTrimestres(
+                        evaluacionesBase,
+                        filtroMultiples
+                    );
+
+                console.log(
+                    `   ✅ ${filtradas.length} ` +
+                    `evaluaciones en ` +
+                    `trimestres seleccionados`
+                );
+
                 return filtradas;
-            } else if (tipoMultiples === 'anio') {
-                const filtradas = filtrarEvaluacionesPorMultiplesAnios(evaluaciones, filtroMultiples);
-                console.log(`   ✅ ${filtradas.length} evaluaciones en los años seleccionados`);
+            }
+
+            // ==============================================
+            // AÑOS
+            // ==============================================
+            if (tipoMultiples === 'anio') {
+                const filtradas =
+                    filtrarEvaluacionesPorMultiplesAnios(
+                        evaluacionesBase,
+                        filtroMultiples
+                    );
+
+                console.log(
+                    `   ✅ ${filtradas.length} ` +
+                    `evaluaciones en años seleccionados`
+                );
+
                 return filtradas;
             }
         }
 
-        console.log('⚠️ No hay elementos múltiples seleccionados, devolviendo TODAS');
-        return evaluaciones;
+        console.log(
+            '⚠️ No hay elementos múltiples ' +
+            'seleccionados; ' +
+            'se conserva filtro de campaña'
+        );
+
+        return evaluacionesBase;
     }
 
     // ======================================================
-    // CASO POR DEFECTO: Si ningún filtro coincide, devolver TODAS
+    // CASO POR DEFECTO
     // ======================================================
-    console.log(`⚠️ Período "${periodo}" no reconocido, devolviendo TODAS las evaluaciones`);
-    return evaluaciones;
+    console.log(
+        `⚠️ Período "${periodo}" no reconocido; ` +
+        `se devuelve la base con campaña aplicada`
+    );
+
+    return evaluacionesBase;
 }
 
 // Filtrar por semana específica
@@ -17697,96 +18946,282 @@ let todasEvaluacionesCacheGlobal = null;
 let ultimaCargaEvaluacionesGlobal = null;
 
 // ===== FUNCIÓN CORREGIDA: agruparEvaluacionesEnCiclos =====
-async function agruparEvaluacionesEnCiclos(agente) {
-    console.log(`🔄 Agrupando evaluaciones de ${agente} en ciclos...`);
+async function agruparEvaluacionesEnCiclos(
+    agente,
+    evaluacionesFuente = null,
+    contextoCache = 'global'
+) {
+    console.log(
+        `🔄 Agrupando evaluaciones de ${agente} en ciclos [${contextoCache}]...`
+    );
 
     const ahora = Date.now();
-    const cacheEntry = ciclosCacheGlobal.get(agente);
-    if (cacheEntry && (ahora - cacheEntry.timestamp) < CACHE_DURACION_CICLOS) {
-        console.log(`✅ Usando caché de ciclos para ${agente}`);
+
+    const cacheKey =
+        `${agente}|${contextoCache}`;
+
+    const cacheEntry =
+        ciclosCacheGlobal.get(cacheKey);
+
+    if (
+        cacheEntry &&
+        (
+            ahora -
+            cacheEntry.timestamp
+        ) < CACHE_DURACION_CICLOS
+    ) {
+        console.log(
+            `✅ Usando caché de ciclos: ${cacheKey}`
+        );
+
         return cacheEntry.ciclos;
     }
 
     try {
-        const evaluacionesAgente = (window.evaluacionesGlobales || []).filter(e => e.agente === agente);
+        const fuente =
+            Array.isArray(evaluacionesFuente)
+                ? evaluacionesFuente
+                : (
+                    window.evaluacionesGlobales ||
+                    []
+                );
 
-        if (!evaluacionesAgente || evaluacionesAgente.length === 0) {
-            ciclosCacheGlobal.set(agente, { ciclos: [], timestamp: ahora });
+        const evaluacionesAgente =
+            fuente.filter(
+                e =>
+                    e.agente === agente
+            );
+
+        if (
+            !evaluacionesAgente ||
+            evaluacionesAgente.length === 0
+        ) {
+            ciclosCacheGlobal.set(
+                cacheKey,
+                {
+                    ciclos: [],
+                    timestamp: ahora
+                }
+            );
+
             return [];
         }
 
-        // ======================================================
-        // 🔴 CORREGIDO: Ordenar por fecha (NO fecha_descarga)
-        // ======================================================
-        evaluacionesAgente.sort((a, b) => {
-            const fechaA = obtenerFechaEvaluacion(a);
-            const fechaB = obtenerFechaEvaluacion(b);
-            if (!fechaA && !fechaB) return 0;
-            if (!fechaA) return 1;
-            if (!fechaB) return -1;
-            return fechaA - fechaB;
-        });
+        const evaluacionesOrdenadas =
+            [...evaluacionesAgente];
+
+        evaluacionesOrdenadas.sort(
+            (a, b) => {
+                const fechaA =
+                    obtenerFechaEvaluacion(a);
+
+                const fechaB =
+                    obtenerFechaEvaluacion(b);
+
+                if (!fechaA && !fechaB) {
+                    return 0;
+                }
+
+                if (!fechaA) {
+                    return 1;
+                }
+
+                if (!fechaB) {
+                    return -1;
+                }
+
+                return fechaA - fechaB;
+            }
+        );
 
         const TAMANO_CICLO = 5;
         const ciclos = [];
 
-        for (let i = 0; i < evaluacionesAgente.length; i += TAMANO_CICLO) {
-            const evaluacionesCiclo = evaluacionesAgente.slice(i, i + TAMANO_CICLO);
-            const numeroCiclo = Math.floor(i / TAMANO_CICLO) + 1;
+        for (
+            let i = 0;
+            i < evaluacionesOrdenadas.length;
+            i += TAMANO_CICLO
+        ) {
+            const evaluacionesCiclo =
+                evaluacionesOrdenadas.slice(
+                    i,
+                    i + TAMANO_CICLO
+                );
 
-            let sumaNotas = 0, sumaENC = 0, sumaECUF = 0, sumaECN = 0;
-            let fechas = [];
+            const numeroCiclo =
+                Math.floor(
+                    i / TAMANO_CICLO
+                ) + 1;
 
-            for (const evalItem of evaluacionesCiclo) {
-                sumaNotas += evalItem.notaFinal || 0;
-                sumaENC += evalItem.totalENC || 0;
-                sumaECUF += evalItem.totalECUF || 0;
-                sumaECN += evalItem.totalECN || 0;
+            let sumaNotas = 0;
+            let sumaENC = 0;
+            let sumaECUF = 0;
+            let sumaECN = 0;
 
-                // 🔴 CORREGIDO: Usar fecha (NO fecha_descarga)
-                const fecha = obtenerFechaEvaluacion(evalItem);
+            const fechas = [];
+
+            for (
+                const evalItem of evaluacionesCiclo
+            ) {
+                sumaNotas += Number(
+                    evalItem.notaFinal ??
+                    evalItem.nota_final ??
+                    0
+                );
+
+                sumaENC += Number(
+                    evalItem.totalENC ??
+                    evalItem.total_enc ??
+                    0
+                );
+
+                sumaECUF += Number(
+                    evalItem.totalECUF ??
+                    evalItem.total_ecuf ??
+                    0
+                );
+
+                sumaECN += Number(
+                    evalItem.totalECN ??
+                    evalItem.total_ecn ??
+                    0
+                );
+
+                const fecha =
+                    obtenerFechaEvaluacion(
+                        evalItem
+                    );
+
                 if (fecha) {
                     fechas.push(fecha);
                 }
             }
 
-            const totalEvals = evaluacionesCiclo.length;
-            const promedioFinal = totalEvals > 0 ? (sumaNotas / totalEvals).toFixed(1) : 0;
-            const promedioENC = totalEvals > 0 ? (sumaENC / totalEvals).toFixed(1) : 0;
-            const promedioECUF = totalEvals > 0 ? (sumaECUF / totalEvals).toFixed(1) : 0;
-            const promedioECN = totalEvals > 0 ? (sumaECN / totalEvals).toFixed(1) : 0;
+            const totalEvals =
+                evaluacionesCiclo.length;
 
-            // 🔴 CORREGIDO: Usar fecha (NO fecha_descarga)
-            fechas.sort((a, b) => a - b);
+            const promedioFinal =
+                totalEvals > 0
+                    ? (
+                        sumaNotas /
+                        totalEvals
+                    ).toFixed(1)
+                    : 0;
 
-            const fechaInicio = fechas.length > 0 ? formatearFechaParaDocumento(fechas[0]) : 'N/A';
-            const fechaFin = fechas.length > 0 ? formatearFechaParaDocumento(fechas[fechas.length - 1]) : 'N/A';
+            const promedioENC =
+                totalEvals > 0
+                    ? (
+                        sumaENC /
+                        totalEvals
+                    ).toFixed(1)
+                    : 0;
 
-            const resultadoCuartil = await obtenerCuartilPorNota(parseFloat(promedioFinal));
-            const cuartil = resultadoCuartil.cuartil;
+            const promedioECUF =
+                totalEvals > 0
+                    ? (
+                        sumaECUF /
+                        totalEvals
+                    ).toFixed(1)
+                    : 0;
+
+            const promedioECN =
+                totalEvals > 0
+                    ? (
+                        sumaECN /
+                        totalEvals
+                    ).toFixed(1)
+                    : 0;
+
+            fechas.sort(
+                (a, b) =>
+                    a - b
+            );
+
+            const fechaInicio =
+                fechas.length > 0
+                    ? formatearFechaParaDocumento(
+                        fechas[0]
+                    )
+                    : 'N/A';
+
+            const fechaFin =
+                fechas.length > 0
+                    ? formatearFechaParaDocumento(
+                        fechas[
+                            fechas.length - 1
+                        ]
+                    )
+                    : 'N/A';
+
+            const resultadoCuartil =
+                await obtenerCuartilPorNota(
+                    parseFloat(
+                        promedioFinal
+                    )
+                );
 
             ciclos.push({
-                numero: numeroCiclo,
-                fechaInicio: fechaInicio,
-                fechaFin: fechaFin,
-                totalEvaluaciones: totalEvals,
-                promedio: parseFloat(promedioFinal),
-                promedioENC: parseFloat(promedioENC),
-                promedioECUF: parseFloat(promedioECUF),
-                promedioECN: parseFloat(promedioECN),
-                cuartil: cuartil,
-                evaluaciones: evaluacionesCiclo,
-                esCompleto: totalEvals === TAMANO_CICLO
+                numero:
+                    numeroCiclo,
+
+                fechaInicio,
+                fechaFin,
+
+                totalEvaluaciones:
+                    totalEvals,
+
+                promedio:
+                    parseFloat(
+                        promedioFinal
+                    ),
+
+                promedioENC:
+                    parseFloat(
+                        promedioENC
+                    ),
+
+                promedioECUF:
+                    parseFloat(
+                        promedioECUF
+                    ),
+
+                promedioECN:
+                    parseFloat(
+                        promedioECN
+                    ),
+
+                cuartil:
+                    resultadoCuartil.cuartil,
+
+                evaluaciones:
+                    evaluacionesCiclo,
+
+                esCompleto:
+                    totalEvals ===
+                    TAMANO_CICLO
             });
         }
 
-        ciclosCacheGlobal.set(agente, { ciclos: ciclos, timestamp: ahora });
+        ciclosCacheGlobal.set(
+            cacheKey,
+            {
+                ciclos,
+                timestamp: ahora
+            }
+        );
 
-        console.log(`✅ ${ciclos.length} ciclos calculados para ${agente}`);
+        console.log(
+            `✅ ${ciclos.length} ciclos calculados para ${agente} [${contextoCache}]`
+        );
+
         return ciclos;
 
     } catch (error) {
-        console.error(`Error agrupando evaluaciones de ${agente}:`, error);
+        console.error(
+            `❌ Error agrupando evaluaciones de ${agente}:`,
+            error
+        );
+
         return [];
     }
 }
@@ -17795,8 +19230,25 @@ async function agruparEvaluacionesEnCiclos(agente) {
 
 //  ===== 22. INICIO FUNCIÓN: invalidarCacheCiclos ========================
 function invalidarCacheCiclos() {
-    cacheCiclos.clear();
-    console.log('🗑️ Caché de ciclos invalidado');
+    if (
+        typeof ciclosCacheGlobal !==
+        'undefined' &&
+        ciclosCacheGlobal?.clear
+    ) {
+        ciclosCacheGlobal.clear();
+    }
+
+    if (
+        typeof cacheCiclos !==
+        'undefined' &&
+        cacheCiclos?.clear
+    ) {
+        cacheCiclos.clear();
+    }
+
+    console.log(
+        '🗑️ Cachés de ciclos invalidados'
+    );
 }
 // ===== FIN FUNCIÓN: invalidarCacheCiclos ================================
 
@@ -23668,7 +25120,7 @@ function generarDocumentoHTML(data) {
         </div>
 
         <div class="footer">
-            Documento generado automáticamente por Sistema MECA - © Auditoría Calidad Cobranzas<br>
+            Documento generado automáticamente por Sistema MECA - © Auditoría de Calidad<br>
             Este informe debe ser enviado al área de Operaciones para su gestión.
         </div>
     </div>
@@ -23816,7 +25268,7 @@ generarDocumentoTexto = function (data) {
 ║  📅 EMITIDO: ${padRight(fechaEmision, 53)}║
 ║  👤 GESTOR: ${padRight(agente, 53)}║
 ║  📌 CAMPAÑA: ${padRight(campanaPrincipal, 52)}║
-║  👤 EMITIDO POR: Mesa Calidad Cobranzas${' '.repeat(29)}║
+║  👤 EMITIDO POR: Mesa de Calidad${' '.repeat(29)}║
 ║                                                                               ║
 ╠═══════════════════════════════════════════════════════════════════════════════╣
 ║ 1. RESULTADOS DE EVALUACIONES                                                 ║
@@ -23849,7 +25301,7 @@ generarDocumentoTexto = function (data) {
 ║                                                                               ║
 ╠═══════════════════════════════════════════════════════════════════════════════╣
 ║  Documento generado automáticamente por Sistema MECA                          ║
-║  © Auditoría Calidad Cobranzas - No requiere respuesta del gestor              ║
+║  © Auditoría de Calidad - No requiere respuesta del gestor              ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
     `;
 };
@@ -25613,30 +27065,117 @@ async function inicializarGestionEscuchas() {
     }
 
     // 🔴 NUEVO: Filtro por campaña
-    const filtroCampana = document.getElementById('filtroCampanaEscuchas');
-    if (filtroCampana) {
-        const nuevoFiltroCampana = filtroCampana.cloneNode(true);
-        filtroCampana.parentNode.replaceChild(nuevoFiltroCampana, filtroCampana);
-        document.getElementById('filtroCampanaEscuchas').addEventListener('change', function () {
-            console.log('📌 Filtro campaña cambiado a:', this.value);
-            aplicarFiltrosEscuchas();
-        });
-        
-        // 🔴 Cargar campañas en el filtro
+    // ======================================================
+    // F11.5.9 - FILTRO POR CAMPAÑA MEDIANTE campana_id
+    // ======================================================
+    const filtroCampanaOriginal =
+        document.getElementById('filtroCampanaEscuchas');
+
+    if (filtroCampanaOriginal) {
+
+        // Eliminar listeners anteriores de forma segura
+        const filtroCampana =
+            filtroCampanaOriginal.cloneNode(true);
+
+        filtroCampanaOriginal.parentNode.replaceChild(
+            filtroCampana,
+            filtroCampanaOriginal
+        );
+
+        // ==================================================
+        // EVENTO
+        // ==================================================
+        filtroCampana.addEventListener(
+            'change',
+            function () {
+
+                console.log(
+                    '📌 Filtro campaña cambiado a:',
+                    this.value
+                );
+
+                aplicarFiltrosEscuchas();
+            }
+        );
+
+        // ==================================================
+        // CARGAR CAMPAÑAS
+        // ==================================================
         try {
-            const campanas = await obtenerCampanas();
-            const valorActual = filtroCampana.value;
-            filtroCampana.innerHTML = '<option value="">📊 Todas las campañas</option>';
-            const activas = campanas.filter(c => c.activa);
+
+            const campanas =
+                await obtenerCampanas();
+
+            const valorActual =
+                String(
+                    filtroCampana.value || ''
+                );
+
+            filtroCampana.innerHTML =
+                '<option value="">' +
+                '📊 Todas las campañas' +
+                '</option>';
+
+            const activas =
+                Array.isArray(campanas)
+                    ? campanas.filter(
+                        c => c.activa
+                    )
+                    : [];
+
             activas.forEach(c => {
-                filtroCampana.innerHTML += `<option value="${escapeHtml(c.codigo)}" ${valorActual === c.codigo ? 'selected' : ''}>
-                    ${escapeHtml(c.codigo)} - ${escapeHtml(c.descripcion)}
-                </option>`;
+
+                const option =
+                    document.createElement(
+                        'option'
+                    );
+
+                option.value =
+                    String(c.id);
+
+                option.dataset.codigo =
+                    String(
+                        c.codigo || ''
+                    );
+
+                option.dataset.descripcion =
+                    String(
+                        c.descripcion || ''
+                    );
+
+                option.textContent =
+                    `${c.codigo} - ${c.descripcion}`;
+
+                if (
+                    valorActual ===
+                    String(c.id)
+                ) {
+                    option.selected = true;
+                }
+
+                filtroCampana.appendChild(
+                    option
+                );
             });
-            console.log(`✅ ${activas.length} campañas cargadas en filtro de escuchas`);
+
+            console.log(
+                `✅ ${activas.length} campañas ` +
+                'cargadas en filtro de escuchas ' +
+                'usando campana_id'
+            );
+
         } catch (error) {
-            console.error('Error cargando campañas en filtro de escuchas:', error);
-            filtroCampana.innerHTML = '<option value="">📊 Todas las campañas</option><option value="">⚠️ Error</option>';
+
+            console.error(
+                '❌ Error cargando campañas ' +
+                'en filtro de escuchas:',
+                error
+            );
+
+            filtroCampana.innerHTML =
+                '<option value="">' +
+                '📊 Todas las campañas' +
+                '</option>';
         }
     }
 
@@ -30357,9 +31896,22 @@ function aplicarFiltrosEscuchas() {
     }
 
     // 🔴 NUEVO: FILTRO POR CAMPAÑA
+    // F11.5.9: filtro canónico por campana_id
     if (filtroCampana) {
-        filtradas = filtradas.filter(a => (a.campana || a.campana_codigo || '') === filtroCampana);
-        console.log(`   📌 Filtro campaña "${filtroCampana}": ${filtradas.length} asignaciones`);
+        const campanaId = Number(filtroCampana);
+
+        if (Number.isInteger(campanaId) && campanaId > 0) {
+            filtradas = filtradas.filter(
+                a => Number(a.campana_id) === campanaId
+            );
+
+            console.log(
+                `   📌 Filtro campana_id=${campanaId}: ${filtradas.length} asignaciones`
+            );
+        } else {
+            console.warn('⚠️ campana_id inválido en filtro de escuchas:', filtroCampana);
+            filtradas = [];
+        }
     }
 
     if (filtroLote && filtroLote !== 'activo' && filtroLote !== 'todos') {
@@ -38798,9 +40350,106 @@ async function cargarMesesInformes() {
 
 // =============================CIERRE BLOQUE 13==========================================
 
+async function normalizarFiltroCampanaGP() {
+    const select =
+        document.getElementById('filtroCampanaGP');
+
+    if (!select) {
+        return 'todos';
+    }
+
+    try {
+        const campanas =
+            await obtenerCampanas();
+
+        const activas =
+            Array.isArray(campanas)
+                ? campanas.filter(c => c.activa)
+                : [];
+
+        const valorAnterior =
+            String(select.value || 'todos');
+
+        let idSeleccionado = 'todos';
+
+        // Compatibilidad con selector antiguo:
+        // T / ST / F
+        if (valorAnterior !== 'todos') {
+
+            if (/^\d+$/.test(valorAnterior)) {
+                idSeleccionado =
+                    valorAnterior;
+
+            } else {
+                const encontrada =
+                    activas.find(
+                        c =>
+                            String(c.codigo) ===
+                            valorAnterior
+                    );
+
+                if (encontrada) {
+                    idSeleccionado =
+                        String(encontrada.id);
+                }
+            }
+        }
+
+        select.innerHTML =
+            '<option value="todos">' +
+            '📊 Todas las campañas' +
+            '</option>';
+
+        activas.forEach(campana => {
+            const option =
+                document.createElement('option');
+
+            option.value =
+                String(campana.id);
+
+            option.dataset.codigo =
+                campana.codigo;
+
+            option.dataset.descripcion =
+                campana.descripcion || '';
+
+            option.textContent =
+                `${campana.codigo} - ${campana.descripcion}`;
+
+            select.appendChild(option);
+        });
+
+        const existeValor =
+            [...select.options].some(
+                o =>
+                    o.value ===
+                    idSeleccionado
+            );
+
+        select.value =
+            existeValor
+                ? idSeleccionado
+                : 'todos';
+
+        console.log(
+            '✅ filtroCampanaGP migrado a campana_id:',
+            select.value
+        );
+
+        return select.value;
+
+    } catch (error) {
+        console.error(
+            '❌ Error normalizando filtroCampanaGP:',
+            error
+        );
+
+        return 'todos';
+    }
+}
 
 // ======================================================
-// FUNCIÓN COMPLETA: cargarGestionPersonasGP (CORREGIDA)
+// FUNCIÓN COMPLETA: cargarGestionPersonasGP (RESTAURADA)
 // ======================================================
 
 async function cargarGestionPersonasGP() {
@@ -38819,7 +40468,58 @@ async function cargarGestionPersonasGP() {
 
         await cargarDatosPDA();
         await cargarAgentes();
+        await normalizarFiltroCampanaGP();
 
+        const selectCampana =
+            document.getElementById(
+                'filtroCampanaGP'
+            );
+
+        const campanaFiltro =
+            selectCampana?.value ||
+            'todos';
+
+        const opcionCampana =
+            selectCampana
+                ?.selectedOptions?.[0];
+
+        const campanaCodigo =
+            opcionCampana
+                ?.dataset?.codigo ||
+            'todos';
+
+        let evaluacionesBase =
+            evaluaciones;
+
+        if (
+            campanaFiltro !==
+            'todos'
+        ) {
+            const campanaId =
+                Number(
+                    campanaFiltro
+                );
+
+            evaluacionesBase =
+                evaluaciones.filter(
+                    e =>
+                        Number(
+                            e.campana_id
+                        ) ===
+                        campanaId
+                );
+
+            console.log(
+                `📌 Performance campaña ${campanaCodigo} ` +
+                `[ID ${campanaId}]: ` +
+                `${evaluacionesBase.length} evaluaciones`
+            );
+        }
+
+        const contextoCacheGP =
+            campanaFiltro === 'todos'
+                ? 'GP:todos'
+                : `GP:campana:${campanaFiltro}`;                
         const selectMes = document.getElementById('filtroMesGP');
         let mesFiltro = 'todos';
         if (selectMes) {
@@ -38876,7 +40576,8 @@ async function cargarGestionPersonasGP() {
         }
 
         // 🔴 Obtener TODAS las evaluaciones (sin filtro de mes) para el ranking
-        const ranking = await construirRankingAgentes(evaluaciones);
+        const ranking = 
+        await construirRankingAgentes(evaluacionesBase);
 
         const liderPorAgente = {};
         const ubicacionPorAgente = {};
@@ -38889,7 +40590,7 @@ async function cargarGestionPersonasGP() {
         // 🔴 NUEVO: Recolectar campañas por gestor
         // ======================================================
         const campanasPorGestor = {};
-        for (const evalItem of evaluaciones) {
+        for (const evalItem of evaluacionesBase) {
             const agente = evalItem.agente;
             const campana = evalItem.campana || 'Sin campaña';
             if (!campanasPorGestor[agente]) {
@@ -38905,7 +40606,10 @@ async function cargarGestionPersonasGP() {
         for (const gestor of ranking) {
             const nombre = gestor.agente;
 
-            const todasEvaluacionesAgente = evaluaciones.filter(e => e.agente === nombre);
+            const todasEvaluacionesAgente =
+                evaluacionesBase.filter(
+                    e => e.agente === nombre
+                );
 
             if (mesFiltro !== 'todos') {
                 const [anioFiltro, mesFiltroNum] = mesFiltro.split('-');
@@ -38923,7 +40627,12 @@ async function cargarGestionPersonasGP() {
                 if (!tieneEvalMes) continue;
             }
 
-            const ciclos = await agruparEvaluacionesEnCiclos(nombre);
+            const ciclos =
+            await agruparEvaluacionesEnCiclos(
+                nombre,
+                evaluacionesBase,
+                contextoCacheGP
+            );
             const ciclosCompletos = ciclos.filter(c => c.esCompleto);
 
             // 🔴 OBTENER CAMPAÑAS DEL GESTOR
@@ -39173,31 +40882,7 @@ async function cargarFiltrosGestionPersonasGP() {
     // ======================================================
     // 🔴 NUEVO: Cargar campañas en el filtro
     // ======================================================
-    const selectCampana = document.getElementById('filtroCampanaGP');
-    if (selectCampana) {
-        try {
-            const campanas = await obtenerCampanas();
-            const valorActual = selectCampana.value;
-            
-            selectCampana.innerHTML = '<option value="todos">📊 Todas las campañas</option>';
-            const activas = campanas.filter(c => c.activa);
-            
-            if (activas.length === 0) {
-                selectCampana.innerHTML += '<option value="todos" selected>📊 No hay campañas activas</option>';
-            } else {
-                activas.forEach(c => {
-                    const selected = (valorActual === c.codigo) ? 'selected' : '';
-                    selectCampana.innerHTML += `<option value="${escapeHtml(c.codigo)}" ${selected}>
-                        ${escapeHtml(c.codigo)} - ${escapeHtml(c.descripcion)}
-                    </option>`;
-                });
-            }
-            console.log(`✅ ${activas.length} campañas cargadas en filtro GP`);
-        } catch (error) {
-            console.error('Error cargando campañas en GP:', error);
-            selectCampana.innerHTML = '<option value="todos">⚠️ Error cargando campañas</option>';
-        }
-    }
+    await normalizarFiltroCampanaGP();
 
     // ======================================================
     // Cargar líderes
@@ -39300,64 +40985,226 @@ async function cargarMesesDisponiblesGP() {
 // Aplicar filtros (incluyendo mes)
 // ======================================================
 function aplicarFiltrosGestionPersonasGP() {
-    const filtroMes = document.getElementById('filtroMesGP')?.value || 'todos';
-    const filtroLider = document.getElementById('filtroLiderGP')?.value || 'todos';
-    const filtroUbicacion = document.getElementById('filtroUbicacionGP')?.value || 'todos';
-    const filtroCuartil = document.getElementById('filtroCuartilGP')?.value || 'todos';
-    // 🔴 NUEVO: Obtener filtro de campaña
-    const filtroCampana = document.getElementById('filtroCampanaGP')?.value || 'todos';
-    const busqueda = document.getElementById('buscarGestorGP')?.value.toLowerCase() || '';
+    const filtroMes =
+        document.getElementById(
+            'filtroMesGP'
+        )?.value ||
+        'todos';
 
-    mesFiltroGP = filtroMes;
+    const filtroLider =
+        document.getElementById(
+            'filtroLiderGP'
+        )?.value ||
+        'todos';
 
-    gestoresFiltradosGP = datosGestoresGP.filter(gestor => {
-        // Filtro por mes (basado en los ciclos del gestor)
-        if (filtroMes !== 'todos') {
-            const [anioFiltro, mesFiltroNum] = filtroMes.split('-');
-            const mesFiltro = mesFiltroNum.padStart(2, '0');
+    const filtroUbicacion =
+        document.getElementById(
+            'filtroUbicacionGP'
+        )?.value ||
+        'todos';
 
-            const tieneCicloEnMes = gestor.ciclos.some(ciclo => {
-                if (ciclo.fechaFin && ciclo.fechaFin !== 'N/A') {
-                    const partes = ciclo.fechaFin.split('/');
-                    if (partes.length === 3) {
-                        const anioCiclo = partes[2];
-                        const mesCiclo = partes[1].padStart(2, '0');
-                        return anioCiclo === anioFiltro && mesCiclo === mesFiltro;
+    const filtroCuartil =
+        document.getElementById(
+            'filtroCuartilGP'
+        )?.value ||
+        'todos';
+
+    const busqueda =
+        document.getElementById(
+            'buscarGestorGP'
+        )?.value
+            ?.toLowerCase()
+            .trim() ||
+        '';
+
+    mesFiltroGP =
+        filtroMes;
+
+    gestoresFiltradosGP =
+        datosGestoresGP.filter(
+            gestor => {
+                // ==========================================
+                // MES
+                // ==========================================
+                if (
+                    filtroMes !==
+                    'todos'
+                ) {
+                    const [
+                        anioFiltro,
+                        mesFiltroNum
+                    ] =
+                        filtroMes.split(
+                            '-'
+                        );
+
+                    const mesFiltro =
+                        mesFiltroNum
+                            .padStart(
+                                2,
+                                '0'
+                            );
+
+                    const tieneCicloEnMes =
+                        gestor.ciclos.some(
+                            ciclo => {
+                                if (
+                                    !ciclo.fechaFin ||
+                                    ciclo.fechaFin ===
+                                    'N/A'
+                                ) {
+                                    return false;
+                                }
+
+                                const partes =
+                                    ciclo.fechaFin
+                                        .split(
+                                            '/'
+                                        );
+
+                                if (
+                                    partes.length !==
+                                    3
+                                ) {
+                                    return false;
+                                }
+
+                                const anioCiclo =
+                                    partes[2];
+
+                                const mesCiclo =
+                                    partes[1]
+                                        .padStart(
+                                            2,
+                                            '0'
+                                        );
+
+                                return (
+                                    anioCiclo ===
+                                        anioFiltro &&
+                                    mesCiclo ===
+                                        mesFiltro
+                                );
+                            }
+                        );
+
+                    if (
+                        !tieneCicloEnMes
+                    ) {
+                        return false;
                     }
                 }
-                return false;
-            });
-            if (!tieneCicloEnMes) return false;
-        }
 
-        if (filtroLider !== 'todos' && gestor.lider !== filtroLider) return false;
-        if (filtroUbicacion !== 'todos' && gestor.ubicacion !== filtroUbicacion) return false;
-        if (filtroCuartil !== 'todos' && gestor.cuartilGlobal !== filtroCuartil) return false;
-        
-        // 🔴 NUEVO: Filtrar por campaña (buscar en el array de campañas del gestor)
-        if (filtroCampana !== 'todos') {
-            if (!gestor.campanas || !gestor.campanas.includes(filtroCampana)) {
-                return false;
+                // ==========================================
+                // LÍDER
+                // ==========================================
+                if (
+                    filtroLider !==
+                    'todos' &&
+                    gestor.lider !==
+                    filtroLider
+                ) {
+                    return false;
+                }
+
+                // ==========================================
+                // UBICACIÓN
+                // ==========================================
+                if (
+                    filtroUbicacion !==
+                    'todos' &&
+                    gestor.ubicacion !==
+                    filtroUbicacion
+                ) {
+                    return false;
+                }
+
+                // ==========================================
+                // CUARTIL
+                // ==========================================
+                if (
+                    filtroCuartil !==
+                    'todos' &&
+                    gestor.cuartilGlobal !==
+                    filtroCuartil
+                ) {
+                    return false;
+                }
+
+                // ==========================================
+                // BUSCADOR
+                // ==========================================
+                if (
+                    busqueda &&
+                    !String(
+                        gestor.nombre ||
+                        ''
+                    )
+                        .toLowerCase()
+                        .includes(
+                            busqueda
+                        )
+                ) {
+                    return false;
+                }
+
+                return true;
             }
-        }
-        
-        if (busqueda && !gestor.nombre.toLowerCase().includes(busqueda)) return false;
-        return true;
-    });
+        );
 
-    const totalResultados = gestoresFiltradosGP.length;
-    const infoFiltro = document.getElementById('infoFiltroGP');
+    // ======================================================
+    // INFORMACIÓN DEL FILTRO
+    // ======================================================
+    const totalResultados =
+        gestoresFiltradosGP.length;
+
+    const infoFiltro =
+        document.getElementById(
+            'infoFiltroGP'
+        );
+
+    const selectCampana =
+        document.getElementById(
+            'filtroCampanaGP'
+        );
+
+    const campanaTexto =
+        selectCampana
+            ?.selectedOptions?.[0]
+            ?.textContent
+            ?.trim() ||
+        'Todas las campañas';
+
     if (infoFiltro) {
-        const selectMes = document.getElementById('filtroMesGP');
-        const nombreMes = selectMes?.options[selectMes.selectedIndex]?.text || 'todos';
-        if (filtroMes !== 'todos') {
-            infoFiltro.innerHTML = `<span style="background: #e3f2fd; padding: 4px 12px; border-radius: 20px; font-size: 12px;">📅 ${nombreMes} | ${totalResultados} gestor(es)</span>`;
-        } else {
-            infoFiltro.innerHTML = `<span style="background: #e3f2fd; padding: 4px 12px; border-radius: 20px; font-size: 12px;">📅 Todos los períodos | ${totalResultados} gestor(es)</span>`;
-        }
+        const selectMes =
+            document.getElementById(
+                'filtroMesGP'
+            );
+
+        const nombreMes =
+            selectMes
+                ?.options[
+                    selectMes
+                        .selectedIndex
+                ]
+                ?.text ||
+            'Todos los períodos';
+
+        infoFiltro.innerHTML =
+            `<span style="` +
+            `background: #e3f2fd; ` +
+            `padding: 4px 12px; ` +
+            `border-radius: 20px; ` +
+            `font-size: 12px;">` +
+            `📌 ${escapeHtml(campanaTexto)} | ` +
+            `📅 ${escapeHtml(nombreMes)} | ` +
+            `${totalResultados} gestor(es)` +
+            `</span>`;
     }
 
-    paginaActualGP = 1;
+    paginaActualGP =
+        1;
+
     actualizarTablaGestionPersonasGP();
     actualizarPaginacionGP();
 }
@@ -40426,37 +42273,136 @@ function irAPaginaGP(pagina) {
 }
 
 function inicializarFiltrosGestionPersonasGP() {
-    // Conectar filtro de mes
-    const selectMes = document.getElementById('filtroMesGP');
-    if (selectMes) {
-        selectMes.addEventListener('change', function () {
-            console.log(`📅 Cambiando filtro de mes a: ${this.value}`);
-            // 🔴 RECARGAR GESTIÓN DE PERSONAS CON EL NUEVO MES
-            if (typeof cargarGestionPersonasGP === 'function') {
-                cargarGestionPersonasGP();
+    // ======================================================
+    // CAMPAÑA
+    // Cambiar campaña implica RECALCULAR todo Performance.
+    // ======================================================
+    const selectCampana =
+        document.getElementById(
+            'filtroCampanaGP'
+        );
+
+    if (
+        selectCampana &&
+        !selectCampana.dataset
+            .listenerGpInicializado
+    ) {
+        selectCampana.addEventListener(
+            'change',
+            async function () {
+                console.log(
+                    `📌 Cambiando campaña GP a: ` +
+                    `${this.value}`
+                );
+
+                invalidarCacheCiclos();
+
+                await cargarGestionPersonasGP();
             }
-        });
+        );
+
+        selectCampana.dataset
+            .listenerGpInicializado =
+            '1';
     }
 
-    // Conectar otros filtros
-    const filtros = ['filtroLiderGP', 'filtroUbicacionGP', 'filtroCuartilGP', 'buscarGestorGP'];
-    filtros.forEach(id => {
-        const elemento = document.getElementById(id);
-        if (elemento) {
-            // Eliminar event listeners anteriores
-            const nuevoElemento = elemento.cloneNode(true);
-            elemento.parentNode.replaceChild(nuevoElemento, elemento);
+    // ======================================================
+    // MES
+    // También recalcula métricas.
+    // ======================================================
+    const selectMes =
+        document.getElementById(
+            'filtroMesGP'
+        );
 
-            const elFinal = document.getElementById(id);
-            if (id === 'buscarGestorGP') {
-                elFinal.addEventListener('input', () => aplicarFiltrosGestionPersonasGP());
-            } else {
-                elFinal.addEventListener('change', () => aplicarFiltrosGestionPersonasGP());
+    if (
+        selectMes &&
+        !selectMes.dataset
+            .listenerGpInicializado
+    ) {
+        selectMes.addEventListener(
+            'change',
+            async function () {
+                console.log(
+                    `📅 Cambiando filtro de mes a: ` +
+                    `${this.value}`
+                );
+
+                invalidarCacheCiclos();
+
+                await cargarGestionPersonasGP();
             }
-        }
-    });
+        );
 
-    console.log("✅ Filtros de Gestión de Personas inicializados");
+        selectMes.dataset
+            .listenerGpInicializado =
+            '1';
+    }
+
+    // ======================================================
+    // FILTROS QUE SOLO AFECTAN LA TABLA YA CALCULADA
+    // ======================================================
+    const filtros =
+        [
+            'filtroLiderGP',
+            'filtroUbicacionGP',
+            'filtroCuartilGP'
+        ];
+
+    filtros.forEach(
+        id => {
+            const elemento =
+                document.getElementById(
+                    id
+                );
+
+            if (
+                !elemento ||
+                elemento.dataset
+                    .listenerGpInicializado
+            ) {
+                return;
+            }
+
+            elemento.addEventListener(
+                'change',
+                () =>
+                    aplicarFiltrosGestionPersonasGP()
+            );
+
+            elemento.dataset
+                .listenerGpInicializado =
+                '1';
+        }
+    );
+
+    // ======================================================
+    // BUSCADOR
+    // ======================================================
+    const buscar =
+        document.getElementById(
+            'buscarGestorGP'
+        );
+
+    if (
+        buscar &&
+        !buscar.dataset
+            .listenerGpInicializado
+    ) {
+        buscar.addEventListener(
+            'input',
+            () =>
+                aplicarFiltrosGestionPersonasGP()
+        );
+
+        buscar.dataset
+            .listenerGpInicializado =
+            '1';
+    }
+
+    console.log(
+        '✅ Filtros de Gestión de Personas inicializados'
+    )
 }
 
 
@@ -42578,6 +44524,383 @@ window.generarPDA = async function (agente) {
 };
 // ===== FIN : originalGenerarPDA ===========================================
 
+async function inicializarSelectorContextoMatriz() {
+
+    const container =
+        document.getElementById(
+            'selectorVersionesContainer'
+        );
+
+    if (!container) {
+        console.warn(
+            '⚠️ selectorVersionesContainer no disponible'
+        );
+        return;
+    }
+
+    // ==================================================
+    // CREAR CONTENEDOR SOLO UNA VEZ
+    // ==================================================
+    let contextoContainer =
+        document.getElementById(
+            'selectorContextoMatriz'
+        );
+
+    if (!contextoContainer) {
+
+        contextoContainer =
+            document.createElement(
+                'div'
+            );
+
+        contextoContainer.id =
+            'selectorContextoMatriz';
+
+        contextoContainer.style.cssText =
+            [
+                'display:flex',
+                'align-items:center',
+                'gap:10px',
+                'flex-wrap:wrap',
+                'margin-bottom:12px',
+                'padding:10px 15px',
+                'background:#f8f9fa',
+                'border:1px solid #e0e0e0',
+                'border-radius:8px'
+            ].join(';');
+
+        container.parentNode.insertBefore(
+            contextoContainer,
+            container
+        );
+    }
+
+    contextoContainer.innerHTML = `
+        <span
+            style="
+                font-size:13px;
+                font-weight:600;
+                color:var(--muted);
+            "
+        >
+            🧭 Contexto:
+        </span>
+
+        <select
+            id="selectQuiebreMatriz"
+            style="
+                padding:6px 12px;
+                border-radius:6px;
+                border:1px solid var(--line);
+                background:white;
+                min-width:190px;
+            "
+        >
+            <option value="">
+                -- Seleccionar quiebre --
+            </option>
+        </select>
+
+        <select
+            id="selectCampanaMatriz"
+            disabled
+            style="
+                padding:6px 12px;
+                border-radius:6px;
+                border:1px solid var(--line);
+                background:white;
+                min-width:220px;
+            "
+        >
+            <option value="">
+                -- Seleccionar campaña --
+            </option>
+        </select>
+
+        <span
+            id="contextoMatrizInfo"
+            style="
+                font-size:12px;
+                color:var(--muted);
+            "
+        ></span>
+    `;
+
+    const selectQuiebre =
+        document.getElementById(
+            'selectQuiebreMatriz'
+        );
+
+    const selectCampana =
+        document.getElementById(
+            'selectCampanaMatriz'
+        );
+
+    // ==================================================
+    // CARGAR QUIEBRES
+    // ==================================================
+    const quiebres =
+        await obtenerQuiebres();
+
+    const activos =
+        Array.isArray(quiebres)
+            ? quiebres.filter(
+                q =>
+                    q.activo !== false
+            )
+            : [];
+
+    activos.forEach(
+        quiebre => {
+
+            const option =
+                document.createElement(
+                    'option'
+                );
+
+            option.value =
+                String(quiebre.id);
+
+            option.textContent =
+                `${quiebre.codigo} - ` +
+                `${
+                    quiebre.nombre ||
+                    quiebre.descripcion ||
+                    ''
+                }`;
+
+            option.dataset.codigo =
+                quiebre.codigo || '';
+
+            selectQuiebre.appendChild(
+                option
+            );
+        }
+    );
+
+    // ==================================================
+    // CAMBIO DE QUIEBRE
+    // ==================================================
+    selectQuiebre.addEventListener(
+        'change',
+        async function () {
+
+            const quiebreId =
+                Number(this.value);
+
+            // Limpiar contexto anterior
+            window.contextoEvaluacionActual =
+                null;
+
+            window.matrizActualId =
+                null;
+
+            window.versionMatrizActualId =
+                null;
+
+            window.versionActivaActual =
+                null;
+
+            selectCampana.innerHTML =
+                `
+                    <option value="">
+                        -- Seleccionar campaña --
+                    </option>
+                `;
+
+            selectCampana.disabled =
+                true;
+
+            const info =
+                document.getElementById(
+                    'contextoMatrizInfo'
+                );
+
+            if (info) {
+                info.textContent = '';
+            }
+
+            if (
+                !Number.isInteger(
+                    quiebreId
+                ) ||
+                quiebreId <= 0
+            ) {
+                return;
+            }
+
+            const campanas =
+                await obtenerCampanasPorQuiebre(
+                    quiebreId
+                );
+
+            const activasCampana =
+                Array.isArray(campanas)
+                    ? campanas.filter(
+                        c =>
+                            c.activa !== false
+                    )
+                    : [];
+
+            activasCampana.forEach(
+                campana => {
+
+                    const option =
+                        document.createElement(
+                            'option'
+                        );
+
+                    option.value =
+                        String(campana.id);
+
+                    option.textContent =
+                        `${campana.codigo} - ` +
+                        `${campana.descripcion}`;
+
+                    option.dataset.codigo =
+                        campana.codigo || '';
+
+                    selectCampana.appendChild(
+                        option
+                    );
+                }
+            );
+
+            selectCampana.disabled =
+                activasCampana.length === 0;
+        }
+    );
+
+    // ==================================================
+    // CAMBIO DE CAMPAÑA
+    // ==================================================
+    selectCampana.addEventListener(
+        'change',
+        async function () {
+
+            const campanaId =
+                Number(this.value);
+
+            if (
+                !Number.isInteger(
+                    campanaId
+                ) ||
+                campanaId <= 0
+            ) {
+
+                window.contextoEvaluacionActual =
+                    null;
+
+                window.matrizActualId =
+                    null;
+
+                window.versionMatrizActualId =
+                    null;
+
+                return;
+            }
+
+            try {
+
+                const contexto =
+                    await resolverContextoEvaluacionActual(
+                        campanaId
+                    );
+
+                if (!contexto) {
+                    throw new Error(
+                        'No se obtuvo contexto'
+                    );
+                }
+
+                const info =
+                    document.getElementById(
+                        'contextoMatrizInfo'
+                    );
+
+                if (info) {
+
+                    info.textContent =
+                        `Matriz: ${
+                            contexto.matriz_codigo ||
+                            contexto.matriz_id
+                        } · Versión: ${
+                            contexto.version ||
+                            contexto.version_matriz_id
+                        }`;
+                }
+
+                console.log(
+                    '🎯 Contexto administración matriz:',
+                    {
+                        quiebre_id:
+                            contexto.quiebre_id,
+
+                        quiebre_codigo:
+                            contexto.quiebre_codigo,
+
+                        campana_id:
+                            contexto.campana_id,
+
+                        campana_codigo:
+                            contexto.campana_codigo,
+
+                        matriz_id:
+                            contexto.matriz_id,
+
+                        version_matriz_id:
+                            contexto.version_matriz_id,
+
+                        version:
+                            contexto.version
+                    }
+                );
+
+                // ==================================================
+                // CARGAR MATRIZ DEL CONTEXTO SELECCIONADO
+                // ==================================================
+                if (
+                    !contexto.matriz_id ||
+                    !contexto.version_matriz_id
+                ) {
+                    throw new Error(
+                        'El contexto seleccionado no tiene matriz o versión válida'
+                    );
+                }
+
+                console.log(
+                    '📊 Cargando matriz automáticamente:',
+                    {
+                        matriz_id: contexto.matriz_id,
+                        version_matriz_id:
+                            contexto.version_matriz_id
+                    }
+                );
+
+                await cargarMatrizCompleta();
+
+            } catch (error) {
+
+                console.error(
+                    '❌ Error resolviendo contexto de matriz:',
+                    error
+                );
+
+                alert(
+                    '❌ No se pudo resolver ' +
+                    'la matriz de la campaña seleccionada.\n\n' +
+                    error.message
+                );
+            }
+        }
+    );
+
+    console.log(
+        `✅ Selector contexto matriz inicializado: ` +
+        `${activos.length} quiebres`
+    );
+}
+
 // ======================================================
 // ADMINISTRADOR DE MATRIZ DE EVALUACIÓN
 // ======================================================
@@ -42588,127 +44911,312 @@ let matrizData = null;
 // CARGAR MATRIZ COMPLETA (VERSIÓN COMPLETA CON SELECTOR)
 // ======================================================
 async function cargarMatrizCompleta() {
-    console.log('📊 Cargando matriz de evaluación versionada...');
+    console.log(
+        '📊 Cargando matriz de evaluación por contexto...'
+    );
 
-    const container = document.getElementById('matrizTreeContainer');
+    const container =
+        document.getElementById(
+            'matrizTreeContainer'
+        );
+
     if (!container) {
-        console.warn('⚠️ No se encontró matrizTreeContainer');
-        return;
+        console.warn(
+            '⚠️ No se encontró matrizTreeContainer'
+        );
+        return false;
     }
 
-    container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Cargando estructura...</div>';
-
     try {
-        const token = localStorage.getItem('meca_token');
-        if (!token) {
-            throw new Error('No hay token de autenticación');
-        }
+        // ==================================================
+        // 1. OBTENER MATRIZ DEL CONTEXTO ACTUAL
+        // ==================================================
+        const matrizId =
+            Number(
+                window.matrizActualId ??
+                window.contextoEvaluacionActual?.matriz_id ??
+                0
+            );
 
-        // 🔴 FORZAR SIN CACHÉ
-        const timestamp = Date.now();
-
-        // 1. Obtener versión activa (sin caché)
-        console.log('📡 Obteniendo versión activa...');
-        const versionResponse = await fetch(`/api/matriz/versiones/activa?_=${timestamp}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            }
-        });
-
-        if (!versionResponse.ok) {
-            throw new Error(`Error al obtener versión activa: ${versionResponse.status}`);
-        }
-
-        const versionActiva = await versionResponse.json();
-
-        if (!versionActiva || !versionActiva.id) {
+        if (
+            !Number.isInteger(matrizId) ||
+            matrizId <= 0
+        ) {
             container.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: var(--warning);">
-                    ⚠️ No hay versión activa configurada.
+                <div
+                    style="
+                        text-align:center;
+                        padding:40px;
+                        color:var(--muted);
+                    "
+                >
+                    🧭 Seleccione primero un
+                    <strong>quiebre</strong> y una
+                    <strong>campaña</strong>
+                    para cargar su matriz.
+                </div>
+            `;
+
+            console.log(
+                'ℹ️ Matriz pendiente de selección de contexto'
+            );
+
+            return false;
+        }
+
+        container.innerHTML = `
+            <div
+                style="
+                    text-align:center;
+                    padding:40px;
+                "
+            >
+                ⏳ Cargando estructura...
+            </div>
+        `;
+
+        // ==================================================
+        // 2. OBTENER VERSIÓN ACTIVA DE ESA MATRIZ
+        // ==================================================
+        console.log(
+            `📡 Obteniendo versión activa de matriz ${matrizId}...`
+        );
+
+        const versionActiva =
+            await API.getVersionActiva(
+                matrizId
+            );
+
+        if (
+            !versionActiva ||
+            !versionActiva.id
+        ) {
+            container.innerHTML = `
+                <div
+                    style="
+                        text-align:center;
+                        padding:40px;
+                        color:var(--warning);
+                    "
+                >
+                    ⚠️ La matriz ${matrizId}
+                    no tiene una versión activa configurada.
                     <br><br>
-                    <button onclick="abrirModalNuevaVersion()" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; color: white; cursor: pointer;">
+
+                    <button
+                        onclick="abrirModalNuevaVersion()"
+                        style="
+                            padding:10px 20px;
+                            background:var(--accent);
+                            border:none;
+                            border-radius:8px;
+                            color:white;
+                            cursor:pointer;
+                        "
+                    >
                         📦 Crear Versión Inicial
                     </button>
                 </div>
             `;
-            return;
+
+            return false;
         }
 
-        console.log(`✅ Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
-
-        // 2. Obtener estructura (sin caché)
-        console.log('📡 Obteniendo estructura...');
-        const estructuraResponse = await fetch(`/api/matriz/versiones/${versionActiva.id}/estructura?_=${timestamp}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            }
-        });
-
-        if (!estructuraResponse.ok) {
-            throw new Error(`Error al obtener estructura: ${estructuraResponse.status}`);
+        // Protección de aislamiento
+        if (
+            versionActiva.matriz_id != null &&
+            Number(versionActiva.matriz_id) !==
+                matrizId
+        ) {
+            throw new Error(
+                `La versión ${versionActiva.id} pertenece ` +
+                `a matriz ${versionActiva.matriz_id}, ` +
+                `pero el contexto actual usa matriz ${matrizId}`
+            );
         }
 
-        const estructura = await estructuraResponse.json();
+        console.log(
+            `✅ Versión activa matriz ${matrizId}: ` +
+            `${versionActiva.version} ` +
+            `(ID ${versionActiva.id})`
+        );
 
-        if (!estructura || !estructura.frentes || estructura.frentes.length === 0) {
+        // ==================================================
+        // 3. CARGAR ESTRUCTURA EXACTA
+        // ==================================================
+        console.log(
+            `📡 Obteniendo estructura de versión ` +
+            `${versionActiva.id}...`
+        );
+
+        const estructura =
+            await API.getEstructuraVersion(
+                versionActiva.id
+            );
+
+        if (
+            !estructura ||
+            !Array.isArray(
+                estructura.frentes
+            ) ||
+            estructura.frentes.length === 0
+        ) {
             container.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: var(--warning);">
-                    ⚠️ La versión activa no tiene estructura definida.
+                <div
+                    style="
+                        text-align:center;
+                        padding:40px;
+                        color:var(--warning);
+                    "
+                >
+                    ⚠️ La versión activa
+                    <strong>${versionActiva.version}</strong>
+                    no tiene estructura definida.
                     <br><br>
-                    <button onclick="cargarMatrizCompleta()" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; color: white; cursor: pointer;">
+
+                    <button
+                        onclick="cargarMatrizCompleta()"
+                        style="
+                            padding:10px 20px;
+                            background:var(--accent);
+                            border:none;
+                            border-radius:8px;
+                            color:white;
+                            cursor:pointer;
+                        "
+                    >
                         🔄 Reintentar
                     </button>
                 </div>
             `;
-            return;
+
+            return false;
         }
 
-        // 3. Guardar en variable global
-        window.matrizData = estructura;
-        window.versionActivaActual = versionActiva;
+        // ==================================================
+        // 4. SINCRONIZAR CONTEXTO
+        // ==================================================
+        window.matrizActualId =
+            matrizId;
 
-        // 4. Renderizar el árbol
-        console.log('📡 Renderizando matriz...');
-        renderMatrizVersionada(estructura, versionActiva);
+        window.versionMatrizActualId =
+            Number(versionActiva.id);
 
-        // 🔴 PASO 3: CARGAR EL SELECTOR DE VERSIONES
-        console.log('📡 Cargando selector de versiones...');
-        if (document.getElementById('selectorVersionesContainer')) {
+        window.matrizData =
+            estructura;
+
+        window.versionActivaActual =
+            versionActiva;
+
+        // ==================================================
+        // 5. RENDERIZAR
+        // ==================================================
+        console.log(
+            '📡 Renderizando matriz...'
+        );
+
+        renderMatrizVersionada(
+            estructura,
+            versionActiva
+        );
+
+        // ==================================================
+        // 6. SELECTOR DE VERSIONES
+        // ==================================================
+        if (
+            document.getElementById(
+                'selectorVersionesContainer'
+            )
+        ) {
             await cargarSelectorVersiones();
-            console.log('   ✅ Selector de versiones cargado');
-        } else {
-            console.warn('   ⚠️ selectorVersionesContainer no encontrado en el DOM');
-            console.log('   💡 Agrega: <div id="selectorVersionesContainer"></div> en el HTML');
         }
 
-        // 5. Contar sub-motivos para verificar
+        // ==================================================
+        // 7. DIAGNÓSTICO
+        // ==================================================
         let totalSubs = 0;
-        for (const frente of (estructura.frentes || [])) {
-            for (const attr of (frente.atributos || [])) {
-                totalSubs += (attr.sub_motivos || []).length;
+
+        for (
+            const frente of
+            estructura.frentes
+        ) {
+            for (
+                const attr of
+                (
+                    frente.atributos ||
+                    []
+                )
+            ) {
+                totalSubs +=
+                    (
+                        attr.sub_motivos ||
+                        []
+                    ).length;
             }
         }
 
-        console.log(`✅ Matriz cargada: ${estructura.frentes.length} frentes, ${totalSubs} sub-motivos`);
-        console.log('✅ Versión activa:', versionActiva.version, '(ID:', versionActiva.id, ')');
+        console.log(
+            '✅ Matriz contextual cargada:',
+            {
+                matriz_id:
+                    matrizId,
+
+                version_matriz_id:
+                    versionActiva.id,
+
+                version:
+                    versionActiva.version,
+
+                frentes:
+                    estructura.frentes.length,
+
+                submotivos:
+                    totalSubs
+            }
+        );
+
+        return true;
 
     } catch (error) {
-        console.error('❌ Error cargando matriz:', error);
+
+        console.error(
+            '❌ Error cargando matriz contextual:',
+            error
+        );
+
         container.innerHTML = `
-            <div style="text-align: center; padding: 40px; color: var(--danger);">
-                ❌ Error: ${error.message}
+            <div
+                style="
+                    text-align:center;
+                    padding:40px;
+                    color:var(--danger);
+                "
+            >
+                ❌ Error:
+                ${escapeHtml(
+                    error.message ||
+                    'Error cargando matriz'
+                )}
+
                 <br><br>
-                <button onclick="cargarMatrizCompleta()" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; color: white; cursor: pointer;">
+
+                <button
+                    onclick="cargarMatrizCompleta()"
+                    style="
+                        padding:10px 20px;
+                        background:var(--accent);
+                        border:none;
+                        border-radius:8px;
+                        color:white;
+                        cursor:pointer;
+                    "
+                >
                     🔄 Reintentar
                 </button>
             </div>
         `;
+
+        return false;
     }
 }
 
@@ -43077,86 +45585,288 @@ function toggleMatrizNode(header) {
 // CARGAR SELECTOR DE VERSIONES
 // ======================================================
 async function cargarSelectorVersiones() {
-    console.log('📦 Cargando selector de versiones...');
+    console.log(
+        '📦 Cargando selector de versiones contextual...'
+    );
 
-    const container = document.getElementById('selectorVersionesContainer');
+    const container =
+        document.getElementById(
+            'selectorVersionesContainer'
+        );
+
     if (!container) {
-        console.warn('⚠️ selectorVersionesContainer no encontrado');
-        return;
+        console.warn(
+            '⚠️ selectorVersionesContainer no encontrado'
+        );
+        return false;
     }
 
     try {
-        // Obtener todas las versiones
-        const versiones = await API.getVersionesMatriz();
+        // ==================================================
+        // 1. MATRIZ ACTUAL
+        // ==================================================
+        const matrizId =
+            Number(
+                window.matrizActualId ??
+                window.contextoEvaluacionActual?.matriz_id ??
+                0
+            );
 
-        if (!versiones || versiones.length === 0) {
+        if (
+            !Number.isInteger(matrizId) ||
+            matrizId <= 0
+        ) {
             container.innerHTML = `
-                <div style="padding: 10px; text-align: center; color: var(--muted); background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
-                    📭 No hay versiones disponibles. 
-                    <button onclick="abrirModalNuevaVersion()" style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px; margin-left: 10px;">
+                <div
+                    style="
+                        padding:10px;
+                        text-align:center;
+                        color:var(--muted);
+                        background:#f8f9fa;
+                        border-radius:8px;
+                        border:1px solid #e0e0e0;
+                    "
+                >
+                    🧭 Seleccione primero
+                    un contexto de matriz.
+                </div>
+            `;
+
+            return false;
+        }
+
+        // ==================================================
+        // 2. VERSIONES DE ESTA MATRIZ
+        // ==================================================
+        const versiones =
+            await API.getVersionesMatriz(
+                matrizId
+            );
+
+        if (
+            !Array.isArray(versiones) ||
+            versiones.length === 0
+        ) {
+            container.innerHTML = `
+                <div
+                    style="
+                        padding:10px;
+                        text-align:center;
+                        color:var(--muted);
+                        background:#f8f9fa;
+                        border-radius:8px;
+                        border:1px solid #e0e0e0;
+                    "
+                >
+                    📭 No hay versiones disponibles
+                    para la matriz ${matrizId}.
+
+                    <button
+                        onclick="abrirModalNuevaVersion()"
+                        style="
+                            background:var(--accent);
+                            padding:4px 12px;
+                            border:none;
+                            border-radius:6px;
+                            color:white;
+                            cursor:pointer;
+                            font-size:12px;
+                            margin-left:10px;
+                        "
+                    >
                         📦 Crear primera versión
                     </button>
                 </div>
             `;
-            return;
+
+            window._versionesDisponibles = [];
+
+            return true;
         }
 
-        // Obtener la versión activa
-        const versionActiva = await API.getVersionActiva();
-        const activaId = versionActiva?.id;
+        // ==================================================
+        // 3. VERSIÓN ACTIVA DE ESTA MATRIZ
+        // ==================================================
+        const versionActiva =
+            await API.getVersionActiva(
+                matrizId
+            );
 
+        const activaId =
+            versionActiva?.id
+                ? Number(versionActiva.id)
+                : null;
+
+        window._versionesDisponibles =
+            versiones;
+
+        // ==================================================
+        // 4. CONSTRUIR SELECT
+        // ==================================================
         let html = `
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #f8f9fa; padding: 10px 15px; border-radius: 8px; border: 1px solid #e0e0e0;">
-                <span style="font-size: 13px; font-weight: 600; color: var(--muted);">📦 Versiones:</span>
-                <select id="selectVersion" onchange="cambiarVersionSeleccionada(this.value)" 
-                        style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: white; min-width: 200px; cursor: pointer;">
+            <div
+                style="
+                    display:flex;
+                    align-items:center;
+                    gap:10px;
+                    flex-wrap:wrap;
+                    background:#f8f9fa;
+                    padding:10px 15px;
+                    border-radius:8px;
+                    border:1px solid #e0e0e0;
+                "
+            >
+                <span
+                    style="
+                        font-size:13px;
+                        font-weight:600;
+                        color:var(--muted);
+                    "
+                >
+                    📦 Versiones:
+                </span>
+
+                <select
+                    id="selectVersion"
+                    onchange="cambiarVersionSeleccionada(this.value)"
+                    style="
+                        padding:6px 12px;
+                        border-radius:6px;
+                        border:1px solid var(--line);
+                        background:white;
+                        min-width:200px;
+                        cursor:pointer;
+                    "
+                >
         `;
 
         for (const v of versiones) {
-            const esActiva = v.id === activaId;
-            const label = esActiva ? '✅ Activa' : '⏸️ Inactiva';
-            const selected = esActiva ? 'selected' : '';
-            const bgColor = esActiva ? 'background: #e8f5e9;' : '';
-            html += `<option value="${v.id}" ${selected} style="${bgColor}">${v.version} (${label})</option>`;
+            const versionId =
+                Number(v.id);
+
+            const esActiva =
+                activaId !== null &&
+                versionId === activaId;
+
+            const label =
+                esActiva
+                    ? '✅ Activa'
+                    : '⏸️ Inactiva';
+
+            const selected =
+                esActiva
+                    ? 'selected'
+                    : '';
+
+            const bgColor =
+                esActiva
+                    ? 'background:#e8f5e9;'
+                    : '';
+
+            html += `
+                <option
+                    value="${versionId}"
+                    ${selected}
+                    style="${bgColor}"
+                >
+                    ${escapeHtml(v.version)} (${label})
+                </option>
+            `;
         }
 
         html += `
                 </select>
-                <button onclick="cargarMatrizCompleta()" 
-                        style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;" 
-                        title="Refrescar">
+
+                <button
+                    onclick="cargarMatrizCompleta()"
+                    style="
+                        background:var(--accent);
+                        padding:4px 12px;
+                        border:none;
+                        border-radius:6px;
+                        color:white;
+                        cursor:pointer;
+                        font-size:12px;
+                    "
+                    title="Refrescar"
+                >
                     🔄
                 </button>
-                <button onclick="abrirModalActivarVersion()" 
-                        style="background: var(--warning); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;" 
-                        title="Activar versión seleccionada">
-                    ⭐ Activar
+
+                <button
+                    onclick="abrirModalActivarVersion()"
+                    style="
+                        background:var(--warning);
+                        padding:4px 12px;
+                        border:none;
+                        border-radius:6px;
+                        color:white;
+                        cursor:pointer;
+                        font-size:12px;
+                    "
+                    title="Activar versión seleccionada"
+                >
+                    ⚡ Activar
                 </button>
-                <button onclick="abrirModalNuevaVersion()" 
-                        style="background: #7b1fa2; padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;" 
-                        title="Crear nueva versión">
-                    📦 Nueva
+
+                <button
+                    onclick="abrirModalNuevaVersion()"
+                    style="
+                        background:var(--ok);
+                        padding:4px 12px;
+                        border:none;
+                        border-radius:6px;
+                        color:white;
+                        cursor:pointer;
+                        font-size:12px;
+                    "
+                    title="Crear nueva versión"
+                >
+                    ➕ Nueva
                 </button>
             </div>
         `;
 
-        container.innerHTML = html;
+        container.innerHTML =
+            html;
 
-        // Guardar lista de versiones para referencia
-        window._versionesDisponibles = versiones;
+        console.log(
+            '✅ Selector versiones contextual cargado:',
+            {
+                matriz_id:
+                    matrizId,
 
-        console.log(`✅ Selector cargado: ${versiones.length} versiones`);
+                versiones:
+                    versiones.length,
+
+                version_activa_id:
+                    activaId
+            }
+        );
+
+        return true;
 
     } catch (error) {
-        console.error('❌ Error cargando selector:', error);
+        console.error(
+            '❌ Error cargando selector de versiones:',
+            error
+        );
+
         container.innerHTML = `
-            <div style="padding: 10px; text-align: center; color: var(--danger); background: #fff0f0; border-radius: 8px; border: 1px solid #ffcfcf;">
-                ❌ Error cargando versiones: ${error.message}
-                <button onclick="cargarSelectorVersiones()" style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px; margin-left: 10px;">
-                    🔄 Reintentar
-                </button>
+            <div
+                style="
+                    padding:10px;
+                    text-align:center;
+                    color:var(--danger);
+                    background:#fff5f5;
+                    border-radius:8px;
+                "
+            >
+                ❌ ${escapeHtml(error.message)}
             </div>
         `;
+
+        return false;
     }
 }
 
@@ -43164,66 +45874,279 @@ async function cargarSelectorVersiones() {
 // CAMBIAR VERSIÓN SELECCIONADA (VISTA PREVIA)
 // ======================================================
 async function cambiarVersionSeleccionada(versionId) {
-    if (!versionId) return;
+    if (!versionId) {
+        return;
+    }
 
     try {
-        console.log(`📌 Viendo versión ID: ${versionId}`);
+        // ======================================================
+        // 1. VALIDAR CONTEXTO ACTUAL
+        // ======================================================
+        const matrizId =
+            Number(
+                window.matrizActualId ??
+                window.contextoEvaluacionActual?.matriz_id ??
+                0
+            );
 
-        // Obtener la estructura de la versión seleccionada
-        const estructura = await API.getEstructuraVersion(versionId);
+        const parsedVersionId =
+            Number(versionId);
 
-        if (!estructura) {
-            alert('❌ No se pudo cargar la estructura de la versión');
+        if (
+            !Number.isInteger(matrizId) ||
+            matrizId <= 0
+        ) {
+            alert(
+                '⚠️ No existe una matriz seleccionada.'
+            );
+
             return;
         }
 
-        // Guardar la versión seleccionada
-        window.versionSeleccionada = estructura.version;
-        window.matrizData = estructura;
+        if (
+            !Number.isInteger(parsedVersionId) ||
+            parsedVersionId <= 0
+        ) {
+            alert(
+                '⚠️ ID de versión inválido.'
+            );
 
-        // Renderizar el árbol (con indicador de que es vista previa)
-        renderMatrizVersionada(estructura, {
-            ...estructura.version,
-            esVistaPrevia: true
-        });
-
-        // Mostrar indicador de vista previa
-        const container = document.getElementById('matrizTreeContainer');
-        if (container) {
-            // Verificar si ya existe el indicador
-            let indicator = document.getElementById('vistaPreviaIndicator');
-            if (!indicator) {
-                indicator = document.createElement('div');
-                indicator.id = 'vistaPreviaIndicator';
-                indicator.style.cssText = `
-                    background: #fff3e0;
-                    padding: 8px 15px;
-                    border-radius: 8px;
-                    margin-bottom: 10px;
-                    font-size: 13px;
-                    border-left: 4px solid #f39c12;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                `;
-                container.prepend(indicator);
-            }
-
-            const esActiva = estructura.version.id === window.versionActivaActual?.id;
-            indicator.innerHTML = `
-                <span>👁️ ${esActiva ? '✅ Versión ACTIVA' : '📌 Vista previa'} - <strong>${estructura.version.version}</strong> 
-                (ID: ${estructura.version.id}) - ${esActiva ? '' : 'INACTIVA - Solo consulta'}</span>
-                ${!esActiva ? `<button onclick="cargarMatrizCompleta()" style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 12px;">
-                    ⬅ Volver a Activa
-                </button>` : ''}
-            `;
+            return;
         }
 
-        console.log(`✅ Vista previa de versión: ${estructura.version.version}`);
+        // ======================================================
+        // 2. VALIDAR QUE LA VERSIÓN PERTENECE
+        //    AL CONTEXTO ACTUAL
+        // ======================================================
+        const versionesDisponibles =
+            Array.isArray(
+                window._versionesDisponibles
+            )
+                ? window._versionesDisponibles
+                : [];
+
+        const versionSeleccionada =
+            versionesDisponibles.find(
+                v =>
+                    Number(v.id) ===
+                    parsedVersionId
+            );
+
+        if (!versionSeleccionada) {
+            throw new Error(
+                'La versión seleccionada no pertenece ' +
+                'al contexto actual de matriz.'
+            );
+        }
+
+        if (
+            versionSeleccionada.matriz_id != null &&
+            Number(
+                versionSeleccionada.matriz_id
+            ) !== matrizId
+        ) {
+            throw new Error(
+                `La versión ${parsedVersionId} pertenece ` +
+                `a la matriz ${versionSeleccionada.matriz_id}, ` +
+                `pero actualmente está seleccionada ` +
+                `la matriz ${matrizId}.`
+            );
+        }
+
+        console.log(
+            `📌 Visualizando versión ID ${parsedVersionId} ` +
+            `de matriz ${matrizId}`
+        );
+
+        // ======================================================
+        // 3. OBTENER ESTRUCTURA DE LA VERSIÓN
+        // ======================================================
+        const estructura =
+            await API.getEstructuraVersion(
+                parsedVersionId
+            );
+
+        if (!estructura) {
+            throw new Error(
+                'No se pudo obtener la estructura ' +
+                'de la versión seleccionada.'
+            );
+        }
+
+        if (
+            !Array.isArray(
+                estructura.frentes
+            )
+        ) {
+            throw new Error(
+                'La estructura de la versión ' +
+                'seleccionada no es válida.'
+            );
+        }
+
+        // ======================================================
+        // 4. DETERMINAR SI ES LA VERSIÓN ACTIVA
+        // ======================================================
+        const versionActivaId =
+            Number(
+                window.versionActivaActual?.id ??
+                0
+            );
+
+        const esActiva =
+            Number.isInteger(
+                versionActivaId
+            ) &&
+            versionActivaId > 0 &&
+            versionActivaId ===
+                parsedVersionId;
+
+        // ======================================================
+        // 5. SINCRONIZAR ESTADO DE VISUALIZACIÓN
+        // ======================================================
+        window.versionMatrizActualId =
+            parsedVersionId;
+
+        window.matrizData =
+            estructura;
+
+        /*
+         * IMPORTANTE:
+         *
+         * NO cambiamos:
+         *
+         * window.versionActivaActual
+         *
+         * porque esa variable debe representar
+         * la versión realmente ACTIVA de la matriz.
+         *
+         * Aquí solamente estamos cambiando
+         * la versión que el Supervisor está visualizando.
+         */
+
+        // ======================================================
+        // 6. RENDERIZAR MATRIZ
+        // ======================================================
+        renderMatrizVersionada(
+            estructura,
+            versionSeleccionada
+        );
+
+        // ======================================================
+        // 7. MOSTRAR INDICADOR DE VERSIÓN
+        // ======================================================
+        const container =
+            document.getElementById(
+                'matrizTreeContainer'
+            );
+
+        if (container) {
+            let indicador =
+                document.getElementById(
+                    'indicadorVersionVisualizada'
+                );
+
+            if (!indicador) {
+                indicador =
+                    document.createElement(
+                        'div'
+                    );
+
+                indicador.id =
+                    'indicadorVersionVisualizada';
+
+                container.insertBefore(
+                    indicador,
+                    container.firstChild
+                );
+            }
+
+            indicador.style.cssText =
+                [
+                    'margin-bottom:12px',
+                    'padding:8px 12px',
+                    'border-radius:6px',
+                    'font-size:13px',
+                    'background:#f8f9fa',
+                    'border:1px solid #e0e0e0'
+                ].join(';');
+
+            if (esActiva) {
+                indicador.innerHTML =
+                    `
+                        ✅ Versión ACTIVA:
+                        <strong>
+                            ${escapeHtml(
+                                versionSeleccionada.version
+                            )}
+                        </strong>
+                        (ID ${parsedVersionId})
+                    `;
+            } else {
+                indicador.innerHTML =
+                    `
+                        📌 Vista previa:
+                        <strong>
+                            ${escapeHtml(
+                                versionSeleccionada.version
+                            )}
+                        </strong>
+                        (ID ${parsedVersionId})
+
+                        — INACTIVA / solo consulta
+
+                        <button
+                            onclick="cargarMatrizCompleta()"
+                            style="
+                                margin-left:10px;
+                                background:var(--accent);
+                                padding:4px 12px;
+                                border:none;
+                                border-radius:6px;
+                                color:white;
+                                cursor:pointer;
+                                font-size:12px;
+                            "
+                        >
+                            ⬅ Volver a activa
+                        </button>
+                    `;
+            }
+        }
+
+        // ======================================================
+        // 8. LOG DE DIAGNÓSTICO
+        // ======================================================
+        console.log(
+            '✅ Versión visualizada:',
+            {
+                matriz_id:
+                    matrizId,
+
+                version_matriz_id:
+                    parsedVersionId,
+
+                version:
+                    versionSeleccionada.version,
+
+                activa:
+                    esActiva,
+
+                frentes:
+                    estructura.frentes.length
+            }
+        );
 
     } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error al cargar la versión: ' + error.message);
+        console.error(
+            '❌ Error cambiando versión seleccionada:',
+            error
+        );
+
+        alert(
+            '❌ No se pudo cargar la versión seleccionada.\n\n' +
+            error.message
+        );
     }
 }
 
@@ -43341,89 +46264,425 @@ async function editarFrente(id) {
 // GUARDAR FRENTE - CON VALIDACIÓN POR VERSIÓN ACTIVA
 // ======================================================
 async function guardarFrente() {
-    const id = document.getElementById('frenteId').value;
-    const codigo = document.getElementById('frenteCodigo').value.trim().toUpperCase();
-    const nombre = document.getElementById('frenteNombre').value.trim();
-    const peso_maximo = parseFloat(document.getElementById('frentePeso').value);
-    const orden = parseInt(document.getElementById('frenteOrden').value) || 0;
-
-    if (!codigo || !nombre || !peso_maximo) {
-        alert('⚠️ Complete todos los campos obligatorios');
-        return;
-    }
-
-    if (peso_maximo <= 0 || peso_maximo > 100) {
-        alert('⚠️ El peso debe ser mayor a 0 y menor o igual a 100');
-        return;
-    }
-
     try {
-        // 🔴 OBTENER LA VERSIÓN ACTIVA
-        const versionActiva = await API.getVersionActiva();
-        if (!versionActiva) {
-            alert('❌ No hay versión activa');
+        // ======================================================
+        // 1. OBTENER DATOS DEL FORMULARIO
+        // ======================================================
+        const id =
+            document.getElementById('frenteId')?.value || '';
+
+        const codigo =
+            document
+                .getElementById('frenteCodigo')
+                ?.value
+                ?.trim()
+                ?.toUpperCase() || '';
+
+        const nombre =
+            document
+                .getElementById('frenteNombre')
+                ?.value
+                ?.trim() || '';
+
+        const peso_maximo =
+            parseFloat(
+                document.getElementById('frentePeso')?.value
+            );
+
+        const ordenElemento =
+            document.getElementById('frenteOrden');
+
+        const orden =
+            ordenElemento
+                ? parseInt(ordenElemento.value || '0', 10)
+                : 0;
+
+        const activoElemento =
+            document.getElementById('frenteActivo');
+
+        const activo =
+            activoElemento
+                ? (
+                    activoElemento.type === 'checkbox'
+                        ? activoElemento.checked
+                        : activoElemento.value !== 'false'
+                )
+                : true;
+
+        // ======================================================
+        // 2. VALIDAR CAMPOS DEL FORMULARIO
+        // ======================================================
+        if (!codigo) {
+            alert(
+                '⚠️ Debe ingresar el código del frente.'
+            );
             return;
         }
-        console.log(`📌 Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
 
-        // 🔴 OBTENER SOLO FRENTES DE LA VERSIÓN ACTIVA
-        const frentes = await API.getFrentes(); // Esta función ya debe filtrar por versión activa
-
-        // Calcular suma actual (excluyendo el que se está editando)
-        let sumaActual = 0;
-        for (const f of frentes) {
-            if (id && f.id == id) continue;
-            sumaActual += parseFloat(f.peso_maximo);
-        }
-
-        const nuevaSuma = sumaActual + peso_maximo;
-
-        if (nuevaSuma > 100) {
-            alert(`❌ La suma total de los frentes en la versión activa excede el 100%.\n\nActual: ${sumaActual}% + ${peso_maximo}% = ${nuevaSuma}%\n\nAjuste los pesos para que sumen exactamente 100%.`);
+        if (!nombre) {
+            alert(
+                '⚠️ Debe ingresar el nombre del frente.'
+            );
             return;
         }
 
-        const data = { codigo, nombre, peso_maximo, orden, activo: true };
+        if (
+            !Number.isFinite(peso_maximo) ||
+            peso_maximo <= 0 ||
+            peso_maximo > 100
+        ) {
+            alert(
+                '⚠️ El peso máximo debe ser mayor a 0 ' +
+                'y menor o igual a 100.'
+            );
+            return;
+        }
 
+        // ======================================================
+        // 3. OBTENER CONTEXTO ACTUAL DE MATRIZ
+        // ======================================================
+        const matrizId =
+            Number(
+                window.matrizActualId ??
+                window.contextoEvaluacionActual?.matriz_id ??
+                0
+            );
+
+        const versionId =
+            Number(
+                window.versionMatrizActualId ??
+                0
+            );
+
+        if (
+            !Number.isInteger(matrizId) ||
+            matrizId <= 0
+        ) {
+            alert(
+                '❌ No existe una matriz seleccionada.\n\n' +
+                'Seleccione primero un quiebre y una campaña.'
+            );
+            return;
+        }
+
+        if (
+            !Number.isInteger(versionId) ||
+            versionId <= 0
+        ) {
+            alert(
+                '❌ No existe una versión de matriz seleccionada.'
+            );
+            return;
+        }
+
+        // ======================================================
+        // 4. IMPEDIR ESCRITURA SOBRE VERSIÓN HISTÓRICA
+        // ======================================================
+        const versionActivaId =
+            Number(
+                window.versionActivaActual?.id ??
+                0
+            );
+
+        if (
+            !Number.isInteger(versionActivaId) ||
+            versionActivaId <= 0
+        ) {
+            alert(
+                '❌ No se pudo determinar la versión activa ' +
+                'de la matriz seleccionada.'
+            );
+            return;
+        }
+
+        if (versionId !== versionActivaId) {
+            alert(
+                '🔒 La versión seleccionada es histórica ' +
+                'y se encuentra en modo solo lectura.\n\n' +
+                `Versión visualizada: ${versionId}\n` +
+                `Versión activa: ${versionActivaId}`
+            );
+            return;
+        }
+
+        // ======================================================
+        // 5. CONSTRUIR PAYLOAD CONTEXTUAL
+        // ======================================================
+        const data = {
+            codigo,
+            nombre,
+            peso_maximo,
+            orden,
+            activo,
+
+            // F11.6.3E.3
+            // Contexto explícito de escritura
+            matriz_id: matrizId,
+            version_matriz_id: versionId
+        };
+
+        console.log(
+            '💾 Guardando frente con contexto:',
+            {
+                operacion:
+                    id ? 'UPDATE' : 'CREATE',
+
+                frente_id:
+                    id || null,
+
+                codigo,
+
+                matriz_id:
+                    matrizId,
+
+                version_matriz_id:
+                    versionId,
+
+                version_activa_id:
+                    versionActivaId
+            }
+        );
+
+        // ======================================================
+        // 6. CREAR O ACTUALIZAR
+        // ======================================================
         if (id) {
-            await API.actualizarFrente(id, data);
-            alert('✅ Frente actualizado correctamente');
+            await API.actualizarFrente(
+                id,
+                data
+            );
+
+            alert(
+                '✅ Frente actualizado correctamente'
+            );
+
         } else {
-            await API.crearFrente(data);
-            alert('✅ Frente creado correctamente');
+            await API.crearFrente(
+                data
+            );
+
+            alert(
+                '✅ Frente creado correctamente'
+            );
         }
 
-        cerrarModalFrente();
+        // ======================================================
+        // 7. CERRAR MODAL
+        // ======================================================
+        if (
+            typeof cerrarModalFrente ===
+            'function'
+        ) {
+            cerrarModalFrente();
+        }
+
+        // ======================================================
+        // 8. RECARGAR LA MISMA MATRIZ CONTEXTUAL
+        // ======================================================
         await cargarMatrizCompleta();
 
+        console.log(
+            '✅ Frente guardado correctamente:',
+            {
+                matriz_id:
+                    matrizId,
+
+                version_matriz_id:
+                    versionId
+            }
+        );
+
     } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error al guardar: ' + error.message);
+        console.error(
+            '❌ Error guardando frente:',
+            error
+        );
+
+        alert(
+            '❌ Error al guardar: ' +
+            (
+                error?.message ||
+                'Error desconocido'
+            )
+        );
     }
 }
 
 async function eliminarFrente(id) {
     try {
-        const frentes = await API.getFrentes();
-        const frente = frentes.find(f => f.id == id);
+        // ======================================================
+        // 1. VALIDAR ID
+        // ======================================================
+        const frenteId =
+            Number(id);
 
-        if (!frente) {
-            alert('❌ Frente no encontrado');
+        if (
+            !Number.isInteger(frenteId) ||
+            frenteId <= 0
+        ) {
+            throw new Error(
+                'ID de frente inválido'
+            );
+        }
+
+        // ======================================================
+        // 2. CONTEXTO ACTUAL
+        // ======================================================
+        const matrizId =
+            Number(
+                window.matrizActualId ??
+                window.contextoEvaluacionActual?.matriz_id ??
+                0
+            );
+
+        const versionId =
+            Number(
+                window.versionMatrizActualId ??
+                0
+            );
+
+        const versionActivaId =
+            Number(
+                window.versionActivaActual?.id ??
+                0
+            );
+
+        if (
+            !Number.isInteger(matrizId) ||
+            matrizId <= 0
+        ) {
+            throw new Error(
+                'No existe matriz seleccionada'
+            );
+        }
+
+        if (
+            !Number.isInteger(versionId) ||
+            versionId <= 0
+        ) {
+            throw new Error(
+                'No existe versión seleccionada'
+            );
+        }
+
+        // ======================================================
+        // 3. BLOQUEAR VERSIÓN HISTÓRICA
+        // ======================================================
+        if (
+            !Number.isInteger(versionActivaId) ||
+            versionActivaId <= 0
+        ) {
+            throw new Error(
+                'No se pudo determinar la versión activa'
+            );
+        }
+
+        if (
+            versionId !== versionActivaId
+        ) {
+            alert(
+                '🔒 No se puede eliminar un frente ' +
+                'desde una versión histórica.\n\n' +
+                `Versión visualizada: ${versionId}\n` +
+                `Versión activa: ${versionActivaId}`
+            );
+
             return;
         }
 
-        // Confirmación con información detallada
-        const confirmar = confirm(`⚠️ ¿ELIMINAR FRENTE "${frente.nombre}"?\n\n⚠️ ADVERTENCIA: Esta acción eliminará:\n   • Todos los atributos dentro de este frente\n   • Todos los sub-motivos dentro de esos atributos\n\n¿Está seguro de continuar?`);
+        // ======================================================
+        // 4. BUSCAR FRENTE EN LA MATRIZ CONTEXTUAL
+        // ======================================================
+        const frentes =
+            Array.isArray(
+                window.matrizData?.frentes
+            )
+                ? window.matrizData.frentes
+                : [];
 
-        if (!confirmar) return;
+        const frente =
+            frentes.find(
+                f =>
+                    Number(f.id) ===
+                    frenteId
+            );
 
-        const result = await API.eliminarFrente(id);
-        alert(result.message || '✅ Frente eliminado correctamente');
-        cargarMatrizCompleta();
+        if (!frente) {
+            throw new Error(
+                'Frente no encontrado en la matriz seleccionada'
+            );
+        }
+
+        // ======================================================
+        // 5. CONFIRMACIÓN
+        // ======================================================
+        const confirmar =
+            confirm(
+                `⚠️ ¿ELIMINAR FRENTE "${frente.nombre}"?\n\n` +
+                `⚠️ ADVERTENCIA: Esta acción eliminará:\n` +
+                `   • Todos los atributos dentro de este frente\n` +
+                `   • Todos los sub-motivos dentro de esos atributos\n\n` +
+                `Matriz: ${matrizId}\n` +
+                `Versión: ${versionId}\n\n` +
+                `¿Está seguro de continuar?`
+            );
+
+        if (!confirmar) {
+            return;
+        }
+
+        // ======================================================
+        // 6. DELETE CONTEXTUAL
+        // ======================================================
+        console.log(
+            '🗑️ Eliminando frente con contexto:',
+            {
+                frente_id:
+                    frenteId,
+
+                matriz_id:
+                    matrizId,
+
+                version_matriz_id:
+                    versionId
+            }
+        );
+
+        const result =
+            await API.eliminarFrente(
+                frenteId,
+                {
+                    matriz_id:
+                        matrizId,
+
+                    version_matriz_id:
+                        versionId
+                }
+            );
+
+        alert(
+            result?.message ||
+            '✅ Frente eliminado correctamente'
+        );
+
+        // ======================================================
+        // 7. RECARGAR MISMO CONTEXTO
+        // ======================================================
+        await cargarMatrizCompleta();
 
     } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error al eliminar frente: ' + error.message);
+        console.error(
+            '❌ Error eliminando frente:',
+            error
+        );
+
+        alert(
+            '❌ Error al eliminar frente: ' +
+            (
+                error?.message ||
+                'Error desconocido'
+            )
+        );
     }
 }
 
@@ -46903,7 +50162,7 @@ function generarHTMLConsolidado(agrupados) {
     <div class="container">
         <div class="header">
             <h1>📊 Reporte Consolidado de PDA</h1>
-            <p>Movistar Perú - Auditoría Calidad Cobranzas | Generado: ${fecha}</p>
+            <p>Movistar Perú - Auditoría de Calidad | Generado: ${fecha}</p>
         </div>
         <div class="content">
     `;
@@ -47168,7 +50427,7 @@ function generarHTMLConsolidado(agrupados) {
         </div>
         <div class="footer">
             Documento generado automáticamente por Sistema MECA - Movistar Perú<br>
-            © Auditoría Calidad Cobranzas - Todos los derechos reservados
+            © Auditoría de Calidad - Todos los derechos reservados
         </div>
     </div>
     </body>
@@ -49602,8 +52861,17 @@ async function cargarSelectCampanas(selectorId) {
     select.innerHTML = '<option value="">-- Seleccionar campaña --</option>';
 
     campanas.forEach(c => {
-        const selected = valorActual === c.codigo ? 'selected' : '';
-        select.innerHTML += `<option value="${c.codigo}" ${selected}>${c.codigo} - ${c.descripcion}</option>`;
+        const campanaId = String(c.id);
+        const selected = valorActual === campanaId ? 'selected' : '';
+
+        select.innerHTML += `
+            <option
+                value="${escapeHtml(campanaId)}"
+                data-codigo="${escapeHtml(c.codigo)}"
+                ${selected}
+            >
+                ${escapeHtml(c.codigo)} - ${escapeHtml(c.descripcion)}
+            </option>`;
     });
 
     console.log(`✅ ${campanas.length} campañas cargadas en select ${selectorId}`);
@@ -50201,95 +53469,6 @@ window.actualizarTablaMonitoreo = function(asignaciones) {
     console.log('✅ Tabla de monitoreo actualizada con campañas');
 };
 
-// ======================================================
-// 6. FUNCIONES PARA FILTRAR POR CAMPAÑA EN MONITOREO
-// ======================================================
-
-/**
- * Aplica filtros de escuchas incluyendo campaña
- */
-function aplicarFiltrosEscuchasConCampana() {
-    console.log('🔍 aplicarFiltrosEscuchasConCampana - INICIADO');
-
-    const filtroAuditor = document.getElementById('filtroAuditorEscuchas')?.value || '';
-    const filtroEstado = document.getElementById('filtroEstadoEscuchas')?.value || '';
-    const filtroLote = document.getElementById('filtroLoteEscuchas')?.value || '';
-    // 🔴 NUEVO FILTRO POR CAMPAÑA
-    const filtroCampana = document.getElementById('filtroCampanaEscuchas')?.value || '';
-    const busquedaTicket = document.getElementById('buscarTicketEscucha')?.value?.toLowerCase() || '';
-
-    const fechaInicio = document.getElementById('filtroFechaInicioEscuchas')?.value || '';
-    const fechaFin = document.getElementById('filtroFechaFinEscuchas')?.value || '';
-
-    console.log(`   Filtros: Auditor=${filtroAuditor || 'todos'}, Estado=${filtroEstado || 'todos'}, Lote=${filtroLote || 'todos'}, Campaña=${filtroCampana || 'todos'}`);
-
-    let asignaciones = window.asignacionesEscuchasGlobales || [];
-
-    if (asignaciones.length === 0) {
-        console.log('⚠️ No hay asignaciones para filtrar');
-        refrescarMonitoreoEscuchas();
-        return;
-    }
-
-    let filtradas = asignaciones;
-
-    if (filtroAuditor) {
-        filtradas = filtradas.filter(a => a.auditor_asignado === filtroAuditor);
-    }
-
-    if (filtroEstado) {
-        filtradas = filtradas.filter(a => a.estado === filtroEstado);
-    }
-
-    // 🔴 FILTRO POR CAMPAÑA
-    if (filtroCampana) {
-        filtradas = filtradas.filter(a => (a.campana || a.campana_codigo || '') === filtroCampana);
-        console.log(`   📌 Filtro campaña "${filtroCampana}": ${filtradas.length} asignaciones`);
-    }
-
-    if (filtroLote && filtroLote !== 'activo' && filtroLote !== 'todos') {
-        const loteId = parseInt(filtroLote);
-        if (!isNaN(loteId)) {
-            filtradas = filtradas.filter(a => a.tarea_id === loteId);
-        }
-    } else if (filtroLote === 'activo') {
-        const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
-        if (loteActivo) {
-            filtradas = filtradas.filter(a => a.tarea_id === loteActivo.id);
-        }
-    }
-
-    if (fechaInicio || fechaFin) {
-        const inicio = fechaInicio ? new Date(fechaInicio) : null;
-        const fin = fechaFin ? new Date(fechaFin) : null;
-
-        if (inicio) inicio.setHours(0, 0, 0, 0);
-        if (fin) fin.setHours(23, 59, 59, 999);
-
-        filtradas = filtradas.filter(a => {
-            if (!a.fecha_asignacion) return false;
-            const fechaAsig = new Date(a.fecha_asignacion);
-            if (isNaN(fechaAsig.getTime())) return false;
-            if (inicio && fechaAsig < inicio) return false;
-            if (fin && fechaAsig > fin) return false;
-            return true;
-        });
-    }
-
-    if (busquedaTicket) {
-        filtradas = filtradas.filter(a =>
-            (a.ticket || '').toLowerCase().includes(busquedaTicket) ||
-            (a.gestor_auditado || '').toLowerCase().includes(busquedaTicket) ||
-            (a.supervisor_responsable || '').toLowerCase().includes(busquedaTicket) ||
-            (a.auditor_asignado || '').toLowerCase().includes(busquedaTicket)
-        );
-    }
-
-    actualizarTablaMonitoreo(filtradas);
-
-    const contador = document.getElementById('resultadosEscuchasCount');
-    if (contador) contador.textContent = filtradas.length;
-}
 
 // ======================================================
 // 7. INICIALIZACIÓN DEL MÓDULO DE CAMPAÑAS
@@ -50308,50 +53487,198 @@ function inicializarModuloCampanas() {
     }, 500);
 
     // 2. Configurar el filtro de campaña en monitoreo
-    const filtroCampana = document.getElementById('filtroCampanaEscuchas');
-    if (filtroCampana) {
-        filtroCampana.addEventListener('change', function () {
-            console.log('📌 Filtro campaña cambiado a:', this.value);
-            if (typeof aplicarFiltrosEscuchasConCampana === 'function') {
-                aplicarFiltrosEscuchasConCampana();
-            } else {
-                aplicarFiltrosEscuchas();
-            }
-        });
-    }
-
-    // 3. Verificar si existen campañas iniciales, si no, crear las predeterminadas
+    
+    // 3. Las campañas provienen exclusivamente de la configuración persistida.
+    // F11.3.1: el frontend no crea campañas específicas de Cobranzas.
     setTimeout(async () => {
         const campanas = await obtenerCampanas();
+
         if (campanas.length === 0) {
-            console.log('📌 No hay campañas registradas. Creando campañas predeterminadas...');
-
-            const predeterminadas = [
-                { codigo: 'T', descripcion: 'Temprana' },
-                { codigo: 'ST', descripcion: 'Super Temprana' },
-                { codigo: 'F', descripcion: 'Fraccionamiento' }
-            ];
-
-            for (const c of predeterminadas) {
-                await crearCampana({ codigo: c.codigo, descripcion: c.descripcion, activa: true });
-            }
-
-            // Recargar selectores
-            cargarSelectCampanas('filtroCampanaEscuchas');
-            cargarSelectCampanas('selectCampanaEscucha');
-
-            console.log('✅ Campañas predeterminadas creadas');
+            console.warn(
+                '⚠️ No hay campañas configuradas para el contexto actual. ' +
+                'Regístrelas desde la administración de campañas.'
+            );
         }
     }, 1000);
 
     console.log('✅ Módulo de campañas inicializado');
 }
 
+async function obtenerQuiebres() {
+    try {
+        const token =
+            localStorage.getItem(
+                'meca_token'
+            );
+
+        const response =
+            await fetch(
+                '/api/domain/quiebres',
+                {
+                    headers: token
+                        ? {
+                            Authorization:
+                                'Bearer ' + token
+                        }
+                        : {}
+                }
+            );
+
+        if (!response.ok) {
+            const body =
+                await response.text();
+
+            throw new Error(
+                'No se pudieron obtener los quiebres: ' +
+                response.status +
+                ' ' +
+                body
+            );
+        }
+
+        const payload =
+            await response.json();
+
+        if (
+            Array.isArray(payload)
+        ) {
+            return payload;
+        }
+
+        if (
+            payload &&
+            Array.isArray(
+                payload.data
+            )
+        ) {
+            return payload.data;
+        }
+
+        return [];
+
+    } catch (error) {
+        console.error(
+            '❌ Error obteniendo quiebres:',
+            error
+        );
+
+        return [];
+    }
+}
+
+window.obtenerQuiebres = obtenerQuiebres;
+
 // ======================================================
 // 8. EXPOSICIÓN GLOBAL DE FUNCIONES
 // ======================================================
+async function obtenerCampanasPorQuiebre(quiebreId) {
+    if (!quiebreId) {
+        return [];
+    }
+
+    try {
+        const token = localStorage.getItem('meca_token');
+
+        const response = await fetch(
+            '/api/domain/campanas?quiebreId=' +
+            encodeURIComponent(quiebreId),
+            {
+                headers: token
+                    ? { Authorization: 'Bearer ' + token }
+                    : {}
+            }
+        );
+
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(
+                'No se pudieron obtener campañas del quiebre: ' +
+                response.status +
+                ' ' +
+                body
+            );
+        }
+
+        const payload = await response.json();
+
+        if (Array.isArray(payload)) {
+            return payload;
+        }
+
+        if (Array.isArray(payload.data)) {
+            return payload.data;
+        }
+
+        return [];
+    } catch (error) {
+        console.error(
+            '❌ Error obteniendo campañas por quiebre:',
+            error
+        );
+        return [];
+    }
+}
+
+async function cargarCampanasPorQuiebreEnSelect(
+    quiebreId,
+    selectId,
+    {
+        incluirTodos = false,
+        placeholder = 'Seleccione campaña'
+    } = {}
+) {
+    const select = document.getElementById(selectId);
+
+    if (!select) {
+        return [];
+    }
+
+    const campanas =
+        await obtenerCampanasPorQuiebre(quiebreId);
+
+    select.innerHTML = '';
+
+    const optionInicial =
+        document.createElement('option');
+
+    optionInicial.value = '';
+    optionInicial.textContent =
+        incluirTodos
+            ? 'Todas las campañas'
+            : placeholder;
+
+    select.appendChild(optionInicial);
+
+    for (const campana of campanas) {
+        const option =
+            document.createElement('option');
+
+        option.value = String(campana.id);
+
+        option.textContent =
+            campana.descripcion
+                ? campana.codigo +
+                  ' - ' +
+                  campana.descripcion
+                : campana.codigo;
+
+        option.dataset.codigo =
+            campana.codigo || '';
+
+        option.dataset.quiebreId =
+            campana.quiebre_id || quiebreId;
+
+        select.appendChild(option);
+    }
+
+    return campanas;
+}
 
 window.obtenerCampanas = obtenerCampanas;
+window.obtenerCampanasPorQuiebre =
+    obtenerCampanasPorQuiebre;
+window.cargarCampanasPorQuiebreEnSelect =
+    cargarCampanasPorQuiebreEnSelect;
 window.obtenerCampanaPorCodigo = obtenerCampanaPorCodigo;
 window.crearCampana = crearCampana;
 window.actualizarCampana = actualizarCampana;
@@ -50367,7 +53694,6 @@ window.cerrarModalCampana = cerrarModalCampana;
 window.guardarCampana = guardarCampana;
 window.eliminarCampanaUI = eliminarCampanaUI;
 window.reactivarCampanaUI = reactivarCampanaUI;
-window.aplicarFiltrosEscuchasConCampana = aplicarFiltrosEscuchasConCampana;
 window.inicializarModuloCampanas = inicializarModuloCampanas;
 
 console.log('✅ Módulo de campañas cargado y funciones expuestas globalmente');
@@ -50746,26 +54072,53 @@ async function exportarCampanasCSV() {
 // ======================================================
 // FUNCIÓN: VER TICKETS POR CAMPAÑA (FILTRO)
 // ======================================================
-function verTicketsPorCampana(codigo) {
-    // Cambiar a la pestaña de escuchas y aplicar filtro
+async function verTicketsPorCampana(codigoOId) {
     const filtroCampana = document.getElementById('filtroCampanaEscuchas');
-    if (filtroCampana) {
-        filtroCampana.value = codigo;
+
+    let campanaId = Number(codigoOId);
+    let codigoMostrar = String(codigoOId);
+
+    // Compatibilidad temporal con llamadas legacy que todavía envían T/ST/F
+    if (!Number.isInteger(campanaId) || campanaId <= 0) {
+        const campanas = await obtenerCampanas();
+
+        const campana = campanas.find(
+            c => String(c.codigo) === String(codigoOId)
+        );
+
+        if (!campana) {
+            console.warn('⚠️ Campaña no encontrada:', codigoOId);
+            return;
+        }
+        campanaId = Number(campana.id);
+        codigoMostrar = campana.codigo;
+    } else {
+        const campanas = await obtenerCampanas();
+        const campana = campanas.find(c => Number(c.id) === campanaId);
+
+        if (campana) {
+            codigoMostrar = campana.codigo;
+        }
     }
 
-    // Cambiar a la pestaña de escuchas
-    const tabEscuchas = document.querySelector('.tab-button[data-tab="gestionEscuchas"]');
+    if (filtroCampana) {
+        filtroCampana.value = String(campanaId);
+    }
+
+    const tabEscuchas = document.querySelector(
+        '.tab-button[data-tab="gestionEscuchas"]'
+    );
+
     if (tabEscuchas) {
         tabEscuchas.click();
 
-        // Aplicar filtro después de un breve retraso
         setTimeout(() => {
-            if (typeof aplicarFiltrosEscuchasConCampana === 'function') {
-                aplicarFiltrosEscuchasConCampana();
-            } else if (typeof aplicarFiltrosEscuchas === 'function') {
-                aplicarFiltrosEscuchas();
-            }
-            mostrarMensajeTemporal(`📌 Mostrando tickets de campaña: ${codigo}`, 'var(--accent)');
+            aplicarFiltrosEscuchas();
+
+            mostrarMensajeTemporal(
+                `📌 Mostrando tickets de campaña: ${codigoMostrar}`,
+                'var(--accent)'
+            );
         }, 500);
     }
 }
@@ -50911,3 +54264,301 @@ async function obtenerEstadisticasCampanas() {
 // ======================================================
 
 window.obtenerEstadisticasCampanas = obtenerEstadisticasCampanas;
+
+
+async function resolverContextoEvaluacion(
+    campanaId,
+    fecha = null
+) {
+    if (!campanaId) {
+        throw new Error(
+            'campanaId es obligatorio para resolver el contexto'
+        );
+    }
+
+    const params = new URLSearchParams();
+
+    params.set(
+        'campanaId',
+        String(campanaId)
+    );
+
+    if (fecha) {
+        params.set(
+            'fecha',
+            String(fecha)
+        );
+    }
+
+    const token =
+        localStorage.getItem('meca_token');
+
+    const response = await fetch(
+        '/api/domain/contexto-evaluacion?' +
+        params.toString(),
+        {
+            headers: token
+                ? {
+                    Authorization:
+                        'Bearer ' + token
+                }
+                : {}
+        }
+    );
+
+    const raw = await response.text();
+
+    let payload = null;
+
+    try {
+        payload =
+            raw
+                ? JSON.parse(raw)
+                : null;
+    } catch (_) {
+        payload = raw;
+    }
+
+    if (!response.ok) {
+        const message =
+            payload &&
+            typeof payload === 'object' &&
+            payload.error
+                ? payload.error
+                : raw ||
+                  'No se pudo resolver el contexto de evaluación';
+
+        const error = new Error(message);
+
+        error.status = response.status;
+        error.payload = payload;
+
+        throw error;
+    }
+
+    if (
+        payload &&
+        typeof payload === 'object' &&
+        'data' in payload
+    ) {
+        return payload.data;
+    }
+
+    return payload;
+}
+
+
+
+async function resolverContextoEvaluacionActual(
+    campanaId,
+    fecha = null
+) {
+    const contexto =
+        await resolverContextoEvaluacion(
+            campanaId,
+            fecha
+        );
+
+    window.contextoEvaluacionActual =
+        contexto || null;
+
+    if (contexto) {
+        window.matrizActualId =
+            contexto.matriz_id ??
+            contexto.matrizId ??
+            null;
+
+        window.versionMatrizActualId =
+            contexto.matriz_version_id ??
+            contexto.version_matriz_id ??
+            contexto.matrizVersionId ??
+            null;
+    } else {
+        window.matrizActualId = null;
+        window.versionMatrizActualId = null;
+    }
+
+    return contexto;
+}
+
+window.resolverContextoEvaluacion =
+    resolverContextoEvaluacion;
+
+window.resolverContextoEvaluacionActual =
+    resolverContextoEvaluacionActual;
+
+
+
+async function cargarMatrizDesdeContexto(
+    contexto
+) {
+    if (!contexto) {
+        throw new Error(
+            'El contexto de evaluación es obligatorio'
+        );
+    }
+
+    const matrizId =
+        contexto.matriz_id ??
+        contexto.matrizId ??
+        window.matrizActualId ??
+        null;
+
+    const versionMatrizId =
+        contexto.matriz_version_id ??
+        contexto.version_matriz_id ??
+        contexto.matrizVersionId ??
+        window.versionMatrizActualId ??
+        null;
+
+    if (!matrizId) {
+        throw new Error(
+            'El contexto no contiene matriz_id'
+        );
+    }
+
+    if (!versionMatrizId) {
+        throw new Error(
+            'El contexto no contiene matriz_version_id'
+        );
+    }
+
+    window.matrizActualId =
+        matrizId;
+
+    window.versionMatrizActualId =
+        versionMatrizId;
+
+    // Reutilizar loader existente si está disponible.
+    if (
+        typeof window.cargarMatrizVersion === 'function'
+    ) {
+        return await window.cargarMatrizVersion(
+            matrizId,
+            versionMatrizId
+        );
+    }
+
+    if (
+        typeof window.cargarMatrizPorVersion === 'function'
+    ) {
+        return await window.cargarMatrizPorVersion(
+            versionMatrizId,
+            matrizId
+        );
+    }
+
+    if (
+        typeof window.cargarMatriz === 'function'
+    ) {
+        return await window.cargarMatriz(
+            versionMatrizId,
+            matrizId
+        );
+    }
+
+    // Si no existe loader compatible, devolver contrato explícito.
+    return {
+        matriz_id: matrizId,
+        matriz_version_id: versionMatrizId,
+        cargada: false,
+        motivo:
+            'No existe un loader de matriz compatible expuesto en window'
+    };
+}
+
+async function resolverYCargarMatrizDeCampana(
+    campanaId,
+    fecha = null
+) {
+    const contexto =
+        await resolverContextoEvaluacionActual(
+            campanaId,
+            fecha
+        );
+
+    const resultado =
+        await cargarMatrizDesdeContexto(
+            contexto
+        );
+
+    return {
+        contexto,
+        resultado
+    };
+}
+
+window.cargarMatrizDesdeContexto =
+    cargarMatrizDesdeContexto;
+
+window.resolverYCargarMatrizDeCampana =
+    resolverYCargarMatrizDeCampana;
+
+async function normalizarFiltroCampanaReportesAIds() {
+    const select =
+        document.getElementById('filtroCampanaReportes');
+
+    if (!select) {
+        return;
+    }
+
+    try {
+        const campanas =
+            await obtenerCampanas();
+
+        if (
+            !Array.isArray(campanas) ||
+            campanas.length === 0
+        ) {
+            return;
+        }
+
+        const mapaPorCodigo =
+            new Map(
+                campanas.map(c => [
+                    String(c.codigo).trim(),
+                    c
+                ])
+            );
+
+        [...select.options].forEach(option => {
+            if (option.value === 'todos') {
+                return;
+            }
+
+            const codigo =
+                String(option.value).trim();
+
+            const campana =
+                mapaPorCodigo.get(codigo);
+
+            if (!campana) {
+                console.warn(
+                    '⚠️ Campaña sin correspondencia:',
+                    codigo
+                );
+                return;
+            }
+
+            option.dataset.codigo =
+                campana.codigo;
+
+            option.dataset.descripcion =
+                campana.descripcion || '';
+
+            // Fuente real del filtro
+            option.value =
+                String(campana.id);
+        });
+
+        console.log(
+            '✅ filtroCampanaReportes migrado a campana_id'
+        );
+
+    } catch (error) {
+        console.error(
+            '❌ Error normalizando filtro de campañas:',
+            error
+        );
+    }
+}

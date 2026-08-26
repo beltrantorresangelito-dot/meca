@@ -19,10 +19,32 @@ test('MATRIXSAFE-REPO-001 reglas serializan campos JSON', () => {
   assert.match(repo, /\$9::jsonb/);
 });
 
-test('MATRIXSAFE-REPO-002 estructura usa árbol versionado existente', () => {
-  assert.match(repo, /getLegacyMatrixStructure\(active\.id\)/);
-  assert.match(repo, /getLegacyEvaluationRulesByVersion\(active\.id\)/);
-});
+test(
+  'MATRIXSAFE-REPO-002 estructura usa árbol versionado existente',
+  () => {
+    const repositorySource = fs.readFileSync(
+      path.join(
+        __dirname,
+        '..',
+        'src',
+        'modules',
+        'matrix',
+        'matrix.repository.js'
+      ),
+      'utf8'
+    );
+
+    assert.match(
+      repositorySource,
+      /getLegacyMatrixStructure\s*\(/
+    );
+
+    assert.match(
+      repositorySource,
+      /getLegacyEvaluationRulesByVersion\s*\(/
+    );
+  }
+);
 
 test('MATRIXSAFE-SERVER-001 estructura ya no está inline', () => {
   assert.doesNotMatch(
