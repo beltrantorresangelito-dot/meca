@@ -44,9 +44,9 @@ async getLegacyMatrixVersionByDate(matrizId, date) {
         matrizId,
         date
     ]);
-
     return result.rows[0] || null;
-}  
+}
+
 async getLegacyMatrixStructure(versionId) {
   const versionResult = await this.db.query(
     'SELECT * FROM versiones_matriz WHERE id = $1',
@@ -929,11 +929,29 @@ async getVersionById(client, id) {
   return result.rows[0] || null;
 }
 
-async findVersionByName(client, version) {
-  const result = await client.query(
-    'SELECT id FROM versiones_matriz WHERE version = $1',
-    [version]
-  );
+async findVersionByName(
+  client,
+  matrizId,
+  version
+) {
+  const result =
+    await client.query(
+      `
+        SELECT
+          id,
+          matriz_id,
+          version
+        FROM versiones_matriz
+        WHERE matriz_id = $1
+          AND version = $2
+        LIMIT 1
+      `,
+      [
+        matrizId,
+        version
+      ]
+    );
+
   return result.rows[0] || null;
 }
 
@@ -1107,60 +1125,97 @@ async copyVersionTree(client, sourceVersionId, targetVersionId) {
 }
 
 async activateVersion(client, id) {
-  const target = await this.getVersionById(
-    client,
-    id
-  );
+    const versionId =
+        Number(id);
 
-  if (!target) {
-    return null;
-  }
+    if (
+        !Number.isInteger(versionId) ||
+        versionId <= 0
+    ) {
+        return null;
+    }
 
-  /*
-   * F11.7.5
-   *
-   * La exclusividad de versión activa es POR MATRIZ,
-   * no global para todo MECA.
-   *
-   * Activar una versión de Matriz A no puede afectar
-   * la versión activa de Matriz B.
-   */
-  await client.query(
-    `
-      UPDATE versiones_matriz
-      SET activa = FALSE
-      WHERE matriz_id = $1
-        AND activa = TRUE
-        AND id <> $2
-    `,
-    [
-      target.matriz_id,
-      id
-    ]
-  );
+    // ==================================================
+    // 1. OBTENER VERSIÓN QUE SE QUIERE ACTIVAR
+    // ==================================================
 
-  const result = await client.query(
-    `
-      UPDATE versiones_matriz
-      SET
-        activa = TRUE,
-        publicado_por = COALESCE(
-          publicado_por,
-          $2
-        ),
-        publicado_en = NOW()
-      WHERE id = $1
-        AND matriz_id = $3
-      RETURNING *
-    `,
-    [
-      id,
-      'Sistema',
-      target.matriz_id
-    ]
-  );
+    const target =
+        await this.getVersionById(
+            client,
+            versionId
+        );
 
-  return result.rows[0] || null;
+    if (!target) {
+        return null;
+    }
+
+    const matrizId =
+        Number(
+            target.matriz_id
+        );
+
+    if (
+        !Number.isInteger(matrizId) ||
+        matrizId <= 0
+    ) {
+        throw new Error(
+            `La versión ${versionId} no tiene una matriz válida asociada`
+        );
+    }
+
+
+    // ==================================================
+    // 2. DESACTIVAR SOLAMENTE VERSIONES
+    //    DE LA MISMA MATRIZ
+    // ==================================================
+
+    await client.query(
+        `
+        UPDATE versiones_matriz
+        SET activa = FALSE
+        WHERE matriz_id = $1
+          AND activa = TRUE
+          AND id <> $2
+        `,
+        [
+            matrizId,
+            versionId
+        ]
+    );
+
+
+    // ==================================================
+    // 3. ACTIVAR LA VERSIÓN SELECCIONADA
+    // ==================================================
+
+    const result =
+        await client.query(
+            `
+            UPDATE versiones_matriz
+            SET
+                activa = TRUE,
+                publicado_por =
+                    COALESCE(
+                        publicado_por,
+                        $2
+                    ),
+                publicado_en = NOW()
+            WHERE id = $1
+              AND matriz_id = $3
+            RETURNING *
+            `,
+            [
+                versionId,
+                'Sistema',
+                matrizId
+            ]
+        );
+
+
+    return (
+        result.rows[0] ||
+        null
+    );
 }
 
 async getVersionIntegrity(client, versionId) {

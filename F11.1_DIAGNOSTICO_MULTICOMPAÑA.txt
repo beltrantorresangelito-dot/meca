@@ -1,0 +1,186 @@
+======================================================
+ MECA F11.1 - DIAGNÓSTICO MULTI-QUIEBRE / MULTI-CAMPAÑA
+======================================================
+
+Archivos analizados : 155
+Hallazgos totales   : 39
+Alta prioridad      : 35
+Prioridad media     : 4
+Señales positivas   : 6
+
+SEÑALES DE PARAMETRIZACIÓN ENCONTRADAS
+--------------------------------------
+- F11-POS-001: Uso de quiebre_id -> migrations\0003_campanas_quiebre.down.sql:11
+- F11-POS-006: Concepto de versión de matriz -> migrations\0004_matrices_quiebre.down.sql:3
+- F11-POS-002: Uso de campana_id -> migrations\0005_campana_matriz_vigencia.up.sql:14
+- F11-POS-003: Resolver contexto de evaluación -> migrations\0006_domain_resolution.down.sql:2
+- F11-POS-004: Endpoint/API de quiebres -> src\modules\domain\domain.routes.js:12
+- F11-POS-005: Endpoint/API de campañas -> src\modules\domain\domain.routes.js:13
+
+HALLAZGOS A REVISAR
+-------------------
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0002_create_quiebres.up.sql:22
+  'COBRANZAS',
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0002_create_quiebres.up.sql:23
+  'Cobranzas',
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0002_create_quiebres.up.sql:24
+  'Actividad de gestión de cobranzas. Quiebre inicial de MECA.',
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0003_campanas_quiebre.up.sql:3
+  -- Todas las campañas existentes pertenecen actualmente al quiebre COBRANZAS.
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0003_campanas_quiebre.up.sql:12
+  WHERE codigo = 'COBRANZAS'
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0003_campanas_quiebre.up.sql:24
+  WHERE codigo = 'COBRANZAS';
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0003_campanas_quiebre.up.sql:27
+  RAISE EXCEPTION 'No existe el quiebre COBRANZAS. F1.6 debe estar aplicada.';
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0004_matrices_quiebre.up.sql:51
+  -- existentes de Cobranzas.
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0004_matrices_quiebre.up.sql:62
+  'Matriz de Cobranzas',
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0004_matrices_quiebre.up.sql:63
+  'Matriz inicial que agrupa las versiones históricas existentes de Cobranzas.',
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0004_matrices_quiebre.up.sql:66
+  WHERE q.codigo = 'COBRANZAS';
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0004_matrices_quiebre.up.sql:76
+  WHERE q.codigo = 'COBRANZAS'
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0004_matrices_quiebre.up.sql:80
+  RAISE EXCEPTION 'No se pudo crear MATRIZ_COBRANZAS. Verifique que exista el quiebre COBRANZAS.';
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0004_matrices_quiebre.up.sql:92
+  WHERE q.codigo = 'COBRANZAS'
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0005_campana_matriz_vigencia.up.sql:128
+  -- todas las campañas existentes son de COBRANZAS y usan la matriz raíz
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  migrations\0005_campana_matriz_vigencia.up.sql:147
+  AND qc.codigo = 'COBRANZAS'
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  public\js\auditor.js:3688
+  // F1.3 - Regla oficial vigente de Cobranzas.
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  public\js\supervisor.js:23671
+  Documento generado automáticamente por Sistema MECA - © Auditoría Calidad Cobranzas<br>
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  public\js\supervisor.js:23819
+  ║  👤 EMITIDO POR: Mesa Calidad Cobranzas${' '.repeat(29)}║
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  public\js\supervisor.js:23852
+  ║  © Auditoría Calidad Cobranzas - No requiere respuesta del gestor              ║
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  public\js\supervisor.js:46906
+  <p>Movistar Perú - Auditoría Calidad Cobranzas | Generado: ${fecha}</p>
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  public\js\supervisor.js:47171
+  © Auditoría Calidad Cobranzas - Todos los derechos reservados
+
+[HIGH] F11-HARD-002 - Campaña Temprana hardcodeada
+  public\js\supervisor.js:49469
+  * @param {string} data.descripcion - Descripción (Temprana, Super Temprana, Fraccionamiento)
+
+[HIGH] F11-HARD-003 - Campaña Super Temprana hardcodeada
+  public\js\supervisor.js:49469
+  * @param {string} data.descripcion - Descripción (Temprana, Super Temprana, Fraccionamiento)
+
+[HIGH] F11-HARD-002 - Campaña Temprana hardcodeada
+  public\js\supervisor.js:50330
+  { codigo: 'T', descripcion: 'Temprana' },
+
+[HIGH] F11-HARD-002 - Campaña Temprana hardcodeada
+  public\js\supervisor.js:50331
+  { codigo: 'ST', descripcion: 'Super Temprana' },
+
+[HIGH] F11-HARD-003 - Campaña Super Temprana hardcodeada
+  public\js\supervisor.js:50331
+  { codigo: 'ST', descripcion: 'Super Temprana' },
+
+[HIGH] F11-HARD-001 - Código de quiebre COBRANZAS hardcodeado
+  scripts\f111-diagnostico-multiquiebre.js:36
+  title: 'Código de quiebre COBRANZAS hardcodeado',
+
+[HIGH] F11-HARD-002 - Campaña Temprana hardcodeada
+  scripts\f111-diagnostico-multiquiebre.js:42
+  title: 'Campaña Temprana hardcodeada',
+
+[HIGH] F11-HARD-002 - Campaña Temprana hardcodeada
+  scripts\f111-diagnostico-multiquiebre.js:48
+  title: 'Campaña Super Temprana hardcodeada',
+
+[HIGH] F11-HARD-003 - Campaña Super Temprana hardcodeada
+  scripts\f111-diagnostico-multiquiebre.js:48
+  title: 'Campaña Super Temprana hardcodeada',
+
+[HIGH] F11-HARD-008 - Referencia explícita a matriz legacy
+  scripts\f111-diagnostico-multiquiebre.js:78
+  title: 'Referencia explícita a matriz legacy',
+
+[HIGH] F11-HARD-008 - Referencia explícita a matriz legacy
+  scripts\f111-diagnostico-multiquiebre.js:79
+  regex: /legacy.{0,30}matriz|matriz.{0,30}legacy/i
+
+[HIGH] F11-HARD-002 - Campaña Temprana hardcodeada
+  views\supervisor\dashboard.html:3525
+  placeholder="Ej: Temprana, Super Temprana, Fraccionamiento"
+
+[HIGH] F11-HARD-003 - Campaña Super Temprana hardcodeada
+  views\supervisor\dashboard.html:3525
+  placeholder="Ej: Temprana, Super Temprana, Fraccionamiento"
+
+[MEDIUM] F11-HARD-004 - Campaña Fraccionamiento hardcodeada
+  public\js\supervisor.js:49469
+  * @param {string} data.descripcion - Descripción (Temprana, Super Temprana, Fraccionamiento)
+
+[MEDIUM] F11-HARD-004 - Campaña Fraccionamiento hardcodeada
+  public\js\supervisor.js:50332
+  { codigo: 'F', descripcion: 'Fraccionamiento' }
+
+[MEDIUM] F11-HARD-004 - Campaña Fraccionamiento hardcodeada
+  scripts\f111-diagnostico-multiquiebre.js:54
+  title: 'Campaña Fraccionamiento hardcodeada',
+
+[MEDIUM] F11-HARD-004 - Campaña Fraccionamiento hardcodeada
+  views\supervisor\dashboard.html:3525
+  placeholder="Ej: Temprana, Super Temprana, Fraccionamiento"
+
+INTERPRETACIÓN
+--------------
+HIGH no significa automáticamente bug: requiere revisión funcional.
+Los textos de UI o datos semilla pueden ser legítimos; un valor usado
+para decidir comportamiento sí representa acoplamiento a corregir.
+
+No modificar nada hasta clasificar cada hallazgo como:
+DATO / UI / SEED / TEST / LEGACY / LOGICA_ACOPLADA.

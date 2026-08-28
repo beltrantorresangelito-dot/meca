@@ -1,0 +1,467 @@
+﻿
+  src\modules\domain\domain.routes.js:7:  const controller = new 
+DomainController(service);
+  src\modules\domain\domain.routes.js:8:
+  src\modules\domain\domain.routes.js:9:  const routes = new Map([
+> src\modules\domain\domain.routes.js:10:    ['/api/domain/quiebres', 
+controller.listBreaks.bind(controller)],
+> src\modules\domain\domain.routes.js:11:    ['/api/domain/campanas', 
+controller.listCampaigns.bind(controller)],
+> src\modules\domain\domain.routes.js:12:    ['/api/domain/matrices', 
+controller.listMatrices.bind(controller)],
+> src\modules\domain\domain.routes.js:13:    ['/api/domain/campana-matriz', 
+controller.campaignMatrixHistory.bind(controller)],
+> src\modules\domain\domain.routes.js:14:    ['/api/domain/contexto-evaluacion', 
+controller.resolveContext.bind(controller)],
+> src\modules\domain\domain.routes.js:15:    ['/api/domain/consistencia', 
+controller.consistency.bind(controller)]
+  src\modules\domain\domain.routes.js:16:  ]);
+  src\modules\domain\domain.routes.js:17:
+  src\modules\domain\domain.routes.js:18:  return async function handleDomainRequest({
+  src\modules\domain\domain.routes.js:19:    ruta,
+  src\modules\domain\domain.routes.js:20:    metodo,
+  src\modules\domain\domain.routes.js:21:    peticion,
+  src\modules\domain\domain.routes.js:22:    respuesta,
+  src\modules\domain\domain.routes.js:23:    query
+  src\modules\domain\domain.routes.js:24:  }) {
+  src\modules\domain\domain.routes.js:25:    if (metodo !== 'GET') {
+  src\modules\domain\domain.routes.js:26:      return false;
+  src\modules\domain\domain.routes.js:27:    }
+  src\modules\domain\domain.routes.js:28:
+  src\modules\domain\domain.routes.js:29:    const handler = routes.get(ruta);
+  src\modules\domain\domain.routes.js:30:
+  src\modules\domain\domain.routes.js:58:
+  src\modules\domain\domain.routes.js:59:  const definitions = [
+  src\modules\domain\domain.routes.js:60:    [
+> src\modules\domain\domain.routes.js:61:      '/api/domain/quiebres',
+  src\modules\domain\domain.routes.js:62:      controller.listBreaks.bind(controller)
+  src\modules\domain\domain.routes.js:63:    ],
+  src\modules\domain\domain.routes.js:64:    [
+> src\modules\domain\domain.routes.js:65:      '/api/domain/campanas',
+  src\modules\domain\domain.routes.js:66:      
+controller.listCampaigns.bind(controller)
+  src\modules\domain\domain.routes.js:67:    ],
+  src\modules\domain\domain.routes.js:68:    [
+> src\modules\domain\domain.routes.js:69:      '/api/domain/matrices',
+  src\modules\domain\domain.routes.js:70:      controller.listMatrices.bind(controller)
+  src\modules\domain\domain.routes.js:71:    ],
+  src\modules\domain\domain.routes.js:72:    [
+> src\modules\domain\domain.routes.js:73:      '/api/domain/campana-matriz',
+  src\modules\domain\domain.routes.js:74:      
+controller.campaignMatrixHistory.bind(controller)
+  src\modules\domain\domain.routes.js:75:    ],
+  src\modules\domain\domain.routes.js:76:    [
+> src\modules\domain\domain.routes.js:77:      '/api/domain/contexto-evaluacion',
+  src\modules\domain\domain.routes.js:78:      
+controller.resolveContext.bind(controller)
+  src\modules\domain\domain.routes.js:79:    ],
+  src\modules\domain\domain.routes.js:80:    [
+> src\modules\domain\domain.routes.js:81:      '/api/domain/consistencia',
+  src\modules\domain\domain.routes.js:82:      controller.consistency.bind(controller)
+  src\modules\domain\domain.routes.js:83:    ]
+  src\modules\domain\domain.routes.js:84:  ];
+  src\modules\domain\domain.routes.js:85:
+  src\modules\domain\domain.routes.js:86:  for (const [routePath, handler] of 
+definitions) {
+  src\modules\domain\domain.routes.js:87:    targetRoutes[routePath] =
+  src\modules\domain\domain.routes.js:88:      targetRoutes[routePath] || {};
+  src\modules\domain\domain.routes.js:89:
+  src\modules\domain\domain.routes.js:90:    targetRoutes[routePath].GET =
+  src\modules\domain\domain.routes.js:91:      handler;
+  src\modules\domain\domain.routes.js:92:  }
+  src\modules\domain\domain.routes.js:93:
+  src\modules\domain\domain.routes.js:94:  return definitions.map(
+  src\modules\domain\domain.routes.js:95:    ([routePath]) => routePath
+  src\modules\domain\domain.routes.js:96:  );
+  src\modules\matrix\matrix.routes.js:16:    if (metodo !== 'GET') return false;
+  src\modules\matrix\matrix.routes.js:17:
+  src\modules\matrix\matrix.routes.js:18:
+> src\modules\matrix\matrix.routes.js:19:if (ruta === '/api/matriz/frentes') {
+> src\modules\matrix\matrix.routes.js:20:  console.log('[API] GET 
+/api/matriz/frentes');
+  src\modules\matrix\matrix.routes.js:21:
+  src\modules\matrix\matrix.routes.js:22:  await controller.listFrentes(
+  src\modules\matrix\matrix.routes.js:23:    peticion,
+  src\modules\matrix\matrix.routes.js:24:    respuesta,
+  src\modules\matrix\matrix.routes.js:25:    query
+  src\modules\matrix\matrix.routes.js:26:  );
+  src\modules\matrix\matrix.routes.js:27:
+  src\modules\matrix\matrix.routes.js:28:  return true;
+  src\modules\matrix\matrix.routes.js:29:}
+  src\modules\matrix\matrix.routes.js:30:
+> src\modules\matrix\matrix.routes.js:31:if (ruta === '/api/matriz/atributos') {
+> src\modules\matrix\matrix.routes.js:32:  console.log('[API] GET 
+/api/matriz/atributos');
+  src\modules\matrix\matrix.routes.js:33:  await controller.listAtributos(peticion, 
+respuesta, query);
+  src\modules\matrix\matrix.routes.js:34:  return true;
+  src\modules\matrix\matrix.routes.js:35:}
+  src\modules\matrix\matrix.routes.js:36:
+> src\modules\matrix\matrix.routes.js:37:if (ruta === '/api/matriz/sub-motivos') {
+> src\modules\matrix\matrix.routes.js:38:  console.log('[API] GET 
+/api/matriz/sub-motivos');
+  src\modules\matrix\matrix.routes.js:39:  await controller.listSubMotivos(peticion, 
+respuesta, query);
+  src\modules\matrix\matrix.routes.js:40:  return true;
+  src\modules\matrix\matrix.routes.js:41:}
+  src\modules\matrix\matrix.routes.js:42:
+  src\modules\matrix\matrix.routes.js:43:if (ruta === '/api/reglas-evaluacion') {
+  src\modules\matrix\matrix.routes.js:44:  console.log('[API] GET 
+/api/reglas-evaluacion');
+  src\modules\matrix\matrix.routes.js:45:
+  src\modules\matrix\matrix.routes.js:46:  await controller.listEvaluationRulesAdmin(
+  src\modules\matrix\matrix.routes.js:47:    peticion,
+  src\modules\matrix\matrix.routes.js:48:    respuesta,
+  src\modules\matrix\matrix.routes.js:49:    query
+  src\modules\matrix\matrix.routes.js:50:  );
+  src\modules\matrix\matrix.routes.js:51:
+  src\modules\matrix\matrix.routes.js:52:  return true;
+  src\modules\matrix\matrix.routes.js:53:}
+  src\modules\matrix\matrix.routes.js:62:      return true;
+  src\modules\matrix\matrix.routes.js:63:    }
+  src\modules\matrix\matrix.routes.js:64:
+> src\modules\matrix\matrix.routes.js:65:    if (ruta === 
+'/api/matriz/versiones/activa') {
+> src\modules\matrix\matrix.routes.js:66:      console.log('[API] GET 
+/api/matriz/versiones/activa');
+  src\modules\matrix\matrix.routes.js:67:      await controller.activeVersion(
+  src\modules\matrix\matrix.routes.js:68:          peticion,
+  src\modules\matrix\matrix.routes.js:69:          respuesta,
+  src\modules\matrix\matrix.routes.js:70:          query
+  src\modules\matrix\matrix.routes.js:71:      );
+  src\modules\matrix\matrix.routes.js:72:      return true;
+  src\modules\matrix\matrix.routes.js:73:    }
+  src\modules\matrix\matrix.routes.js:74:
+> src\modules\matrix\matrix.routes.js:75:    if (ruta === 
+'/api/matriz/versiones/por-fecha') {
+> src\modules\matrix\matrix.routes.js:76:      console.log('[API] GET 
+/api/matriz/versiones/por-fecha');
+  src\modules\matrix\matrix.routes.js:77:      await 
+controller.versionByDate(peticion, respuesta, query);
+  src\modules\matrix\matrix.routes.js:78:      return true;
+  src\modules\matrix\matrix.routes.js:79:    }
+  src\modules\matrix\matrix.routes.js:80:
+  src\modules\matrix\matrix.routes.js:81:    const structureMatch = ruta.match(
+  src\modules\matrix\matrix.routes.js:82:      
+/^\/api\/matriz\/versiones\/(\d+)\/estructura$/
+  src\modules\matrix\matrix.routes.js:83:    );
+  src\modules\matrix\matrix.routes.js:84:
+  src\modules\matrix\matrix.routes.js:85:    if (structureMatch) {
+> src\modules\matrix\matrix.routes.js:86:      console.log('[API] GET 
+/api/matriz/versiones/:id/estructura');
+  src\modules\matrix\matrix.routes.js:87:      await controller.structure(
+  src\modules\matrix\matrix.routes.js:88:        peticion,
+  src\modules\matrix\matrix.routes.js:89:        respuesta,
+  src\modules\matrix\matrix.routes.js:90:        structureMatch[1]
+  src\modules\matrix\matrix.routes.js:91:      );
+  src\modules\matrix\matrix.routes.js:92:      return true;
+  src\modules\matrix\matrix.routes.js:93:    }
+  src\modules\matrix\matrix.routes.js:94:
+> src\modules\matrix\matrix.routes.js:95:    if (ruta === '/api/matriz/versiones') {
+> src\modules\matrix\matrix.routes.js:96:      console.log('[API] GET 
+/api/matriz/versiones');
+  src\modules\matrix\matrix.routes.js:97:
+  src\modules\matrix\matrix.routes.js:98:      await controller.listVersions(
+  src\modules\matrix\matrix.routes.js:99:        peticion,
+  src\modules\matrix\matrix.routes.js:100:        respuesta,
+  src\modules\matrix\matrix.routes.js:101:        query
+  src\modules\matrix\matrix.routes.js:102:      );
+  src\modules\matrix\matrix.routes.js:103:
+  src\modules\matrix\matrix.routes.js:104:      return true;
+  src\modules\matrix\matrix.routes.js:105:    }
+  src\modules\matrix\matrix.routes.js:106:
+  src\modules\matrix\matrix.routes.js:107:    const rulesMatch = ruta.match(
+  src\modules\matrix\matrix.routes.js:108:      
+/^\/api\/reglas-evaluacion\/version\/(\d+)$/
+  src\modules\matrix\matrix.routes.js:109:    );
+  src\modules\matrix\matrix.routes.js:110:
+  src\modules\matrix\matrix.routes.js:111:    if (rulesMatch) {
+  src\modules\matrix\matrix.routes.js:170:    peticion,
+  src\modules\matrix\matrix.routes.js:171:    respuesta
+  src\modules\matrix\matrix.routes.js:172:  }) {
+> src\modules\matrix\matrix.routes.js:173:    if (ruta === '/api/matriz/frentes' && 
+metodo === 'POST') {
+> src\modules\matrix\matrix.routes.js:174:      console.log('[API] POST 
+/api/matriz/frentes');
+  src\modules\matrix\matrix.routes.js:175:
+  src\modules\matrix\matrix.routes.js:176:      let body;
+  src\modules\matrix\matrix.routes.js:177:      try {
+  src\modules\matrix\matrix.routes.js:178:        body = await readJsonBody(peticion);
+  src\modules\matrix\matrix.routes.js:179:      } catch (error) {
+  src\modules\matrix\matrix.routes.js:180:        MatrixController.json(respuesta, 
+500, { error: error.message });
+  src\modules\matrix\matrix.routes.js:181:        return true;
+  src\modules\matrix\matrix.routes.js:182:      }
+  src\modules\matrix\matrix.routes.js:183:
+  src\modules\matrix\matrix.routes.js:184:      await controller.createFront(peticion, 
+respuesta, body);
+  src\modules\matrix\matrix.routes.js:185:      return true;
+  src\modules\matrix\matrix.routes.js:186:    }
+  src\modules\matrix\matrix.routes.js:187:
+  src\modules\matrix\matrix.routes.js:188:    const frontMatch = 
+ruta.match(/^\/api\/matriz\/frentes\/(\d+)$/);
+  src\modules\matrix\matrix.routes.js:189:
+  src\modules\matrix\matrix.routes.js:190:    if (frontMatch && metodo === 'PUT') {
+> src\modules\matrix\matrix.routes.js:191:      console.log('[API] PUT 
+/api/matriz/frentes/:id');
+  src\modules\matrix\matrix.routes.js:192:
+  src\modules\matrix\matrix.routes.js:193:      let body;
+  src\modules\matrix\matrix.routes.js:194:      try {
+  src\modules\matrix\matrix.routes.js:195:        body = await readJsonBody(peticion);
+  src\modules\matrix\matrix.routes.js:196:      } catch (error) {
+  src\modules\matrix\matrix.routes.js:197:        MatrixController.json(respuesta, 
+500, { error: error.message });
+  src\modules\matrix\matrix.routes.js:198:        return true;
+  src\modules\matrix\matrix.routes.js:199:      }
+  src\modules\matrix\matrix.routes.js:200:
+  src\modules\matrix\matrix.routes.js:201:      await controller.updateFront(
+  src\modules\matrix\matrix.routes.js:202:        peticion,
+  src\modules\matrix\matrix.routes.js:203:        respuesta,
+  src\modules\matrix\matrix.routes.js:204:        frontMatch[1],
+  src\modules\matrix\matrix.routes.js:205:        body
+  src\modules\matrix\matrix.routes.js:206:      );
+  src\modules\matrix\matrix.routes.js:212:  metodo === 'DELETE'
+  src\modules\matrix\matrix.routes.js:213:) {
+  src\modules\matrix\matrix.routes.js:214:  console.log(
+> src\modules\matrix\matrix.routes.js:215:    '[API] DELETE /api/matriz/frentes/:id'
+  src\modules\matrix\matrix.routes.js:216:  );
+  src\modules\matrix\matrix.routes.js:217:
+  src\modules\matrix\matrix.routes.js:218:  let body;
+  src\modules\matrix\matrix.routes.js:219:
+  src\modules\matrix\matrix.routes.js:220:  try {
+  src\modules\matrix\matrix.routes.js:221:    body =
+  src\modules\matrix\matrix.routes.js:222:      await readJsonBody(
+  src\modules\matrix\matrix.routes.js:223:        peticion
+  src\modules\matrix\matrix.routes.js:224:      );
+  src\modules\matrix\matrix.routes.js:225:  } catch (error) {
+  src\modules\matrix\matrix.routes.js:226:    MatrixController.json(
+  src\modules\matrix\matrix.routes.js:227:      respuesta,
+  src\modules\matrix\matrix.routes.js:228:      400,
+  src\modules\matrix\matrix.routes.js:229:      {
+  src\modules\matrix\matrix.routes.js:230:        error:
+  src\modules\matrix\matrix.routes.js:246:}
+  src\modules\matrix\matrix.routes.js:247:
+  src\modules\matrix\matrix.routes.js:248:
+> src\modules\matrix\matrix.routes.js:249:if (ruta === '/api/matriz/atributos' && 
+metodo === 'POST') {
+> src\modules\matrix\matrix.routes.js:250:  console.log('[API] POST 
+/api/matriz/atributos');
+  src\modules\matrix\matrix.routes.js:251:
+  src\modules\matrix\matrix.routes.js:252:  let body;
+  src\modules\matrix\matrix.routes.js:253:  try {
+  src\modules\matrix\matrix.routes.js:254:    body = await readJsonBody(peticion);
+  src\modules\matrix\matrix.routes.js:255:  } catch (error) {
+  src\modules\matrix\matrix.routes.js:256:    MatrixController.json(respuesta, 500, { 
+error: error.message });
+  src\modules\matrix\matrix.routes.js:257:    return true;
+  src\modules\matrix\matrix.routes.js:258:  }
+  src\modules\matrix\matrix.routes.js:259:
+  src\modules\matrix\matrix.routes.js:260:  await controller.createAttribute(peticion, 
+respuesta, body);
+  src\modules\matrix\matrix.routes.js:261:  return true;
+  src\modules\matrix\matrix.routes.js:262:}
+  src\modules\matrix\matrix.routes.js:263:
+  src\modules\matrix\matrix.routes.js:264:const attributeMatch = 
+ruta.match(/^\/api\/matriz\/atributos\/(\d+)$/);
+  src\modules\matrix\matrix.routes.js:265:
+  src\modules\matrix\matrix.routes.js:266:if (attributeMatch && metodo === 'PUT') {
+> src\modules\matrix\matrix.routes.js:267:  console.log('[API] PUT 
+/api/matriz/atributos/:id');
+  src\modules\matrix\matrix.routes.js:268:
+  src\modules\matrix\matrix.routes.js:269:  let body;
+  src\modules\matrix\matrix.routes.js:270:  try {
+  src\modules\matrix\matrix.routes.js:271:    body = await readJsonBody(peticion);
+  src\modules\matrix\matrix.routes.js:272:  } catch (error) {
+  src\modules\matrix\matrix.routes.js:273:    MatrixController.json(respuesta, 500, { 
+error: error.message });
+  src\modules\matrix\matrix.routes.js:274:    return true;
+  src\modules\matrix\matrix.routes.js:275:  }
+  src\modules\matrix\matrix.routes.js:276:
+  src\modules\matrix\matrix.routes.js:277:  await controller.updateAttribute(
+  src\modules\matrix\matrix.routes.js:278:    peticion,
+  src\modules\matrix\matrix.routes.js:279:    respuesta,
+  src\modules\matrix\matrix.routes.js:280:    attributeMatch[1],
+  src\modules\matrix\matrix.routes.js:281:    body
+  src\modules\matrix\matrix.routes.js:282:  );
+  src\modules\matrix\matrix.routes.js:284:}
+  src\modules\matrix\matrix.routes.js:285:
+  src\modules\matrix\matrix.routes.js:286:if (attributeMatch && metodo === 'DELETE') {
+> src\modules\matrix\matrix.routes.js:287:  console.log('[API] DELETE 
+/api/matriz/atributos/:id');
+  src\modules\matrix\matrix.routes.js:288:
+  src\modules\matrix\matrix.routes.js:289:  let body = {};
+  src\modules\matrix\matrix.routes.js:290:
+  src\modules\matrix\matrix.routes.js:291:  try {
+  src\modules\matrix\matrix.routes.js:292:    body = await readJsonBody(peticion);
+  src\modules\matrix\matrix.routes.js:293:  } catch (error) {
+  src\modules\matrix\matrix.routes.js:294:    // DELETE legacy puede llegar sin body.
+  src\modules\matrix\matrix.routes.js:295:    // Conservamos compatibilidad durante la 
+transición.
+  src\modules\matrix\matrix.routes.js:296:    body = {};
+  src\modules\matrix\matrix.routes.js:297:  }
+  src\modules\matrix\matrix.routes.js:298:
+  src\modules\matrix\matrix.routes.js:299:  await controller.deleteAttribute(
+  src\modules\matrix\matrix.routes.js:300:    peticion,
+  src\modules\matrix\matrix.routes.js:301:    respuesta,
+  src\modules\matrix\matrix.routes.js:302:    attributeMatch[1],
+  src\modules\matrix\matrix.routes.js:307:}
+  src\modules\matrix\matrix.routes.js:308:
+  src\modules\matrix\matrix.routes.js:309:
+> src\modules\matrix\matrix.routes.js:310:if (ruta === '/api/matriz/sub-motivos' && 
+metodo === 'POST') {
+> src\modules\matrix\matrix.routes.js:311:  console.log('[API] POST 
+/api/matriz/sub-motivos');
+  src\modules\matrix\matrix.routes.js:312:
+  src\modules\matrix\matrix.routes.js:313:  let body;
+  src\modules\matrix\matrix.routes.js:314:  try {
+  src\modules\matrix\matrix.routes.js:315:    body = await readJsonBody(peticion);
+  src\modules\matrix\matrix.routes.js:316:  } catch (error) {
+  src\modules\matrix\matrix.routes.js:317:    MatrixController.json(respuesta, 500, { 
+error: error.message });
+  src\modules\matrix\matrix.routes.js:318:    return true;
+  src\modules\matrix\matrix.routes.js:319:  }
+  src\modules\matrix\matrix.routes.js:320:
+  src\modules\matrix\matrix.routes.js:321:  await controller.createSubReason(peticion, 
+respuesta, body);
+  src\modules\matrix\matrix.routes.js:322:  return true;
+  src\modules\matrix\matrix.routes.js:323:}
+  src\modules\matrix\matrix.routes.js:324:
+  src\modules\matrix\matrix.routes.js:325:const subReasonMatch = 
+ruta.match(/^\/api\/matriz\/sub-motivos\/(\d+)$/);
+  src\modules\matrix\matrix.routes.js:326:
+  src\modules\matrix\matrix.routes.js:327:if (subReasonMatch && metodo === 'PUT') {
+> src\modules\matrix\matrix.routes.js:328:  console.log('[API] PUT 
+/api/matriz/sub-motivos/:id');
+  src\modules\matrix\matrix.routes.js:329:
+  src\modules\matrix\matrix.routes.js:330:  let body;
+  src\modules\matrix\matrix.routes.js:331:  try {
+  src\modules\matrix\matrix.routes.js:332:    body = await readJsonBody(peticion);
+  src\modules\matrix\matrix.routes.js:333:  } catch (error) {
+  src\modules\matrix\matrix.routes.js:334:    MatrixController.json(respuesta, 500, { 
+error: error.message });
+  src\modules\matrix\matrix.routes.js:335:    return true;
+  src\modules\matrix\matrix.routes.js:336:  }
+  src\modules\matrix\matrix.routes.js:337:
+  src\modules\matrix\matrix.routes.js:338:  await controller.updateSubReason(
+  src\modules\matrix\matrix.routes.js:339:    peticion,
+  src\modules\matrix\matrix.routes.js:340:    respuesta,
+  src\modules\matrix\matrix.routes.js:341:    subReasonMatch[1],
+  src\modules\matrix\matrix.routes.js:342:    body
+  src\modules\matrix\matrix.routes.js:343:  );
+  src\modules\matrix\matrix.routes.js:345:}
+  src\modules\matrix\matrix.routes.js:346:
+  src\modules\matrix\matrix.routes.js:347:if (subReasonMatch && metodo === 'DELETE') {
+> src\modules\matrix\matrix.routes.js:348:  console.log('[API] DELETE 
+/api/matriz/sub-motivos/:id');
+  src\modules\matrix\matrix.routes.js:349:
+  src\modules\matrix\matrix.routes.js:350:  let body = {};
+  src\modules\matrix\matrix.routes.js:351:
+  src\modules\matrix\matrix.routes.js:352:  try {
+  src\modules\matrix\matrix.routes.js:353:    body = await readJsonBody(peticion);
+  src\modules\matrix\matrix.routes.js:354:  } catch (error) {
+  src\modules\matrix\matrix.routes.js:355:    // Compatibilidad legacy:
+  src\modules\matrix\matrix.routes.js:356:    // DELETE puede llegar sin body.
+  src\modules\matrix\matrix.routes.js:357:    body = {};
+  src\modules\matrix\matrix.routes.js:358:  }
+  src\modules\matrix\matrix.routes.js:359:
+  src\modules\matrix\matrix.routes.js:360:  await controller.deleteSubReason(
+  src\modules\matrix\matrix.routes.js:361:    peticion,
+  src\modules\matrix\matrix.routes.js:362:    respuesta,
+  src\modules\matrix\matrix.routes.js:363:    subReasonMatch[1],
+  src\modules\matrix\matrix.routes.js:369:
+  src\modules\matrix\matrix.routes.js:370:
+  src\modules\matrix\matrix.routes.js:371:
+> src\modules\matrix\matrix.routes.js:372:if (ruta === 
+'/api/matriz/versiones/congelar' && metodo === 'POST') {
+  src\modules\matrix\matrix.routes.js:373:  let body;
+  src\modules\matrix\matrix.routes.js:374:  try { body = await readJsonBody(peticion); 
+}
+  src\modules\matrix\matrix.routes.js:375:  catch (error) {
+  src\modules\matrix\matrix.routes.js:376:    MatrixController.json(respuesta, 500, { 
+error: error.message });
+  src\modules\matrix\matrix.routes.js:377:    return true;
+  src\modules\matrix\matrix.routes.js:378:  }
+  src\modules\matrix\matrix.routes.js:379:  await controller.freezeVersion(peticion, 
+respuesta, body);
+  src\modules\matrix\matrix.routes.js:380:  return true;
+  src\modules\matrix\matrix.routes.js:381:}
+  src\modules\matrix\matrix.routes.js:382:
+> src\modules\matrix\matrix.routes.js:383:if (ruta === '/api/matriz/versiones' && 
+metodo === 'POST') {
+  src\modules\matrix\matrix.routes.js:384:  let body;
+  src\modules\matrix\matrix.routes.js:385:  try { body = await readJsonBody(peticion); 
+}
+  src\modules\matrix\matrix.routes.js:386:  catch (error) {
+  src\modules\matrix\matrix.routes.js:387:    MatrixController.json(respuesta, 500, { 
+error: error.message });
+  src\modules\matrix\matrix.routes.js:388:    return true;
+  src\modules\matrix\matrix.routes.js:389:  }
+  src\modules\matrix\matrix.routes.js:390:  await 
+controller.createEmptyVersion(peticion, respuesta, body);
+  src\modules\matrix\matrix.routes.js:391:  return true;
+  src\modules\matrix\matrix.routes.js:392:}
+  src\modules\matrix\matrix.routes.js:393:
+  src\modules\matrix\matrix.routes.js:394:const activateVersionMatch = ruta.match(
+  src\modules\matrix\matrix.routes.js:395:  
+/^\/api\/matriz\/versiones\/(\d+)\/activar$/
+  src\modules\matrix\matrix.routes.js:396:);
+  src\modules\matrix\matrix.routes.js:397:if (activateVersionMatch && metodo === 
+'PUT') {
+  src\modules\matrix\matrix.routes.js:398:  await controller.activateVersion(
+  src\modules\matrix\matrix.routes.js:411:  return true;
+  src\modules\matrix\matrix.routes.js:412:}
+  src\modules\matrix\matrix.routes.js:413:
+> src\modules\matrix\matrix.routes.js:414:if (ruta === '/api/matriz/validar/frentes' 
+&& metodo === 'POST') {
+  src\modules\matrix\matrix.routes.js:415:  let body;
+  src\modules\matrix\matrix.routes.js:416:  try { body = await readJsonBody(peticion); 
+}
+  src\modules\matrix\matrix.routes.js:417:  catch (error) {
+  src\modules\matrix\matrix.routes.js:418:    MatrixController.json(respuesta, 500, { 
+error: error.message });
+  src\modules\matrix\matrix.routes.js:419:    return true;
+  src\modules\matrix\matrix.routes.js:420:  }
+  src\modules\matrix\matrix.routes.js:421:  await 
+controller.validateFrontWeight(peticion, respuesta, body);
+  src\modules\matrix\matrix.routes.js:422:  return true;
+  src\modules\matrix\matrix.routes.js:423:}
+  src\modules\matrix\matrix.routes.js:424:
+> src\modules\matrix\matrix.routes.js:425:if (ruta === '/api/matriz/validar/atributos' 
+&& metodo === 'POST') {
+  src\modules\matrix\matrix.routes.js:426:  let body;
+  src\modules\matrix\matrix.routes.js:427:  try { body = await readJsonBody(peticion); 
+}
+  src\modules\matrix\matrix.routes.js:428:  catch (error) {
+  src\modules\matrix\matrix.routes.js:429:    MatrixController.json(respuesta, 500, { 
+error: error.message });
+  src\modules\matrix\matrix.routes.js:430:    return true;
+  src\modules\matrix\matrix.routes.js:431:  }
+  src\modules\matrix\matrix.routes.js:432:  await 
+controller.validateAttributeWeight(peticion, respuesta, body);
+  src\modules\matrix\matrix.routes.js:433:  return true;
+  src\modules\matrix\matrix.routes.js:434:}
+  src\modules\matrix\matrix.routes.js:435:
+> src\modules\matrix\matrix.routes.js:436:if (ruta === 
+'/api/matriz/validar/sub-motivos' && metodo === 'POST') {
+  src\modules\matrix\matrix.routes.js:437:  let body;
+  src\modules\matrix\matrix.routes.js:438:  try { body = await readJsonBody(peticion); 
+}
+  src\modules\matrix\matrix.routes.js:439:  catch (error) {
+  src\modules\matrix\matrix.routes.js:440:    MatrixController.json(respuesta, 500, { 
+error: error.message });
+  src\modules\matrix\matrix.routes.js:441:    return true;
+  src\modules\matrix\matrix.routes.js:442:  }
+  src\modules\matrix\matrix.routes.js:443:  await 
+controller.validateSubReasonWeight(peticion, respuesta, body);
+  src\modules\matrix\matrix.routes.js:444:  return true;
+  src\modules\matrix\matrix.routes.js:445:}
+  src\modules\matrix\matrix.routes.js:446:
+  src\modules\matrix\matrix.routes.js:447:
+  src\modules\matrix\matrix.routes.js:448:if (ruta === '/api/reglas-evaluacion' && 
+metodo === 'POST') {
+  src\modules\matrix\matrix.routes.js:449:  let body;
+  src\modules\matrix\matrix.routes.js:450:  try { body = await readJsonBody(peticion); 
+}
+  src\modules\matrix\matrix.routes.js:451:  catch (error) {
+
+

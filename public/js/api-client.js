@@ -1842,37 +1842,142 @@ async function loginConAPI(usuario, contrasena) {
     // ======================================================
     // CREAR FRENTE - USAR VERSION_FRENTES
     // ======================================================
-    async function crearFrente(data) {
-        const token = localStorage.getItem('meca_token');
-        
-        const response = await fetch('/api/query', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                table: 'version_frentes',
-                operation: 'insert',
-                data: {
-                    codigo: data.codigo,
-                    nombre: data.nombre,
-                    peso_maximo: data.peso_maximo,
-                    orden: data.orden || 0,
-                    activo: data.activo !== undefined ? data.activo : true,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                }
-            })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al crear frente');
+    async function crearFrente(data = {}) {
+        const token =
+            localStorage.getItem(
+                'meca_token'
+            );
+
+
+        const matrizId =
+            Number(
+                data.matriz_id ??
+                data.matrizId ??
+                0
+            );
+
+
+        const versionId =
+            Number(
+                data.version_matriz_id ??
+                data.versionId ??
+                data.version_id ??
+                0
+            );
+
+
+        if (
+            !Number.isInteger(matrizId) ||
+            matrizId <= 0
+        ) {
+            throw new Error(
+                'matriz_id requerido para crear frente'
+            );
         }
-        
-        const result = await response.json();
-        return result.data && result.data.length > 0 ? result.data[0] : null;
+
+
+        if (
+            !Number.isInteger(versionId) ||
+            versionId <= 0
+        ) {
+            throw new Error(
+                'version_matriz_id requerido para crear frente'
+            );
+        }
+
+
+        const payload = {
+            codigo:
+                data.codigo,
+
+            nombre:
+                data.nombre,
+
+            peso_maximo:
+                data.peso_maximo,
+
+            orden:
+                data.orden ?? 0,
+
+            activo:
+                data.activo !== false,
+
+            matriz_id:
+                matrizId,
+
+            version_matriz_id:
+                versionId
+        };
+
+
+        console.log(
+            '📤 API.crearFrente:',
+            payload
+        );
+
+
+        const response =
+            await fetch(
+                '/api/matriz/frentes',
+                {
+                    method:
+                        'POST',
+
+                    headers: {
+                        'Content-Type':
+                            'application/json',
+
+                        ...(token
+                            ? {
+                                Authorization:
+                                    `Bearer ${token}`
+                            }
+                            : {})
+                    },
+
+                    body:
+                        JSON.stringify(
+                            payload
+                        )
+                }
+            );
+
+
+        let result = null;
+
+
+        try {
+            result =
+                await response.json();
+
+        } catch (_) {
+            result =
+                null;
+        }
+
+
+        if (!response.ok) {
+            const error =
+                new Error(
+                    result?.error ||
+                    `Error HTTP ${response.status}`
+                );
+
+            error.status =
+                response.status;
+
+            error.code =
+                result?.code ||
+                null;
+
+            error.data =
+                result;
+
+            throw error;
+        }
+
+
+        return result;
     }
 
     // ======================================================
@@ -2110,39 +2215,161 @@ async function loginConAPI(usuario, contrasena) {
     // ======================================================
     // CREAR ATRIBUTO - USAR /api/query
     // ======================================================
-    async function crearAtributo(data) {
-        const token = localStorage.getItem('meca_token');
-        
-        // 🔴 CAMBIAR: Usar /api/query en lugar de /api/matriz/atributos
-        const response = await fetch('/api/query', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                table: 'version_atributos',
-                operation: 'insert',
-                data: {
-                    version_frente_id: data.frente_id,
-                    nombre: data.nombre,
-                    peso_maximo: data.peso_maximo,
-                    orden: data.orden || 0,
-                    activo: data.activo !== undefined ? data.activo : true,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                }
-            })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al crear atributo');
-        }
-        
-        const result = await response.json();
-        return result.data && result.data.length > 0 ? result.data[0] : null;
+    async function crearAtributo(data = {}) {
+    const token =
+        localStorage.getItem(
+            'meca_token'
+        );
+
+
+    const matrizId =
+        Number(
+            data.matriz_id ??
+            data.matrizId ??
+            0
+        );
+
+
+    const versionId =
+        Number(
+            data.version_matriz_id ??
+            data.versionId ??
+            data.version_id ??
+            0
+        );
+
+
+    const frenteId =
+        Number(
+            data.frente_id ??
+            data.frenteId ??
+            0
+        );
+
+
+    if (
+        !Number.isInteger(matrizId) ||
+        matrizId <= 0
+    ) {
+        throw new Error(
+            'matriz_id requerido para crear atributo'
+        );
     }
+
+
+    if (
+        !Number.isInteger(versionId) ||
+        versionId <= 0
+    ) {
+        throw new Error(
+            'version_matriz_id requerido para crear atributo'
+        );
+    }
+
+
+    if (
+        !Number.isInteger(frenteId) ||
+        frenteId <= 0
+    ) {
+        throw new Error(
+            'frente_id requerido para crear atributo'
+        );
+    }
+
+
+    const payload = {
+        frente_id:
+            frenteId,
+
+        nombre:
+            data.nombre,
+
+        peso_maximo:
+            data.peso_maximo,
+
+        orden:
+            data.orden ?? 0,
+
+        activo:
+            data.activo !== false,
+
+        matriz_id:
+            matrizId,
+
+        version_matriz_id:
+            versionId
+    };
+
+
+    console.log(
+        '📤 API.crearAtributo:',
+        payload
+    );
+
+
+    const response =
+        await fetch(
+            '/api/matriz/atributos',
+            {
+                method:
+                    'POST',
+
+                headers: {
+                    'Content-Type':
+                        'application/json',
+
+                    ...(token
+                        ? {
+                            Authorization:
+                                `Bearer ${token}`
+                        }
+                        : {})
+                },
+
+                body:
+                    JSON.stringify(
+                        payload
+                    )
+            }
+        );
+
+
+    let result = null;
+
+
+    try {
+        result =
+            await response.json();
+
+    } catch (_) {
+        result =
+            null;
+    }
+
+
+    if (!response.ok) {
+        const error =
+            new Error(
+                result?.error ||
+                `Error HTTP ${response.status}`
+            );
+
+        error.status =
+            response.status;
+
+        error.code =
+            result?.code ||
+            null;
+
+        error.data =
+            result;
+
+        throw error;
+    }
+
+
+    return result;
+}
 
     // ======================================================
     // ACTUALIZAR ATRIBUTO - USAR /api/query
@@ -3095,6 +3322,58 @@ async function loginConAPI(usuario, contrasena) {
         return await response.json();
     }
 
+    async function crearVersionMatriz(data) {
+        const token =
+            localStorage.getItem(
+                'meca_token'
+            );
+
+        const response =
+            await fetch(
+                '/api/matriz/versiones',
+                {
+                    method: 'POST',
+
+                    headers: {
+                        'Content-Type':
+                            'application/json',
+
+                        ...(token
+                            ? {
+                                Authorization:
+                                    `Bearer ${token}`
+                            }
+                            : {})
+                    },
+
+                    body:
+                        JSON.stringify(data)
+                }
+            );
+
+        const payload =
+            await response.json();
+
+        if (!response.ok) {
+            const error =
+                new Error(
+                    payload?.error ||
+                    'Error creando versión'
+                );
+
+            error.status =
+                response.status;
+
+            error.code =
+                payload?.code ||
+                null;
+
+            throw error;
+        }
+
+        return payload;
+    }
+
     // Activar una versión
     async function activarVersion(versionId) {
         const token = localStorage.getItem('meca_token');
@@ -3106,8 +3385,33 @@ async function loginConAPI(usuario, contrasena) {
             }
         });
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al activar la versión');
+            const error =
+                await response.json();
+
+            let mensaje =
+                error.error ||
+                'Error al activar versión';
+
+            const violations =
+                error.integrity?.violations;
+
+            if (
+                Array.isArray(violations) &&
+                violations.length > 0
+            ) {
+                mensaje +=
+                    '\n\nLa versión todavía no está completa:\n';
+
+                for (const violation of violations) {
+                    mensaje +=
+                        `\n• ${violation.mensaje}`;
+                }
+
+                mensaje +=
+                    '\n\nComplete los pesos indicados y vuelva a intentar la activación.';
+            }
+
+            throw new Error(mensaje);
         }
         return await response.json();
     }
@@ -4043,6 +4347,7 @@ async function loginConAPI(usuario, contrasena) {
         getEstructuraVersion,
         congelarVersionActual,
         activarVersion,
+        crearVersionMatriz,
 
         // ==============================================
         // TRANSCRIPCIÓN (NUEVO)

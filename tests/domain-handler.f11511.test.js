@@ -25,18 +25,26 @@ test('F11511-DOM-001 ruta desconocida devuelve false', async () => {
   assert.equal(handled, false);
 });
 
-test('F11511-DOM-002 método no GET devuelve false', async () => {
-  const handler = createDomainHandler({
-    service: fakeControllerService()
-  });
+test(
+  'F11511-DOM-002 método no soportado devuelve false',
+  async () => {
+    const handler =
+      createDomainHandler({
+        service: {}
+      });
 
-  const handled = await handler({
-    ruta: '/api/domain/campanas',
-    metodo: 'POST',
-    peticion: {},
-    respuesta: {},
-    query: {}
-  });
+    const result =
+      await handler({
+        ruta: '/api/domain/quiebres',
+        metodo: 'DELETE',
+        peticion: {},
+        respuesta: {},
+        query: {}
+      });
 
-  assert.equal(handled, false);
-});
+    assert.equal(
+      result,
+      false
+    );
+  }
+);

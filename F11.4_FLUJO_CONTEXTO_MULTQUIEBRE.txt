@@ -1,0 +1,3219 @@
+===========================================================
+ MECA F11.4 - FLUJO QUIEBRE -> CAMPAÑA -> MATRIZ
+===========================================================
+
+[ARCHIVO] public/js/auditor.js
+Existe: SI
+Señales detectadas: 4
+
+CTX-005 | campana_id | línea 1805
+campana_id: document.getElementById('evalCampanaId')?.value || null,
+--- CONTEXTO ---
+  1790:     // 9. CONSTRUIR OBJETO EVALUACIÓN
+  1791:     // ======================================================
+  1792:     const evaluacion = {
+  1793:         id: Date.now(),
+  1794:         timestamp: fechaObj.getTime(),
+  1795:         evaluador: evaluador,
+  1796:         ticketPSI: ticketPSI,
+  1797:         agente: agente,
+  1798:         fecha: fechaRaw,
+  1799:         fechaFormateada: fechaFormateada,
+  1800:         idLlamada: idLlamada,
+  1801:         fechaDescarga: convertirFecha(document.getElementById('evalFechaDescargaAudio')?.value),
+  1802:         
+  1803:         // 🔴 NUEVOS CAMPOS DE CAMPAÑA
+  1804:         campana: document.getElementById('evalCampana')?.value || null,
+  1805:         campana_id: document.getElementById('evalCampanaId')?.value || null,
+  1806:         
+  1807:         totalENC: 0,
+  1808:         totalECUF: 0,
+  1809:         totalECN: 0,
+  1810:         notaFinal: totalGeneral.toFixed(1),
+  1811:         rango: rango,
+  1812:         detalles: detalles,
+  1813:         fechaRegistro: new Date().toLocaleString('es-ES'),
+  1814:         tiempoAuditoria: tiempoTotalSegundos,
+  1815:         tiempoAuditoriaFormateado: tiempoFormateado,
+  1816:         fechaInicioAuditoria: tiempoInicio.toISOString(),
+  1817:         fechaFinAuditoria: tiempoFin.toISOString(),
+  1818:         versionMatrizId: window.versionMatrizActualId || null
+  1819:     };
+  1820: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 6076
+campanaIdHidden.value = escucha.campana_id || '';
+--- CONTEXTO ---
+  6061:         idLlamada.style.backgroundColor = '#f0f0f0';
+  6062:     }
+  6063:     
+  6064:     // ======================================================
+  6065:     // 🔴 NUEVO: CARGAR DATOS DE CAMPAÑA
+  6066:     // ======================================================
+  6067:     if (campanaInput) {
+  6068:         campanaInput.value = escucha.campana || 'Sin campaña';
+  6069:         campanaInput.readOnly = true;
+  6070:         campanaInput.disabled = true;
+  6071:         campanaInput.style.backgroundColor = '#f0f0f0';
+  6072:         campanaInput.style.cursor = 'not-allowed';
+  6073:     }
+  6074:     
+  6075:     if (campanaIdHidden) {
+  6076:         campanaIdHidden.value = escucha.campana_id || '';
+  6077:     }
+  6078:     
+  6079:     // ======================================================
+  6080:     // 2. FECHA DESCARGA (código existente)
+  6081:     // ======================================================
+  6082:     if (fechaDescarga) {
+  6083:         if (escucha.fecha_descarga) {
+  6084:             try {
+  6085:                 let fechaStr = escucha.fecha_descarga;
+  6086:                 let anio, mes, dia, horas, minutos;
+  6087:                 
+  6088:                 if (fechaStr.includes('T')) {
+  6089:                     const [fechaParte, horaParte] = fechaStr.split('T');
+  6090:                     [anio, mes, dia] = fechaParte.split('-');
+  6091:                     if (horaParte) {
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 7424
+campanaIdHidden.value = evaluacion.campana_id || '';
+--- CONTEXTO ---
+  7409: 
+  7410:     if (idLlamadaInput) {
+  7411:         idLlamadaInput.value = evaluacion.idLlamada || '';
+  7412:         idLlamadaInput.readOnly = true;
+  7413:         idLlamadaInput.disabled = true;
+  7414:         idLlamadaInput.style.backgroundColor = '#f0f0f0';
+  7415:     }
+  7416: 
+  7417:     if (campanaInput) {
+  7418:         campanaInput.value = evaluacion.campana || 'Sin campaña';
+  7419:         campanaInput.readOnly = true;
+  7420:         campanaInput.disabled = true;
+  7421:         campanaInput.style.backgroundColor = '#f0f0f0';
+  7422:     }
+  7423:     if (campanaIdHidden) {
+  7424:         campanaIdHidden.value = evaluacion.campana_id || '';
+  7425:     }
+  7426: 
+  7427:     if (fechaInput && evaluacion.fecha) {
+  7428:         let fechaParaInput = '';
+  7429:         if (evaluacion.fechaFormateada && evaluacion.fechaFormateada.includes('/')) {
+  7430:             const partes = evaluacion.fechaFormateada.split(' ');
+  7431:             const fechaParte = partes[0];
+  7432:             const horaParte = partes[1] || '00:00';
+  7433:             const [dia, mes, anio] = fechaParte.split('/');
+  7434:             if (dia && mes && anio) {
+  7435:                 fechaParaInput = `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}T${horaParte}`;
+  7436:             }
+  7437:         }
+  7438:         if (fechaParaInput) {
+  7439:             fechaInput.value = fechaParaInput;
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 3688
+// F1.3 - Regla oficial vigente de Cobranzas.
+--- CONTEXTO ---
+  3673:         min: 0, 
+  3674:         max: 84 
+  3675:     };
+  3676: }
+  3677: 
+  3678: // ======================================================
+  3679: // 3. FUNCIÓN: obtenerCuartil()
+  3680: // ======================================================
+  3681: // 📌 PROPÓSITO: Obtener el cuartil según la nota del agente
+  3682: // 📌 PARÁMETROS: nota (number) - Nota obtenida
+  3683: // 📌 RETORNO: String con el cuartil (Q1, Q2, Q3, Q4)
+  3684: // 📌 USO: Clasificar agentes en cuartiles para ranking
+  3685: // ======================================================
+  3686: 
+  3687: function obtenerCuartil(nota) {
+  3688:     // F1.3 - Regla oficial vigente de Cobranzas.
+  3689:     // En fases posteriores esta clasificación debe provenir de la configuración central.
+  3690:     if (nota >= 97) return 'Q1';   // Excelente
+  3691:     if (nota >= 90) return 'Q2';   // Bien
+  3692:     if (nota >= 85) return 'Q3';   // Regular
+  3693:     return 'Q4';                   // Bajo / Riesgo
+  3694: }
+  3695: 
+  3696: // ======================================================
+  3697: // 4. FUNCIÓN: calcularTodo()
+  3698: // ======================================================
+  3699: // 📌 PROPÓSITO: Recalcular todos los frentes de evaluación
+  3700: // 📌 USO: Cuando se cambia un select y se necesita actualizar todo
+  3701: // 📌 EJECUCIÓN: Llamada desde el evento onchange de los selects
+  3702: // ======================================================
+  3703: 
+--- FIN CONTEXTO ---
+
+[ARCHIVO] public/js/supervisor.js
+Existe: SI
+Señales detectadas: 53
+
+CTX-005 | campana_id | línea 2391
+campana_id: evalItem.campana_id || null,
+--- CONTEXTO ---
+  2376:                 cumple: det.cumple === true || det.cumple === 1 || det.cumple === 'true'
+  2377:             }));
+  2378: 
+  2379:             return {
+  2380:                 id: evalItem.id,
+  2381:                 timestamp: evalItem.timestamp,
+  2382:                 fechaOriginal: evalItem.fecha_formateada || evalItem.fecha,
+  2383:                 fecha: evalItem.fecha_formateada || evalItem.fecha,
+  2384:                 ticketPSI: evalItem.ticket_psi || '',
+  2385:                 agente: evalItem.agente || '',
+  2386:                 evaluador: evalItem.evaluador || '',
+  2387:                 idLlamada: evalItem.id_llamada || '',
+  2388:                 fechaDescarga: evalItem.fecha_descarga || null,
+  2389:                 // 🔴 NUEVO: CAMPOS DE CAMPAÑA
+  2390:                 campana: evalItem.campana || '',
+  2391:                 campana_id: evalItem.campana_id || null,
+  2392:                 notaFinal: Number(evalItem.nota_final) || 0,
+  2393:                 rango: evalItem.rango || '',
+  2394:                 totalENC: Number(evalItem.total_enc) || 0,
+  2395:                 totalECUF: Number(evalItem.total_ecuf) || 0,
+  2396:                 totalECN: Number(evalItem.total_ecn) || 0,
+  2397:                 tiempoAuditoria: evalItem.tiempo_auditoria || '',
+  2398:                 tiempoAuditoriaFormateado: evalItem.tiempo_auditoria_formateado || '',
+  2399:                 detalles: detalles
+  2400:             };
+  2401:         });
+  2402: 
+  2403:         window.evaluacionesGlobales = evaluacionesFormateadas;
+  2404: 
+  2405:         // 🔴 NUEVO: DIAGNÓSTICO
+  2406:         const conCampana = evaluacionesFormateadas.filter(e => e.campana && e.campana !== '').length;
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 2416
+campana_id: evaluacionesFormateadas[0]?.campana_id
+--- CONTEXTO ---
+  2401:         });
+  2402: 
+  2403:         window.evaluacionesGlobales = evaluacionesFormateadas;
+  2404: 
+  2405:         // 🔴 NUEVO: DIAGNÓSTICO
+  2406:         const conCampana = evaluacionesFormateadas.filter(e => e.campana && e.campana !== '').length;
+  2407:         console.log(`✅ ${window.evaluacionesGlobales.length} evaluaciones cargadas`);
+  2408:         console.log(`📋 Evaluaciones con campaña: ${conCampana}`);
+  2409:         console.log(`📋 Evaluaciones con detalles: ${evaluacionesFormateadas.filter(e => e.detalles && e.detalles.length > 0).length}`);
+  2410:         
+  2411:         if (evaluacionesFormateadas.length > 0) {
+  2412:             console.log('📊 Ejemplo de campaña:', {
+  2413:                 id: evaluacionesFormateadas[0]?.id,
+  2414:                 ticketPSI: evaluacionesFormateadas[0]?.ticketPSI,
+  2415:                 campana: evaluacionesFormateadas[0]?.campana,
+  2416:                 campana_id: evaluacionesFormateadas[0]?.campana_id
+  2417:             });
+  2418:         }
+  2419: 
+  2420:         return window.evaluacionesGlobales;
+  2421: 
+  2422:     } catch (error) {
+  2423:         console.error('❌ Error cargando evaluaciones:', error);
+  2424:         window.evaluacionesGlobales = [];
+  2425:         return [];
+  2426:     }
+  2427: }
+  2428: 
+  2429: async function obtenerEvaluacionesConCache(forzarRecarga = false) {
+  2430:     const ahora = Date.now();
+  2431:     const cacheValido = cacheEvaluaciones.data &&
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 25771
+let campana_id = null;
+--- CONTEXTO ---
+ 25756:                     // Si no se encuentra, buscar cualquier columna que contenga "camp"
+ 25757:                     if (!campana) {
+ 25758:                         for (const key of Object.keys(row)) {
+ 25759:                             if (key.toLowerCase().includes('camp') && row[key]) {
+ 25760:                                 campana = row[key];
+ 25761:                                 break;
+ 25762:                             }
+ 25763:                         }
+ 25764:                     }
+ 25765:                     
+ 25766:                     campana = campana.toString().trim().toUpperCase();
+ 25767: 
+ 25768:                     console.log(`🔍 Fila ${i+1}: Ticket="${ticket}", Campaña="${campana}"`);
+ 25769: 
+ 25770:                     // 🔴 VALIDAR CAMPAÑA
+ 25771:                     let campana_id = null;
+ 25772:                     let errorCampana = null;
+ 25773: 
+ 25774:                     if (campana) {
+ 25775:                         const campanaData = await obtenerCampanaPorCodigo(campana);
+ 25776:                         if (campanaData && campanaData.activa) {
+ 25777:                             campana_id = campanaData.id;
+ 25778:                             console.log(`   ✅ Campaña "${campana}" válida (ID: ${campana_id})`);
+ 25779:                         } else {
+ 25780:                             errorCampana = `Campaña "${campana}" no existe o está inactiva`;
+ 25781:                             console.error(`   ❌ ${errorCampana}`);
+ 25782:                         }
+ 25783:                     } else {
+ 25784:                         errorCampana = 'Campaña vacía';
+ 25785:                         console.error(`   ❌ ${errorCampana}`);
+ 25786:                     }
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 25777
+campana_id = campanaData.id;
+--- CONTEXTO ---
+ 25762:                             }
+ 25763:                         }
+ 25764:                     }
+ 25765:                     
+ 25766:                     campana = campana.toString().trim().toUpperCase();
+ 25767: 
+ 25768:                     console.log(`🔍 Fila ${i+1}: Ticket="${ticket}", Campaña="${campana}"`);
+ 25769: 
+ 25770:                     // 🔴 VALIDAR CAMPAÑA
+ 25771:                     let campana_id = null;
+ 25772:                     let errorCampana = null;
+ 25773: 
+ 25774:                     if (campana) {
+ 25775:                         const campanaData = await obtenerCampanaPorCodigo(campana);
+ 25776:                         if (campanaData && campanaData.activa) {
+ 25777:                             campana_id = campanaData.id;
+ 25778:                             console.log(`   ✅ Campaña "${campana}" válida (ID: ${campana_id})`);
+ 25779:                         } else {
+ 25780:                             errorCampana = `Campaña "${campana}" no existe o está inactiva`;
+ 25781:                             console.error(`   ❌ ${errorCampana}`);
+ 25782:                         }
+ 25783:                     } else {
+ 25784:                         errorCampana = 'Campaña vacía';
+ 25785:                         console.error(`   ❌ ${errorCampana}`);
+ 25786:                     }
+ 25787: 
+ 25788:                     if (errorCampana) {
+ 25789:                         errores.push(`Fila ${i+2}: ${errorCampana}`);
+ 25790:                         continue;
+ 25791:                     }
+ 25792: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 25778
+console.log(`   ✅ Campaña "${campana}" válida (ID: ${campana_id})`);
+--- CONTEXTO ---
+ 25763:                         }
+ 25764:                     }
+ 25765:                     
+ 25766:                     campana = campana.toString().trim().toUpperCase();
+ 25767: 
+ 25768:                     console.log(`🔍 Fila ${i+1}: Ticket="${ticket}", Campaña="${campana}"`);
+ 25769: 
+ 25770:                     // 🔴 VALIDAR CAMPAÑA
+ 25771:                     let campana_id = null;
+ 25772:                     let errorCampana = null;
+ 25773: 
+ 25774:                     if (campana) {
+ 25775:                         const campanaData = await obtenerCampanaPorCodigo(campana);
+ 25776:                         if (campanaData && campanaData.activa) {
+ 25777:                             campana_id = campanaData.id;
+ 25778:                             console.log(`   ✅ Campaña "${campana}" válida (ID: ${campana_id})`);
+ 25779:                         } else {
+ 25780:                             errorCampana = `Campaña "${campana}" no existe o está inactiva`;
+ 25781:                             console.error(`   ❌ ${errorCampana}`);
+ 25782:                         }
+ 25783:                     } else {
+ 25784:                         errorCampana = 'Campaña vacía';
+ 25785:                         console.error(`   ❌ ${errorCampana}`);
+ 25786:                     }
+ 25787: 
+ 25788:                     if (errorCampana) {
+ 25789:                         errores.push(`Fila ${i+2}: ${errorCampana}`);
+ 25790:                         continue;
+ 25791:                     }
+ 25792: 
+ 25793:                     // Validar ticket
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 25836
+campana_id: campana_id
+--- CONTEXTO ---
+ 25821:                         ticket: ticket,
+ 25822:                         supervisor_responsable: supervisor,
+ 25823:                         gestor_auditado: gestor,
+ 25824:                         auditor_asignado: auditor,
+ 25825:                         motivos: motivos,
+ 25826:                         submotivos: submotivos,
+ 25827:                         subnivel: subnivel,
+ 25828:                         peticion: peticion,
+ 25829:                         usuario_dni: usuario_dni,
+ 25830:                         usuario_mov: gestor,
+ 25831:                         motivo_call: motivo_call,
+ 25832:                         fecha_descarga: fecha_descarga,
+ 25833:                         estado: 'pendiente',
+ 25834:                         // 🔴 CAMPOS DE CAMPAÑA
+ 25835:                         campana: campana,
+ 25836:                         campana_id: campana_id
+ 25837:                     });
+ 25838:                 }
+ 25839: 
+ 25840:                 console.log(`✅ Tickets procesados: ${tickets.length}`);
+ 25841:                 console.log(`❌ Errores: ${errores.length}`);
+ 25842: 
+ 25843:                 if (errores.length > 0) {
+ 25844:                     reject(new Error(`❌ ${errores.length} errores:\n${errores.join('\n')}`));
+ 25845:                     return;
+ 25846:                 }
+ 25847: 
+ 25848:                 if (tickets.length === 0) {
+ 25849:                     reject(new Error('No se encontraron tickets válidos'));
+ 25850:                     return;
+ 25851:                 }
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 26273
+let campanaId = ticket.campana_id || null;
+--- CONTEXTO ---
+ 26258:     if (!distribucion || typeof distribucion !== 'object' || Object.keys(distribucion).length === 0) {
+ 26259:         console.error('❌ No hay distribución válida');
+ 26260:         return { total: 0, error: 'No hay distribución' };
+ 26261:     }
+ 26262: 
+ 26263:     let idBase = Date.now();
+ 26264:     let contador = 0;
+ 26265: 
+ 26266:     for (const [auditor, tickets] of Object.entries(distribucion)) {
+ 26267:         if (!tickets || !Array.isArray(tickets) || tickets.length === 0) continue;
+ 26268: 
+ 26269:         for (const ticket of tickets) {
+ 26270:             contador++;
+ 26271:             const nuevoId = idBase + contador;
+ 26272: 
+ 26273:             let campanaId = ticket.campana_id || null;
+ 26274:             
+ 26275:             if (!campanaId && ticket.campana) {
+ 26276:                 try {
+ 26277:                     const campana = await obtenerCampanaPorCodigo(ticket.campana);
+ 26278:                     if (campana) campanaId = campana.id;
+ 26279:                 } catch (e) {
+ 26280:                     console.warn('⚠️ No se pudo obtener campana_id para:', ticket.campana);
+ 26281:                 }
+ 26282:             }
+ 26283: 
+ 26284:             registros.push({
+ 26285:                 id: nuevoId,
+ 26286:                 tarea_id: tareaId,
+ 26287:                 ticket: String(ticket.ticket || ''),
+ 26288:                 supervisor_responsable: String(ticket.supervisor_responsable || ''),
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 26280
+console.warn('⚠️ No se pudo obtener campana_id para:', ticket.campana);
+--- CONTEXTO ---
+ 26265: 
+ 26266:     for (const [auditor, tickets] of Object.entries(distribucion)) {
+ 26267:         if (!tickets || !Array.isArray(tickets) || tickets.length === 0) continue;
+ 26268: 
+ 26269:         for (const ticket of tickets) {
+ 26270:             contador++;
+ 26271:             const nuevoId = idBase + contador;
+ 26272: 
+ 26273:             let campanaId = ticket.campana_id || null;
+ 26274:             
+ 26275:             if (!campanaId && ticket.campana) {
+ 26276:                 try {
+ 26277:                     const campana = await obtenerCampanaPorCodigo(ticket.campana);
+ 26278:                     if (campana) campanaId = campana.id;
+ 26279:                 } catch (e) {
+ 26280:                     console.warn('⚠️ No se pudo obtener campana_id para:', ticket.campana);
+ 26281:                 }
+ 26282:             }
+ 26283: 
+ 26284:             registros.push({
+ 26285:                 id: nuevoId,
+ 26286:                 tarea_id: tareaId,
+ 26287:                 ticket: String(ticket.ticket || ''),
+ 26288:                 supervisor_responsable: String(ticket.supervisor_responsable || ''),
+ 26289:                 gestor_auditado: String(ticket.gestor_auditado || ''),
+ 26290:                 auditor_asignado: String(auditor),
+ 26291:                 motivos: String(ticket.motivos || ''),
+ 26292:                 submotivos: String(ticket.submotivos || ''),
+ 26293:                 subnivel: String(ticket.subnivel || ''),
+ 26294:                 peticion: String(ticket.peticion || ''),
+ 26295:                 usuario_dni: String(ticket.usuario_dni || ''),
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 26300
+campana_id: campanaId,
+--- CONTEXTO ---
+ 26285:                 id: nuevoId,
+ 26286:                 tarea_id: tareaId,
+ 26287:                 ticket: String(ticket.ticket || ''),
+ 26288:                 supervisor_responsable: String(ticket.supervisor_responsable || ''),
+ 26289:                 gestor_auditado: String(ticket.gestor_auditado || ''),
+ 26290:                 auditor_asignado: String(auditor),
+ 26291:                 motivos: String(ticket.motivos || ''),
+ 26292:                 submotivos: String(ticket.submotivos || ''),
+ 26293:                 subnivel: String(ticket.subnivel || ''),
+ 26294:                 peticion: String(ticket.peticion || ''),
+ 26295:                 usuario_dni: String(ticket.usuario_dni || ''),
+ 26296:                 usuario_mov: String(ticket.usuario_mov || ''),
+ 26297:                 motivo_call: String(ticket.motivo_call || ''),
+ 26298:                 fecha_descarga: ticket.fecha_descarga || null,
+ 26299:                 campana: String(ticket.campana || ''),
+ 26300:                 campana_id: campanaId,
+ 26301:                 estado: 'pendiente',
+ 26302:                 fecha_asignacion: new Date().toISOString(),
+ 26303:                 created_at: new Date().toISOString(),
+ 26304:                 updated_at: new Date().toISOString()
+ 26305:             });
+ 26306:         }
+ 26307:     }
+ 26308: 
+ 26309:     if (registros.length === 0) {
+ 26310:         console.warn('⚠️ No hay registros para guardar');
+ 26311:         return { total: 0, registros: [] };
+ 26312:     }
+ 26313: 
+ 26314:     console.log(`📝 ${registros.length} registros generados`);
+ 26315: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 28258
+.select('transcripcion_estado, audio_encontrado, estado, campana, campana_id')
+--- CONTEXTO ---
+ 28243:                 📭 No hay lotes cargados aún. Cargue su primer archivo de escuchas.
+ 28244:             </td></tr>`;
+ 28245:             window.lotesHistorialGlobal = [];
+ 28246:             return;
+ 28247:         }
+ 28248: 
+ 28249:         // ======================================================
+ 28250:         // PROCESAR CADA LOTE CON ESTADÍSTICAS Y CAMPAÑAS
+ 28251:         // ======================================================
+ 28252:         const lotesConEstadisticas = [];
+ 28253:         
+ 28254:         for (const lote of lotes) {
+ 28255:             try {
+ 28256:                 const { data: asignaciones, error: asigError } = await db
+ 28257:                     .from('asignaciones_escucha')
+ 28258:                     .select('transcripcion_estado, audio_encontrado, estado, campana, campana_id')
+ 28259:                     .eq('tarea_id', lote.id);
+ 28260: 
+ 28261:                 const total = asignaciones?.length || 0;
+ 28262: 
+ 28263:                 // Recolectar campañas del lote
+ 28264:                 const campanasSet = new Set();
+ 28265:                 (asignaciones || []).forEach(a => {
+ 28266:                     if (a.campana) campanasSet.add(a.campana);
+ 28267:                 });
+ 28268: 
+ 28269:                 const gestionados = asignaciones?.filter(a =>
+ 28270:                     a.transcripcion_estado === 'transcrito' ||
+ 28271:                     a.transcripcion_estado === 'analizado'
+ 28272:                 ).length || 0;
+ 28273: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 49973
+campana_id: campanaData ? campanaData.id : null
+--- CONTEXTO ---
+ 49958:                         ticket: ticket,
+ 49959:                         supervisor_responsable: supervisor,
+ 49960:                         gestor_auditado: gestor,
+ 49961:                         auditor_asignado: auditor,
+ 49962:                         motivos: motivos,
+ 49963:                         submotivos: submotivos,
+ 49964:                         subnivel: subnivel,
+ 49965:                         peticion: peticion,
+ 49966:                         usuario_dni: usuario_dni,
+ 49967:                         usuario_mov: gestor,
+ 49968:                         motivo_call: motivo_call,
+ 49969:                         fecha_descarga: fecha_descarga,
+ 49970:                         estado: 'pendiente',
+ 49971:                         // 🔴 NUEVO CAMPO
+ 49972:                         campana: campana,
+ 49973:                         campana_id: campanaData ? campanaData.id : null
+ 49974:                     });
+ 49975:                 }
+ 49976: 
+ 49977:                 console.log(`✅ Tickets procesados: ${tickets.length}`);
+ 49978:                 console.log(`⚠️ Errores encontrados: ${errores.length}`);
+ 49979: 
+ 49980:                 // 🔴 SI HAY ERRORES DE CAMPAÑA, RECHAZAR LA CARGA
+ 49981:                 if (errores.length > 0) {
+ 49982:                     const mensajeError = `
+ 49983: ❌ ERRORES EN EL ARCHIVO (${errores.length}):
+ 49984: 
+ 49985: ${errores.slice(0, 10).join('\n')}
+ 49986: ${errores.length > 10 ? `\n... y ${errores.length - 10} más` : ''}
+ 49987: 
+ 49988: 📌 SOLUCIÓN:
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50822
+// Obtener todas las asignaciones con campana_id
+--- CONTEXTO ---
+ 50807:     if (!db) {
+ 50808:         console.error('❌ Base de datos no disponible');
+ 50809:         return [];
+ 50810:     }
+ 50811: 
+ 50812:     try {
+ 50813:         // Obtener todas las campañas
+ 50814:         const { data: campanas, error: campError } = await db
+ 50815:             .from('campanas')
+ 50816:             .select('id, codigo, descripcion, activa')
+ 50817:             .order('codigo', { ascending: true });
+ 50818: 
+ 50819:         if (campError) throw campError;
+ 50820:         if (!campanas || campanas.length === 0) return [];
+ 50821: 
+ 50822:         // Obtener todas las asignaciones con campana_id
+ 50823:         const { data: asignaciones, error: asigError } = await db
+ 50824:             .from('asignaciones_escucha')
+ 50825:             .select('campana_id, estado')
+ 50826:             .not('campana_id', 'is', null);
+ 50827: 
+ 50828:         if (asigError) throw asigError;
+ 50829: 
+ 50830:         // Obtener todas las evaluaciones con campana_id
+ 50831:         const { data: evaluaciones, error: evalError } = await db
+ 50832:             .from('evaluaciones')
+ 50833:             .select('campana_id, nota_final')
+ 50834:             .not('campana_id', 'is', null);
+ 50835: 
+ 50836:         if (evalError) throw evalError;
+ 50837: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50825
+.select('campana_id, estado')
+--- CONTEXTO ---
+ 50810:     }
+ 50811: 
+ 50812:     try {
+ 50813:         // Obtener todas las campañas
+ 50814:         const { data: campanas, error: campError } = await db
+ 50815:             .from('campanas')
+ 50816:             .select('id, codigo, descripcion, activa')
+ 50817:             .order('codigo', { ascending: true });
+ 50818: 
+ 50819:         if (campError) throw campError;
+ 50820:         if (!campanas || campanas.length === 0) return [];
+ 50821: 
+ 50822:         // Obtener todas las asignaciones con campana_id
+ 50823:         const { data: asignaciones, error: asigError } = await db
+ 50824:             .from('asignaciones_escucha')
+ 50825:             .select('campana_id, estado')
+ 50826:             .not('campana_id', 'is', null);
+ 50827: 
+ 50828:         if (asigError) throw asigError;
+ 50829: 
+ 50830:         // Obtener todas las evaluaciones con campana_id
+ 50831:         const { data: evaluaciones, error: evalError } = await db
+ 50832:             .from('evaluaciones')
+ 50833:             .select('campana_id, nota_final')
+ 50834:             .not('campana_id', 'is', null);
+ 50835: 
+ 50836:         if (evalError) throw evalError;
+ 50837: 
+ 50838:         // Crear mapa de estadísticas
+ 50839:         const statsMap = {};
+ 50840: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50826
+.not('campana_id', 'is', null);
+--- CONTEXTO ---
+ 50811: 
+ 50812:     try {
+ 50813:         // Obtener todas las campañas
+ 50814:         const { data: campanas, error: campError } = await db
+ 50815:             .from('campanas')
+ 50816:             .select('id, codigo, descripcion, activa')
+ 50817:             .order('codigo', { ascending: true });
+ 50818: 
+ 50819:         if (campError) throw campError;
+ 50820:         if (!campanas || campanas.length === 0) return [];
+ 50821: 
+ 50822:         // Obtener todas las asignaciones con campana_id
+ 50823:         const { data: asignaciones, error: asigError } = await db
+ 50824:             .from('asignaciones_escucha')
+ 50825:             .select('campana_id, estado')
+ 50826:             .not('campana_id', 'is', null);
+ 50827: 
+ 50828:         if (asigError) throw asigError;
+ 50829: 
+ 50830:         // Obtener todas las evaluaciones con campana_id
+ 50831:         const { data: evaluaciones, error: evalError } = await db
+ 50832:             .from('evaluaciones')
+ 50833:             .select('campana_id, nota_final')
+ 50834:             .not('campana_id', 'is', null);
+ 50835: 
+ 50836:         if (evalError) throw evalError;
+ 50837: 
+ 50838:         // Crear mapa de estadísticas
+ 50839:         const statsMap = {};
+ 50840: 
+ 50841:         // Inicializar con todas las campañas
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50830
+// Obtener todas las evaluaciones con campana_id
+--- CONTEXTO ---
+ 50815:             .from('campanas')
+ 50816:             .select('id, codigo, descripcion, activa')
+ 50817:             .order('codigo', { ascending: true });
+ 50818: 
+ 50819:         if (campError) throw campError;
+ 50820:         if (!campanas || campanas.length === 0) return [];
+ 50821: 
+ 50822:         // Obtener todas las asignaciones con campana_id
+ 50823:         const { data: asignaciones, error: asigError } = await db
+ 50824:             .from('asignaciones_escucha')
+ 50825:             .select('campana_id, estado')
+ 50826:             .not('campana_id', 'is', null);
+ 50827: 
+ 50828:         if (asigError) throw asigError;
+ 50829: 
+ 50830:         // Obtener todas las evaluaciones con campana_id
+ 50831:         const { data: evaluaciones, error: evalError } = await db
+ 50832:             .from('evaluaciones')
+ 50833:             .select('campana_id, nota_final')
+ 50834:             .not('campana_id', 'is', null);
+ 50835: 
+ 50836:         if (evalError) throw evalError;
+ 50837: 
+ 50838:         // Crear mapa de estadísticas
+ 50839:         const statsMap = {};
+ 50840: 
+ 50841:         // Inicializar con todas las campañas
+ 50842:         campanas.forEach(c => {
+ 50843:             statsMap[c.id] = {
+ 50844:                 campana_codigo: c.codigo,
+ 50845:                 campana_descripcion: c.descripcion,
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50833
+.select('campana_id, nota_final')
+--- CONTEXTO ---
+ 50818: 
+ 50819:         if (campError) throw campError;
+ 50820:         if (!campanas || campanas.length === 0) return [];
+ 50821: 
+ 50822:         // Obtener todas las asignaciones con campana_id
+ 50823:         const { data: asignaciones, error: asigError } = await db
+ 50824:             .from('asignaciones_escucha')
+ 50825:             .select('campana_id, estado')
+ 50826:             .not('campana_id', 'is', null);
+ 50827: 
+ 50828:         if (asigError) throw asigError;
+ 50829: 
+ 50830:         // Obtener todas las evaluaciones con campana_id
+ 50831:         const { data: evaluaciones, error: evalError } = await db
+ 50832:             .from('evaluaciones')
+ 50833:             .select('campana_id, nota_final')
+ 50834:             .not('campana_id', 'is', null);
+ 50835: 
+ 50836:         if (evalError) throw evalError;
+ 50837: 
+ 50838:         // Crear mapa de estadísticas
+ 50839:         const statsMap = {};
+ 50840: 
+ 50841:         // Inicializar con todas las campañas
+ 50842:         campanas.forEach(c => {
+ 50843:             statsMap[c.id] = {
+ 50844:                 campana_codigo: c.codigo,
+ 50845:                 campana_descripcion: c.descripcion,
+ 50846:                 campana_activa: c.activa,
+ 50847:                 total_asignaciones: 0,
+ 50848:                 pendientes: 0,
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50834
+.not('campana_id', 'is', null);
+--- CONTEXTO ---
+ 50819:         if (campError) throw campError;
+ 50820:         if (!campanas || campanas.length === 0) return [];
+ 50821: 
+ 50822:         // Obtener todas las asignaciones con campana_id
+ 50823:         const { data: asignaciones, error: asigError } = await db
+ 50824:             .from('asignaciones_escucha')
+ 50825:             .select('campana_id, estado')
+ 50826:             .not('campana_id', 'is', null);
+ 50827: 
+ 50828:         if (asigError) throw asigError;
+ 50829: 
+ 50830:         // Obtener todas las evaluaciones con campana_id
+ 50831:         const { data: evaluaciones, error: evalError } = await db
+ 50832:             .from('evaluaciones')
+ 50833:             .select('campana_id, nota_final')
+ 50834:             .not('campana_id', 'is', null);
+ 50835: 
+ 50836:         if (evalError) throw evalError;
+ 50837: 
+ 50838:         // Crear mapa de estadísticas
+ 50839:         const statsMap = {};
+ 50840: 
+ 50841:         // Inicializar con todas las campañas
+ 50842:         campanas.forEach(c => {
+ 50843:             statsMap[c.id] = {
+ 50844:                 campana_codigo: c.codigo,
+ 50845:                 campana_descripcion: c.descripcion,
+ 50846:                 campana_activa: c.activa,
+ 50847:                 total_asignaciones: 0,
+ 50848:                 pendientes: 0,
+ 50849:                 en_proceso: 0,
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50859
+if (statsMap[a.campana_id]) {
+--- CONTEXTO ---
+ 50844:                 campana_codigo: c.codigo,
+ 50845:                 campana_descripcion: c.descripcion,
+ 50846:                 campana_activa: c.activa,
+ 50847:                 total_asignaciones: 0,
+ 50848:                 pendientes: 0,
+ 50849:                 en_proceso: 0,
+ 50850:                 gestionados: 0,
+ 50851:                 total_evaluaciones: 0,
+ 50852:                 suma_notas: 0,
+ 50853:                 promedio_calificacion: 0
+ 50854:             };
+ 50855:         });
+ 50856: 
+ 50857:         // Procesar asignaciones
+ 50858:         (asignaciones || []).forEach(a => {
+ 50859:             if (statsMap[a.campana_id]) {
+ 50860:                 statsMap[a.campana_id].total_asignaciones++;
+ 50861:                 if (a.estado === 'pendiente') statsMap[a.campana_id].pendientes++;
+ 50862:                 else if (a.estado === 'en_proceso') statsMap[a.campana_id].en_proceso++;
+ 50863:                 else if (a.estado === 'gestionado' || a.estado === 'completado') {
+ 50864:                     statsMap[a.campana_id].gestionados++;
+ 50865:                 }
+ 50866:             }
+ 50867:         });
+ 50868: 
+ 50869:         // Procesar evaluaciones
+ 50870:         (evaluaciones || []).forEach(e => {
+ 50871:             if (statsMap[e.campana_id]) {
+ 50872:                 statsMap[e.campana_id].total_evaluaciones++;
+ 50873:                 statsMap[e.campana_id].suma_notas += (e.nota_final || 0);
+ 50874:             }
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50860
+statsMap[a.campana_id].total_asignaciones++;
+--- CONTEXTO ---
+ 50845:                 campana_descripcion: c.descripcion,
+ 50846:                 campana_activa: c.activa,
+ 50847:                 total_asignaciones: 0,
+ 50848:                 pendientes: 0,
+ 50849:                 en_proceso: 0,
+ 50850:                 gestionados: 0,
+ 50851:                 total_evaluaciones: 0,
+ 50852:                 suma_notas: 0,
+ 50853:                 promedio_calificacion: 0
+ 50854:             };
+ 50855:         });
+ 50856: 
+ 50857:         // Procesar asignaciones
+ 50858:         (asignaciones || []).forEach(a => {
+ 50859:             if (statsMap[a.campana_id]) {
+ 50860:                 statsMap[a.campana_id].total_asignaciones++;
+ 50861:                 if (a.estado === 'pendiente') statsMap[a.campana_id].pendientes++;
+ 50862:                 else if (a.estado === 'en_proceso') statsMap[a.campana_id].en_proceso++;
+ 50863:                 else if (a.estado === 'gestionado' || a.estado === 'completado') {
+ 50864:                     statsMap[a.campana_id].gestionados++;
+ 50865:                 }
+ 50866:             }
+ 50867:         });
+ 50868: 
+ 50869:         // Procesar evaluaciones
+ 50870:         (evaluaciones || []).forEach(e => {
+ 50871:             if (statsMap[e.campana_id]) {
+ 50872:                 statsMap[e.campana_id].total_evaluaciones++;
+ 50873:                 statsMap[e.campana_id].suma_notas += (e.nota_final || 0);
+ 50874:             }
+ 50875:         });
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50861
+if (a.estado === 'pendiente') statsMap[a.campana_id].pendientes++;
+--- CONTEXTO ---
+ 50846:                 campana_activa: c.activa,
+ 50847:                 total_asignaciones: 0,
+ 50848:                 pendientes: 0,
+ 50849:                 en_proceso: 0,
+ 50850:                 gestionados: 0,
+ 50851:                 total_evaluaciones: 0,
+ 50852:                 suma_notas: 0,
+ 50853:                 promedio_calificacion: 0
+ 50854:             };
+ 50855:         });
+ 50856: 
+ 50857:         // Procesar asignaciones
+ 50858:         (asignaciones || []).forEach(a => {
+ 50859:             if (statsMap[a.campana_id]) {
+ 50860:                 statsMap[a.campana_id].total_asignaciones++;
+ 50861:                 if (a.estado === 'pendiente') statsMap[a.campana_id].pendientes++;
+ 50862:                 else if (a.estado === 'en_proceso') statsMap[a.campana_id].en_proceso++;
+ 50863:                 else if (a.estado === 'gestionado' || a.estado === 'completado') {
+ 50864:                     statsMap[a.campana_id].gestionados++;
+ 50865:                 }
+ 50866:             }
+ 50867:         });
+ 50868: 
+ 50869:         // Procesar evaluaciones
+ 50870:         (evaluaciones || []).forEach(e => {
+ 50871:             if (statsMap[e.campana_id]) {
+ 50872:                 statsMap[e.campana_id].total_evaluaciones++;
+ 50873:                 statsMap[e.campana_id].suma_notas += (e.nota_final || 0);
+ 50874:             }
+ 50875:         });
+ 50876: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50862
+else if (a.estado === 'en_proceso') statsMap[a.campana_id].en_proceso++;
+--- CONTEXTO ---
+ 50847:                 total_asignaciones: 0,
+ 50848:                 pendientes: 0,
+ 50849:                 en_proceso: 0,
+ 50850:                 gestionados: 0,
+ 50851:                 total_evaluaciones: 0,
+ 50852:                 suma_notas: 0,
+ 50853:                 promedio_calificacion: 0
+ 50854:             };
+ 50855:         });
+ 50856: 
+ 50857:         // Procesar asignaciones
+ 50858:         (asignaciones || []).forEach(a => {
+ 50859:             if (statsMap[a.campana_id]) {
+ 50860:                 statsMap[a.campana_id].total_asignaciones++;
+ 50861:                 if (a.estado === 'pendiente') statsMap[a.campana_id].pendientes++;
+ 50862:                 else if (a.estado === 'en_proceso') statsMap[a.campana_id].en_proceso++;
+ 50863:                 else if (a.estado === 'gestionado' || a.estado === 'completado') {
+ 50864:                     statsMap[a.campana_id].gestionados++;
+ 50865:                 }
+ 50866:             }
+ 50867:         });
+ 50868: 
+ 50869:         // Procesar evaluaciones
+ 50870:         (evaluaciones || []).forEach(e => {
+ 50871:             if (statsMap[e.campana_id]) {
+ 50872:                 statsMap[e.campana_id].total_evaluaciones++;
+ 50873:                 statsMap[e.campana_id].suma_notas += (e.nota_final || 0);
+ 50874:             }
+ 50875:         });
+ 50876: 
+ 50877:         // Calcular promedios y convertir a array
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50864
+statsMap[a.campana_id].gestionados++;
+--- CONTEXTO ---
+ 50849:                 en_proceso: 0,
+ 50850:                 gestionados: 0,
+ 50851:                 total_evaluaciones: 0,
+ 50852:                 suma_notas: 0,
+ 50853:                 promedio_calificacion: 0
+ 50854:             };
+ 50855:         });
+ 50856: 
+ 50857:         // Procesar asignaciones
+ 50858:         (asignaciones || []).forEach(a => {
+ 50859:             if (statsMap[a.campana_id]) {
+ 50860:                 statsMap[a.campana_id].total_asignaciones++;
+ 50861:                 if (a.estado === 'pendiente') statsMap[a.campana_id].pendientes++;
+ 50862:                 else if (a.estado === 'en_proceso') statsMap[a.campana_id].en_proceso++;
+ 50863:                 else if (a.estado === 'gestionado' || a.estado === 'completado') {
+ 50864:                     statsMap[a.campana_id].gestionados++;
+ 50865:                 }
+ 50866:             }
+ 50867:         });
+ 50868: 
+ 50869:         // Procesar evaluaciones
+ 50870:         (evaluaciones || []).forEach(e => {
+ 50871:             if (statsMap[e.campana_id]) {
+ 50872:                 statsMap[e.campana_id].total_evaluaciones++;
+ 50873:                 statsMap[e.campana_id].suma_notas += (e.nota_final || 0);
+ 50874:             }
+ 50875:         });
+ 50876: 
+ 50877:         // Calcular promedios y convertir a array
+ 50878:         const resultados = Object.values(statsMap).map(s => {
+ 50879:             const avg = s.total_evaluaciones > 0
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50871
+if (statsMap[e.campana_id]) {
+--- CONTEXTO ---
+ 50856: 
+ 50857:         // Procesar asignaciones
+ 50858:         (asignaciones || []).forEach(a => {
+ 50859:             if (statsMap[a.campana_id]) {
+ 50860:                 statsMap[a.campana_id].total_asignaciones++;
+ 50861:                 if (a.estado === 'pendiente') statsMap[a.campana_id].pendientes++;
+ 50862:                 else if (a.estado === 'en_proceso') statsMap[a.campana_id].en_proceso++;
+ 50863:                 else if (a.estado === 'gestionado' || a.estado === 'completado') {
+ 50864:                     statsMap[a.campana_id].gestionados++;
+ 50865:                 }
+ 50866:             }
+ 50867:         });
+ 50868: 
+ 50869:         // Procesar evaluaciones
+ 50870:         (evaluaciones || []).forEach(e => {
+ 50871:             if (statsMap[e.campana_id]) {
+ 50872:                 statsMap[e.campana_id].total_evaluaciones++;
+ 50873:                 statsMap[e.campana_id].suma_notas += (e.nota_final || 0);
+ 50874:             }
+ 50875:         });
+ 50876: 
+ 50877:         // Calcular promedios y convertir a array
+ 50878:         const resultados = Object.values(statsMap).map(s => {
+ 50879:             const avg = s.total_evaluaciones > 0
+ 50880:                 ? (s.suma_notas / s.total_evaluaciones)
+ 50881:                 : 0;
+ 50882:             return {
+ 50883:                 ...s,
+ 50884:                 promedio_calificacion: Math.round(avg * 10) / 10
+ 50885:             };
+ 50886:         });
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50872
+statsMap[e.campana_id].total_evaluaciones++;
+--- CONTEXTO ---
+ 50857:         // Procesar asignaciones
+ 50858:         (asignaciones || []).forEach(a => {
+ 50859:             if (statsMap[a.campana_id]) {
+ 50860:                 statsMap[a.campana_id].total_asignaciones++;
+ 50861:                 if (a.estado === 'pendiente') statsMap[a.campana_id].pendientes++;
+ 50862:                 else if (a.estado === 'en_proceso') statsMap[a.campana_id].en_proceso++;
+ 50863:                 else if (a.estado === 'gestionado' || a.estado === 'completado') {
+ 50864:                     statsMap[a.campana_id].gestionados++;
+ 50865:                 }
+ 50866:             }
+ 50867:         });
+ 50868: 
+ 50869:         // Procesar evaluaciones
+ 50870:         (evaluaciones || []).forEach(e => {
+ 50871:             if (statsMap[e.campana_id]) {
+ 50872:                 statsMap[e.campana_id].total_evaluaciones++;
+ 50873:                 statsMap[e.campana_id].suma_notas += (e.nota_final || 0);
+ 50874:             }
+ 50875:         });
+ 50876: 
+ 50877:         // Calcular promedios y convertir a array
+ 50878:         const resultados = Object.values(statsMap).map(s => {
+ 50879:             const avg = s.total_evaluaciones > 0
+ 50880:                 ? (s.suma_notas / s.total_evaluaciones)
+ 50881:                 : 0;
+ 50882:             return {
+ 50883:                 ...s,
+ 50884:                 promedio_calificacion: Math.round(avg * 10) / 10
+ 50885:             };
+ 50886:         });
+ 50887: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 50873
+statsMap[e.campana_id].suma_notas += (e.nota_final || 0);
+--- CONTEXTO ---
+ 50858:         (asignaciones || []).forEach(a => {
+ 50859:             if (statsMap[a.campana_id]) {
+ 50860:                 statsMap[a.campana_id].total_asignaciones++;
+ 50861:                 if (a.estado === 'pendiente') statsMap[a.campana_id].pendientes++;
+ 50862:                 else if (a.estado === 'en_proceso') statsMap[a.campana_id].en_proceso++;
+ 50863:                 else if (a.estado === 'gestionado' || a.estado === 'completado') {
+ 50864:                     statsMap[a.campana_id].gestionados++;
+ 50865:                 }
+ 50866:             }
+ 50867:         });
+ 50868: 
+ 50869:         // Procesar evaluaciones
+ 50870:         (evaluaciones || []).forEach(e => {
+ 50871:             if (statsMap[e.campana_id]) {
+ 50872:                 statsMap[e.campana_id].total_evaluaciones++;
+ 50873:                 statsMap[e.campana_id].suma_notas += (e.nota_final || 0);
+ 50874:             }
+ 50875:         });
+ 50876: 
+ 50877:         // Calcular promedios y convertir a array
+ 50878:         const resultados = Object.values(statsMap).map(s => {
+ 50879:             const avg = s.total_evaluaciones > 0
+ 50880:                 ? (s.suma_notas / s.total_evaluaciones)
+ 50881:                 : 0;
+ 50882:             return {
+ 50883:                 ...s,
+ 50884:                 promedio_calificacion: Math.round(avg * 10) / 10
+ 50885:             };
+ 50886:         });
+ 50887: 
+ 50888:         console.log(`✅ Estadísticas calculadas para ${resultados.length} campañas`);
+--- FIN CONTEXTO ---
+
+CTX-007 | campana_codigo | línea 27115
+const campana = asig.campana || asig.campana_codigo || '-';
+--- CONTEXTO ---
+ 27100:     const asignacionesOrdenadas = [...asignaciones].sort((a, b) => {
+ 27101:         const aEsIncidencia = a.audio_disponible === false && a.motivo_incidencia;
+ 27102:         const bEsIncidencia = b.audio_disponible === false && b.motivo_incidencia;
+ 27103:         if (aEsIncidencia && !bEsIncidencia) return -1;
+ 27104:         if (!aEsIncidencia && bEsIncidencia) return 1;
+ 27105: 
+ 27106:         const estadoOrder = { 'pendiente': 1, 'en_proceso': 2, 'gestionado': 3 };
+ 27107:         return (estadoOrder[a.estado] || 4) - (estadoOrder[b.estado] || 4);
+ 27108:     });
+ 27109: 
+ 27110:     let html = '';
+ 27111:     for (const asig of asignacionesOrdenadas) {
+ 27112:         const esIncidencia = asig.audio_disponible === false && asig.motivo_incidencia;
+ 27113: 
+ 27114:         // 🔴 OBTENER CAMPAÑA
+ 27115:         const campana = asig.campana || asig.campana_codigo || '-';
+ 27116:         const campanaBadge = campana !== '-'
+ 27117:             ? `<span style="background: #7b1fa2; color: white; padding: 2px 10px; border-radius: 12px; font-size: 11px; display: inline-block;">📌 ${escapeHtml(campana)}</span>`
+ 27118:             : `<span style="color: var(--muted); font-size: 11px;">-</span>`;
+ 27119: 
+ 27120:         let estadoBadge = '';
+ 27121:         let estadoClase = '';
+ 27122:         let acciones = '';
+ 27123: 
+ 27124:         if (esIncidencia) {
+ 27125:             estadoBadge = `<span class="badge" style="background: var(--danger);">⚠️ Incidencia</span>`;
+ 27126:             estadoClase = 'style="background: #fff0f0;"';
+ 27127:             acciones = `
+ 27128:                 <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+ 27129:                     <button onclick="verDetalleIncidenciaEscucha(${asig.id})" 
+ 27130:                         style="background: var(--warning); padding: 4px 8px; font-size: 11px; border: none; border-radius: 6px; cursor: pointer;">
+--- FIN CONTEXTO ---
+
+CTX-007 | campana_codigo | línea 27232
+const key = a.campana || a.campana_codigo || 'Sin campaña';
+--- CONTEXTO ---
+ 27217:                 <td style="padding: 8px; text-align: center;">${acciones}</td>
+ 27218:             </tr>
+ 27219:         `;
+ 27220:     }
+ 27221: 
+ 27222:     // Agregar fila de resumen
+ 27223:     const total = asignaciones.length;
+ 27224:     const pendientes = asignaciones.filter(a => a.estado === 'pendiente').length;
+ 27225:     const enProceso = asignaciones.filter(a => a.estado === 'en_proceso').length;
+ 27226:     const gestionados = asignaciones.filter(a => a.estado === 'gestionado').length;
+ 27227:     const incidencias = asignaciones.filter(a => a.audio_disponible === false && a.motivo_incidencia).length;
+ 27228: 
+ 27229:     // 🔴 CONTAR POR CAMPAÑA
+ 27230:     const campanasMap = {};
+ 27231:     asignaciones.forEach(a => {
+ 27232:         const key = a.campana || a.campana_codigo || 'Sin campaña';
+ 27233:         campanasMap[key] = (campanasMap[key] || 0) + 1;
+ 27234:     });
+ 27235:     const resumenCampanas = Object.entries(campanasMap)
+ 27236:         .map(([c, count]) => `${c}: ${count}`)
+ 27237:         .join(' | ');
+ 27238: 
+ 27239:     html += `
+ 27240:         <tr style="background: #f8f9fa; font-weight: bold;">
+ 27241:             <td colspan="10" style="padding: 10px;">
+ 27242:                 📊 Resumen: ${total} tickets totales | 
+ 27243:                 ⏳ ${pendientes} pendientes | 
+ 27244:                 🔄 ${enProceso} en proceso | 
+ 27245:                 ✅ ${gestionados} gestionados |
+ 27246:                 ⚠️ ${incidencias} incidencias
+ 27247:                 ${resumenCampanas ? `| 📌 Campañas: ${resumenCampanas}` : ''}
+--- FIN CONTEXTO ---
+
+CTX-007 | campana_codigo | línea 30361
+filtradas = filtradas.filter(a => (a.campana || a.campana_codigo || '') === filtroCampana);
+--- CONTEXTO ---
+ 30346:         return;
+ 30347:     }
+ 30348: 
+ 30349:     let filtradas = asignaciones;
+ 30350: 
+ 30351:     if (filtroAuditor) {
+ 30352:         filtradas = filtradas.filter(a => a.auditor_asignado === filtroAuditor);
+ 30353:     }
+ 30354: 
+ 30355:     if (filtroEstado) {
+ 30356:         filtradas = filtradas.filter(a => a.estado === filtroEstado);
+ 30357:     }
+ 30358: 
+ 30359:     // 🔴 NUEVO: FILTRO POR CAMPAÑA
+ 30360:     if (filtroCampana) {
+ 30361:         filtradas = filtradas.filter(a => (a.campana || a.campana_codigo || '') === filtroCampana);
+ 30362:         console.log(`   📌 Filtro campaña "${filtroCampana}": ${filtradas.length} asignaciones`);
+ 30363:     }
+ 30364: 
+ 30365:     if (filtroLote && filtroLote !== 'activo' && filtroLote !== 'todos') {
+ 30366:         const loteId = parseInt(filtroLote);
+ 30367:         if (!isNaN(loteId)) {
+ 30368:             filtradas = filtradas.filter(a => a.tarea_id === loteId);
+ 30369:         }
+ 30370:     } else if (filtroLote === 'activo') {
+ 30371:         const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+ 30372:         if (loteActivo) {
+ 30373:             filtradas = filtradas.filter(a => a.tarea_id === loteActivo.id);
+ 30374:         }
+ 30375:     }
+ 30376: 
+--- FIN CONTEXTO ---
+
+CTX-007 | campana_codigo | línea 50067
+const campana = asig.campana || asig.campana_codigo || '-';
+--- CONTEXTO ---
+ 50052:         if (!aEsIncidencia && bEsIncidencia) return 1;
+ 50053: 
+ 50054:         const estadoOrder = { 'pendiente': 1, 'en_proceso': 2, 'gestionado': 3 };
+ 50055:         return (estadoOrder[a.estado] || 4) - (estadoOrder[b.estado] || 4);
+ 50056:     });
+ 50057: 
+ 50058:     let html = '';
+ 50059:     for (const asig of asignacionesOrdenadas) {
+ 50060:         const esIncidencia = asig.audio_disponible === false && asig.motivo_incidencia;
+ 50061: 
+ 50062:         let estadoBadge = '';
+ 50063:         let estadoClase = '';
+ 50064:         let acciones = '';
+ 50065: 
+ 50066:         // 🔴 OBTENER CAMPAÑA
+ 50067:         const campana = asig.campana || asig.campana_codigo || '-';
+ 50068:         const campanaBadge = campana !== '-'
+ 50069:             ? `<span class="badge" style="background: #7b1fa2; font-size: 10px;">📌 ${campana}</span>`
+ 50070:             : '<span style="color: var(--muted); font-size: 10px;">-</span>';
+ 50071: 
+ 50072:         if (esIncidencia) {
+ 50073:             estadoBadge = `<span class="badge" style="background: var(--danger);">⚠️ Incidencia</span>`;
+ 50074:             estadoClase = 'style="background: #fff0f0;"';
+ 50075:             acciones = `
+ 50076:                 <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+ 50077:                     <button onclick="verDetalleIncidenciaEscucha(${asig.id})" 
+ 50078:                         style="background: var(--warning); padding: 4px 8px; font-size: 11px; border: none; border-radius: 6px; cursor: pointer;">
+ 50079:                         🔍 Ver
+ 50080:                     </button>
+ 50081:                     <button onclick="marcarIncidenciaResuelta(${asig.id})" 
+ 50082:                         style="background: var(--ok); padding: 4px 8px; font-size: 11px; border: none; border-radius: 6px; cursor: pointer;">
+--- FIN CONTEXTO ---
+
+CTX-007 | campana_codigo | línea 50180
+const key = a.campana || a.campana_codigo || 'Sin campaña';
+--- CONTEXTO ---
+ 50165:                 <td style="padding: 8px; text-align: center;">${acciones}</td>
+ 50166:             </tr>
+ 50167:         `;
+ 50168:     }
+ 50169: 
+ 50170:     // Agregar fila de resumen
+ 50171:     const total = asignaciones.length;
+ 50172:     const pendientes = asignaciones.filter(a => a.estado === 'pendiente').length;
+ 50173:     const enProceso = asignaciones.filter(a => a.estado === 'en_proceso').length;
+ 50174:     const gestionados = asignaciones.filter(a => a.estado === 'gestionado').length;
+ 50175:     const incidencias = asignaciones.filter(a => a.audio_disponible === false && a.motivo_incidencia).length;
+ 50176: 
+ 50177:     // 🔴 CONTAR POR CAMPAÑA
+ 50178:     const campanasMap = {};
+ 50179:     asignaciones.forEach(a => {
+ 50180:         const key = a.campana || a.campana_codigo || 'Sin campaña';
+ 50181:         campanasMap[key] = (campanasMap[key] || 0) + 1;
+ 50182:     });
+ 50183:     const resumenCampanas = Object.entries(campanasMap)
+ 50184:         .map(([c, count]) => `${c}: ${count}`)
+ 50185:         .join(' | ');
+ 50186: 
+ 50187:     html += `
+ 50188:         <tr style="background: #f8f9fa; font-weight: bold;">
+ 50189:             <td colspan="11" style="padding: 10px;">
+ 50190:                 📊 Resumen: ${total} tickets totales | 
+ 50191:                 ⏳ ${pendientes} pendientes | 
+ 50192:                 🔄 ${enProceso} en proceso | 
+ 50193:                 ✅ ${gestionados} gestionados |
+ 50194:                 ⚠️ ${incidencias} incidencias
+ 50195:                 ${resumenCampanas ? `| 📌 Campañas: ${resumenCampanas}` : ''}
+--- FIN CONTEXTO ---
+
+CTX-007 | campana_codigo | línea 50246
+filtradas = filtradas.filter(a => (a.campana || a.campana_codigo || '') === filtroCampana);
+--- CONTEXTO ---
+ 50231:         return;
+ 50232:     }
+ 50233: 
+ 50234:     let filtradas = asignaciones;
+ 50235: 
+ 50236:     if (filtroAuditor) {
+ 50237:         filtradas = filtradas.filter(a => a.auditor_asignado === filtroAuditor);
+ 50238:     }
+ 50239: 
+ 50240:     if (filtroEstado) {
+ 50241:         filtradas = filtradas.filter(a => a.estado === filtroEstado);
+ 50242:     }
+ 50243: 
+ 50244:     // 🔴 FILTRO POR CAMPAÑA
+ 50245:     if (filtroCampana) {
+ 50246:         filtradas = filtradas.filter(a => (a.campana || a.campana_codigo || '') === filtroCampana);
+ 50247:         console.log(`   📌 Filtro campaña "${filtroCampana}": ${filtradas.length} asignaciones`);
+ 50248:     }
+ 50249: 
+ 50250:     if (filtroLote && filtroLote !== 'activo' && filtroLote !== 'todos') {
+ 50251:         const loteId = parseInt(filtroLote);
+ 50252:         if (!isNaN(loteId)) {
+ 50253:             filtradas = filtradas.filter(a => a.tarea_id === loteId);
+ 50254:         }
+ 50255:     } else if (filtroLote === 'activo') {
+ 50256:         const loteActivo = window.lotesHistorialGlobal?.find(l => l.estado === 'activo');
+ 50257:         if (loteActivo) {
+ 50258:             filtradas = filtradas.filter(a => a.tarea_id === loteActivo.id);
+ 50259:         }
+ 50260:     }
+ 50261: 
+--- FIN CONTEXTO ---
+
+CTX-007 | campana_codigo | línea 50412
+statsMap[s.campana_codigo] = s.total_asignaciones || 0;
+--- CONTEXTO ---
+ 50397:                         📭 No hay campañas registradas
+ 50398:                         <br>
+ 50399:                         <button onclick="abrirModalNuevaCampana()" style="margin-top: 10px; padding: 8px 16px; background: var(--ok); border: none; border-radius: 6px; color: white; cursor: pointer;">
+ 50400:                             ➕ Crear primera campaña
+ 50401:                         </button>
+ 50402:                     </td>
+ 50403:                 </tr>
+ 50404:             `;
+ 50405:             return;
+ 50406:         }
+ 50407: 
+ 50408:         // Obtener estadísticas de asignaciones por campaña
+ 50409:         const statsCampanas = await obtenerEstadisticasCampanas();
+ 50410:         const statsMap = {};
+ 50411:         statsCampanas.forEach(s => {
+ 50412:             statsMap[s.campana_codigo] = s.total_asignaciones || 0;
+ 50413:         });
+ 50414: 
+ 50415:         let html = '';
+ 50416:         let index = 0;
+ 50417: 
+ 50418:         for (const c of campanas) {
+ 50419:             index++;
+ 50420:             const esActiva = c.activa;
+ 50421:             const totalTickets = statsMap[c.codigo] || 0;
+ 50422: 
+ 50423:             // Clase para fila (inactiva con opacidad)
+ 50424:             const rowClass = esActiva ? 'campana-row' : 'campana-row campana-inactiva';
+ 50425: 
+ 50426:             // Badge de estado
+ 50427:             const estadoBadge = esActiva
+--- FIN CONTEXTO ---
+
+CTX-007 | campana_codigo | línea 50698
+statsMap[s.campana_codigo] = s;
+--- CONTEXTO ---
+ 50683: // ======================================================
+ 50684: // FUNCIÓN: EXPORTAR CAMPAÑAS A CSV
+ 50685: // ======================================================
+ 50686: async function exportarCampanasCSV() {
+ 50687:     try {
+ 50688:         const campanas = await obtenerCampanas();
+ 50689:         const stats = await obtenerEstadisticasCampanas();
+ 50690: 
+ 50691:         if (campanas.length === 0) {
+ 50692:             alert('⚠️ No hay campañas para exportar');
+ 50693:             return;
+ 50694:         }
+ 50695: 
+ 50696:         const statsMap = {};
+ 50697:         stats.forEach(s => {
+ 50698:             statsMap[s.campana_codigo] = s;
+ 50699:         });
+ 50700: 
+ 50701:         // Headers
+ 50702:         const headers = ['Código', 'Descripción', 'Estado', 'Fecha Creación', 'Tickets Asignados', 'Evaluaciones'];
+ 50703: 
+ 50704:         // Filas
+ 50705:         const rows = campanas.map(c => {
+ 50706:             const stat = statsMap[c.codigo] || {};
+ 50707:             return [
+ 50708:                 `"${c.codigo}"`,
+ 50709:                 `"${c.descripcion}"`,
+ 50710:                 c.activa ? 'Activa' : 'Inactiva',
+ 50711:                 c.created_at ? new Date(c.created_at).toLocaleDateString('es-ES') : '-',
+ 50712:                 stat.total_asignaciones || 0,
+ 50713:                 stat.total_evaluaciones || 0
+--- FIN CONTEXTO ---
+
+CTX-007 | campana_codigo | línea 50844
+campana_codigo: c.codigo,
+--- CONTEXTO ---
+ 50829: 
+ 50830:         // Obtener todas las evaluaciones con campana_id
+ 50831:         const { data: evaluaciones, error: evalError } = await db
+ 50832:             .from('evaluaciones')
+ 50833:             .select('campana_id, nota_final')
+ 50834:             .not('campana_id', 'is', null);
+ 50835: 
+ 50836:         if (evalError) throw evalError;
+ 50837: 
+ 50838:         // Crear mapa de estadísticas
+ 50839:         const statsMap = {};
+ 50840: 
+ 50841:         // Inicializar con todas las campañas
+ 50842:         campanas.forEach(c => {
+ 50843:             statsMap[c.id] = {
+ 50844:                 campana_codigo: c.codigo,
+ 50845:                 campana_descripcion: c.descripcion,
+ 50846:                 campana_activa: c.activa,
+ 50847:                 total_asignaciones: 0,
+ 50848:                 pendientes: 0,
+ 50849:                 en_proceso: 0,
+ 50850:                 gestionados: 0,
+ 50851:                 total_evaluaciones: 0,
+ 50852:                 suma_notas: 0,
+ 50853:                 promedio_calificacion: 0
+ 50854:             };
+ 50855:         });
+ 50856: 
+ 50857:         // Procesar asignaciones
+ 50858:         (asignaciones || []).forEach(a => {
+ 50859:             if (statsMap[a.campana_id]) {
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 10025
+? 'Matriz 30/30/40 (vigente hasta mayo 2026)'
+--- CONTEXTO ---
+ 10010:     }
+ 10011: 
+ 10012:     console.log(`📊 ${mesesValidos.length} meses válidos para la tabla`);
+ 10013: 
+ 10014:     // 🔵 FECHA DE CAMBIO DE MATRIZ: 1 de junio 2026
+ 10015:     const FECHA_CAMBIO = new Date(2026, 5, 1);
+ 10016: 
+ 10017:     // Generar cabecera de meses con badge 🔵 y subtexto de matriz
+ 10018:     const headers = mesesValidos.map(m => {
+ 10019:         const fechaMes = new Date(m.anio, m.mes - 1, 1);
+ 10020:         const esMatrizAntigua = fechaMes < FECHA_CAMBIO;
+ 10021: 
+ 10022:         const matrizText = esMatrizAntigua ? 'M. ANTERIOR' : 'M. NUEVA';
+ 10023:         const badge = esMatrizAntigua ? '🔵' : '';
+ 10024:         const badgeTitle = esMatrizAntigua
+ 10025:             ? 'Matriz 30/30/40 (vigente hasta mayo 2026)'
+ 10026:             : 'Matriz 15/15/70 (desde junio 2026)';
+ 10027:         const bgColor = esMatrizAntigua ? '#e3f2fd' : 'transparent';
+ 10028:         const subTextColor = esMatrizAntigua ? '#019DF4' : '#6c757d';
+ 10029: 
+ 10030:         return `
+ 10031:             <th style="padding: 8px; text-align: center; min-width: 70px; background: ${bgColor};">
+ 10032:                 <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+ 10033:                     <span>${m.label}</span>
+ 10034:                     ${badge ? `<span style="font-size: 12px;" title="${badgeTitle}">${badge}</span>` : ''}
+ 10035:                 </div>
+ 10036:                 <div style="font-size: 9px; font-weight: 400; color: ${subTextColor}; margin-top: 2px;">
+ 10037:                     ${matrizText}
+ 10038:                 </div>
+ 10039:             </th>
+ 10040:         `;
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 10113
+<span>= Matriz anterior (ENC 30| ECUF 30 | ECN 40) - vigente hasta mayo 2026</span>
+--- CONTEXTO ---
+ 10098:     // LEYENDA INFERIOR (explicación del badge)
+ 10099:     // ======================================================
+ 10100:     const leyendaBadge = `
+ 10101:         <div style="
+ 10102:             margin-top: 12px;
+ 10103:             padding: 6px 14px;
+ 10104:             background: #f8f9fa;
+ 10105:             border-radius: 8px;
+ 10106:             font-size: 11px;
+ 10107:             color: #6c757d;
+ 10108:             display: flex;
+ 10109:             align-items: center;
+ 10110:             gap: 6px;
+ 10111:         ">
+ 10112:             <span>🔵</span>
+ 10113:             <span>= Matriz anterior (ENC 30| ECUF 30 | ECN 40) - vigente hasta mayo 2026</span>
+ 10114:         </div>
+ 10115:     `;
+ 10116: 
+ 10117:     // ======================================================
+ 10118:     // HTML COMPLETO
+ 10119:     // ======================================================
+ 10120:     return `
+ 10121:         ${leyendaMatriz}
+ 10122:         
+ 10123:         <div id="tablaEvolutivaIndicadores" style="margin-top: 20px;">
+ 10124:             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+ 10125:                 <h3 style="margin: 0; font-size: 16px;">📈 EVOLUCIÓN MENSUAL DE INDICADORES</h3>
+ 10126:                 <div style="display: flex; gap: 8px;">
+ 10127:                     <button id="expandirTodoIndicadores" style="background: var(--accent); border: none; padding: 4px 12px; border-radius: 16px; font-size: 11px; cursor: pointer; color: white;">🔄 Expandir todo</button>
+ 10128:                     <button id="contraerTodoIndicadores" style="background: var(--accent); border: none; padding: 4px 12px; border-radius: 16px; font-size: 11px; cursor: pointer; color: white;">⬛ Contraer todo</button>
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 12912
+console.log(`   ✅ Versión encontrada: ${version.version} (${estado}) - vigente desde ${version.fecha_vigencia}`);
+--- CONTEXTO ---
+ 12897:         const { data: versiones, error: versionError } = await db
+ 12898:             .from('versiones_matriz')
+ 12899:             .select('*')
+ 12900:             .lte('fecha_vigencia', fechaComparable)
+ 12901:             .order('fecha_vigencia', { ascending: false })
+ 12902:             .limit(1);
+ 12903: 
+ 12904:         if (versionError) {
+ 12905:             console.error('❌ Error buscando versión:', versionError);
+ 12906:             return null;
+ 12907:         }
+ 12908: 
+ 12909:         if (versiones && versiones.length > 0) {
+ 12910:             const version = versiones[0];
+ 12911:             const estado = version.activa ? 'ACTIVA' : 'INACTIVA (histórica)';
+ 12912:             console.log(`   ✅ Versión encontrada: ${version.version} (${estado}) - vigente desde ${version.fecha_vigencia}`);
+ 12913:             return version;
+ 12914:         }
+ 12915: 
+ 12916:         // Si no hay versión para esa fecha, usar la activa
+ 12917:         console.log('   ⚠️ No hay versión para esa fecha, usando versión activa');
+ 12918:         const { data: activa, error: activaError } = await db
+ 12919:             .from('versiones_matriz')
+ 12920:             .select('*')
+ 12921:             .eq('activa', true)
+ 12922:             .limit(1);
+ 12923: 
+ 12924:         if (activaError || !activa || activa.length === 0) {
+ 12925:             console.error('❌ No hay versión activa');
+ 12926:             return null;
+ 12927:         }
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 13119
+console.log(`   📌 Usando matriz: ${version.version} (${estado}) - vigente desde ${version.fecha_vigencia}`);
+--- CONTEXTO ---
+ 13104: 
+ 13105: async function clasificarPDAporTipo(submotivosFallados, fechaEvaluacion = null) {
+ 13106:     console.log(`📋 Clasificando PDA para ${submotivosFallados.length} submotivos...`);
+ 13107:     console.log(`   📅 Fecha de referencia: ${fechaEvaluacion || 'actual'}`);
+ 13108: 
+ 13109:     const matriz = await obtenerMatrizParaFecha(fechaEvaluacion);
+ 13110: 
+ 13111:     if (!matriz) {
+ 13112:         console.warn('⚠️ No se pudo cargar matriz, usando clasificación por defecto');
+ 13113:         return clasificarPDAporTipoFallback(submotivosFallados);
+ 13114:     }
+ 13115: 
+ 13116:     const version = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
+ 13117:     if (version) {
+ 13118:         const estado = version.activa ? 'ACTIVA' : 'HISTÓRICA';
+ 13119:         console.log(`   📌 Usando matriz: ${version.version} (${estado}) - vigente desde ${version.fecha_vigencia}`);
+ 13120:     }
+ 13121: 
+ 13122:     const resultado = {
+ 13123:         tipo: null,
+ 13124:         requiereProcesos: false,
+ 13125:         requiereHabilidades: false,
+ 13126:         requiereFeedback: false,
+ 13127:         detalle: {
+ 13128:             procesos: [],
+ 13129:             habilidades: [],
+ 13130:             feedback: []
+ 13131:         },
+ 13132:         mensaje: '',
+ 13133:         resumenTipos: []
+ 13134:     };
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 13540
+console.log(`   📌 Matriz usada: ${version.version} (vigente desde ${version.fecha_vigencia})`);
+--- CONTEXTO ---
+ 13525:         fechaGeneracion: new Date().toISOString(),
+ 13526:         versionMatriz: {
+ 13527:             id: null,
+ 13528:             nombre: null,
+ 13529:             fecha_vigencia: null
+ 13530:         }
+ 13531:     };
+ 13532: 
+ 13533:     // AGREGAR INFORMACIÓN DE LA VERSIÓN DE MATRIZ
+ 13534:     try {
+ 13535:         const version = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
+ 13536:         if (version) {
+ 13537:             estructura.versionMatriz.id = version.id;
+ 13538:             estructura.versionMatriz.nombre = version.version;
+ 13539:             estructura.versionMatriz.fecha_vigencia = version.fecha_vigencia;
+ 13540:             console.log(`   📌 Matriz usada: ${version.version} (vigente desde ${version.fecha_vigencia})`);
+ 13541:         }
+ 13542:     } catch (e) {
+ 13543:         console.warn('   ⚠️ No se pudo obtener la versión de matriz:', e);
+ 13544:     }
+ 13545: 
+ 13546:     console.log(`✅ Estructura de informe generada`);
+ 13547:     console.log(`   - ${estructura.evaluaciones.length} evaluaciones con fallas`);
+ 13548:     console.log(`   - ${estructura.audiosQuiebre.length} audios con quiebres`);
+ 13549:     console.log(`   - ${estructura.resumen.totalFallas} fallas totales`);
+ 13550:     console.log(`   - Tipo PDA: ${estructura.clasificacion.tipo}`);
+ 13551:     console.log(`   - Campañas: ${estructura.campanaPrincipal}`);
+ 13552: 
+ 13553:     return estructura;
+ 13554: }
+ 13555: 
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 14376
+console.log(`   📌 Matriz usada: ${version.version} (vigente desde ${version.fecha_vigencia})`);
+--- CONTEXTO ---
+ 14361:         fechaGeneracion: new Date().toISOString(),
+ 14362:         versionMatriz: {
+ 14363:             id: null,
+ 14364:             nombre: null,
+ 14365:             fecha_vigencia: null
+ 14366:         }
+ 14367:     };
+ 14368: 
+ 14369:     // AGREGAR INFORMACIÓN DE LA VERSIÓN DE MATRIZ
+ 14370:     try {
+ 14371:         const version = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
+ 14372:         if (version) {
+ 14373:             estructura.versionMatriz.id = version.id;
+ 14374:             estructura.versionMatriz.nombre = version.version;
+ 14375:             estructura.versionMatriz.fecha_vigencia = version.fecha_vigencia;
+ 14376:             console.log(`   📌 Matriz usada: ${version.version} (vigente desde ${version.fecha_vigencia})`);
+ 14377:         }
+ 14378:     } catch (e) {
+ 14379:         console.warn('   ⚠️ No se pudo obtener la versión de matriz:', e);
+ 14380:     }
+ 14381: 
+ 14382:     console.log(`✅ Estructura de informe generada`);
+ 14383:     console.log(`   - ${estructura.evaluaciones.length} evaluaciones con fallas`);
+ 14384:     console.log(`   - ${estructura.audiosQuiebre.length} audios con quiebres`);
+ 14385:     console.log(`   - ${estructura.resumen.totalFallas} fallas totales`);
+ 14386:     console.log(`   - Tipo PDA: ${estructura.clasificacion.tipo}`);
+ 14387:     console.log(`   - Procesos: ${estructura.resumen.resumenPorTipo.procesos?.total || 0}`);
+ 14388:     console.log(`   - Habilidades: ${estructura.resumen.resumenPorTipo.habilidades?.total || 0}`);
+ 14389:     console.log(`   - Feedback: ${estructura.resumen.resumenPorTipo.feedback?.total || 0}`);
+ 14390: 
+ 14391:     return estructura;
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 14727
+// Filtrar por fecha de vigencia en JavaScript
+--- CONTEXTO ---
+ 14712:         const result = await response.json();
+ 14713:         let data = result.data || [];
+ 14714: 
+ 14715:         if (data.length === 0) {
+ 14716:             console.warn('⚠️ No hay criterios en BD, usando defecto');
+ 14717:             return obtenerCriteriosPorDefecto();
+ 14718:         }
+ 14719: 
+ 14720:         // 🔴 ORDENAR EN JAVASCRIPT por 'orden'
+ 14721:         data = data.sort((a, b) => {
+ 14722:             const ordenA = parseInt(a.orden) || 0;
+ 14723:             const ordenB = parseInt(b.orden) || 0;
+ 14724:             return ordenA - ordenB;
+ 14725:         });
+ 14726: 
+ 14727:         // Filtrar por fecha de vigencia en JavaScript
+ 14728:         const hoy = new Date().toISOString().split('T')[0];
+ 14729:         const filtrados = data.filter(c => {
+ 14730:             if (!c.fecha_vigencia_hasta) return true;
+ 14731:             return c.fecha_vigencia_hasta >= hoy;
+ 14732:         });
+ 14733: 
+ 14734:         if (filtrados.length === 0) {
+ 14735:             console.warn('⚠️ No hay criterios vigentes, usando defecto');
+ 14736:             return obtenerCriteriosPorDefecto();
+ 14737:         }
+ 14738: 
+ 14739:         cacheCuartiles = filtrados;
+ 14740:         cacheCuartilesTimestamp = ahora;
+ 14741:         console.log(`✅ ${filtrados.length} criterios de cuartiles cargados desde PostgreSQL`);
+ 14742:         console.log('📋 Criterios:', filtrados.map(c => `${c.cuartil}: ${c.limite_inferior}-${c.limite_superior}`).join(', '));
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 14735
+console.warn('⚠️ No hay criterios vigentes, usando defecto');
+--- CONTEXTO ---
+ 14720:         // 🔴 ORDENAR EN JAVASCRIPT por 'orden'
+ 14721:         data = data.sort((a, b) => {
+ 14722:             const ordenA = parseInt(a.orden) || 0;
+ 14723:             const ordenB = parseInt(b.orden) || 0;
+ 14724:             return ordenA - ordenB;
+ 14725:         });
+ 14726: 
+ 14727:         // Filtrar por fecha de vigencia en JavaScript
+ 14728:         const hoy = new Date().toISOString().split('T')[0];
+ 14729:         const filtrados = data.filter(c => {
+ 14730:             if (!c.fecha_vigencia_hasta) return true;
+ 14731:             return c.fecha_vigencia_hasta >= hoy;
+ 14732:         });
+ 14733: 
+ 14734:         if (filtrados.length === 0) {
+ 14735:             console.warn('⚠️ No hay criterios vigentes, usando defecto');
+ 14736:             return obtenerCriteriosPorDefecto();
+ 14737:         }
+ 14738: 
+ 14739:         cacheCuartiles = filtrados;
+ 14740:         cacheCuartilesTimestamp = ahora;
+ 14741:         console.log(`✅ ${filtrados.length} criterios de cuartiles cargados desde PostgreSQL`);
+ 14742:         console.log('📋 Criterios:', filtrados.map(c => `${c.cuartil}: ${c.limite_inferior}-${c.limite_superior}`).join(', '));
+ 14743:         return filtrados;
+ 14744: 
+ 14745:     } catch (error) {
+ 14746:         console.error('Error cargando criterios de cuartiles:', error);
+ 14747:         return obtenerCriteriosPorDefecto();
+ 14748:     }
+ 14749: }
+ 14750: 
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 42753
+(ID: ${version.id}) - Vigente desde: ${new Date(version.fecha_vigencia).toLocaleDateString('es-ES')}
+--- CONTEXTO ---
+ 42738:     const headerBg = esActiva ? '#e8f5e9' : (esVistaPrevia ? '#fff3e0' : '#f8f9fa');
+ 42739:     const headerBorder = esActiva ? '#28a745' : (esVistaPrevia ? '#f39c12' : '#6c757d');
+ 42740:     const estadoTexto = esActiva ? '✅ Activa' : (esVistaPrevia ? '👁️ Vista previa' : '⏸️ Inactiva');
+ 42741:     const estadoColor = esActiva ? '#28a745' : (esVistaPrevia ? '#f39c12' : '#6c757d');
+ 42742: 
+ 42743:     // Mostrar información de la versión
+ 42744:     let html = `
+ 42745:         <div style="margin-bottom: 20px; padding: 15px; background: ${headerBg}; border-radius: 12px; border-left: 4px solid ${headerBorder};">
+ 42746:             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+ 42747:                 <div>
+ 42748:                     <strong style="font-size: 16px;">📌 ${version.version}</strong>
+ 42749:                     <span style="margin-left: 10px; font-size: 12px; padding: 2px 12px; background: ${headerBorder}; color: white; border-radius: 12px;">
+ 42750:                         ${estadoTexto}
+ 42751:                     </span>
+ 42752:                     <span style="margin-left: 10px; font-size: 12px; color: var(--muted);">
+ 42753:                         (ID: ${version.id}) - Vigente desde: ${new Date(version.fecha_vigencia).toLocaleDateString('es-ES')}
+ 42754:                     </span>
+ 42755:                     ${version.descripcion ? `<div style="font-size: 12px; color: var(--muted); margin-top: 4px;">📝 ${escapeHtml(version.descripcion)}</div>` : ''}
+ 42756:                 </div>
+ 42757:                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+ 42758:                     ${esActiva && !esVistaPrevia ? `
+ 42759:                         <button onclick="abrirModalNuevaVersion()" style="background: #7b1fa2; padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+ 42760:                             📦 Nueva Versión
+ 42761:                         </button>
+ 42762:                     ` : ''}
+ 42763:                     ${esVistaPrevia ? `
+ 42764:                         <button onclick="cargarMatrizCompleta()" style="background: var(--accent); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+ 42765:                             ⬅ Volver a Activa
+ 42766:                         </button>
+ 42767:                     ` : `
+ 42768:                         <button onclick="cargarMatrizCompleta()" style="background: var(--accent); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 43260
+`📅 Fecha vigencia: ${new Date(version.fecha_vigencia).toLocaleDateString('es-ES')}\n\n` +
+--- CONTEXTO ---
+ 43245: 
+ 43246:     if (!version) {
+ 43247:         alert('❌ Versión no encontrada');
+ 43248:         return;
+ 43249:     }
+ 43250: 
+ 43251:     if (version.activa) {
+ 43252:         alert(`✅ La versión "${version.version}" ya está activa`);
+ 43253:         return;
+ 43254:     }
+ 43255: 
+ 43256:     // Confirmar activación
+ 43257:     const confirmar = confirm(
+ 43258:         `⚠️ ¿ACTIVAR VERSIÓN "${version.version}"?\n\n` +
+ 43259:         `📌 Descripción: ${version.descripcion || 'Sin descripción'}\n` +
+ 43260:         `📅 Fecha vigencia: ${new Date(version.fecha_vigencia).toLocaleDateString('es-ES')}\n\n` +
+ 43261:         `⚠️ Al activar esta versión:\n` +
+ 43262:         `   • Se desactivará la versión actual\n` +
+ 43263:         `   • Los auditores verán la nueva matriz\n` +
+ 43264:         `   • Las evaluaciones futuras usarán esta versión\n\n` +
+ 43265:         `¿Está seguro de continuar?`
+ 43266:     );
+ 43267: 
+ 43268:     if (!confirmar) return;
+ 43269: 
+ 43270:     activarVersion(versionId);
+ 43271: }
+ 43272: 
+ 43273: // ======================================================
+ 43274: // ACTIVAR VERSIÓN
+ 43275: // ======================================================
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 43884
+<label style="font-size: 12px; font-weight: 600;">📅 Fecha de vigencia *</label>
+--- CONTEXTO ---
+ 43869:                 <div style="padding: 15px 20px; background: linear-gradient(135deg, #7b1fa2, #9c27b0); color: white;">
+ 43870:                     <strong style="font-size: 16px;">📦 Crear Nueva Versión de Matriz</strong>
+ 43871:                 </div>
+ 43872:                 <div style="padding: 20px;">
+ 43873:                     <p style="margin-bottom: 15px; font-size: 13px; color: var(--muted);">
+ 43874:                         Esta acción creará un "snapshot" de la versión actual. 
+ 43875:                         La nueva versión será una copia exacta que podrás modificar sin afectar la versión activa.
+ 43876:                     </p>
+ 43877:                     <div style="margin-bottom: 15px;">
+ 43878:                         <label style="font-size: 12px; font-weight: 600;">📌 Nombre de la versión *</label>
+ 43879:                         <input type="text" id="nuevaVersionNombre" placeholder="Ej: v2.0.0" 
+ 43880:                             style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+ 43881:                         <small style="color: var(--muted);">Formato: vX.X.X</small>
+ 43882:                     </div>
+ 43883:                     <div style="margin-bottom: 15px;">
+ 43884:                         <label style="font-size: 12px; font-weight: 600;">📅 Fecha de vigencia *</label>
+ 43885:                         <input type="date" id="nuevaVersionFecha" value="${new Date().toISOString().split('T')[0]}"
+ 43886:                             style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+ 43887:                     </div>
+ 43888:                     <div style="margin-bottom: 15px;">
+ 43889:                         <label style="font-size: 12px; font-weight: 600;">📝 Descripción</label>
+ 43890:                         <textarea id="nuevaVersionDescripcion" rows="2" placeholder="Describe los cambios de esta versión..."
+ 43891:                             style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);"></textarea>
+ 43892:                     </div>
+ 43893:                     <div style="background: #fff3e0; padding: 12px; border-radius: 8px; font-size: 12px; border-left: 4px solid #f39c12;">
+ 43894:                         ⚠️ La nueva versión se creará como <strong>INACTIVA</strong>. 
+ 43895:                         Deberás activarla manualmente después de hacer los cambios necesarios.
+ 43896:                     </div>
+ 43897:                 </div>
+ 43898:                 <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0;">
+ 43899:                     <button onclick="cerrarModalNuevaVersion()" style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white;">Cancelar</button>
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 43927
+alert('⚠️ Seleccione una fecha de vigencia');
+--- CONTEXTO ---
+ 43912:     const modal = document.getElementById('modalNuevaVersion');
+ 43913:     if (modal) modal.remove();
+ 43914: }
+ 43915: 
+ 43916: async function crearNuevaVersion() {
+ 43917:     const nombre = document.getElementById('nuevaVersionNombre').value.trim();
+ 43918:     const fecha = document.getElementById('nuevaVersionFecha').value;
+ 43919:     const descripcion = document.getElementById('nuevaVersionDescripcion').value.trim();
+ 43920: 
+ 43921:     if (!nombre) {
+ 43922:         alert('⚠️ Ingrese un nombre para la versión');
+ 43923:         return;
+ 43924:     }
+ 43925: 
+ 43926:     if (!fecha) {
+ 43927:         alert('⚠️ Seleccione una fecha de vigencia');
+ 43928:         return;
+ 43929:     }
+ 43930: 
+ 43931:     // Validar formato de versión
+ 43932:     if (!/^v\d+\.\d+\.\d+$/.test(nombre)) {
+ 43933:         alert('⚠️ Formato inválido. Use: v1.0.0, v2.0.0, etc.');
+ 43934:         return;
+ 43935:     }
+ 43936: 
+ 43937:     const btn = document.querySelector('#modalNuevaVersion button:last-child');
+ 43938:     const textoOriginal = btn?.innerHTML;
+ 43939:     if (btn) {
+ 43940:         btn.innerHTML = '⏳ Creando...';
+ 43941:         btn.disabled = true;
+ 43942:     }
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 44074
+const vigencia = c.fecha_vigencia_hasta
+--- CONTEXTO ---
+ 44059: 
+ 44060:         const result = await response.json();
+ 44061:         const criterios = result.data || [];
+ 44062: 
+ 44063:         if (criterios.length === 0) {
+ 44064:             tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px;">📭 No hay criterios registrados</td></tr>';
+ 44065:             return;
+ 44066:         }
+ 44067: 
+ 44068:         let html = '';
+ 44069:         for (const c of criterios) {
+ 44070:             const estadoBadge = c.activo
+ 44071:                 ? '<span class="badge" style="background: var(--ok);">✅ Activo</span>'
+ 44072:                 : '<span class="badge" style="background: var(--danger);">❌ Inactivo</span>';
+ 44073: 
+ 44074:             const vigencia = c.fecha_vigencia_hasta
+ 44075:                 ? `${formatDate(c.fecha_vigencia_desde)} → ${formatDate(c.fecha_vigencia_hasta)}`
+ 44076:                 : `${formatDate(c.fecha_vigencia_desde)} → ∞`;
+ 44077: 
+ 44078:             html += `
+ 44079:                 <tr>
+ 44080:                     <td style="padding: 8px; text-align: center;">${c.id}</td>
+ 44081:                     <td style="padding: 8px;">
+ 44082:                         <span style="background: ${c.color_hex}; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px;">
+ 44083:                             ${c.icono || '📊'} ${c.cuartil}
+ 44084:                         </span>
+ 44085:                     </td>
+ 44086:                     <td style="padding: 8px;">${escapeHtml(c.nombre)}</td>
+ 44087:                     <td style="padding: 8px; text-align: center;">${c.limite_inferior}%</td>
+ 44088:                     <td style="padding: 8px; text-align: center;">${c.limite_superior}%</td>
+ 44089:                     <td style="padding: 8px; text-align: center;">${c.orden}</td>
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 44090
+<td style="padding: 8px; font-size: 12px;">${vigencia}</td>
+--- CONTEXTO ---
+ 44075:                 ? `${formatDate(c.fecha_vigencia_desde)} → ${formatDate(c.fecha_vigencia_hasta)}`
+ 44076:                 : `${formatDate(c.fecha_vigencia_desde)} → ∞`;
+ 44077: 
+ 44078:             html += `
+ 44079:                 <tr>
+ 44080:                     <td style="padding: 8px; text-align: center;">${c.id}</td>
+ 44081:                     <td style="padding: 8px;">
+ 44082:                         <span style="background: ${c.color_hex}; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px;">
+ 44083:                             ${c.icono || '📊'} ${c.cuartil}
+ 44084:                         </span>
+ 44085:                     </td>
+ 44086:                     <td style="padding: 8px;">${escapeHtml(c.nombre)}</td>
+ 44087:                     <td style="padding: 8px; text-align: center;">${c.limite_inferior}%</td>
+ 44088:                     <td style="padding: 8px; text-align: center;">${c.limite_superior}%</td>
+ 44089:                     <td style="padding: 8px; text-align: center;">${c.orden}</td>
+ 44090:                     <td style="padding: 8px; font-size: 12px;">${vigencia}</td>
+ 44091:                     <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
+ 44092:                     <td style="padding: 8px; text-align: center; white-space: nowrap;">
+ 44093:                         <button onclick="editarCriterioCuartil(${c.id})" 
+ 44094:                                 style="background: var(--warning); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; margin-right: 5px;">
+ 44095:                             ✏️
+ 44096:                         </button>
+ 44097:                         ${c.activo ? `
+ 44098:                             <button onclick="desactivarCriterioCuartil(${c.id})" 
+ 44099:                                     style="background: var(--danger); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; color: white;">
+ 44100:                                 🗑️
+ 44101:                             </button>
+ 44102:                         ` : `
+ 44103:                             <button onclick="activarCriterioCuartil(${c.id})" 
+ 44104:                                     style="background: var(--ok); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; color: white;">
+ 44105:                                 ✅ Activar
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 44128
+const vigentes = criterios.filter(c => {
+--- CONTEXTO ---
+ 44113:         tbody.innerHTML = html;
+ 44114:         actualizarEstadisticasCriterios(criterios);
+ 44115: 
+ 44116:     } catch (error) {
+ 44117:         console.error('Error:', error);
+ 44118:         tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--danger); padding: 40px;">❌ Error: ${error.message}</td></tr>`;
+ 44119:     }
+ 44120: }
+ 44121: 
+ 44122: // =============================================
+ 44123: // 2. ACTUALIZAR ESTADÍSTICAS
+ 44124: // =============================================
+ 44125: function actualizarEstadisticasCriterios(criterios) {
+ 44126:     const total = criterios.length;
+ 44127:     const activos = criterios.filter(c => c.activo).length;
+ 44128:     const vigentes = criterios.filter(c => {
+ 44129:         if (!c.activo) return false;
+ 44130:         const hoy = new Date().toISOString().split('T')[0];
+ 44131:         if (!c.fecha_vigencia_hasta) return true;
+ 44132:         return c.fecha_vigencia_hasta >= hoy;
+ 44133:     }).length;
+ 44134: 
+ 44135:     document.getElementById('statsTotalCriterios').textContent = total;
+ 44136:     document.getElementById('statsActivosCriterios').textContent = activos;
+ 44137:     document.getElementById('statsVigentesCriterios').textContent = vigentes;
+ 44138: }
+ 44139: 
+ 44140: // =============================================
+ 44141: // 3. ABRIR MODAL NUEVO CRITERIO
+ 44142: // =============================================
+ 44143: function abrirModalNuevoCriterio() {
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 44137
+document.getElementById('statsVigentesCriterios').textContent = vigentes;
+--- CONTEXTO ---
+ 44122: // =============================================
+ 44123: // 2. ACTUALIZAR ESTADÍSTICAS
+ 44124: // =============================================
+ 44125: function actualizarEstadisticasCriterios(criterios) {
+ 44126:     const total = criterios.length;
+ 44127:     const activos = criterios.filter(c => c.activo).length;
+ 44128:     const vigentes = criterios.filter(c => {
+ 44129:         if (!c.activo) return false;
+ 44130:         const hoy = new Date().toISOString().split('T')[0];
+ 44131:         if (!c.fecha_vigencia_hasta) return true;
+ 44132:         return c.fecha_vigencia_hasta >= hoy;
+ 44133:     }).length;
+ 44134: 
+ 44135:     document.getElementById('statsTotalCriterios').textContent = total;
+ 44136:     document.getElementById('statsActivosCriterios').textContent = activos;
+ 44137:     document.getElementById('statsVigentesCriterios').textContent = vigentes;
+ 44138: }
+ 44139: 
+ 44140: // =============================================
+ 44141: // 3. ABRIR MODAL NUEVO CRITERIO
+ 44142: // =============================================
+ 44143: function abrirModalNuevoCriterio() {
+ 44144:     document.getElementById('modalCriterioTitulo').textContent = '➕ Nuevo Criterio de Cuartil';
+ 44145:     document.getElementById('criterioId').value = '';
+ 44146:     document.getElementById('criterioCuartil').value = '';
+ 44147:     document.getElementById('criterioNombre').value = '';
+ 44148:     document.getElementById('criterioLimiteInferior').value = '';
+ 44149:     document.getElementById('criterioLimiteSuperior').value = '';
+ 44150:     document.getElementById('criterioColor').value = '#019DF4';
+ 44151:     document.getElementById('criterioIcono').value = '📊';
+ 44152:     document.getElementById('criterioOrden').value = '';
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 44234
+alert('⚠️ Seleccione una fecha de vigencia');
+--- CONTEXTO ---
+ 44219:         alert('⚠️ Los límites deben ser números válidos');
+ 44220:         return;
+ 44221:     }
+ 44222: 
+ 44223:     if (limiteInferior >= limiteSuperior) {
+ 44224:         alert('⚠️ El límite inferior debe ser menor que el límite superior');
+ 44225:         return;
+ 44226:     }
+ 44227: 
+ 44228:     if (limiteInferior < 0 || limiteSuperior > 100) {
+ 44229:         alert('⚠️ Los límites deben estar entre 0 y 100');
+ 44230:         return;
+ 44231:     }
+ 44232: 
+ 44233:     if (!fechaDesde) {
+ 44234:         alert('⚠️ Seleccione una fecha de vigencia');
+ 44235:         return;
+ 44236:     }
+ 44237: 
+ 44238:     // 🔴 🔴 🔴 CONSTRUIR DATOS EXACTAMENTE COMO LA PRUEBA 🔴 🔴 🔴
+ 44239:     const data = {
+ 44240:         cuartil: cuartil,
+ 44241:         nombre: nombre,
+ 44242:         limite_inferior: limiteInferior,
+ 44243:         limite_superior: limiteSuperior,
+ 44244:         color_hex: color,
+ 44245:         icono: icono,
+ 44246:         orden: orden,
+ 44247:         fecha_vigencia_desde: fechaDesde,
+ 44248:         fecha_vigencia_hasta: fechaHasta,
+ 44249:         activo: activo
+--- FIN CONTEXTO ---
+
+CTX-012 | contexto persistido frontend | línea 29703
+// Mostrar contexto del lote actual
+--- CONTEXTO ---
+ 29688:                 <\/td><\/tr>`;
+ 29689:         }
+ 29690:     }
+ 29691: }
+ 29692: // ===== FIN FUNCIÓN: cargarTicketsPorLote ===============================
+ 29693: 
+ 29694: // ===== 33. INICIO FUNCIÓN: mostrarTicketsConContextoLote ==============
+ 29695: function mostrarTicketsConContextoLote(asignaciones, lote) {
+ 29696:     const tbody = document.getElementById('tablaMonitoreoEscuchas');
+ 29697:     if (!tbody) return;
+ 29698: 
+ 29699:     const esLoteActivo = lote?.estado === 'activo';
+ 29700:     const nombreArchivo = lote?.nombre_archivo ? lote.nombre_archivo.split('/').pop().split('\\').pop() : 'Desconocido';
+ 29701:     const fechaLote = lote?.fecha_carga ? new Date(lote.fecha_carga).toLocaleString('es-ES') : 'Fecha desconocida';
+ 29702: 
+ 29703:     // Mostrar contexto del lote actual
+ 29704:     let html = `
+ 29705:             <div style="background: ${esLoteActivo ? '#e8f5e9' : '#fff3e0'}; padding: 10px 12px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid ${esLoteActivo ? '#28a745' : '#f39c12'};">
+ 29706:                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+ 29707:                     <div>
+ 29708:                         <strong>📦 Lote actual:</strong> ${escapeHtml(nombreArchivo)}
+ 29709:                         <div style="font-size: 11px; color: var(--muted); margin-top: 3px;">
+ 29710:                             📅 Cargado: ${fechaLote} | 
+ 29711:                             🆔 ID: ${lote?.id} | 
+ 29712:                             ${esLoteActivo ? '✅ Este es el LOTE ACTIVO' : '⚠️ Este es un LOTE HISTÓRICO (solo consulta)'}
+ 29713:                         </div>
+ 29714:                     </div>
+ 29715:                     ${!esLoteActivo ? `
+ 29716:                     <button onclick="activarLote(${lote?.id})" style="background: var(--warning); padding: 6px 12px; font-size: 12px;">
+ 29717:                         📌 Activar este lote
+ 29718:                     </button>
+--- FIN CONTEXTO ---
+
+CTX-012 | contexto persistido frontend | línea 50329
+'⚠️ No hay campañas configuradas para el contexto actual. ' +
+--- CONTEXTO ---
+ 50314:             console.log('📌 Filtro campaña cambiado a:', this.value);
+ 50315:             if (typeof aplicarFiltrosEscuchasConCampana === 'function') {
+ 50316:                 aplicarFiltrosEscuchasConCampana();
+ 50317:             } else {
+ 50318:                 aplicarFiltrosEscuchas();
+ 50319:             }
+ 50320:         });
+ 50321:     }
+ 50322:     // 3. Las campañas provienen exclusivamente de la configuración persistida.
+ 50323:     // F11.3.1: el frontend no crea campañas específicas de Cobranzas.
+ 50324:     setTimeout(async () => {
+ 50325:         const campanas = await obtenerCampanas();
+ 50326: 
+ 50327:         if (campanas.length === 0) {
+ 50328:             console.warn(
+ 50329:                 '⚠️ No hay campañas configuradas para el contexto actual. ' +
+ 50330:                 'Regístrelas desde la administración de campañas.'
+ 50331:             );
+ 50332:         }
+ 50333:     }, 1000);
+ 50334: 
+ 50335:     console.log('✅ Módulo de campañas inicializado');
+ 50336: }
+ 50337: 
+ 50338: // ======================================================
+ 50339: // 8. EXPOSICIÓN GLOBAL DE FUNCIONES
+ 50340: // ======================================================
+ 50341: 
+ 50342: window.obtenerCampanas = obtenerCampanas;
+ 50343: window.obtenerCampanaPorCodigo = obtenerCampanaPorCodigo;
+ 50344: window.crearCampana = crearCampana;
+--- FIN CONTEXTO ---
+
+[ARCHIVO] src/modules/domain/domain.routes.js
+Existe: SI
+Señales detectadas: 3
+
+CTX-001 | API quiebres | línea 12
+['/api/domain/quiebres', controller.listBreaks.bind(controller)],
+--- CONTEXTO ---
+     1: const DomainService = require('./domain.service');
+     2: const DomainController = require('./domain.controller');
+     3: 
+     4: function registerDomainRoutes(routes, { service = new DomainService() } = {}) {
+     5:   if (!routes || typeof routes !== 'object') {
+     6:     throw new Error('routes es obligatorio');
+     7:   }
+     8: 
+     9:   const controller = new DomainController(service);
+    10: 
+    11:   const definitions = [
+    12:     ['/api/domain/quiebres', controller.listBreaks.bind(controller)],
+    13:     ['/api/domain/campanas', controller.listCampaigns.bind(controller)],
+    14:     ['/api/domain/matrices', controller.listMatrices.bind(controller)],
+    15:     ['/api/domain/campana-matriz', controller.campaignMatrixHistory.bind(controller)],
+    16:     ['/api/domain/contexto-evaluacion', controller.resolveContext.bind(controller)],
+    17:     ['/api/domain/consistencia', controller.consistency.bind(controller)]
+    18:   ];
+    19: 
+    20:   for (const [path, handler] of definitions) {
+    21:     routes[path] = routes[path] || {};
+    22:     routes[path].GET = handler;
+    23:   }
+    24: 
+    25:   return definitions.map(([path]) => path);
+    26: }
+    27: 
+--- FIN CONTEXTO ---
+
+CTX-002 | API campañas | línea 13
+['/api/domain/campanas', controller.listCampaigns.bind(controller)],
+--- CONTEXTO ---
+     1: const DomainService = require('./domain.service');
+     2: const DomainController = require('./domain.controller');
+     3: 
+     4: function registerDomainRoutes(routes, { service = new DomainService() } = {}) {
+     5:   if (!routes || typeof routes !== 'object') {
+     6:     throw new Error('routes es obligatorio');
+     7:   }
+     8: 
+     9:   const controller = new DomainController(service);
+    10: 
+    11:   const definitions = [
+    12:     ['/api/domain/quiebres', controller.listBreaks.bind(controller)],
+    13:     ['/api/domain/campanas', controller.listCampaigns.bind(controller)],
+    14:     ['/api/domain/matrices', controller.listMatrices.bind(controller)],
+    15:     ['/api/domain/campana-matriz', controller.campaignMatrixHistory.bind(controller)],
+    16:     ['/api/domain/contexto-evaluacion', controller.resolveContext.bind(controller)],
+    17:     ['/api/domain/consistencia', controller.consistency.bind(controller)]
+    18:   ];
+    19: 
+    20:   for (const [path, handler] of definitions) {
+    21:     routes[path] = routes[path] || {};
+    22:     routes[path].GET = handler;
+    23:   }
+    24: 
+    25:   return definitions.map(([path]) => path);
+    26: }
+    27: 
+    28: module.exports = { registerDomainRoutes };
+--- FIN CONTEXTO ---
+
+CTX-003 | API contexto | línea 16
+['/api/domain/contexto-evaluacion', controller.resolveContext.bind(controller)],
+--- CONTEXTO ---
+     1: const DomainService = require('./domain.service');
+     2: const DomainController = require('./domain.controller');
+     3: 
+     4: function registerDomainRoutes(routes, { service = new DomainService() } = {}) {
+     5:   if (!routes || typeof routes !== 'object') {
+     6:     throw new Error('routes es obligatorio');
+     7:   }
+     8: 
+     9:   const controller = new DomainController(service);
+    10: 
+    11:   const definitions = [
+    12:     ['/api/domain/quiebres', controller.listBreaks.bind(controller)],
+    13:     ['/api/domain/campanas', controller.listCampaigns.bind(controller)],
+    14:     ['/api/domain/matrices', controller.listMatrices.bind(controller)],
+    15:     ['/api/domain/campana-matriz', controller.campaignMatrixHistory.bind(controller)],
+    16:     ['/api/domain/contexto-evaluacion', controller.resolveContext.bind(controller)],
+    17:     ['/api/domain/consistencia', controller.consistency.bind(controller)]
+    18:   ];
+    19: 
+    20:   for (const [path, handler] of definitions) {
+    21:     routes[path] = routes[path] || {};
+    22:     routes[path].GET = handler;
+    23:   }
+    24: 
+    25:   return definitions.map(([path]) => path);
+    26: }
+    27: 
+    28: module.exports = { registerDomainRoutes };
+    29: 
+--- FIN CONTEXTO ---
+
+[ARCHIVO] src/modules/domain/domain.service.js
+Existe: SI
+Señales detectadas: 0
+
+[ARCHIVO] src/modules/domain/domain.repository.js
+Existe: SI
+Señales detectadas: 21
+
+CTX-004 | quiebre_id | línea 36
+c.quiebre_id,
+--- CONTEXTO ---
+    21:       `SELECT id, codigo, nombre, descripcion, activo, created_at, updated_at
+    22:        FROM quiebres
+    23:        WHERE id = $1`,
+    24:       [id]
+    25:     );
+    26:     return result.rows[0] || null;
+    27:   }
+    28: 
+    29:   async listCampaignsByBreak(breakId, { activeOnly = true } = {}) {
+    30:     let sql = `
+    31:       SELECT
+    32:         c.id,
+    33:         c.codigo,
+    34:         c.descripcion,
+    35:         c.activa,
+    36:         c.quiebre_id,
+    37:         q.codigo AS quiebre_codigo,
+    38:         q.nombre AS quiebre_nombre
+    39:       FROM campanas c
+    40:       JOIN quiebres q ON q.id = c.quiebre_id
+    41:       WHERE c.quiebre_id = $1
+    42:     `;
+    43:     if (activeOnly) sql += ` AND c.activa = TRUE`;
+    44:     sql += ` ORDER BY c.codigo, c.id`;
+    45:     return (await this.db.query(sql, [breakId])).rows;
+    46:   }
+    47: 
+    48:   async listMatricesByBreak(breakId, { activeOnly = true } = {}) {
+    49:     let sql = `
+    50:       SELECT id, quiebre_id, codigo, nombre, descripcion, activa, created_at, updated_at
+    51:       FROM matrices
+--- FIN CONTEXTO ---
+
+CTX-004 | quiebre_id | línea 40
+JOIN quiebres q ON q.id = c.quiebre_id
+--- CONTEXTO ---
+    25:     );
+    26:     return result.rows[0] || null;
+    27:   }
+    28: 
+    29:   async listCampaignsByBreak(breakId, { activeOnly = true } = {}) {
+    30:     let sql = `
+    31:       SELECT
+    32:         c.id,
+    33:         c.codigo,
+    34:         c.descripcion,
+    35:         c.activa,
+    36:         c.quiebre_id,
+    37:         q.codigo AS quiebre_codigo,
+    38:         q.nombre AS quiebre_nombre
+    39:       FROM campanas c
+    40:       JOIN quiebres q ON q.id = c.quiebre_id
+    41:       WHERE c.quiebre_id = $1
+    42:     `;
+    43:     if (activeOnly) sql += ` AND c.activa = TRUE`;
+    44:     sql += ` ORDER BY c.codigo, c.id`;
+    45:     return (await this.db.query(sql, [breakId])).rows;
+    46:   }
+    47: 
+    48:   async listMatricesByBreak(breakId, { activeOnly = true } = {}) {
+    49:     let sql = `
+    50:       SELECT id, quiebre_id, codigo, nombre, descripcion, activa, created_at, updated_at
+    51:       FROM matrices
+    52:       WHERE quiebre_id = $1
+    53:     `;
+    54:     if (activeOnly) sql += ` AND activa = TRUE`;
+    55:     sql += ` ORDER BY nombre, id`;
+--- FIN CONTEXTO ---
+
+CTX-004 | quiebre_id | línea 41
+WHERE c.quiebre_id = $1
+--- CONTEXTO ---
+    26:     return result.rows[0] || null;
+    27:   }
+    28: 
+    29:   async listCampaignsByBreak(breakId, { activeOnly = true } = {}) {
+    30:     let sql = `
+    31:       SELECT
+    32:         c.id,
+    33:         c.codigo,
+    34:         c.descripcion,
+    35:         c.activa,
+    36:         c.quiebre_id,
+    37:         q.codigo AS quiebre_codigo,
+    38:         q.nombre AS quiebre_nombre
+    39:       FROM campanas c
+    40:       JOIN quiebres q ON q.id = c.quiebre_id
+    41:       WHERE c.quiebre_id = $1
+    42:     `;
+    43:     if (activeOnly) sql += ` AND c.activa = TRUE`;
+    44:     sql += ` ORDER BY c.codigo, c.id`;
+    45:     return (await this.db.query(sql, [breakId])).rows;
+    46:   }
+    47: 
+    48:   async listMatricesByBreak(breakId, { activeOnly = true } = {}) {
+    49:     let sql = `
+    50:       SELECT id, quiebre_id, codigo, nombre, descripcion, activa, created_at, updated_at
+    51:       FROM matrices
+    52:       WHERE quiebre_id = $1
+    53:     `;
+    54:     if (activeOnly) sql += ` AND activa = TRUE`;
+    55:     sql += ` ORDER BY nombre, id`;
+    56:     return (await this.db.query(sql, [breakId])).rows;
+--- FIN CONTEXTO ---
+
+CTX-004 | quiebre_id | línea 50
+SELECT id, quiebre_id, codigo, nombre, descripcion, activa, created_at, updated_at
+--- CONTEXTO ---
+    35:         c.activa,
+    36:         c.quiebre_id,
+    37:         q.codigo AS quiebre_codigo,
+    38:         q.nombre AS quiebre_nombre
+    39:       FROM campanas c
+    40:       JOIN quiebres q ON q.id = c.quiebre_id
+    41:       WHERE c.quiebre_id = $1
+    42:     `;
+    43:     if (activeOnly) sql += ` AND c.activa = TRUE`;
+    44:     sql += ` ORDER BY c.codigo, c.id`;
+    45:     return (await this.db.query(sql, [breakId])).rows;
+    46:   }
+    47: 
+    48:   async listMatricesByBreak(breakId, { activeOnly = true } = {}) {
+    49:     let sql = `
+    50:       SELECT id, quiebre_id, codigo, nombre, descripcion, activa, created_at, updated_at
+    51:       FROM matrices
+    52:       WHERE quiebre_id = $1
+    53:     `;
+    54:     if (activeOnly) sql += ` AND activa = TRUE`;
+    55:     sql += ` ORDER BY nombre, id`;
+    56:     return (await this.db.query(sql, [breakId])).rows;
+    57:   }
+    58: 
+    59:   async listCampaignMatrixAssignments(campaignId) {
+    60:     return (await this.db.query(
+    61:       `
+    62:       SELECT
+    63:         cm.id,
+    64:         cm.campana_id,
+    65:         cm.matriz_id,
+--- FIN CONTEXTO ---
+
+CTX-004 | quiebre_id | línea 52
+WHERE quiebre_id = $1
+--- CONTEXTO ---
+    37:         q.codigo AS quiebre_codigo,
+    38:         q.nombre AS quiebre_nombre
+    39:       FROM campanas c
+    40:       JOIN quiebres q ON q.id = c.quiebre_id
+    41:       WHERE c.quiebre_id = $1
+    42:     `;
+    43:     if (activeOnly) sql += ` AND c.activa = TRUE`;
+    44:     sql += ` ORDER BY c.codigo, c.id`;
+    45:     return (await this.db.query(sql, [breakId])).rows;
+    46:   }
+    47: 
+    48:   async listMatricesByBreak(breakId, { activeOnly = true } = {}) {
+    49:     let sql = `
+    50:       SELECT id, quiebre_id, codigo, nombre, descripcion, activa, created_at, updated_at
+    51:       FROM matrices
+    52:       WHERE quiebre_id = $1
+    53:     `;
+    54:     if (activeOnly) sql += ` AND activa = TRUE`;
+    55:     sql += ` ORDER BY nombre, id`;
+    56:     return (await this.db.query(sql, [breakId])).rows;
+    57:   }
+    58: 
+    59:   async listCampaignMatrixAssignments(campaignId) {
+    60:     return (await this.db.query(
+    61:       `
+    62:       SELECT
+    63:         cm.id,
+    64:         cm.campana_id,
+    65:         cm.matriz_id,
+    66:         cm.vigente_desde,
+    67:         cm.vigente_hasta,
+--- FIN CONTEXTO ---
+
+CTX-004 | quiebre_id | línea 99
+WHERE quiebre_id IS NULL) AS campanas_sin_quiebre,
+--- CONTEXTO ---
+    84:           [campaignId, date]
+    85:         )
+    86:       : await this.db.query(
+    87:           `SELECT * FROM resolver_contexto_evaluacion($1, CURRENT_DATE)`,
+    88:           [campaignId]
+    89:         );
+    90: 
+    91:     return result.rows;
+    92:   }
+    93: 
+    94:   async getDomainConsistency() {
+    95:     return (await this.db.query(`
+    96:       SELECT
+    97:         (SELECT COUNT(*)::int
+    98:            FROM campanas
+    99:           WHERE quiebre_id IS NULL) AS campanas_sin_quiebre,
+   100: 
+   101:         (SELECT COUNT(*)::int
+   102:            FROM versiones_matriz
+   103:           WHERE matriz_id IS NULL) AS versiones_sin_matriz,
+   104: 
+   105:         (SELECT COUNT(*)::int
+   106:            FROM campana_matriz cm
+   107:            JOIN campanas c ON c.id = cm.campana_id
+   108:            JOIN matrices m ON m.id = cm.matriz_id
+   109:           WHERE c.quiebre_id <> m.quiebre_id) AS relaciones_quiebre_cruzado,
+   110: 
+   111:         (SELECT COUNT(*)::int
+   112:            FROM campanas c
+   113:           WHERE NOT EXISTS (
+   114:             SELECT 1
+--- FIN CONTEXTO ---
+
+CTX-004 | quiebre_id | línea 109
+WHERE c.quiebre_id <> m.quiebre_id) AS relaciones_quiebre_cruzado,
+--- CONTEXTO ---
+    94:   async getDomainConsistency() {
+    95:     return (await this.db.query(`
+    96:       SELECT
+    97:         (SELECT COUNT(*)::int
+    98:            FROM campanas
+    99:           WHERE quiebre_id IS NULL) AS campanas_sin_quiebre,
+   100: 
+   101:         (SELECT COUNT(*)::int
+   102:            FROM versiones_matriz
+   103:           WHERE matriz_id IS NULL) AS versiones_sin_matriz,
+   104: 
+   105:         (SELECT COUNT(*)::int
+   106:            FROM campana_matriz cm
+   107:            JOIN campanas c ON c.id = cm.campana_id
+   108:            JOIN matrices m ON m.id = cm.matriz_id
+   109:           WHERE c.quiebre_id <> m.quiebre_id) AS relaciones_quiebre_cruzado,
+   110: 
+   111:         (SELECT COUNT(*)::int
+   112:            FROM campanas c
+   113:           WHERE NOT EXISTS (
+   114:             SELECT 1
+   115:             FROM campana_matriz cm
+   116:             WHERE cm.campana_id = c.id
+   117:               AND cm.activa = TRUE
+   118:           )) AS campanas_sin_matriz_activa
+   119:     `)).rows[0];
+   120:   }
+   121: }
+   122: 
+   123: module.exports = DomainRepository;
+   124: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 64
+cm.campana_id,
+--- CONTEXTO ---
+    49:     let sql = `
+    50:       SELECT id, quiebre_id, codigo, nombre, descripcion, activa, created_at, updated_at
+    51:       FROM matrices
+    52:       WHERE quiebre_id = $1
+    53:     `;
+    54:     if (activeOnly) sql += ` AND activa = TRUE`;
+    55:     sql += ` ORDER BY nombre, id`;
+    56:     return (await this.db.query(sql, [breakId])).rows;
+    57:   }
+    58: 
+    59:   async listCampaignMatrixAssignments(campaignId) {
+    60:     return (await this.db.query(
+    61:       `
+    62:       SELECT
+    63:         cm.id,
+    64:         cm.campana_id,
+    65:         cm.matriz_id,
+    66:         cm.vigente_desde,
+    67:         cm.vigente_hasta,
+    68:         cm.activa,
+    69:         m.codigo AS matriz_codigo,
+    70:         m.nombre AS matriz_nombre
+    71:       FROM campana_matriz cm
+    72:       JOIN matrices m ON m.id = cm.matriz_id
+    73:       WHERE cm.campana_id = $1
+    74:       ORDER BY cm.vigente_desde DESC, cm.id DESC
+    75:       `,
+    76:       [campaignId]
+    77:     )).rows;
+    78:   }
+    79: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 73
+WHERE cm.campana_id = $1
+--- CONTEXTO ---
+    58: 
+    59:   async listCampaignMatrixAssignments(campaignId) {
+    60:     return (await this.db.query(
+    61:       `
+    62:       SELECT
+    63:         cm.id,
+    64:         cm.campana_id,
+    65:         cm.matriz_id,
+    66:         cm.vigente_desde,
+    67:         cm.vigente_hasta,
+    68:         cm.activa,
+    69:         m.codigo AS matriz_codigo,
+    70:         m.nombre AS matriz_nombre
+    71:       FROM campana_matriz cm
+    72:       JOIN matrices m ON m.id = cm.matriz_id
+    73:       WHERE cm.campana_id = $1
+    74:       ORDER BY cm.vigente_desde DESC, cm.id DESC
+    75:       `,
+    76:       [campaignId]
+    77:     )).rows;
+    78:   }
+    79: 
+    80:   async resolveEvaluationContext(campaignId, date = null) {
+    81:     const result = date
+    82:       ? await this.db.query(
+    83:           `SELECT * FROM resolver_contexto_evaluacion($1, $2::date)`,
+    84:           [campaignId, date]
+    85:         )
+    86:       : await this.db.query(
+    87:           `SELECT * FROM resolver_contexto_evaluacion($1, CURRENT_DATE)`,
+    88:           [campaignId]
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 107
+JOIN campanas c ON c.id = cm.campana_id
+--- CONTEXTO ---
+    92:   }
+    93: 
+    94:   async getDomainConsistency() {
+    95:     return (await this.db.query(`
+    96:       SELECT
+    97:         (SELECT COUNT(*)::int
+    98:            FROM campanas
+    99:           WHERE quiebre_id IS NULL) AS campanas_sin_quiebre,
+   100: 
+   101:         (SELECT COUNT(*)::int
+   102:            FROM versiones_matriz
+   103:           WHERE matriz_id IS NULL) AS versiones_sin_matriz,
+   104: 
+   105:         (SELECT COUNT(*)::int
+   106:            FROM campana_matriz cm
+   107:            JOIN campanas c ON c.id = cm.campana_id
+   108:            JOIN matrices m ON m.id = cm.matriz_id
+   109:           WHERE c.quiebre_id <> m.quiebre_id) AS relaciones_quiebre_cruzado,
+   110: 
+   111:         (SELECT COUNT(*)::int
+   112:            FROM campanas c
+   113:           WHERE NOT EXISTS (
+   114:             SELECT 1
+   115:             FROM campana_matriz cm
+   116:             WHERE cm.campana_id = c.id
+   117:               AND cm.activa = TRUE
+   118:           )) AS campanas_sin_matriz_activa
+   119:     `)).rows[0];
+   120:   }
+   121: }
+   122: 
+--- FIN CONTEXTO ---
+
+CTX-005 | campana_id | línea 116
+WHERE cm.campana_id = c.id
+--- CONTEXTO ---
+   101:         (SELECT COUNT(*)::int
+   102:            FROM versiones_matriz
+   103:           WHERE matriz_id IS NULL) AS versiones_sin_matriz,
+   104: 
+   105:         (SELECT COUNT(*)::int
+   106:            FROM campana_matriz cm
+   107:            JOIN campanas c ON c.id = cm.campana_id
+   108:            JOIN matrices m ON m.id = cm.matriz_id
+   109:           WHERE c.quiebre_id <> m.quiebre_id) AS relaciones_quiebre_cruzado,
+   110: 
+   111:         (SELECT COUNT(*)::int
+   112:            FROM campanas c
+   113:           WHERE NOT EXISTS (
+   114:             SELECT 1
+   115:             FROM campana_matriz cm
+   116:             WHERE cm.campana_id = c.id
+   117:               AND cm.activa = TRUE
+   118:           )) AS campanas_sin_matriz_activa
+   119:     `)).rows[0];
+   120:   }
+   121: }
+   122: 
+   123: module.exports = DomainRepository;
+   124: 
+--- FIN CONTEXTO ---
+
+CTX-006 | quiebre_codigo | línea 37
+q.codigo AS quiebre_codigo,
+--- CONTEXTO ---
+    22:        FROM quiebres
+    23:        WHERE id = $1`,
+    24:       [id]
+    25:     );
+    26:     return result.rows[0] || null;
+    27:   }
+    28: 
+    29:   async listCampaignsByBreak(breakId, { activeOnly = true } = {}) {
+    30:     let sql = `
+    31:       SELECT
+    32:         c.id,
+    33:         c.codigo,
+    34:         c.descripcion,
+    35:         c.activa,
+    36:         c.quiebre_id,
+    37:         q.codigo AS quiebre_codigo,
+    38:         q.nombre AS quiebre_nombre
+    39:       FROM campanas c
+    40:       JOIN quiebres q ON q.id = c.quiebre_id
+    41:       WHERE c.quiebre_id = $1
+    42:     `;
+    43:     if (activeOnly) sql += ` AND c.activa = TRUE`;
+    44:     sql += ` ORDER BY c.codigo, c.id`;
+    45:     return (await this.db.query(sql, [breakId])).rows;
+    46:   }
+    47: 
+    48:   async listMatricesByBreak(breakId, { activeOnly = true } = {}) {
+    49:     let sql = `
+    50:       SELECT id, quiebre_id, codigo, nombre, descripcion, activa, created_at, updated_at
+    51:       FROM matrices
+    52:       WHERE quiebre_id = $1
+--- FIN CONTEXTO ---
+
+CTX-008 | resolver_contexto_evaluacion | línea 83
+`SELECT * FROM resolver_contexto_evaluacion($1, $2::date)`,
+--- CONTEXTO ---
+    68:         cm.activa,
+    69:         m.codigo AS matriz_codigo,
+    70:         m.nombre AS matriz_nombre
+    71:       FROM campana_matriz cm
+    72:       JOIN matrices m ON m.id = cm.matriz_id
+    73:       WHERE cm.campana_id = $1
+    74:       ORDER BY cm.vigente_desde DESC, cm.id DESC
+    75:       `,
+    76:       [campaignId]
+    77:     )).rows;
+    78:   }
+    79: 
+    80:   async resolveEvaluationContext(campaignId, date = null) {
+    81:     const result = date
+    82:       ? await this.db.query(
+    83:           `SELECT * FROM resolver_contexto_evaluacion($1, $2::date)`,
+    84:           [campaignId, date]
+    85:         )
+    86:       : await this.db.query(
+    87:           `SELECT * FROM resolver_contexto_evaluacion($1, CURRENT_DATE)`,
+    88:           [campaignId]
+    89:         );
+    90: 
+    91:     return result.rows;
+    92:   }
+    93: 
+    94:   async getDomainConsistency() {
+    95:     return (await this.db.query(`
+    96:       SELECT
+    97:         (SELECT COUNT(*)::int
+    98:            FROM campanas
+--- FIN CONTEXTO ---
+
+CTX-008 | resolver_contexto_evaluacion | línea 87
+`SELECT * FROM resolver_contexto_evaluacion($1, CURRENT_DATE)`,
+--- CONTEXTO ---
+    72:       JOIN matrices m ON m.id = cm.matriz_id
+    73:       WHERE cm.campana_id = $1
+    74:       ORDER BY cm.vigente_desde DESC, cm.id DESC
+    75:       `,
+    76:       [campaignId]
+    77:     )).rows;
+    78:   }
+    79: 
+    80:   async resolveEvaluationContext(campaignId, date = null) {
+    81:     const result = date
+    82:       ? await this.db.query(
+    83:           `SELECT * FROM resolver_contexto_evaluacion($1, $2::date)`,
+    84:           [campaignId, date]
+    85:         )
+    86:       : await this.db.query(
+    87:           `SELECT * FROM resolver_contexto_evaluacion($1, CURRENT_DATE)`,
+    88:           [campaignId]
+    89:         );
+    90: 
+    91:     return result.rows;
+    92:   }
+    93: 
+    94:   async getDomainConsistency() {
+    95:     return (await this.db.query(`
+    96:       SELECT
+    97:         (SELECT COUNT(*)::int
+    98:            FROM campanas
+    99:           WHERE quiebre_id IS NULL) AS campanas_sin_quiebre,
+   100: 
+   101:         (SELECT COUNT(*)::int
+   102:            FROM versiones_matriz
+--- FIN CONTEXTO ---
+
+CTX-009 | matriz_id | línea 65
+cm.matriz_id,
+--- CONTEXTO ---
+    50:       SELECT id, quiebre_id, codigo, nombre, descripcion, activa, created_at, updated_at
+    51:       FROM matrices
+    52:       WHERE quiebre_id = $1
+    53:     `;
+    54:     if (activeOnly) sql += ` AND activa = TRUE`;
+    55:     sql += ` ORDER BY nombre, id`;
+    56:     return (await this.db.query(sql, [breakId])).rows;
+    57:   }
+    58: 
+    59:   async listCampaignMatrixAssignments(campaignId) {
+    60:     return (await this.db.query(
+    61:       `
+    62:       SELECT
+    63:         cm.id,
+    64:         cm.campana_id,
+    65:         cm.matriz_id,
+    66:         cm.vigente_desde,
+    67:         cm.vigente_hasta,
+    68:         cm.activa,
+    69:         m.codigo AS matriz_codigo,
+    70:         m.nombre AS matriz_nombre
+    71:       FROM campana_matriz cm
+    72:       JOIN matrices m ON m.id = cm.matriz_id
+    73:       WHERE cm.campana_id = $1
+    74:       ORDER BY cm.vigente_desde DESC, cm.id DESC
+    75:       `,
+    76:       [campaignId]
+    77:     )).rows;
+    78:   }
+    79: 
+    80:   async resolveEvaluationContext(campaignId, date = null) {
+--- FIN CONTEXTO ---
+
+CTX-009 | matriz_id | línea 72
+JOIN matrices m ON m.id = cm.matriz_id
+--- CONTEXTO ---
+    57:   }
+    58: 
+    59:   async listCampaignMatrixAssignments(campaignId) {
+    60:     return (await this.db.query(
+    61:       `
+    62:       SELECT
+    63:         cm.id,
+    64:         cm.campana_id,
+    65:         cm.matriz_id,
+    66:         cm.vigente_desde,
+    67:         cm.vigente_hasta,
+    68:         cm.activa,
+    69:         m.codigo AS matriz_codigo,
+    70:         m.nombre AS matriz_nombre
+    71:       FROM campana_matriz cm
+    72:       JOIN matrices m ON m.id = cm.matriz_id
+    73:       WHERE cm.campana_id = $1
+    74:       ORDER BY cm.vigente_desde DESC, cm.id DESC
+    75:       `,
+    76:       [campaignId]
+    77:     )).rows;
+    78:   }
+    79: 
+    80:   async resolveEvaluationContext(campaignId, date = null) {
+    81:     const result = date
+    82:       ? await this.db.query(
+    83:           `SELECT * FROM resolver_contexto_evaluacion($1, $2::date)`,
+    84:           [campaignId, date]
+    85:         )
+    86:       : await this.db.query(
+    87:           `SELECT * FROM resolver_contexto_evaluacion($1, CURRENT_DATE)`,
+--- FIN CONTEXTO ---
+
+CTX-009 | matriz_id | línea 103
+WHERE matriz_id IS NULL) AS versiones_sin_matriz,
+--- CONTEXTO ---
+    88:           [campaignId]
+    89:         );
+    90: 
+    91:     return result.rows;
+    92:   }
+    93: 
+    94:   async getDomainConsistency() {
+    95:     return (await this.db.query(`
+    96:       SELECT
+    97:         (SELECT COUNT(*)::int
+    98:            FROM campanas
+    99:           WHERE quiebre_id IS NULL) AS campanas_sin_quiebre,
+   100: 
+   101:         (SELECT COUNT(*)::int
+   102:            FROM versiones_matriz
+   103:           WHERE matriz_id IS NULL) AS versiones_sin_matriz,
+   104: 
+   105:         (SELECT COUNT(*)::int
+   106:            FROM campana_matriz cm
+   107:            JOIN campanas c ON c.id = cm.campana_id
+   108:            JOIN matrices m ON m.id = cm.matriz_id
+   109:           WHERE c.quiebre_id <> m.quiebre_id) AS relaciones_quiebre_cruzado,
+   110: 
+   111:         (SELECT COUNT(*)::int
+   112:            FROM campanas c
+   113:           WHERE NOT EXISTS (
+   114:             SELECT 1
+   115:             FROM campana_matriz cm
+   116:             WHERE cm.campana_id = c.id
+   117:               AND cm.activa = TRUE
+   118:           )) AS campanas_sin_matriz_activa
+--- FIN CONTEXTO ---
+
+CTX-009 | matriz_id | línea 108
+JOIN matrices m ON m.id = cm.matriz_id
+--- CONTEXTO ---
+    93: 
+    94:   async getDomainConsistency() {
+    95:     return (await this.db.query(`
+    96:       SELECT
+    97:         (SELECT COUNT(*)::int
+    98:            FROM campanas
+    99:           WHERE quiebre_id IS NULL) AS campanas_sin_quiebre,
+   100: 
+   101:         (SELECT COUNT(*)::int
+   102:            FROM versiones_matriz
+   103:           WHERE matriz_id IS NULL) AS versiones_sin_matriz,
+   104: 
+   105:         (SELECT COUNT(*)::int
+   106:            FROM campana_matriz cm
+   107:            JOIN campanas c ON c.id = cm.campana_id
+   108:            JOIN matrices m ON m.id = cm.matriz_id
+   109:           WHERE c.quiebre_id <> m.quiebre_id) AS relaciones_quiebre_cruzado,
+   110: 
+   111:         (SELECT COUNT(*)::int
+   112:            FROM campanas c
+   113:           WHERE NOT EXISTS (
+   114:             SELECT 1
+   115:             FROM campana_matriz cm
+   116:             WHERE cm.campana_id = c.id
+   117:               AND cm.activa = TRUE
+   118:           )) AS campanas_sin_matriz_activa
+   119:     `)).rows[0];
+   120:   }
+   121: }
+   122: 
+   123: module.exports = DomainRepository;
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 66
+cm.vigente_desde,
+--- CONTEXTO ---
+    51:       FROM matrices
+    52:       WHERE quiebre_id = $1
+    53:     `;
+    54:     if (activeOnly) sql += ` AND activa = TRUE`;
+    55:     sql += ` ORDER BY nombre, id`;
+    56:     return (await this.db.query(sql, [breakId])).rows;
+    57:   }
+    58: 
+    59:   async listCampaignMatrixAssignments(campaignId) {
+    60:     return (await this.db.query(
+    61:       `
+    62:       SELECT
+    63:         cm.id,
+    64:         cm.campana_id,
+    65:         cm.matriz_id,
+    66:         cm.vigente_desde,
+    67:         cm.vigente_hasta,
+    68:         cm.activa,
+    69:         m.codigo AS matriz_codigo,
+    70:         m.nombre AS matriz_nombre
+    71:       FROM campana_matriz cm
+    72:       JOIN matrices m ON m.id = cm.matriz_id
+    73:       WHERE cm.campana_id = $1
+    74:       ORDER BY cm.vigente_desde DESC, cm.id DESC
+    75:       `,
+    76:       [campaignId]
+    77:     )).rows;
+    78:   }
+    79: 
+    80:   async resolveEvaluationContext(campaignId, date = null) {
+    81:     const result = date
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 67
+cm.vigente_hasta,
+--- CONTEXTO ---
+    52:       WHERE quiebre_id = $1
+    53:     `;
+    54:     if (activeOnly) sql += ` AND activa = TRUE`;
+    55:     sql += ` ORDER BY nombre, id`;
+    56:     return (await this.db.query(sql, [breakId])).rows;
+    57:   }
+    58: 
+    59:   async listCampaignMatrixAssignments(campaignId) {
+    60:     return (await this.db.query(
+    61:       `
+    62:       SELECT
+    63:         cm.id,
+    64:         cm.campana_id,
+    65:         cm.matriz_id,
+    66:         cm.vigente_desde,
+    67:         cm.vigente_hasta,
+    68:         cm.activa,
+    69:         m.codigo AS matriz_codigo,
+    70:         m.nombre AS matriz_nombre
+    71:       FROM campana_matriz cm
+    72:       JOIN matrices m ON m.id = cm.matriz_id
+    73:       WHERE cm.campana_id = $1
+    74:       ORDER BY cm.vigente_desde DESC, cm.id DESC
+    75:       `,
+    76:       [campaignId]
+    77:     )).rows;
+    78:   }
+    79: 
+    80:   async resolveEvaluationContext(campaignId, date = null) {
+    81:     const result = date
+    82:       ? await this.db.query(
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 74
+ORDER BY cm.vigente_desde DESC, cm.id DESC
+--- CONTEXTO ---
+    59:   async listCampaignMatrixAssignments(campaignId) {
+    60:     return (await this.db.query(
+    61:       `
+    62:       SELECT
+    63:         cm.id,
+    64:         cm.campana_id,
+    65:         cm.matriz_id,
+    66:         cm.vigente_desde,
+    67:         cm.vigente_hasta,
+    68:         cm.activa,
+    69:         m.codigo AS matriz_codigo,
+    70:         m.nombre AS matriz_nombre
+    71:       FROM campana_matriz cm
+    72:       JOIN matrices m ON m.id = cm.matriz_id
+    73:       WHERE cm.campana_id = $1
+    74:       ORDER BY cm.vigente_desde DESC, cm.id DESC
+    75:       `,
+    76:       [campaignId]
+    77:     )).rows;
+    78:   }
+    79: 
+    80:   async resolveEvaluationContext(campaignId, date = null) {
+    81:     const result = date
+    82:       ? await this.db.query(
+    83:           `SELECT * FROM resolver_contexto_evaluacion($1, $2::date)`,
+    84:           [campaignId, date]
+    85:         )
+    86:       : await this.db.query(
+    87:           `SELECT * FROM resolver_contexto_evaluacion($1, CURRENT_DATE)`,
+    88:           [campaignId]
+    89:         );
+--- FIN CONTEXTO ---
+
+[ARCHIVO] src/modules/matrix/matrix.routes.js
+Existe: SI
+Señales detectadas: 0
+
+[ARCHIVO] src/modules/matrix/matrix.service.js
+Existe: SI
+Señales detectadas: 3
+
+CTX-009 | matriz_id | línea 745
+matrizId: source.matriz_id,
+--- CONTEXTO ---
+   730:       throw MatrixService.writeError(
+   731:         'No hay una versión activa para congelar',
+   732:         400
+   733:       );
+   734:     }
+   735: 
+   736:     const exists = await this.repository.findVersionByName(client, version);
+   737:     if (exists) {
+   738:       throw MatrixService.writeError(
+   739:         `La versión "${version}" ya existe`,
+   740:         400
+   741:       );
+   742:     }
+   743: 
+   744:     const created = await this.repository.insertVersion(client, {
+   745:       matrizId: source.matriz_id,
+   746:       version,
+   747:       descripcion: descripcion || `Snapshot de versión ${source.id}`,
+   748:       fechaVigencia: fecha_vigencia,
+   749:       activa: false
+   750:     });
+   751: 
+   752:     const resumen = await this.repository.copyVersionTree(
+   753:       client,
+   754:       source.id,
+   755:       created.id
+   756:     );
+   757: 
+   758:     return {
+   759:       success: true,
+   760:       message: `Versión "${version}" creada exitosamente como snapshot`,
+--- FIN CONTEXTO ---
+
+CTX-009 | matriz_id | línea 788
+matrizId: source.matriz_id,
+--- CONTEXTO ---
+   773:   return this.repository.withTransaction(async client => {
+   774:     const source = await this.repository.getActiveVersionSource(client);
+   775:     if (!source) {
+   776:       throw MatrixService.writeError(
+   777:         'No hay versión activa para resolver la matriz',
+   778:         400
+   779:       );
+   780:     }
+   781: 
+   782:     const exists = await this.repository.findVersionByName(client, version);
+   783:     if (exists) {
+   784:       throw MatrixService.writeError(`La versión "${version}" ya existe`, 400);
+   785:     }
+   786: 
+   787:     return this.repository.insertVersion(client, {
+   788:       matrizId: source.matriz_id,
+   789:       version,
+   790:       descripcion,
+   791:       activa: false
+   792:     });
+   793:   });
+   794: }
+   795: 
+   796: async validateVersionIntegrity(versionId) {
+   797:   const id = Number(versionId);
+   798:   if (!Number.isInteger(id) || id <= 0) {
+   799:     throw MatrixService.writeError('ID de versión inválido', 400);
+   800:   }
+   801: 
+   802:   return this.repository.withTransaction(async client => {
+   803:     const result = await this.repository.getVersionIntegrity(client, id);
+--- FIN CONTEXTO ---
+
+CTX-011 | vigencia matriz | línea 722
+'Versión y fecha vigencia son requeridos',
+--- CONTEXTO ---
+   707:     }
+   708: 
+   709:     return {
+   710:       success: true,
+   711:       message: `✅ Sub-motivo "${deleted.codigo}" eliminado.`
+   712:     };
+   713:   });
+   714: }
+   715: 
+   716: 
+   717: async freezeVersion(input = {}) {
+   718:   const { version, descripcion, fecha_vigencia } = input;
+   719: 
+   720:   if (!version || !fecha_vigencia) {
+   721:     throw MatrixService.writeError(
+   722:       'Versión y fecha vigencia son requeridos',
+   723:       400
+   724:     );
+   725:   }
+   726: 
+   727:   return this.repository.withTransaction(async client => {
+   728:     const source = await this.repository.getActiveVersionSource(client);
+   729:     if (!source) {
+   730:       throw MatrixService.writeError(
+   731:         'No hay una versión activa para congelar',
+   732:         400
+   733:       );
+   734:     }
+   735: 
+   736:     const exists = await this.repository.findVersionByName(client, version);
+   737:     if (exists) {
+--- FIN CONTEXTO ---
+
+[ARCHIVO] src/modules/matrix/matrix.repository.js
+Existe: SI
+Señales detectadas: 4
+
+CTX-009 | matriz_id | línea 745
+SELECT id, matriz_id, version
+--- CONTEXTO ---
+   730:   await client.query(`
+   731:     DELETE FROM version_sub_motivos vsm
+   732:     USING version_atributos va, version_frentes vf
+   733:     WHERE vsm.id = $1
+   734:       AND vsm.version_atributo_id = va.id
+   735:       AND va.version_frente_id = vf.id
+   736:       AND vf.version_id = $2
+   737:   `, [id, versionId]);
+   738: 
+   739:   return current;
+   740: }
+   741: 
+   742: 
+   743: async getActiveVersionSource(client) {
+   744:   const result = await client.query(`
+   745:     SELECT id, matriz_id, version
+   746:     FROM versiones_matriz
+   747:     WHERE activa = TRUE
+   748:     LIMIT 1
+   749:   `);
+   750:   return result.rows[0] || null;
+   751: }
+   752: 
+   753: async getVersionById(client, id) {
+   754:   const result = await client.query(`
+   755:     SELECT id, matriz_id, version, descripcion, fecha_vigencia, activa
+   756:     FROM versiones_matriz
+   757:     WHERE id = $1
+   758:   `, [id]);
+   759:   return result.rows[0] || null;
+   760: }
+--- FIN CONTEXTO ---
+
+CTX-009 | matriz_id | línea 755
+SELECT id, matriz_id, version, descripcion, fecha_vigencia, activa
+--- CONTEXTO ---
+   740: }
+   741: 
+   742: 
+   743: async getActiveVersionSource(client) {
+   744:   const result = await client.query(`
+   745:     SELECT id, matriz_id, version
+   746:     FROM versiones_matriz
+   747:     WHERE activa = TRUE
+   748:     LIMIT 1
+   749:   `);
+   750:   return result.rows[0] || null;
+   751: }
+   752: 
+   753: async getVersionById(client, id) {
+   754:   const result = await client.query(`
+   755:     SELECT id, matriz_id, version, descripcion, fecha_vigencia, activa
+   756:     FROM versiones_matriz
+   757:     WHERE id = $1
+   758:   `, [id]);
+   759:   return result.rows[0] || null;
+   760: }
+   761: 
+   762: async findVersionByName(client, version) {
+   763:   const result = await client.query(
+   764:     'SELECT id FROM versiones_matriz WHERE version = $1',
+   765:     [version]
+   766:   );
+   767:   return result.rows[0] || null;
+   768: }
+   769: 
+   770: async insertVersion(client, {
+--- FIN CONTEXTO ---
+
+CTX-009 | matriz_id | línea 779
+matriz_id,
+--- CONTEXTO ---
+   764:     'SELECT id FROM versiones_matriz WHERE version = $1',
+   765:     [version]
+   766:   );
+   767:   return result.rows[0] || null;
+   768: }
+   769: 
+   770: async insertVersion(client, {
+   771:   matrizId,
+   772:   version,
+   773:   descripcion,
+   774:   fechaVigencia = null,
+   775:   activa = false
+   776: }) {
+   777:   const result = await client.query(`
+   778:     INSERT INTO versiones_matriz (
+   779:       matriz_id,
+   780:       version,
+   781:       descripcion,
+   782:       fecha_vigencia,
+   783:       activa,
+   784:       creado_por,
+   785:       creado_en
+   786:     ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+   787:     RETURNING *
+   788:   `, [
+   789:     matrizId,
+   790:     version,
+   791:     descripcion,
+   792:     fechaVigencia,
+   793:     activa,
+   794:     'Sistema'
+--- FIN CONTEXTO ---
+
+CTX-009 | matriz_id | línea 944
+// La activación por matriz se hará cuando el frontend transporte matriz_id.
+--- CONTEXTO ---
+   929:   }
+   930: 
+   931:   return {
+   932:     frentes: frentes.rows.length,
+   933:     atributos: totalAttributes,
+   934:     sub_motivos: totalSubReasons,
+   935:     reglas: totalRules
+   936:   };
+   937: }
+   938: 
+   939: async activateVersion(client, id) {
+   940:   const target = await this.getVersionById(client, id);
+   941:   if (!target) return null;
+   942: 
+   943:   // Contrato actual de MECA: una sola versión activa global.
+   944:   // La activación por matriz se hará cuando el frontend transporte matriz_id.
+   945:   await client.query('UPDATE versiones_matriz SET activa = FALSE WHERE activa = TRUE');
+   946:   const result = await client.query(`
+   947:     UPDATE versiones_matriz
+   948:     SET activa = TRUE,
+   949:         publicado_por = COALESCE(publicado_por, $2),
+   950:         publicado_en = NOW()
+   951:     WHERE id = $1
+   952:     RETURNING *
+   953:   `, [id, 'Sistema']);
+   954: 
+   955:   return result.rows[0] || null;
+   956: }
+   957: 
+   958: async getVersionIntegrity(client, versionId) {
+   959:   const version = await this.getVersionById(client, versionId);
+--- FIN CONTEXTO ---
+
+[ARCHIVO] server.js
+Existe: SI
+Señales detectadas: 0
+
+===========================================================
+ CHECKLIST DE VALIDACIÓN MANUAL
+===========================================================
+
+A. SUPERVISOR
+1. ¿Carga quiebres desde API?
+2. ¿Al elegir quiebre filtra campañas?
+3. ¿Guarda quiebre_id/campana_id reales?
+4. ¿La matriz se resuelve por contexto y no por ID fijo?
+
+B. AUDITOR
+1. ¿Obtiene contexto de evaluación?
+2. ¿Usa campana_id/quiebre_id de la escucha/evaluación?
+3. ¿Solicita estructura de matriz vigente para ese contexto?
+4. ¿Evita asumir COBRANZAS/T/ST/F?
+
+C. BACKEND
+1. ¿Existe /api/domain/contexto?
+2. ¿resolver_contexto_evaluacion determina la matriz vigente?
+3. ¿La vigencia se resuelve por fecha?
+4. ¿Dos campañas pueden compartir matriz sin duplicarla?
+
+CLASIFICACIÓN ESPERADA
+- OK_PARAMETRIZADO
+- PARCIAL
+- ACOPLADO
+- NO_ENCONTRADO

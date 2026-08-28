@@ -1,0 +1,363 @@
+{
+  "summary": {
+    "generated_at": "2026-08-24T20:52:58.981Z",
+    "project_root": "C:\\MECA_ML\\meca-app",
+    "files_scanned": 155,
+    "findings_total": 39,
+    "high": 35,
+    "medium": 4,
+    "positive_signals": 6
+  },
+  "positive_signals": [
+    {
+      "id": "F11-POS-001",
+      "title": "Uso de quiebre_id",
+      "file": "migrations\\0003_campanas_quiebre.down.sql",
+      "line": 11
+    },
+    {
+      "id": "F11-POS-006",
+      "title": "Concepto de versión de matriz",
+      "file": "migrations\\0004_matrices_quiebre.down.sql",
+      "line": 3
+    },
+    {
+      "id": "F11-POS-002",
+      "title": "Uso de campana_id",
+      "file": "migrations\\0005_campana_matriz_vigencia.up.sql",
+      "line": 14
+    },
+    {
+      "id": "F11-POS-003",
+      "title": "Resolver contexto de evaluación",
+      "file": "migrations\\0006_domain_resolution.down.sql",
+      "line": 2
+    },
+    {
+      "id": "F11-POS-004",
+      "title": "Endpoint/API de quiebres",
+      "file": "src\\modules\\domain\\domain.routes.js",
+      "line": 12
+    },
+    {
+      "id": "F11-POS-005",
+      "title": "Endpoint/API de campañas",
+      "file": "src\\modules\\domain\\domain.routes.js",
+      "line": 13
+    }
+  ],
+  "findings": [
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0002_create_quiebres.up.sql",
+      "line": 22,
+      "sample": "'COBRANZAS',"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0002_create_quiebres.up.sql",
+      "line": 23,
+      "sample": "'Cobranzas',"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0002_create_quiebres.up.sql",
+      "line": 24,
+      "sample": "'Actividad de gestión de cobranzas. Quiebre inicial de MECA.',"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0003_campanas_quiebre.up.sql",
+      "line": 3,
+      "sample": "-- Todas las campañas existentes pertenecen actualmente al quiebre COBRANZAS."
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0003_campanas_quiebre.up.sql",
+      "line": 12,
+      "sample": "WHERE codigo = 'COBRANZAS'"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0003_campanas_quiebre.up.sql",
+      "line": 24,
+      "sample": "WHERE codigo = 'COBRANZAS';"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0003_campanas_quiebre.up.sql",
+      "line": 27,
+      "sample": "RAISE EXCEPTION 'No existe el quiebre COBRANZAS. F1.6 debe estar aplicada.';"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0004_matrices_quiebre.up.sql",
+      "line": 51,
+      "sample": "-- existentes de Cobranzas."
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0004_matrices_quiebre.up.sql",
+      "line": 62,
+      "sample": "'Matriz de Cobranzas',"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0004_matrices_quiebre.up.sql",
+      "line": 63,
+      "sample": "'Matriz inicial que agrupa las versiones históricas existentes de Cobranzas.',"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0004_matrices_quiebre.up.sql",
+      "line": 66,
+      "sample": "WHERE q.codigo = 'COBRANZAS';"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0004_matrices_quiebre.up.sql",
+      "line": 76,
+      "sample": "WHERE q.codigo = 'COBRANZAS'"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0004_matrices_quiebre.up.sql",
+      "line": 80,
+      "sample": "RAISE EXCEPTION 'No se pudo crear MATRIZ_COBRANZAS. Verifique que exista el quiebre COBRANZAS.';"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0004_matrices_quiebre.up.sql",
+      "line": 92,
+      "sample": "WHERE q.codigo = 'COBRANZAS'"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0005_campana_matriz_vigencia.up.sql",
+      "line": 128,
+      "sample": "-- todas las campañas existentes son de COBRANZAS y usan la matriz raíz"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "migrations\\0005_campana_matriz_vigencia.up.sql",
+      "line": 147,
+      "sample": "AND qc.codigo = 'COBRANZAS'"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "public\\js\\auditor.js",
+      "line": 3688,
+      "sample": "// F1.3 - Regla oficial vigente de Cobranzas."
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "public\\js\\supervisor.js",
+      "line": 23671,
+      "sample": "Documento generado automáticamente por Sistema MECA - © Auditoría Calidad Cobranzas<br>"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "public\\js\\supervisor.js",
+      "line": 23819,
+      "sample": "║  👤 EMITIDO POR: Mesa Calidad Cobranzas${' '.repeat(29)}║"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "public\\js\\supervisor.js",
+      "line": 23852,
+      "sample": "║  © Auditoría Calidad Cobranzas - No requiere respuesta del gestor              ║"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "public\\js\\supervisor.js",
+      "line": 46906,
+      "sample": "<p>Movistar Perú - Auditoría Calidad Cobranzas | Generado: ${fecha}</p>"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "public\\js\\supervisor.js",
+      "line": 47171,
+      "sample": "© Auditoría Calidad Cobranzas - Todos los derechos reservados"
+    },
+    {
+      "id": "F11-HARD-002",
+      "severity": "HIGH",
+      "title": "Campaña Temprana hardcodeada",
+      "file": "public\\js\\supervisor.js",
+      "line": 49469,
+      "sample": "* @param {string} data.descripcion - Descripción (Temprana, Super Temprana, Fraccionamiento)"
+    },
+    {
+      "id": "F11-HARD-003",
+      "severity": "HIGH",
+      "title": "Campaña Super Temprana hardcodeada",
+      "file": "public\\js\\supervisor.js",
+      "line": 49469,
+      "sample": "* @param {string} data.descripcion - Descripción (Temprana, Super Temprana, Fraccionamiento)"
+    },
+    {
+      "id": "F11-HARD-002",
+      "severity": "HIGH",
+      "title": "Campaña Temprana hardcodeada",
+      "file": "public\\js\\supervisor.js",
+      "line": 50330,
+      "sample": "{ codigo: 'T', descripcion: 'Temprana' },"
+    },
+    {
+      "id": "F11-HARD-002",
+      "severity": "HIGH",
+      "title": "Campaña Temprana hardcodeada",
+      "file": "public\\js\\supervisor.js",
+      "line": 50331,
+      "sample": "{ codigo: 'ST', descripcion: 'Super Temprana' },"
+    },
+    {
+      "id": "F11-HARD-003",
+      "severity": "HIGH",
+      "title": "Campaña Super Temprana hardcodeada",
+      "file": "public\\js\\supervisor.js",
+      "line": 50331,
+      "sample": "{ codigo: 'ST', descripcion: 'Super Temprana' },"
+    },
+    {
+      "id": "F11-HARD-001",
+      "severity": "HIGH",
+      "title": "Código de quiebre COBRANZAS hardcodeado",
+      "file": "scripts\\f111-diagnostico-multiquiebre.js",
+      "line": 36,
+      "sample": "title: 'Código de quiebre COBRANZAS hardcodeado',"
+    },
+    {
+      "id": "F11-HARD-002",
+      "severity": "HIGH",
+      "title": "Campaña Temprana hardcodeada",
+      "file": "scripts\\f111-diagnostico-multiquiebre.js",
+      "line": 42,
+      "sample": "title: 'Campaña Temprana hardcodeada',"
+    },
+    {
+      "id": "F11-HARD-002",
+      "severity": "HIGH",
+      "title": "Campaña Temprana hardcodeada",
+      "file": "scripts\\f111-diagnostico-multiquiebre.js",
+      "line": 48,
+      "sample": "title: 'Campaña Super Temprana hardcodeada',"
+    },
+    {
+      "id": "F11-HARD-003",
+      "severity": "HIGH",
+      "title": "Campaña Super Temprana hardcodeada",
+      "file": "scripts\\f111-diagnostico-multiquiebre.js",
+      "line": 48,
+      "sample": "title: 'Campaña Super Temprana hardcodeada',"
+    },
+    {
+      "id": "F11-HARD-008",
+      "severity": "HIGH",
+      "title": "Referencia explícita a matriz legacy",
+      "file": "scripts\\f111-diagnostico-multiquiebre.js",
+      "line": 78,
+      "sample": "title: 'Referencia explícita a matriz legacy',"
+    },
+    {
+      "id": "F11-HARD-008",
+      "severity": "HIGH",
+      "title": "Referencia explícita a matriz legacy",
+      "file": "scripts\\f111-diagnostico-multiquiebre.js",
+      "line": 79,
+      "sample": "regex: /legacy.{0,30}matriz|matriz.{0,30}legacy/i"
+    },
+    {
+      "id": "F11-HARD-002",
+      "severity": "HIGH",
+      "title": "Campaña Temprana hardcodeada",
+      "file": "views\\supervisor\\dashboard.html",
+      "line": 3525,
+      "sample": "placeholder=\"Ej: Temprana, Super Temprana, Fraccionamiento\""
+    },
+    {
+      "id": "F11-HARD-003",
+      "severity": "HIGH",
+      "title": "Campaña Super Temprana hardcodeada",
+      "file": "views\\supervisor\\dashboard.html",
+      "line": 3525,
+      "sample": "placeholder=\"Ej: Temprana, Super Temprana, Fraccionamiento\""
+    },
+    {
+      "id": "F11-HARD-004",
+      "severity": "MEDIUM",
+      "title": "Campaña Fraccionamiento hardcodeada",
+      "file": "public\\js\\supervisor.js",
+      "line": 49469,
+      "sample": "* @param {string} data.descripcion - Descripción (Temprana, Super Temprana, Fraccionamiento)"
+    },
+    {
+      "id": "F11-HARD-004",
+      "severity": "MEDIUM",
+      "title": "Campaña Fraccionamiento hardcodeada",
+      "file": "public\\js\\supervisor.js",
+      "line": 50332,
+      "sample": "{ codigo: 'F', descripcion: 'Fraccionamiento' }"
+    },
+    {
+      "id": "F11-HARD-004",
+      "severity": "MEDIUM",
+      "title": "Campaña Fraccionamiento hardcodeada",
+      "file": "scripts\\f111-diagnostico-multiquiebre.js",
+      "line": 54,
+      "sample": "title: 'Campaña Fraccionamiento hardcodeada',"
+    },
+    {
+      "id": "F11-HARD-004",
+      "severity": "MEDIUM",
+      "title": "Campaña Fraccionamiento hardcodeada",
+      "file": "views\\supervisor\\dashboard.html",
+      "line": 3525,
+      "sample": "placeholder=\"Ej: Temprana, Super Temprana, Fraccionamiento\""
+    }
+  ]
+}

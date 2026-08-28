@@ -1,0 +1,1040 @@
+﻿
+  src\modules\domain\domain.controller.js:49:      DomainController.handleError(res, 
+error);
+  src\modules\domain\domain.controller.js:50:    }
+  src\modules\domain\domain.controller.js:51:  }
+  src\modules\domain\domain.controller.js:52:
+> src\modules\domain\domain.controller.js:53:  async listMatrices(req, res, query = 
+{}) {
+  src\modules\domain\domain.controller.js:54:    if (!this.requireAuth(req, res)) 
+return;
+  src\modules\domain\domain.controller.js:55:    try {
+> src\modules\domain\domain.controller.js:56:      const rows = await 
+this.service.listMatrices(query.quiebreId, { activeOnly: true });
+  src\modules\domain\domain.controller.js:57:      DomainController.sendJson(res, 200, 
+rows);
+  src\modules\domain\domain.controller.js:58:    } catch (error) {
+  src\modules\domain\domain.controller.js:59:      DomainController.handleError(res, 
+error);
+  src\modules\domain\domain.controller.js:60:    }
+  src\modules\domain\domain.controller.js:61:  }
+  src\modules\domain\domain.controller.js:62:
+  src\modules\domain\domain.controller.js:63:  async campaignMatrixHistory(req, res, 
+query = {}) {
+  src\modules\domain\domain.controller.js:64:    if (!this.requireAuth(req, res)) 
+return;
+  src\modules\domain\domain.controller.js:65:    try {
+  src\modules\domain\domain.controller.js:66:      const rows = await 
+this.service.getCampaignMatrixHistory(query.campanaId);
+  src\modules\domain\domain.controller.js:67:      DomainController.sendJson(res, 200, 
+rows);
+  src\modules\domain\domain.controller.js:68:    } catch (error) {
+  src\modules\domain\domain.controller.js:69:      DomainController.handleError(res, 
+error);
+  src\modules\domain\domain.controller.js:70:    }
+  src\modules\domain\domain.controller.js:71:  }
+  src\modules\domain\domain.controller.js:72:
+  src\modules\domain\domain.controller.js:73:  async resolveContext(req, res, query = 
+{}) {
+  src\modules\domain\domain.controller.js:74:    if (!this.requireAuth(req, res)) 
+return;
+  src\modules\domain\domain.controller.js:75:    try {
+  src\modules\domain\domain.controller.js:76:      const context = await 
+this.service.resolveContext({
+  src\modules\domain\domain.controller.js:77:        campaignId: query.campanaId,
+  src\modules\domain\domain.controller.js:78:        date: query.fecha || null
+  src\modules\domain\domain.controller.js:79:      });
+  src\modules\domain\domain.controller.js:80:      DomainController.sendJson(res, 200, 
+context);
+  src\modules\domain\domain.controller.js:81:    } catch (error) {
+  src\modules\domain\domain.repository.js:1:class DomainRepository {
+  src\modules\domain\domain.repository.js:2:  constructor(db = null) {
+  src\modules\domain\domain.repository.js:3:    // Carga perezosa:
+> src\modules\domain\domain.repository.js:4:    // - producción sin inyección -> usa 
+pool PostgreSQL real
+> src\modules\domain\domain.repository.js:5:    // - tests con fake DB -> no 
+carga/abre PostgreSQL al importar el módulo
+  src\modules\domain\domain.repository.js:6:    this.db = db || 
+require('../../../models/database').pool;
+  src\modules\domain\domain.repository.js:7:  }
+  src\modules\domain\domain.repository.js:8:
+  src\modules\domain\domain.repository.js:9:  async listBreaks({ activeOnly = true } = 
+{}) {
+  src\modules\domain\domain.repository.js:10:    let sql = `
+> src\modules\domain\domain.repository.js:11:      SELECT id, codigo, nombre, 
+descripcion, activo, created_at, updated_at
+> src\modules\domain\domain.repository.js:12:      FROM quiebres
+  src\modules\domain\domain.repository.js:13:    `;
+  src\modules\domain\domain.repository.js:14:    if (activeOnly) sql += ` WHERE activo 
+= TRUE`;
+  src\modules\domain\domain.repository.js:15:    sql += ` ORDER BY nombre, id`;
+  src\modules\domain\domain.repository.js:16:    return (await 
+this.db.query(sql)).rows;
+  src\modules\domain\domain.repository.js:17:  }
+  src\modules\domain\domain.repository.js:18:
+  src\modules\domain\domain.repository.js:19:  async getBreakById(id) {
+  src\modules\domain\domain.repository.js:20:    const result = await this.db.query(
+> src\modules\domain\domain.repository.js:21:      `SELECT id, codigo, nombre, 
+descripcion, activo, created_at, updated_at
+> src\modules\domain\domain.repository.js:22:       FROM quiebres
+  src\modules\domain\domain.repository.js:23:       WHERE id = $1`,
+  src\modules\domain\domain.repository.js:24:      [id]
+  src\modules\domain\domain.repository.js:25:    );
+  src\modules\domain\domain.repository.js:26:    return result.rows[0] || null;
+  src\modules\domain\domain.repository.js:27:  }
+  src\modules\domain\domain.repository.js:28:
+  src\modules\domain\domain.repository.js:29:  async listCampaignsByBreak(breakId, { 
+activeOnly = true } = {}) {
+  src\modules\domain\domain.repository.js:30:    let sql = `
+  src\modules\domain\domain.repository.js:31:      SELECT
+  src\modules\domain\domain.repository.js:32:        c.id,
+  src\modules\domain\domain.repository.js:33:        c.codigo,
+  src\modules\domain\domain.repository.js:34:        c.descripcion,
+  src\modules\domain\domain.repository.js:35:        c.activa,
+  src\modules\domain\domain.repository.js:36:        c.quiebre_id,
+  src\modules\domain\domain.repository.js:37:        q.codigo AS quiebre_codigo,
+  src\modules\domain\domain.repository.js:38:        q.nombre AS quiebre_nombre
+> src\modules\domain\domain.repository.js:39:      FROM campanas c
+> src\modules\domain\domain.repository.js:40:      JOIN quiebres q ON q.id = 
+c.quiebre_id
+  src\modules\domain\domain.repository.js:41:      WHERE c.quiebre_id = $1
+  src\modules\domain\domain.repository.js:42:    `;
+  src\modules\domain\domain.repository.js:43:    if (activeOnly) sql += ` AND c.activa 
+= TRUE`;
+  src\modules\domain\domain.repository.js:44:    sql += ` ORDER BY c.codigo, c.id`;
+  src\modules\domain\domain.repository.js:45:    return (await this.db.query(sql, 
+[breakId])).rows;
+  src\modules\domain\domain.repository.js:46:  }
+  src\modules\domain\domain.repository.js:47:
+> src\modules\domain\domain.repository.js:48:  async listMatricesByBreak(breakId, { 
+activeOnly = true } = {}) {
+  src\modules\domain\domain.repository.js:49:    let sql = `
+> src\modules\domain\domain.repository.js:50:      SELECT id, quiebre_id, codigo, 
+nombre, descripcion, activa, created_at, updated_at
+> src\modules\domain\domain.repository.js:51:      FROM matrices
+  src\modules\domain\domain.repository.js:52:      WHERE quiebre_id = $1
+  src\modules\domain\domain.repository.js:53:    `;
+  src\modules\domain\domain.repository.js:54:    if (activeOnly) sql += ` AND activa = 
+TRUE`;
+  src\modules\domain\domain.repository.js:55:    sql += ` ORDER BY nombre, id`;
+  src\modules\domain\domain.repository.js:56:    return (await this.db.query(sql, 
+[breakId])).rows;
+  src\modules\domain\domain.repository.js:57:  }
+  src\modules\domain\domain.repository.js:58:
+  src\modules\domain\domain.repository.js:59:  async 
+listCampaignMatrixAssignments(campaignId) {
+  src\modules\domain\domain.repository.js:60:    return (await this.db.query(
+  src\modules\domain\domain.repository.js:61:      `
+  src\modules\domain\domain.repository.js:62:      SELECT
+  src\modules\domain\domain.repository.js:63:        cm.id,
+  src\modules\domain\domain.repository.js:64:        cm.campana_id,
+  src\modules\domain\domain.repository.js:65:        cm.matriz_id,
+  src\modules\domain\domain.repository.js:66:        cm.vigente_desde,
+  src\modules\domain\domain.repository.js:67:        cm.vigente_hasta,
+  src\modules\domain\domain.repository.js:68:        cm.activa,
+  src\modules\domain\domain.repository.js:69:        m.codigo AS matriz_codigo,
+  src\modules\domain\domain.repository.js:70:        m.nombre AS matriz_nombre
+> src\modules\domain\domain.repository.js:71:      FROM campana_matriz cm
+> src\modules\domain\domain.repository.js:72:      JOIN matrices m ON m.id = 
+cm.matriz_id
+  src\modules\domain\domain.repository.js:73:      WHERE cm.campana_id = $1
+  src\modules\domain\domain.repository.js:74:      ORDER BY cm.vigente_desde DESC, 
+cm.id DESC
+  src\modules\domain\domain.repository.js:75:      `,
+  src\modules\domain\domain.repository.js:76:      [campaignId]
+  src\modules\domain\domain.repository.js:77:    )).rows;
+  src\modules\domain\domain.repository.js:78:  }
+  src\modules\domain\domain.repository.js:79:
+  src\modules\domain\domain.repository.js:80:  async 
+resolveEvaluationContext(campaignId, date = null) {
+  src\modules\domain\domain.repository.js:81:    const result = date
+  src\modules\domain\domain.repository.js:82:      ? await this.db.query(
+  src\modules\domain\domain.repository.js:83:          `SELECT * FROM 
+resolver_contexto_evaluacion($1, $2::date)`,
+  src\modules\domain\domain.repository.js:84:          [campaignId, date]
+  src\modules\domain\domain.repository.js:85:        )
+  src\modules\domain\domain.repository.js:86:      : await this.db.query(
+  src\modules\domain\domain.repository.js:87:          `SELECT * FROM 
+resolver_contexto_evaluacion($1, CURRENT_DATE)`,
+  src\modules\domain\domain.repository.js:88:          [campaignId]
+  src\modules\domain\domain.repository.js:89:        );
+  src\modules\domain\domain.repository.js:90:
+  src\modules\domain\domain.repository.js:91:    return result.rows;
+  src\modules\domain\domain.repository.js:92:  }
+  src\modules\domain\domain.repository.js:93:
+  src\modules\domain\domain.repository.js:94:  async getDomainConsistency() {
+  src\modules\domain\domain.repository.js:95:    return (await this.db.query(`
+  src\modules\domain\domain.repository.js:96:      SELECT
+  src\modules\domain\domain.repository.js:97:        (SELECT COUNT(*)::int
+> src\modules\domain\domain.repository.js:98:           FROM campanas
+> src\modules\domain\domain.repository.js:99:          WHERE quiebre_id IS NULL) AS 
+campanas_sin_quiebre,
+  src\modules\domain\domain.repository.js:100:
+  src\modules\domain\domain.repository.js:101:        (SELECT COUNT(*)::int
+  src\modules\domain\domain.repository.js:102:           FROM versiones_matriz
+  src\modules\domain\domain.repository.js:103:          WHERE matriz_id IS NULL) AS 
+versiones_sin_matriz,
+  src\modules\domain\domain.repository.js:104:
+  src\modules\domain\domain.repository.js:105:        (SELECT COUNT(*)::int
+> src\modules\domain\domain.repository.js:106:           FROM campana_matriz cm
+> src\modules\domain\domain.repository.js:107:           JOIN campanas c ON c.id = 
+cm.campana_id
+> src\modules\domain\domain.repository.js:108:           JOIN matrices m ON m.id = 
+cm.matriz_id
+  src\modules\domain\domain.repository.js:109:          WHERE c.quiebre_id <> 
+m.quiebre_id) AS relaciones_quiebre_cruzado,
+  src\modules\domain\domain.repository.js:110:
+  src\modules\domain\domain.repository.js:111:        (SELECT COUNT(*)::int
+> src\modules\domain\domain.repository.js:112:           FROM campanas c
+  src\modules\domain\domain.repository.js:113:          WHERE NOT EXISTS (
+  src\modules\domain\domain.repository.js:114:            SELECT 1
+> src\modules\domain\domain.repository.js:115:            FROM campana_matriz cm
+  src\modules\domain\domain.repository.js:116:            WHERE cm.campana_id = c.id
+  src\modules\domain\domain.repository.js:117:              AND cm.activa = TRUE
+> src\modules\domain\domain.repository.js:118:          )) AS 
+campanas_sin_matriz_activa
+  src\modules\domain\domain.repository.js:119:    `)).rows[0];
+  src\modules\domain\domain.repository.js:120:  }
+  src\modules\domain\domain.repository.js:121:}
+  src\modules\domain\domain.repository.js:122:
+  src\modules\domain\domain.repository.js:123:module.exports = DomainRepository;
+  src\modules\domain\domain.routes.js:1:const DomainService = 
+require('./domain.service');
+  src\modules\domain\domain.routes.js:2:const DomainController = 
+require('./domain.controller');
+  src\modules\domain\domain.routes.js:3:
+> src\modules\domain\domain.routes.js:4:function createDomainHandler({
+  src\modules\domain\domain.routes.js:5:  service = new DomainService()
+  src\modules\domain\domain.routes.js:6:} = {}) {
+  src\modules\domain\domain.routes.js:7:  const controller = new 
+DomainController(service);
+  src\modules\domain\domain.routes.js:8:
+  src\modules\domain\domain.routes.js:9:  const routes = new Map([
+> src\modules\domain\domain.routes.js:10:    ['/api/domain/quiebres', 
+controller.listBreaks.bind(controller)],
+> src\modules\domain\domain.routes.js:11:    ['/api/domain/campanas', 
+controller.listCampaigns.bind(controller)],
+> src\modules\domain\domain.routes.js:12:    ['/api/domain/matrices', 
+controller.listMatrices.bind(controller)],
+  src\modules\domain\domain.routes.js:13:    ['/api/domain/campana-matriz', 
+controller.campaignMatrixHistory.bind(controller)],
+  src\modules\domain\domain.routes.js:14:    ['/api/domain/contexto-evaluacion', 
+controller.resolveContext.bind(controller)],
+  src\modules\domain\domain.routes.js:15:    ['/api/domain/consistencia', 
+controller.consistency.bind(controller)]
+  src\modules\domain\domain.routes.js:16:  ]);
+  src\modules\domain\domain.routes.js:17:
+  src\modules\domain\domain.routes.js:18:  return async function handleDomainRequest({
+  src\modules\domain\domain.routes.js:19:    ruta,
+  src\modules\domain\domain.routes.js:20:    metodo,
+  src\modules\domain\domain.routes.js:21:    peticion,
+  src\modules\domain\domain.routes.js:22:    respuesta,
+  src\modules\domain\domain.routes.js:23:    query
+  src\modules\domain\domain.routes.js:24:  }) {
+  src\modules\domain\domain.routes.js:25:    if (metodo !== 'GET') {
+  src\modules\domain\domain.routes.js:26:      return false;
+  src\modules\domain\domain.routes.js:27:    }
+  src\modules\domain\domain.routes.js:28:
+  src\modules\domain\domain.routes.js:29:    const handler = routes.get(ruta);
+  src\modules\domain\domain.routes.js:30:
+  src\modules\domain\domain.routes.js:31:    if (!handler) {
+  src\modules\domain\domain.routes.js:32:      return false;
+  src\modules\domain\domain.routes.js:33:    }
+  src\modules\domain\domain.routes.js:34:
+  src\modules\domain\domain.routes.js:35:    await handler(
+  src\modules\domain\domain.routes.js:36:      peticion,
+  src\modules\domain\domain.routes.js:37:      respuesta,
+  src\modules\domain\domain.routes.js:57:    new DomainController(service);
+  src\modules\domain\domain.routes.js:58:
+  src\modules\domain\domain.routes.js:59:  const definitions = [
+  src\modules\domain\domain.routes.js:60:    [
+> src\modules\domain\domain.routes.js:61:      '/api/domain/quiebres',
+  src\modules\domain\domain.routes.js:62:      controller.listBreaks.bind(controller)
+  src\modules\domain\domain.routes.js:63:    ],
+  src\modules\domain\domain.routes.js:64:    [
+> src\modules\domain\domain.routes.js:65:      '/api/domain/campanas',
+  src\modules\domain\domain.routes.js:66:      
+controller.listCampaigns.bind(controller)
+  src\modules\domain\domain.routes.js:67:    ],
+  src\modules\domain\domain.routes.js:68:    [
+> src\modules\domain\domain.routes.js:69:      '/api/domain/matrices',
+> src\modules\domain\domain.routes.js:70:      controller.listMatrices.bind(controller)
+  src\modules\domain\domain.routes.js:71:    ],
+  src\modules\domain\domain.routes.js:72:    [
+  src\modules\domain\domain.routes.js:73:      '/api/domain/campana-matriz',
+  src\modules\domain\domain.routes.js:74:      
+controller.campaignMatrixHistory.bind(controller)
+  src\modules\domain\domain.routes.js:75:    ],
+  src\modules\domain\domain.routes.js:76:    [
+  src\modules\domain\domain.routes.js:77:      '/api/domain/contexto-evaluacion',
+  src\modules\domain\domain.routes.js:78:      
+controller.resolveContext.bind(controller)
+  src\modules\domain\domain.routes.js:79:    ],
+  src\modules\domain\domain.routes.js:80:    [
+  src\modules\domain\domain.routes.js:81:      '/api/domain/consistencia',
+  src\modules\domain\domain.routes.js:82:      controller.consistency.bind(controller)
+  src\modules\domain\domain.routes.js:83:    ]
+  src\modules\domain\domain.routes.js:84:  ];
+  src\modules\domain\domain.routes.js:85:
+  src\modules\domain\domain.routes.js:86:  for (const [routePath, handler] of 
+definitions) {
+  src\modules\domain\domain.routes.js:87:    targetRoutes[routePath] =
+  src\modules\domain\domain.routes.js:88:      targetRoutes[routePath] || {};
+  src\modules\domain\domain.routes.js:89:
+  src\modules\domain\domain.routes.js:90:    targetRoutes[routePath].GET =
+  src\modules\domain\domain.routes.js:91:      handler;
+  src\modules\domain\domain.routes.js:92:  }
+  src\modules\domain\domain.routes.js:93:
+  src\modules\domain\domain.routes.js:94:  return definitions.map(
+  src\modules\domain\domain.routes.js:95:    ([routePath]) => routePath
+  src\modules\domain\domain.routes.js:96:  );
+  src\modules\domain\domain.routes.js:97:}
+  src\modules\domain\domain.routes.js:98:
+  src\modules\domain\domain.routes.js:99:module.exports = {
+> src\modules\domain\domain.routes.js:100:  createDomainHandler,
+  src\modules\domain\domain.routes.js:101:  registerDomainRoutes
+  src\modules\domain\domain.routes.js:102:};
+  src\modules\domain\domain.service.js:43:    const id = 
+DomainService.parsePositiveId(breakId, 'quiebreId');
+  src\modules\domain\domain.service.js:44:    return 
+this.repository.listCampaignsByBreak(id, options);
+  src\modules\domain\domain.service.js:45:  }
+  src\modules\domain\domain.service.js:46:
+> src\modules\domain\domain.service.js:47:  async listMatrices(breakId, options = {}) {
+  src\modules\domain\domain.service.js:48:    const id = 
+DomainService.parsePositiveId(breakId, 'quiebreId');
+> src\modules\domain\domain.service.js:49:    return 
+this.repository.listMatricesByBreak(id, options);
+  src\modules\domain\domain.service.js:50:  }
+  src\modules\domain\domain.service.js:51:
+  src\modules\domain\domain.service.js:52:  async getCampaignMatrixHistory(campaignId) 
+{
+  src\modules\domain\domain.service.js:53:    const id = 
+DomainService.parsePositiveId(campaignId, 'campanaId');
+  src\modules\domain\domain.service.js:54:    return 
+this.repository.listCampaignMatrixAssignments(id);
+  src\modules\domain\domain.service.js:55:  }
+  src\modules\domain\domain.service.js:56:
+  src\modules\domain\domain.service.js:57:  async resolveContext({ campaignId, date = 
+null }) {
+  src\modules\domain\domain.service.js:58:    const id = 
+DomainService.parsePositiveId(campaignId, 'campanaId');
+  src\modules\domain\domain.service.js:59:    const normalizedDate = 
+DomainService.normalizeDate(date);
+  src\modules\domain\domain.service.js:60:    const rows = await 
+this.repository.resolveEvaluationContext(id, normalizedDate);
+  src\modules\domain\domain.service.js:61:
+  src\modules\domain\domain.service.js:62:    if (rows.length !== 1) {
+  src\modules\domain\domain.service.js:63:      const error = new Error(
+  src\modules\domain\domain.service.js:64:        `El contexto de evaluación para 
+campaña ${id} esperaba 1 resultado y obtuvo ${rows.length}`
+  src\modules\domain\domain.service.js:65:      );
+  src\modules\domain\domain.service.js:66:      error.code = 
+'DOMAIN_CONFIGURATION_ERROR';
+  src\modules\domain\domain.service.js:67:      throw error;
+  src\modules\domain\domain.service.js:68:    }
+  src\modules\domain\domain.service.js:69:
+  src\modules\domain\domain.service.js:70:    return rows[0];
+  src\modules\domain\domain.service.js:71:  }
+  src\modules\domain\domain.service.js:72:
+  src\modules\domain\domain.service.js:73:  async validateConsistency() {
+  src\modules\domain\domain.service.js:74:    const checks = await 
+this.repository.getDomainConsistency();
+  src\modules\domain\matrix.controller.js:197:  }
+  src\modules\domain\matrix.controller.js:198:}
+  src\modules\domain\matrix.controller.js:199:
+  src\modules\domain\matrix.controller.js:200:
+> src\modules\domain\matrix.controller.js:201:async createFront(req, res, body) {
+  src\modules\domain\matrix.controller.js:202:  if (!this.requireToken(req, res)) 
+return;
+  src\modules\domain\matrix.controller.js:203:
+  src\modules\domain\matrix.controller.js:204:  try {
+> src\modules\domain\matrix.controller.js:205:    const row = await 
+this.service.createFront(body);
+  src\modules\domain\matrix.controller.js:206:    MatrixController.json(res, 201, row);
+  src\modules\domain\matrix.controller.js:207:  } catch (error) {
+  src\modules\domain\matrix.controller.js:208:    console.error('Error creando 
+frente:', error);
+  src\modules\domain\matrix.controller.js:209:    MatrixController.json(
+  src\modules\domain\matrix.controller.js:210:      res,
+  src\modules\domain\matrix.controller.js:211:      error.status || 500,
+  src\modules\domain\matrix.controller.js:212:      error.payload || { error: 
+error.message }
+  src\modules\domain\matrix.controller.js:213:    );
+  src\modules\domain\matrix.controller.js:214:  }
+  src\modules\domain\matrix.controller.js:215:}
+  src\modules\domain\matrix.controller.js:216:
+> src\modules\domain\matrix.controller.js:217:async updateFront(req, res, id, body) {
+  src\modules\domain\matrix.controller.js:218:  if (!this.requireToken(req, res)) 
+return;
+  src\modules\domain\matrix.controller.js:219:
+  src\modules\domain\matrix.controller.js:220:  try {
+> src\modules\domain\matrix.controller.js:221:    const row = await 
+this.service.updateFront(id, body);
+  src\modules\domain\matrix.controller.js:222:    MatrixController.json(res, 200, row);
+  src\modules\domain\matrix.controller.js:223:  } catch (error) {
+  src\modules\domain\matrix.controller.js:224:    console.error('Error actualizando 
+frente:', error);
+  src\modules\domain\matrix.controller.js:225:    MatrixController.json(
+  src\modules\domain\matrix.controller.js:226:      res,
+  src\modules\domain\matrix.controller.js:227:      error.status || 500,
+  src\modules\domain\matrix.controller.js:228:      error.payload || { error: 
+error.message }
+  src\modules\domain\matrix.controller.js:229:    );
+  src\modules\domain\matrix.controller.js:230:  }
+  src\modules\domain\matrix.controller.js:231:}
+  src\modules\domain\matrix.controller.js:232:
+> src\modules\domain\matrix.controller.js:233:async deleteFront(req, res, id) {
+  src\modules\domain\matrix.controller.js:234:  if (!this.requireToken(req, res)) 
+return;
+  src\modules\domain\matrix.controller.js:235:
+  src\modules\domain\matrix.controller.js:236:  try {
+> src\modules\domain\matrix.controller.js:237:    const result = await 
+this.service.deleteFront(id);
+  src\modules\domain\matrix.controller.js:238:    MatrixController.json(res, 200, 
+result);
+  src\modules\domain\matrix.controller.js:239:  } catch (error) {
+  src\modules\domain\matrix.controller.js:240:    console.error('Error eliminando 
+frente:', error);
+  src\modules\domain\matrix.controller.js:241:    MatrixController.json(
+  src\modules\domain\matrix.controller.js:242:      res,
+  src\modules\domain\matrix.controller.js:243:      error.status || 500,
+  src\modules\domain\matrix.controller.js:244:      error.payload || { error: 
+error.message }
+  src\modules\domain\matrix.controller.js:245:    );
+  src\modules\domain\matrix.controller.js:246:  }
+  src\modules\domain\matrix.controller.js:247:}
+  src\modules\domain\matrix.controller.js:248:
+  src\modules\domain\matrix.controller.js:249:}
+  src\modules\domain\matrix.controller.js:250:
+  src\modules\domain\matrix.controller.js:251:module.exports = MatrixController;
+  src\modules\domain\matrix.repository.js:1:class MatrixRepository {
+  src\modules\domain\matrix.repository.js:2:  constructor(db = null) {
+> src\modules\domain\matrix.repository.js:3:    // Carga perezosa: los tests pueden 
+inyectar un fake DB sin abrir PostgreSQL.
+  src\modules\domain\matrix.repository.js:4:    // En producción, al no recibir db, se 
+usa el pool real.
+  src\modules\domain\matrix.repository.js:5:    this.db = db || 
+require('../../../models/database').pool;
+  src\modules\domain\matrix.repository.js:6:  }
+  src\modules\domain\matrix.repository.js:7:
+  src\modules\domain\matrix.repository.js:8:  async getLegacyActiveMatrixVersion() {
+  src\modules\domain\matrix.repository.js:9:    const result = await this.db.query(`
+  src\modules\domain\matrix.repository.js:10:      SELECT *
+  src\modules\domain\matrix.repository.js:11:      FROM versiones_matriz
+  src\modules\domain\matrix.repository.js:12:      WHERE activa = TRUE
+  src\modules\domain\matrix.repository.js:13:      LIMIT 1
+  src\modules\domain\matrix.repository.js:14:    `);
+  src\modules\domain\matrix.repository.js:15:
+  src\modules\domain\matrix.repository.js:16:    return result.rows[0] || null;
+  src\modules\domain\matrix.repository.js:17:  }
+  src\modules\domain\matrix.repository.js:18:
+  src\modules\domain\matrix.repository.js:19:  async 
+getLegacyEvaluationActiveVersion() {
+  src\modules\domain\matrix.repository.js:20:    const result = await this.db.query(`
+> src\modules\domain\matrix.repository.js:21:      SELECT id, version, descripcion, 
+activa, created_at
+  src\modules\domain\matrix.repository.js:22:      FROM versiones_matriz
+  src\modules\domain\matrix.repository.js:23:      WHERE activa = TRUE
+  src\modules\domain\matrix.repository.js:24:      LIMIT 1
+  src\modules\domain\matrix.repository.js:25:    `);
+  src\modules\domain\matrix.repository.js:26:
+  src\modules\domain\matrix.repository.js:27:    return result.rows[0] || null;
+  src\modules\domain\matrix.repository.js:28:  }
+  src\modules\domain\matrix.repository.js:29:
+  src\modules\domain\matrix.repository.js:30:  async 
+getLegacyMatrixVersionByDate(date) {
+  src\modules\domain\matrix.repository.js:31:    const result = await this.db.query(`
+  src\modules\domain\matrix.repository.js:32:      SELECT *
+  src\modules\domain\matrix.repository.js:33:      FROM versiones_matriz
+  src\modules\domain\matrix.repository.js:34:      WHERE fecha_vigencia <= $1
+  src\modules\domain\matrix.repository.js:35:      ORDER BY fecha_vigencia DESC
+  src\modules\domain\matrix.repository.js:36:      LIMIT 1
+  src\modules\domain\matrix.repository.js:37:    `, [date]);
+  src\modules\domain\matrix.repository.js:38:
+  src\modules\domain\matrix.repository.js:39:    return result.rows[0] || null;
+  src\modules\domain\matrix.repository.js:40:  }
+  src\modules\domain\matrix.repository.js:41:
+  src\modules\domain\matrix.repository.js:42:async getLegacyMatrixStructure(versionId) 
+{
+  src\modules\domain\matrix.repository.js:43:  const versionResult = await 
+this.db.query(
+  src\modules\domain\matrix.repository.js:44:    'SELECT * FROM versiones_matriz WHERE 
+id = $1',
+  src\modules\domain\matrix.repository.js:45:    [versionId]
+  src\modules\domain\matrix.repository.js:46:  );
+  src\modules\domain\matrix.repository.js:331:      nombre,
+  src\modules\domain\matrix.repository.js:332:      peso_maximo,
+  src\modules\domain\matrix.repository.js:333:      orden,
+  src\modules\domain\matrix.repository.js:334:      activo,
+> src\modules\domain\matrix.repository.js:335:      created_at,
+> src\modules\domain\matrix.repository.js:336:      updated_at
+  src\modules\domain\matrix.repository.js:337:    ) VALUES ($1, $2, $3, $4, $5, $6, 
+NOW(), NOW())
+  src\modules\domain\matrix.repository.js:338:    RETURNING id, codigo, nombre, 
+peso_maximo, orden, activo
+  src\modules\domain\matrix.repository.js:339:  `, [
+  src\modules\domain\matrix.repository.js:340:    data.versionId,
+  src\modules\domain\matrix.repository.js:341:    data.codigo,
+  src\modules\domain\matrix.repository.js:342:    data.nombre,
+  src\modules\domain\matrix.repository.js:343:    data.pesoMaximo,
+  src\modules\domain\matrix.repository.js:344:    data.orden,
+  src\modules\domain\matrix.repository.js:345:    data.activo
+  src\modules\domain\matrix.repository.js:346:  ]);
+  src\modules\domain\matrix.repository.js:347:
+  src\modules\domain\matrix.repository.js:348:  return result.rows[0];
+  src\modules\domain\matrix.repository.js:349:}
+  src\modules\domain\matrix.repository.js:350:
+> src\modules\domain\matrix.repository.js:351:async updateFront(client, id, data) {
+  src\modules\domain\matrix.repository.js:352:  const result = await client.query(`
+> src\modules\domain\matrix.repository.js:353:    UPDATE version_frentes
+  src\modules\domain\matrix.repository.js:354:    SET codigo = $1,
+  src\modules\domain\matrix.repository.js:355:        nombre = $2,
+  src\modules\domain\matrix.repository.js:356:        peso_maximo = $3,
+  src\modules\domain\matrix.repository.js:357:        orden = $4,
+  src\modules\domain\matrix.repository.js:358:        activo = $5,
+> src\modules\domain\matrix.repository.js:359:        updated_at = NOW()
+  src\modules\domain\matrix.repository.js:360:    WHERE id = $6
+  src\modules\domain\matrix.repository.js:361:    RETURNING id, codigo, nombre, 
+peso_maximo, orden, activo
+  src\modules\domain\matrix.repository.js:362:  `, [
+  src\modules\domain\matrix.repository.js:363:    data.codigo,
+  src\modules\domain\matrix.repository.js:364:    data.nombre,
+  src\modules\domain\matrix.repository.js:365:    data.pesoMaximo,
+  src\modules\domain\matrix.repository.js:366:    data.orden,
+  src\modules\domain\matrix.repository.js:367:    data.activo,
+  src\modules\domain\matrix.repository.js:368:    id
+  src\modules\domain\matrix.repository.js:369:  ]);
+  src\modules\domain\matrix.repository.js:370:
+  src\modules\domain\matrix.repository.js:371:  return result.rows[0] || null;
+  src\modules\domain\matrix.repository.js:372:}
+  src\modules\domain\matrix.repository.js:373:
+> src\modules\domain\matrix.repository.js:374:async deleteFrontTree(client, id, 
+versionId) {
+  src\modules\domain\matrix.repository.js:375:  const front = await 
+this.getFrontByIdAndVersion(client, id, versionId);
+  src\modules\domain\matrix.repository.js:376:  if (!front) return null;
+  src\modules\domain\matrix.repository.js:377:
+  src\modules\domain\matrix.repository.js:378:  // Borrado explícito y transaccional 
+para no depender de la configuración
+> src\modules\domain\matrix.repository.js:379:  // ON DELETE CASCADE del entorno.
+  src\modules\domain\matrix.repository.js:380:  await client.query(`
+> src\modules\domain\matrix.repository.js:381:    DELETE FROM version_sub_motivos
+  src\modules\domain\matrix.repository.js:382:    WHERE version_atributo_id IN (
+  src\modules\domain\matrix.repository.js:383:      SELECT va.id
+  src\modules\domain\matrix.repository.js:384:      FROM version_atributos va
+  src\modules\domain\matrix.repository.js:385:      WHERE va.version_frente_id = $1
+  src\modules\domain\matrix.repository.js:386:    )
+  src\modules\domain\matrix.repository.js:387:  `, [id]);
+  src\modules\domain\matrix.repository.js:388:
+  src\modules\domain\matrix.repository.js:389:  await client.query(
+> src\modules\domain\matrix.repository.js:390:    'DELETE FROM version_atributos WHERE 
+version_frente_id = $1',
+  src\modules\domain\matrix.repository.js:391:    [id]
+  src\modules\domain\matrix.repository.js:392:  );
+  src\modules\domain\matrix.repository.js:393:
+  src\modules\domain\matrix.repository.js:394:  await client.query(
+> src\modules\domain\matrix.repository.js:395:    'DELETE FROM version_frentes WHERE 
+id = $1 AND version_id = $2',
+  src\modules\domain\matrix.repository.js:396:    [id, versionId]
+  src\modules\domain\matrix.repository.js:397:  );
+  src\modules\domain\matrix.repository.js:398:
+  src\modules\domain\matrix.repository.js:399:  return front;
+  src\modules\domain\matrix.repository.js:400:}
+  src\modules\domain\matrix.repository.js:401:
+  src\modules\domain\matrix.repository.js:402:}
+  src\modules\domain\matrix.repository.js:403:
+  src\modules\domain\matrix.repository.js:404:module.exports = MatrixRepository;
+  src\modules\domain\matrix.routes.js:1:const MatrixService = 
+require('./matrix.service');
+  src\modules\domain\matrix.routes.js:2:const MatrixController = 
+require('./matrix.controller');
+  src\modules\domain\matrix.routes.js:3:
+> src\modules\domain\matrix.routes.js:4:function createMatrixReadHandler({
+  src\modules\domain\matrix.routes.js:5:  service = new MatrixService()
+  src\modules\domain\matrix.routes.js:6:} = {}) {
+  src\modules\domain\matrix.routes.js:7:  const controller = new 
+MatrixController(service);
+  src\modules\domain\matrix.routes.js:8:
+  src\modules\domain\matrix.routes.js:9:  return async function 
+handleMatrixReadRequest({
+  src\modules\domain\matrix.routes.js:10:    ruta,
+  src\modules\domain\matrix.routes.js:11:    metodo,
+  src\modules\domain\matrix.routes.js:12:    peticion,
+  src\modules\domain\matrix.routes.js:13:    respuesta,
+  src\modules\domain\matrix.routes.js:14:    query = {}
+  src\modules\domain\matrix.routes.js:15:  }) {
+  src\modules\domain\matrix.routes.js:16:    if (metodo !== 'GET') return false;
+  src\modules\domain\matrix.routes.js:17:
+  src\modules\domain\matrix.routes.js:18:
+  src\modules\domain\matrix.routes.js:19:if (ruta === '/api/matriz/frentes') {
+  src\modules\domain\matrix.routes.js:20:  console.log('[API] GET 
+/api/matriz/frentes');
+  src\modules\domain\matrix.routes.js:21:  await controller.listFrentes(peticion, 
+respuesta);
+  src\modules\domain\matrix.routes.js:22:  return true;
+  src\modules\domain\matrix.routes.js:23:}
+  src\modules\domain\matrix.routes.js:24:
+  src\modules\domain\matrix.routes.js:25:if (ruta === '/api/matriz/atributos') {
+  src\modules\domain\matrix.routes.js:26:  console.log('[API] GET 
+/api/matriz/atributos');
+  src\modules\domain\matrix.routes.js:27:  await controller.listAtributos(peticion, 
+respuesta, query);
+  src\modules\domain\matrix.routes.js:28:  return true;
+  src\modules\domain\matrix.routes.js:29:}
+  src\modules\domain\matrix.routes.js:117:    req.on('error', reject);
+  src\modules\domain\matrix.routes.js:118:  });
+  src\modules\domain\matrix.routes.js:119:}
+  src\modules\domain\matrix.routes.js:120:
+> src\modules\domain\matrix.routes.js:121:function createMatrixWriteHandler({
+  src\modules\domain\matrix.routes.js:122:  service = new MatrixService()
+  src\modules\domain\matrix.routes.js:123:} = {}) {
+  src\modules\domain\matrix.routes.js:124:  const controller = new 
+MatrixController(service);
+  src\modules\domain\matrix.routes.js:125:
+  src\modules\domain\matrix.routes.js:126:  return async function 
+handleMatrixWriteRequest({
+  src\modules\domain\matrix.routes.js:127:    ruta,
+  src\modules\domain\matrix.routes.js:128:    metodo,
+  src\modules\domain\matrix.routes.js:129:    peticion,
+  src\modules\domain\matrix.routes.js:130:    respuesta
+  src\modules\domain\matrix.routes.js:131:  }) {
+> src\modules\domain\matrix.routes.js:132:    if (ruta === '/api/matriz/frentes' && 
+metodo === 'POST') {
+> src\modules\domain\matrix.routes.js:133:      console.log('[API] POST 
+/api/matriz/frentes');
+  src\modules\domain\matrix.routes.js:134:
+  src\modules\domain\matrix.routes.js:135:      let body;
+  src\modules\domain\matrix.routes.js:136:      try {
+  src\modules\domain\matrix.routes.js:137:        body = await readJsonBody(peticion);
+  src\modules\domain\matrix.routes.js:138:      } catch (error) {
+  src\modules\domain\matrix.routes.js:139:        MatrixController.json(respuesta, 
+500, { error: error.message });
+  src\modules\domain\matrix.routes.js:140:        return true;
+  src\modules\domain\matrix.routes.js:141:      }
+  src\modules\domain\matrix.routes.js:142:
+> src\modules\domain\matrix.routes.js:143:      await controller.createFront(peticion, 
+respuesta, body);
+  src\modules\domain\matrix.routes.js:144:      return true;
+  src\modules\domain\matrix.routes.js:145:    }
+  src\modules\domain\matrix.routes.js:146:
+  src\modules\domain\matrix.routes.js:147:    const frontMatch = 
+ruta.match(/^\/api\/matriz\/frentes\/(\d+)$/);
+  src\modules\domain\matrix.routes.js:148:
+> src\modules\domain\matrix.routes.js:149:    if (frontMatch && metodo === 'PUT') {
+> src\modules\domain\matrix.routes.js:150:      console.log('[API] PUT 
+/api/matriz/frentes/:id');
+  src\modules\domain\matrix.routes.js:151:
+  src\modules\domain\matrix.routes.js:152:      let body;
+  src\modules\domain\matrix.routes.js:153:      try {
+  src\modules\domain\matrix.routes.js:154:        body = await readJsonBody(peticion);
+  src\modules\domain\matrix.routes.js:155:      } catch (error) {
+  src\modules\domain\matrix.routes.js:156:        MatrixController.json(respuesta, 
+500, { error: error.message });
+  src\modules\domain\matrix.routes.js:157:        return true;
+  src\modules\domain\matrix.routes.js:158:      }
+  src\modules\domain\matrix.routes.js:159:
+> src\modules\domain\matrix.routes.js:160:      await controller.updateFront(
+  src\modules\domain\matrix.routes.js:161:        peticion,
+  src\modules\domain\matrix.routes.js:162:        respuesta,
+  src\modules\domain\matrix.routes.js:163:        frontMatch[1],
+  src\modules\domain\matrix.routes.js:164:        body
+  src\modules\domain\matrix.routes.js:165:      );
+  src\modules\domain\matrix.routes.js:166:      return true;
+  src\modules\domain\matrix.routes.js:167:    }
+  src\modules\domain\matrix.routes.js:168:
+> src\modules\domain\matrix.routes.js:169:    if (frontMatch && metodo === 'DELETE') {
+> src\modules\domain\matrix.routes.js:170:      console.log('[API] DELETE 
+/api/matriz/frentes/:id');
+> src\modules\domain\matrix.routes.js:171:      await controller.deleteFront(
+  src\modules\domain\matrix.routes.js:172:        peticion,
+  src\modules\domain\matrix.routes.js:173:        respuesta,
+  src\modules\domain\matrix.routes.js:174:        frontMatch[1]
+  src\modules\domain\matrix.routes.js:175:      );
+  src\modules\domain\matrix.routes.js:176:      return true;
+  src\modules\domain\matrix.routes.js:177:    }
+  src\modules\domain\matrix.routes.js:178:
+  src\modules\domain\matrix.routes.js:179:    return false;
+  src\modules\domain\matrix.routes.js:180:  };
+  src\modules\domain\matrix.routes.js:181:}
+  src\modules\domain\matrix.routes.js:182:
+  src\modules\domain\matrix.routes.js:183:module.exports = {
+> src\modules\domain\matrix.routes.js:184:  createMatrixReadHandler,
+> src\modules\domain\matrix.routes.js:185:  createMatrixWriteHandler
+  src\modules\domain\matrix.routes.js:186:};
+  src\modules\domain\matrix.service.js:102:  error.payload = payload || { error: 
+message };
+  src\modules\domain\matrix.service.js:103:  return error;
+  src\modules\domain\matrix.service.js:104:}
+  src\modules\domain\matrix.service.js:105:
+> src\modules\domain\matrix.service.js:106:async createFront(input = {}) {
+> src\modules\domain\matrix.service.js:107:  const { codigo, nombre, peso_maximo, 
+orden, activo } = input;
+  src\modules\domain\matrix.service.js:108:
+  src\modules\domain\matrix.service.js:109:  if (!codigo || !nombre || !peso_maximo) {
+  src\modules\domain\matrix.service.js:110:    throw MatrixService.writeError('Faltan 
+campos obligatorios', 400);
+  src\modules\domain\matrix.service.js:111:  }
+  src\modules\domain\matrix.service.js:112:
+  src\modules\domain\matrix.service.js:113:  const nuevoPeso = parseFloat(peso_maximo);
+  src\modules\domain\matrix.service.js:114:  if (!Number.isFinite(nuevoPeso) || 
+nuevoPeso <= 0 || nuevoPeso > 100) {
+  src\modules\domain\matrix.service.js:115:    throw MatrixService.writeError(
+  src\modules\domain\matrix.service.js:116:      'El peso debe ser mayor a 0 y menor o 
+igual a 100',
+  src\modules\domain\matrix.service.js:117:      400
+  src\modules\domain\matrix.service.js:118:    );
+  src\modules\domain\matrix.service.js:119:  }
+  src\modules\domain\matrix.service.js:120:
+  src\modules\domain\matrix.service.js:121:  return 
+this.repository.withTransaction(async client => {
+  src\modules\domain\matrix.service.js:122:    const versionId = await 
+this.repository.getActiveVersionId(client);
+  src\modules\domain\matrix.service.js:123:    if (!versionId) {
+  src\modules\domain\matrix.service.js:124:      throw MatrixService.writeError('No 
+hay versión activa', 404);
+  src\modules\domain\matrix.service.js:125:    }
+  src\modules\domain\matrix.service.js:126:
+  src\modules\domain\matrix.service.js:127:    const existing = await 
+this.repository.findFrontByCode(
+  src\modules\domain\matrix.service.js:128:      client, versionId, codigo
+  src\modules\domain\matrix.service.js:129:    );
+  src\modules\domain\matrix.service.js:130:    if (existing) {
+  src\modules\domain\matrix.service.js:131:      throw MatrixService.writeError(
+  src\modules\domain\matrix.service.js:132:        `Ya existe un frente con el código 
+"${codigo}" en esta versión`,
+  src\modules\domain\matrix.service.js:163:    });
+  src\modules\domain\matrix.service.js:164:  });
+  src\modules\domain\matrix.service.js:165:}
+  src\modules\domain\matrix.service.js:166:
+> src\modules\domain\matrix.service.js:167:async updateFront(id, input = {}) {
+  src\modules\domain\matrix.service.js:168:  const parsedId = Number(id);
+  src\modules\domain\matrix.service.js:169:  if (!Number.isInteger(parsedId) || 
+parsedId <= 0) {
+  src\modules\domain\matrix.service.js:170:    throw MatrixService.writeError('ID de 
+frente inválido', 400);
+  src\modules\domain\matrix.service.js:171:  }
+  src\modules\domain\matrix.service.js:172:
+  src\modules\domain\matrix.service.js:173:  return 
+this.repository.withTransaction(async client => {
+  src\modules\domain\matrix.service.js:174:    const versionId = await 
+this.repository.getActiveVersionId(client);
+  src\modules\domain\matrix.service.js:175:    if (!versionId) {
+  src\modules\domain\matrix.service.js:176:      throw MatrixService.writeError('No 
+hay versión activa', 404);
+  src\modules\domain\matrix.service.js:177:    }
+  src\modules\domain\matrix.service.js:178:
+  src\modules\domain\matrix.service.js:179:    const actual = await 
+this.repository.getFrontByIdAndVersion(
+  src\modules\domain\matrix.service.js:180:      client, parsedId, versionId
+  src\modules\domain\matrix.service.js:181:    );
+  src\modules\domain\matrix.service.js:182:    if (!actual) {
+  src\modules\domain\matrix.service.js:183:      throw MatrixService.writeError(
+  src\modules\domain\matrix.service.js:184:        'Frente no encontrado en la versión 
+activa',
+  src\modules\domain\matrix.service.js:185:        404
+  src\modules\domain\matrix.service.js:186:      );
+  src\modules\domain\matrix.service.js:187:    }
+  src\modules\domain\matrix.service.js:188:
+> src\modules\domain\matrix.service.js:189:    const nuevoPeso = input.peso_maximo !== 
+undefined
+> src\modules\domain\matrix.service.js:190:      ? parseFloat(input.peso_maximo)
+  src\modules\domain\matrix.service.js:191:      : parseFloat(actual.peso_maximo);
+  src\modules\domain\matrix.service.js:192:
+> src\modules\domain\matrix.service.js:193:    // El endpoint legacy no tenía esta 
+validación explícita en PUT.
+  src\modules\domain\matrix.service.js:194:    // Solo aseguramos que el valor pueda 
+participar en la suma.
+  src\modules\domain\matrix.service.js:195:    if (!Number.isFinite(nuevoPeso)) {
+  src\modules\domain\matrix.service.js:196:      throw MatrixService.writeError('Peso 
+inválido', 400);
+  src\modules\domain\matrix.service.js:197:    }
+  src\modules\domain\matrix.service.js:198:
+> src\modules\domain\matrix.service.js:199:    const nuevoCodigo = input.codigo || 
+actual.codigo;
+  src\modules\domain\matrix.service.js:200:
+> src\modules\domain\matrix.service.js:201:    if (input.codigo && input.codigo !== 
+actual.codigo) {
+  src\modules\domain\matrix.service.js:202:      const duplicate = await 
+this.repository.findFrontByCode(
+> src\modules\domain\matrix.service.js:203:        client, versionId, input.codigo, 
+parsedId
+  src\modules\domain\matrix.service.js:204:      );
+  src\modules\domain\matrix.service.js:205:
+  src\modules\domain\matrix.service.js:206:      if (duplicate) {
+  src\modules\domain\matrix.service.js:207:        throw MatrixService.writeError(
+> src\modules\domain\matrix.service.js:208:          `Ya existe un frente con el 
+código "${input.codigo}" en esta versión`,
+  src\modules\domain\matrix.service.js:209:          400
+  src\modules\domain\matrix.service.js:210:        );
+  src\modules\domain\matrix.service.js:211:      }
+  src\modules\domain\matrix.service.js:212:    }
+  src\modules\domain\matrix.service.js:213:
+  src\modules\domain\matrix.service.js:214:    const sumaOtros = await 
+this.repository.sumActiveFrontWeights(
+  src\modules\domain\matrix.service.js:215:      client, versionId, parsedId
+  src\modules\domain\matrix.service.js:216:    );
+  src\modules\domain\matrix.service.js:217:    const nuevaSuma = sumaOtros + nuevoPeso;
+  src\modules\domain\matrix.service.js:218:
+  src\modules\domain\matrix.service.js:219:    if (nuevaSuma > 100) {
+  src\modules\domain\matrix.service.js:220:      throw MatrixService.writeError(
+  src\modules\domain\matrix.service.js:221:        `La suma total de los frentes en la 
+versión activa excede el 100%. Otros: ${sumaOtros}% + ${nuevoPeso}% = ${nuevaSuma}%`,
+  src\modules\domain\matrix.service.js:222:        400,
+  src\modules\domain\matrix.service.js:223:        {
+  src\modules\domain\matrix.service.js:224:          error: `La suma total de los 
+frentes en la versión activa excede el 100%. Otros: ${sumaOtros}% + ${nuevoPeso}% = 
+${nuevaSuma}%`,
+  src\modules\domain\matrix.service.js:225:          suma_actual: sumaOtros,
+  src\modules\domain\matrix.service.js:226:          nuevo_peso: nuevoPeso,
+  src\modules\domain\matrix.service.js:227:          peso_maximo: 100,
+  src\modules\domain\matrix.service.js:228:          suma_total: nuevaSuma
+  src\modules\domain\matrix.service.js:229:        }
+  src\modules\domain\matrix.service.js:230:      );
+  src\modules\domain\matrix.service.js:231:    }
+  src\modules\domain\matrix.service.js:232:
+> src\modules\domain\matrix.service.js:233:    return 
+this.repository.updateFront(client, parsedId, {
+  src\modules\domain\matrix.service.js:234:      codigo: nuevoCodigo,
+> src\modules\domain\matrix.service.js:235:      nombre: input.nombre || actual.nombre,
+  src\modules\domain\matrix.service.js:236:      pesoMaximo: nuevoPeso,
+> src\modules\domain\matrix.service.js:237:      orden: input.orden !== undefined ? 
+input.orden : 0,
+> src\modules\domain\matrix.service.js:238:      activo: input.activo !== undefined ? 
+input.activo : true
+  src\modules\domain\matrix.service.js:239:    });
+  src\modules\domain\matrix.service.js:240:  });
+  src\modules\domain\matrix.service.js:241:}
+  src\modules\domain\matrix.service.js:242:
+> src\modules\domain\matrix.service.js:243:async deleteFront(id) {
+  src\modules\domain\matrix.service.js:244:  const parsedId = Number(id);
+  src\modules\domain\matrix.service.js:245:  if (!Number.isInteger(parsedId) || 
+parsedId <= 0) {
+  src\modules\domain\matrix.service.js:246:    throw MatrixService.writeError('ID de 
+frente inválido', 400);
+  src\modules\domain\matrix.service.js:247:  }
+  src\modules\domain\matrix.service.js:248:
+  src\modules\domain\matrix.service.js:249:  return 
+this.repository.withTransaction(async client => {
+  src\modules\domain\matrix.service.js:250:    const versionId = await 
+this.repository.getActiveVersionId(client);
+  src\modules\domain\matrix.service.js:251:    if (!versionId) {
+  src\modules\domain\matrix.service.js:252:      throw MatrixService.writeError('No 
+hay versión activa', 404);
+  src\modules\domain\matrix.service.js:253:    }
+  src\modules\domain\matrix.service.js:254:
+> src\modules\domain\matrix.service.js:255:    const front = await 
+this.repository.deleteFrontTree(
+  src\modules\domain\matrix.service.js:256:      client, parsedId, versionId
+  src\modules\domain\matrix.service.js:257:    );
+  src\modules\domain\matrix.service.js:258:
+  src\modules\domain\matrix.service.js:259:    if (!front) {
+  src\modules\domain\matrix.service.js:260:      throw 
+MatrixService.writeError('Frente no encontrado', 404);
+  src\modules\domain\matrix.service.js:261:    }
+  src\modules\domain\matrix.service.js:262:
+  src\modules\domain\matrix.service.js:263:    return {
+  src\modules\domain\matrix.service.js:264:      success: true,
+  src\modules\domain\matrix.service.js:265:      message: `✅ Frente "${front.nombre}" 
+eliminado correctamente.`
+  src\modules\domain\matrix.service.js:266:    };
+  src\modules\domain\matrix.service.js:267:  });
+  src\modules\domain\matrix.service.js:268:}
+  src\modules\domain\matrix.service.js:269:
+  src\modules\domain\matrix.service.js:270:}
+  src\modules\domain\matrix.service.js:271:
+  src\modules\domain\matrix.service.js:272:module.exports = MatrixService;
+  server.js:1:// ======================================================
+  server.js:2:// CONFIGURACIÓN INICIAL
+  server.js:3:// ======================================================
+> server.js:4:// server.js - Servidor MECA - PostgreSQL local
+> server.js:5:// Base de datos: meca_db en PostgreSQL local (puerto 5432)
+  server.js:6:require('dotenv').config();
+> server.js:7:// Pool de conexión PostgreSQL
+  server.js:8:const { pool } = require('./models/database');
+  server.js:9:const http = require('http');
+  server.js:10:const url = require('url');
+  server.js:11:const { hashPassword, verifyPassword } = 
+require('./security/passwords');
+  server.js:12:const { signToken, verifyToken } = require('./security/tokens');
+  server.js:13:const { applyCors } = require('./security/cors');
+  server.js:14:const { authorizeRequest } = require('./security/authorization');
+> server.js:15:const { createMatrixReadHandler, createMatrixWriteHandler } = 
+require('./src/modules/matrix');
+> server.js:16:const { createReportsHandler } = require('./src/modules/reports');
+> server.js:17:const { createAgentsHandler } = require('./src/modules/agents');
+> server.js:18:const { createListeningsHandler } = require('./src/modules/listenings');
+> server.js:19:const { createUsersHandler } = require('./src/modules/users');
+> server.js:20:const { createRolesHandler } = require('./src/modules/roles');
+> server.js:21:const { createEvaluationsHandler } = 
+require('./src/modules/evaluations');
+> server.js:22:const { createSessionsHandler } = require('./src/modules/sessions');
+> server.js:23:const { createRequestsHandler } = require('./src/modules/requests');
+> server.js:24:const { createPdaHandler } = require('./src/modules/pda');
+> server.js:25:const { createQuartileCriteriaHandler } = 
+require('./src/modules/quartile-criteria');
+> server.js:26:const { createVersionsHandler } = require('./src/modules/versions');
+> server.js:27:const { createDatabaseStatusHandler } = 
+require('./src/modules/database-status');
+> server.js:28:const { createAudioProxyHandler } = 
+require('./src/modules/audio-proxy');
+> server.js:29:const { createMatrixRecalculationHandler } = 
+require('./src/modules/matrix-recalculation');
+> server.js:30:const { createGenericQueryHandler } = 
+require('./src/modules/generic-query');
+> server.js:31:const { createGenericRpcHandler } = 
+require('./src/modules/generic-rpc');
+> server.js:32:const { createHttpStaticViewsHandler } = 
+require('./src/modules/http-shell/http-static-views');
+> server.js:33:const { createHealthHandler } = require('./src/modules/health');
+> server.js:34:const { createDomainHandler } = 
+require('./src/modules/domain/domain.routes');
+  server.js:35:// Configuración del servidor Python de audio.
+  server.js:36:// Debe inicializarse antes de crear AudioProxyHandler.
+  server.js:37:const PYTHON_API_URL = process.env.PYTHON_API_URL ||
+  server.js:38:    (process.env.NODE_ENV === 'production'
+  server.js:39:        ? 'http://10.4.240.68:5001'
+  server.js:40:        : 'http://localhost:5001'
+  server.js:41:    );
+  server.js:42:
+> server.js:43:const handleMatrixReadRequest = createMatrixReadHandler();
+> server.js:44:const handleMatrixWriteRequest = createMatrixWriteHandler();
+> server.js:45:const handleReportsRequest = createReportsHandler({ db: pool });
+> server.js:46:const handleAgentsRequest = createAgentsHandler({ db: pool });
+> server.js:47:const handleListeningsRequest = createListeningsHandler({ db: pool });
+> server.js:48:const handleUsersRequest = createUsersHandler({
+  server.js:49:    db: pool,
+  server.js:50:    hashPassword,
+  server.js:51:    verifyPassword,
+  server.js:52:    signToken
+  server.js:53:});
+> server.js:54:const handleRolesRequest = createRolesHandler({ db: pool });
+> server.js:55:const handleEvaluationsRequest = createEvaluationsHandler({ db: pool });
+> server.js:56:const handleSessionsRequest = createSessionsHandler({ db: pool });
+> server.js:57:const handleRequestsRequest = createRequestsHandler({ db: pool });
+> server.js:58:const handlePdaRequest = createPdaHandler({ db: pool });
+> server.js:59:const handleQuartileCriteriaRequest = createQuartileCriteriaHandler({ 
+db: pool });
+> server.js:60:const handleVersionsRequest = createVersionsHandler({ db: pool });
+> server.js:61:const handleDatabaseStatusRequest = createDatabaseStatusHandler({ db: 
+pool });
+> server.js:62:const handleAudioProxyRequest = createAudioProxyHandler({ baseUrl: 
+PYTHON_API_URL, fetchImpl: fetch });
+> server.js:63:const handleMatrixRecalculationRequest = 
+createMatrixRecalculationHandler({ db: pool });
+> server.js:64:const handleGenericQueryRequest = createGenericQueryHandler({ db: pool 
+});
+> server.js:65:const handleGenericRpcRequest = createGenericRpcHandler({ db: pool });
+> server.js:66:const handleHttpStaticViewsRequest = createHttpStaticViewsHandler({ 
+baseDir: __dirname });
+> server.js:67:const handleHealthRequest = createHealthHandler({ db: pool });
+> server.js:68:const handleDomainRequest = createDomainHandler();
+  server.js:69:// Configuración
+  server.js:70:const PORT = process.env.PORT || 8080;
+  server.js:71:const HOST = process.env.HOST || '0.0.0.0';
+  server.js:72:
+  server.js:73:// ======================================================
+  server.js:74:// SERVIDOR PRINCIPAL
+  server.js:75:// ======================================================
+> server.js:76:const servidor = http.createServer(async (peticion, respuesta) => {
+  server.js:77:    // CORS restringido por CORS_ORIGINS; ya no se utiliza wildcard '*'.
+  server.js:78:    applyCors(peticion, respuesta);
+  server.js:79:
+  server.js:80:    if (peticion.method === 'OPTIONS') {
+  server.js:81:        respuesta.writeHead(204);
+  server.js:82:        respuesta.end();
+  server.js:83:        return;
+  server.js:84:    }
+  server.js:85:
+  server.js:86:    const urlParseada = url.parse(peticion.url || '', true);
+  server.js:87:    const ruta = urlParseada.pathname || '/';
+  server.js:88:    const metodo = peticion.method || 'GET';
+  server.js:89:
+  server.js:90:    // Validación central de cualquier Bearer token recibido.
+  server.js:91:    // Las rutas legacy que hoy solo comprueban presencia del token 
+quedan protegidas
+  server.js:92:    // contra tokens alterados sin tener que reescribir todos los 
+endpoints en esta fase.
+  server.js:93:    const authHeader = peticion.headers['authorization'];
+  server.js:94:    if (authHeader) {
+  server.js:95:        const bearer = authHeader.startsWith('Bearer ') ? 
+authHeader.slice(7) : null;
+  server.js:96:        const expectedPurpose = ruta === '/api/auth/cambiar-password' ? 
+'password_change' : 'access';
+  server.js:97:        const verification = verifyToken(bearer, { expectedPurpose });
+  server.js:98:        if (!verification.valid) {
+  server.js:99:            respuesta.writeHead(401, { 'Content-Type': 
+'application/json' });
+  server.js:100:            respuesta.end(JSON.stringify({ error: verification.error 
+|| 'Token inválido' }));
+  server.js:101:            return;
+  server.js:267:        return;
+  server.js:268:    }
+  server.js:269:
+  server.js:270:    // ======================================================
+> server.js:271:    // API - CONSULTA GENÉRICA (PostgreSQL Query Layer)
+  server.js:272:    // Recibe parámetros de consulta y los convierte a SQL
+  server.js:273:    // ======================================================
+  server.js:274:    // F10.40 - GENERIC QUERY MODULE
+  server.js:275:    if (await handleGenericQueryRequest({
+  server.js:276:        ruta,
+  server.js:277:        metodo,
+  server.js:278:        peticion,
+  server.js:279:        respuesta
+  server.js:280:    })) {
+  server.js:281:        return;
+  server.js:282:    }
+  server.js:283:
+> server.js:284:    // API - RPC GENÉRICO (PostgreSQL Query Layer)
+  server.js:285:    // Soporta funciones almacenadas como cerrar_mes, 
+limpiar_sesiones_expiradas, etc.
+  server.js:286:    // ======================================================
+  server.js:287:
+  server.js:288:    // F10.46 - GENERIC RPC MODULE
+  server.js:289:    if (await handleGenericRpcRequest({
+  server.js:290:        ruta,
+  server.js:291:        metodo,
+  server.js:292:        peticion,
+  server.js:293:        respuesta
+  server.js:294:    })) {
+  server.js:295:        return;
+  server.js:296:    }
+  server.js:297:
+  server.js:298:    // F10.23 - DATABASE STATUS MODULE
+  server.js:299:    if (await handleDatabaseStatusRequest({
+  server.js:300:        ruta,
+  server.js:301:        metodo,
+  server.js:302:        peticion,
+  server.js:303:        respuesta
+  server.js:304:    })) {
+  server.js:305:        return;
+  server.js:306:    }
+  server.js:307:
+  server.js:308:    // F10.17 - VERSIONS MODULE
+  server.js:309:    if (await handleVersionsRequest({
+  server.js:351:    // Fallback para rutas no encontradas
+  server.js:352:    respuesta.writeHead(404, { 'Content-Type': 'application/json' });
+  server.js:353:    respuesta.end(JSON.stringify({ error: 'Ruta no encontrada', ruta: 
+ruta }));
+  server.js:354:
+> server.js:355:}); // Fin createServer
+  server.js:356:
+  server.js:357:servidor.listen(PORT, HOST, () => {
+  server.js:358:    console.log('');
+  server.js:359:    
+console.log('=======================================================');
+> server.js:360:    console.log('SISTEMA MECA - SERVIDOR DE AUDITORIA (PostgreSQL 
+Local)');
+  server.js:361:    
+console.log('=======================================================');
+  server.js:362:    console.log(`Servidor: http://${HOST}:${PORT}`);
+  server.js:363:    console.log(`Auditor: http://${HOST}:${PORT}/auditor`);
+  server.js:364:    console.log(`Health: http://${HOST}:${PORT}/api/health`);
+  server.js:365:    console.log(`BD: localhost:5433 / meca_db`);
+  server.js:366:    
+console.log('=======================================================');
+  server.js:367:    console.log('Presiona Ctrl+C para detener el servidor');
+  server.js:368:    console.log('');
+  server.js:369:});
+
+

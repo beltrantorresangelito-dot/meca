@@ -1,0 +1,649 @@
+======================================================
+ MECA F11.2 - CARACTERIZACIÓN RESIDUOS MULTI-QUIEBRE
+======================================================
+
+[F112-SUP-CATALOG] public\js\supervisor.js
+Coincidencias: 3
+
+Línea 50330: { codigo: 'T', descripcion: 'Temprana' },
+--- CONTEXTO ---
+ 50295: // 7. INICIALIZACIÓN DEL MÓDULO DE CAMPAÑAS
+ 50296: // ======================================================
+ 50297: 
+ 50298: /**
+ 50299:  * Inicializa el módulo de campañas
+ 50300:  */
+ 50301: function inicializarModuloCampanas() {
+ 50302:     console.log('📌 Inicializando módulo de campañas...');
+ 50303: 
+ 50304:     // 1. Cargar selectores de campaña
+ 50305:     setTimeout(() => {
+ 50306:         cargarSelectCampanas('filtroCampanaEscuchas');
+ 50307:         cargarSelectCampanas('selectCampanaEscucha');
+ 50308:     }, 500);
+ 50309: 
+ 50310:     // 2. Configurar el filtro de campaña en monitoreo
+ 50311:     const filtroCampana = document.getElementById('filtroCampanaEscuchas');
+ 50312:     if (filtroCampana) {
+ 50313:         filtroCampana.addEventListener('change', function () {
+ 50314:             console.log('📌 Filtro campaña cambiado a:', this.value);
+ 50315:             if (typeof aplicarFiltrosEscuchasConCampana === 'function') {
+ 50316:                 aplicarFiltrosEscuchasConCampana();
+ 50317:             } else {
+ 50318:                 aplicarFiltrosEscuchas();
+ 50319:             }
+ 50320:         });
+ 50321:     }
+ 50322: 
+ 50323:     // 3. Verificar si existen campañas iniciales, si no, crear las predeterminadas
+ 50324:     setTimeout(async () => {
+ 50325:         const campanas = await obtenerCampanas();
+ 50326:         if (campanas.length === 0) {
+ 50327:             console.log('📌 No hay campañas registradas. Creando campañas predeterminadas...');
+ 50328: 
+ 50329:             const predeterminadas = [
+ 50330:                 { codigo: 'T', descripcion: 'Temprana' },
+ 50331:                 { codigo: 'ST', descripcion: 'Super Temprana' },
+ 50332:                 { codigo: 'F', descripcion: 'Fraccionamiento' }
+ 50333:             ];
+ 50334: 
+ 50335:             for (const c of predeterminadas) {
+ 50336:                 await crearCampana({ codigo: c.codigo, descripcion: c.descripcion, activa: true });
+ 50337:             }
+ 50338: 
+ 50339:             // Recargar selectores
+ 50340:             cargarSelectCampanas('filtroCampanaEscuchas');
+ 50341:             cargarSelectCampanas('selectCampanaEscucha');
+ 50342: 
+ 50343:             console.log('✅ Campañas predeterminadas creadas');
+ 50344:         }
+ 50345:     }, 1000);
+ 50346: 
+ 50347:     console.log('✅ Módulo de campañas inicializado');
+ 50348: }
+ 50349: 
+ 50350: // ======================================================
+ 50351: // 8. EXPOSICIÓN GLOBAL DE FUNCIONES
+ 50352: // ======================================================
+ 50353: 
+ 50354: window.obtenerCampanas = obtenerCampanas;
+ 50355: window.obtenerCampanaPorCodigo = obtenerCampanaPorCodigo;
+ 50356: window.crearCampana = crearCampana;
+ 50357: window.actualizarCampana = actualizarCampana;
+ 50358: window.eliminarCampana = eliminarCampana;
+ 50359: window.validarCampana = validarCampana;
+ 50360: window.cargarSelectCampanas = cargarSelectCampanas;
+ 50361: window.mostrarModalGestionCampanas = mostrarModalGestionCampanas;
+ 50362: window.cerrarModalGestionCampanas = cerrarModalGestionCampanas;
+ 50363: window.cargarTablaCampanas = cargarTablaCampanas;
+ 50364: window.abrirModalNuevaCampana = abrirModalNuevaCampana;
+ 50365: window.abrirModalEditarCampana = abrirModalEditarCampana;
+--- FIN CONTEXTO ---
+
+Línea 50331: { codigo: 'ST', descripcion: 'Super Temprana' },
+--- CONTEXTO ---
+ 50296: // ======================================================
+ 50297: 
+ 50298: /**
+ 50299:  * Inicializa el módulo de campañas
+ 50300:  */
+ 50301: function inicializarModuloCampanas() {
+ 50302:     console.log('📌 Inicializando módulo de campañas...');
+ 50303: 
+ 50304:     // 1. Cargar selectores de campaña
+ 50305:     setTimeout(() => {
+ 50306:         cargarSelectCampanas('filtroCampanaEscuchas');
+ 50307:         cargarSelectCampanas('selectCampanaEscucha');
+ 50308:     }, 500);
+ 50309: 
+ 50310:     // 2. Configurar el filtro de campaña en monitoreo
+ 50311:     const filtroCampana = document.getElementById('filtroCampanaEscuchas');
+ 50312:     if (filtroCampana) {
+ 50313:         filtroCampana.addEventListener('change', function () {
+ 50314:             console.log('📌 Filtro campaña cambiado a:', this.value);
+ 50315:             if (typeof aplicarFiltrosEscuchasConCampana === 'function') {
+ 50316:                 aplicarFiltrosEscuchasConCampana();
+ 50317:             } else {
+ 50318:                 aplicarFiltrosEscuchas();
+ 50319:             }
+ 50320:         });
+ 50321:     }
+ 50322: 
+ 50323:     // 3. Verificar si existen campañas iniciales, si no, crear las predeterminadas
+ 50324:     setTimeout(async () => {
+ 50325:         const campanas = await obtenerCampanas();
+ 50326:         if (campanas.length === 0) {
+ 50327:             console.log('📌 No hay campañas registradas. Creando campañas predeterminadas...');
+ 50328: 
+ 50329:             const predeterminadas = [
+ 50330:                 { codigo: 'T', descripcion: 'Temprana' },
+ 50331:                 { codigo: 'ST', descripcion: 'Super Temprana' },
+ 50332:                 { codigo: 'F', descripcion: 'Fraccionamiento' }
+ 50333:             ];
+ 50334: 
+ 50335:             for (const c of predeterminadas) {
+ 50336:                 await crearCampana({ codigo: c.codigo, descripcion: c.descripcion, activa: true });
+ 50337:             }
+ 50338: 
+ 50339:             // Recargar selectores
+ 50340:             cargarSelectCampanas('filtroCampanaEscuchas');
+ 50341:             cargarSelectCampanas('selectCampanaEscucha');
+ 50342: 
+ 50343:             console.log('✅ Campañas predeterminadas creadas');
+ 50344:         }
+ 50345:     }, 1000);
+ 50346: 
+ 50347:     console.log('✅ Módulo de campañas inicializado');
+ 50348: }
+ 50349: 
+ 50350: // ======================================================
+ 50351: // 8. EXPOSICIÓN GLOBAL DE FUNCIONES
+ 50352: // ======================================================
+ 50353: 
+ 50354: window.obtenerCampanas = obtenerCampanas;
+ 50355: window.obtenerCampanaPorCodigo = obtenerCampanaPorCodigo;
+ 50356: window.crearCampana = crearCampana;
+ 50357: window.actualizarCampana = actualizarCampana;
+ 50358: window.eliminarCampana = eliminarCampana;
+ 50359: window.validarCampana = validarCampana;
+ 50360: window.cargarSelectCampanas = cargarSelectCampanas;
+ 50361: window.mostrarModalGestionCampanas = mostrarModalGestionCampanas;
+ 50362: window.cerrarModalGestionCampanas = cerrarModalGestionCampanas;
+ 50363: window.cargarTablaCampanas = cargarTablaCampanas;
+ 50364: window.abrirModalNuevaCampana = abrirModalNuevaCampana;
+ 50365: window.abrirModalEditarCampana = abrirModalEditarCampana;
+ 50366: window.cerrarModalCampana = cerrarModalCampana;
+--- FIN CONTEXTO ---
+
+Línea 50332: { codigo: 'F', descripcion: 'Fraccionamiento' }
+--- CONTEXTO ---
+ 50297: 
+ 50298: /**
+ 50299:  * Inicializa el módulo de campañas
+ 50300:  */
+ 50301: function inicializarModuloCampanas() {
+ 50302:     console.log('📌 Inicializando módulo de campañas...');
+ 50303: 
+ 50304:     // 1. Cargar selectores de campaña
+ 50305:     setTimeout(() => {
+ 50306:         cargarSelectCampanas('filtroCampanaEscuchas');
+ 50307:         cargarSelectCampanas('selectCampanaEscucha');
+ 50308:     }, 500);
+ 50309: 
+ 50310:     // 2. Configurar el filtro de campaña en monitoreo
+ 50311:     const filtroCampana = document.getElementById('filtroCampanaEscuchas');
+ 50312:     if (filtroCampana) {
+ 50313:         filtroCampana.addEventListener('change', function () {
+ 50314:             console.log('📌 Filtro campaña cambiado a:', this.value);
+ 50315:             if (typeof aplicarFiltrosEscuchasConCampana === 'function') {
+ 50316:                 aplicarFiltrosEscuchasConCampana();
+ 50317:             } else {
+ 50318:                 aplicarFiltrosEscuchas();
+ 50319:             }
+ 50320:         });
+ 50321:     }
+ 50322: 
+ 50323:     // 3. Verificar si existen campañas iniciales, si no, crear las predeterminadas
+ 50324:     setTimeout(async () => {
+ 50325:         const campanas = await obtenerCampanas();
+ 50326:         if (campanas.length === 0) {
+ 50327:             console.log('📌 No hay campañas registradas. Creando campañas predeterminadas...');
+ 50328: 
+ 50329:             const predeterminadas = [
+ 50330:                 { codigo: 'T', descripcion: 'Temprana' },
+ 50331:                 { codigo: 'ST', descripcion: 'Super Temprana' },
+ 50332:                 { codigo: 'F', descripcion: 'Fraccionamiento' }
+ 50333:             ];
+ 50334: 
+ 50335:             for (const c of predeterminadas) {
+ 50336:                 await crearCampana({ codigo: c.codigo, descripcion: c.descripcion, activa: true });
+ 50337:             }
+ 50338: 
+ 50339:             // Recargar selectores
+ 50340:             cargarSelectCampanas('filtroCampanaEscuchas');
+ 50341:             cargarSelectCampanas('selectCampanaEscucha');
+ 50342: 
+ 50343:             console.log('✅ Campañas predeterminadas creadas');
+ 50344:         }
+ 50345:     }, 1000);
+ 50346: 
+ 50347:     console.log('✅ Módulo de campañas inicializado');
+ 50348: }
+ 50349: 
+ 50350: // ======================================================
+ 50351: // 8. EXPOSICIÓN GLOBAL DE FUNCIONES
+ 50352: // ======================================================
+ 50353: 
+ 50354: window.obtenerCampanas = obtenerCampanas;
+ 50355: window.obtenerCampanaPorCodigo = obtenerCampanaPorCodigo;
+ 50356: window.crearCampana = crearCampana;
+ 50357: window.actualizarCampana = actualizarCampana;
+ 50358: window.eliminarCampana = eliminarCampana;
+ 50359: window.validarCampana = validarCampana;
+ 50360: window.cargarSelectCampanas = cargarSelectCampanas;
+ 50361: window.mostrarModalGestionCampanas = mostrarModalGestionCampanas;
+ 50362: window.cerrarModalGestionCampanas = cerrarModalGestionCampanas;
+ 50363: window.cargarTablaCampanas = cargarTablaCampanas;
+ 50364: window.abrirModalNuevaCampana = abrirModalNuevaCampana;
+ 50365: window.abrirModalEditarCampana = abrirModalEditarCampana;
+ 50366: window.cerrarModalCampana = cerrarModalCampana;
+ 50367: window.guardarCampana = guardarCampana;
+--- FIN CONTEXTO ---
+
+[F112-AUD-RULE] public\js\auditor.js
+Coincidencias: 1
+
+Línea 3688: // F1.3 - Regla oficial vigente de Cobranzas.
+--- CONTEXTO ---
+  3643: // ======================================================
+  3644: 
+  3645: function obtenerRango(puntaje) {
+  3646:     if (puntaje >= 97) {
+  3647:         return { 
+  3648:             nombre: 'Excelente', 
+  3649:             color: 'var(--ok)', 
+  3650:             min: 97, 
+  3651:             max: 100 
+  3652:         };
+  3653:     }
+  3654:     if (puntaje >= 90) {
+  3655:         return { 
+  3656:             nombre: 'Bien', 
+  3657:             color: '#019DF4', 
+  3658:             min: 90, 
+  3659:             max: 96 
+  3660:         };
+  3661:     }
+  3662:     if (puntaje >= 85) {
+  3663:         return { 
+  3664:             nombre: 'Regular', 
+  3665:             color: 'var(--warning)', 
+  3666:             min: 85, 
+  3667:             max: 89 
+  3668:         };
+  3669:     }
+  3670:     return { 
+  3671:         nombre: 'Bajo', 
+  3672:         color: 'var(--danger)', 
+  3673:         min: 0, 
+  3674:         max: 84 
+  3675:     };
+  3676: }
+  3677: 
+  3678: // ======================================================
+  3679: // 3. FUNCIÓN: obtenerCuartil()
+  3680: // ======================================================
+  3681: // 📌 PROPÓSITO: Obtener el cuartil según la nota del agente
+  3682: // 📌 PARÁMETROS: nota (number) - Nota obtenida
+  3683: // 📌 RETORNO: String con el cuartil (Q1, Q2, Q3, Q4)
+  3684: // 📌 USO: Clasificar agentes en cuartiles para ranking
+  3685: // ======================================================
+  3686: 
+  3687: function obtenerCuartil(nota) {
+  3688:     // F1.3 - Regla oficial vigente de Cobranzas.
+  3689:     // En fases posteriores esta clasificación debe provenir de la configuración central.
+  3690:     if (nota >= 97) return 'Q1';   // Excelente
+  3691:     if (nota >= 90) return 'Q2';   // Bien
+  3692:     if (nota >= 85) return 'Q3';   // Regular
+  3693:     return 'Q4';                   // Bajo / Riesgo
+  3694: }
+  3695: 
+  3696: // ======================================================
+  3697: // 4. FUNCIÓN: calcularTodo()
+  3698: // ======================================================
+  3699: // 📌 PROPÓSITO: Recalcular todos los frentes de evaluación
+  3700: // 📌 USO: Cuando se cambia un select y se necesita actualizar todo
+  3701: // 📌 EJECUCIÓN: Llamada desde el evento onchange de los selects
+  3702: // ======================================================
+  3703: 
+  3704: function calcularTodo() {
+  3705:     console.log('🔄 Recalculando TODOS los frentes...');
+  3706:     
+  3707:     const frentes = document.querySelectorAll('.frente-container');
+  3708:     
+  3709:     frentes.forEach(frenteContainer => {
+  3710:         const frenteCodigo = frenteContainer.dataset.frente;
+  3711:         if (frenteCodigo) {
+  3712:             recalcularFrente(frenteCodigo);
+  3713:         }
+  3714:     });
+  3715:     
+  3716:     recalcularNotaFinalGlobal();
+  3717: }
+  3718: 
+  3719: // ======================================================
+  3720: // 5. FUNCIÓN: formatearFechaConHora()
+  3721: // ======================================================
+  3722: // 📌 PROPÓSITO: Formatear fecha en formato DD/MM/YYYY HH:MM
+  3723: // 📌 PARÁMETROS: fechaTime (string o Date) - Fecha a formatear
+  3724: // 📌 RETORNO: String con fecha formateada o valor original si es inválido
+  3725: // 📌 SOPORTE: 
+  3726: //    - Formato ISO: 2024-01-15T14:30
+  3727: //    - Formato DD/MM/YYYY HH:MM
+  3728: //    - Objeto Date
+  3729: // ======================================================
+  3730: 
+  3731: function formatearFechaConHora(fechaTime) {
+  3732:     // ======================================================
+  3733:     // 5a. SI YA ESTÁ FORMATEADO, DEVOLVERLO
+--- FIN CONTEXTO ---
+
+[F112-SUP-BRANDING] public\js\supervisor.js
+Coincidencias: 6
+
+Línea 23671: Documento generado automáticamente por Sistema MECA - © Auditoría Calidad Cobranzas<br>
+--- CONTEXTO ---
+ 23651:             </div>
+ 23652: 
+ 23653:             <!-- SECCIÓN 5: PRÓXIMA VERIFICACIÓN -->
+ 23654:             <div class="section">
+ 23655:                 <div class="section-title">📅 5. PRÓXIMA VERIFICACIÓN</div>
+ 23656:                 <div class="section-body">
+ 23657:                     <div class="info-grid">
+ 23658:                         <div class="info-label">📅 Fecha estimada nueva evaluación:</div>
+ 23659:                         <div><strong>${fechaProximaEvaluacion}</strong></div>
+ 23660:                     </div>
+ 23661:                     <div style="margin-top: 15px; padding: 12px; background: #fff8e0; border-radius: 8px; border-left: 4px solid #f39c12; font-size: 13px;">
+ 23662:                         <strong>⚠️ NOTA:</strong> Esta es una NOTIFICACIÓN INFORMATIVA. El gestor deberá revisar los hallazgos y ajustar su desempeño.
+ 23663:                         <br><br>📌 <strong>Campaña asociada:</strong> ${escapeHtml(campanaPrincipal)}
+ 23664:                     </div>
+ 23665:                     ${versionMatrizHTML}
+ 23666:                 </div>
+ 23667:             </div>
+ 23668:         </div>
+ 23669: 
+ 23670:         <div class="footer">
+ 23671:             Documento generado automáticamente por Sistema MECA - © Auditoría Calidad Cobranzas<br>
+ 23672:             Este informe debe ser enviado al área de Operaciones para su gestión.
+ 23673:         </div>
+ 23674:     </div>
+ 23675: </body>
+ 23676: </html>`;
+ 23677: }
+ 23678: // ===== FIN FUNCIÓN: generarDocumentoHTML ===============================
+ 23679: 
+ 23680: function generarTablaAudiosConCampana(evaluaciones) {
+ 23681:     const evaluacionesConFallas = evaluaciones.filter(ev => ev.fallas && ev.fallas.length > 0);
+ 23682:     const totalFallasEnAudios = evaluacionesConFallas.reduce((sum, ev) => sum + ev.fallas.length, 0);
+ 23683: 
+ 23684:     const submotivosUnicosSet = new Set();
+ 23685:     for (const ev of evaluacionesConFallas) {
+ 23686:         for (const falla of ev.fallas) {
+ 23687:             if (falla.submotivo) submotivosUnicosSet.add(falla.submotivo);
+ 23688:         }
+ 23689:     }
+ 23690: 
+ 23691:     if (evaluacionesConFallas.length === 0) {
+--- FIN CONTEXTO ---
+
+Línea 23852: ║  © Auditoría Calidad Cobranzas - No requiere respuesta del gestor              ║
+--- CONTEXTO ---
+ 23832: ║  │ ECUF (Negocio)│ ${padRight(promedioECUF + ' (' + pctECUF + '%)', 9)} │ ≥ 90%   │ ${pctECUF >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+ 23833: ║  │ ECN (Proceso) │ ${padRight(promedioECN + ' (' + pctECN + '%)', 9)} │ ≥ 90%   │ ${pctECN >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+ 23834: ║  │ NOTA FINAL    │ ${padRight(promedioFinal + '%', 9)} │ ≥ 85%   │ ${cuartil === 'Q4' ? '🔴 NO APRUEBA' : '🟢 APRUEBA'}${' '.repeat(9)}│             ║
+ 23835: ║  └───────────────┴───────────┴─────────┴───────────────────────┘             ║
+ 23836: ║                                                                               ║
+ 23837: ║  ▶ RESULTADO: ${padRight(estadoFinal, 48)}║
+ 23838: ║                                                                               ║
+ 23839: ╠═══════════════════════════════════════════════════════════════════════════════╣
+ 23840: ║ 2. PRÓXIMA VERIFICACIÓN                                                       ║
+ 23841: ╠═══════════════════════════════════════════════════════════════════════════════╣
+ 23842: ║                                                                               ║
+ 23843: ║  📅 Fecha estimada de nueva evaluación: ${padRight(fechaProximaEvaluacion, 30)}║
+ 23844: ║  📌 Campaña asociada: ${padRight(campanaPrincipal, 40)}║
+ 23845: ║                                                                               ║
+ 23846: ║  ⚠️ NOTA: Esta es una NOTIFICACIÓN INFORMATIVA. El gestor deberá revisar      ║
+ 23847: ║  los hallazgos y ajustar su desempeño. No requiere firma ni compromiso        ║
+ 23848: ║  bilateral.                                                                   ║
+ 23849: ║                                                                               ║
+ 23850: ╠═══════════════════════════════════════════════════════════════════════════════╣
+ 23851: ║  Documento generado automáticamente por Sistema MECA                          ║
+ 23852: ║  © Auditoría Calidad Cobranzas - No requiere respuesta del gestor              ║
+ 23853: ╚═══════════════════════════════════════════════════════════════════════════════╝
+ 23854:     `;
+ 23855: };
+ 23856: // ===== FIN FUNCIÓN: generarDocumentoTexto ==============================
+ 23857: 
+ 23858: // ===== 21. INICIO FUNCIÓN: mostrarModalDocumentoProfesional ===========
+ 23859: function mostrarModalDocumentoProfesional(documentoHTML, documentoTexto, agente) {
+ 23860:     // Verificar si ya existe un modal y eliminarlo
+ 23861:     const modalExistente = document.getElementById('modalDocumentoPDA');
+ 23862:     if (modalExistente) {
+ 23863:         modalExistente.remove();
+ 23864:     }
+ 23865: 
+ 23866:     // Crear modal
+ 23867:     const modal = document.createElement('div');
+ 23868:     modal.id = 'modalDocumentoPDA';
+ 23869:     modal.style.cssText = `
+ 23870:             position: fixed;
+ 23871:             top: 0;
+ 23872:             left: 0;
+--- FIN CONTEXTO ---
+
+Línea 46906: <p>Movistar Perú - Auditoría Calidad Cobranzas | Generado: ${fecha}</p>
+--- CONTEXTO ---
+ 46886:             table { width: 100%; border-collapse: collapse; font-size: 13px; }
+ 46887:             th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+ 46888:             th { background: #f8f9fa; font-weight: 600; }
+ 46889:             .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; color: white; display: inline-block; }
+ 46890:             .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+ 46891:             .kpi-card { background: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; }
+ 46892:             .kpi-number { font-size: 28px; font-weight: bold; }
+ 46893:             .kpi-label { font-size: 12px; color: #6c757d; }
+ 46894:             .footer { background: #f8f9fa; padding: 15px 30px; text-align: center; font-size: 11px; color: #888; border-top: 1px solid #e0e0e0; }
+ 46895:             .riesgo-item { padding: 8px 12px; background: #fff0f0; border-radius: 8px; margin: 5px 0; border-left: 4px solid #d93025; }
+ 46896:             @media print {
+ 46897:                 body { background: white; padding: 0; }
+ 46898:                 .container { box-shadow: none; border-radius: 0; }
+ 46899:             }
+ 46900:         </style>
+ 46901:     </head>
+ 46902:     <body>
+ 46903:     <div class="container">
+ 46904:         <div class="header">
+ 46905:             <h1>📊 Reporte Consolidado de PDA</h1>
+ 46906:             <p>Movistar Perú - Auditoría Calidad Cobranzas | Generado: ${fecha}</p>
+ 46907:         </div>
+ 46908:         <div class="content">
+ 46909:     `;
+ 46910: 
+ 46911:     // ============================================================
+ 46912:     // RESUMEN EJECUTIVO
+ 46913:     // ============================================================
+ 46914:     const estados = [
+ 46915:         { key: 'pendientes', label: '⏳ Pendientes', color: '#f39c12' },
+ 46916:         { key: 'notificados', label: '📨 Notificados', color: '#019DF4' },
+ 46917:         { key: 'capacitacion', label: '📚 Capacitación', color: '#7b1fa2' },
+ 46918:         { key: 'seguimiento', label: '✅ Seguimiento', color: '#28a745' },
+ 46919:         { key: 'completados', label: '🏆 Completados', color: '#1a7f37' },
+ 46920:         { key: 'escalados', label: '🚨 Escalados', color: '#d93025' }
+ 46921:     ];
+ 46922: 
+ 46923:     html += `
+ 46924:         <div class="section">
+ 46925:             <div class="section-title">📈 Resumen Ejecutivo</div>
+ 46926:             <div class="section-body">
+--- FIN CONTEXTO ---
+
+Línea 47171: © Auditoría Calidad Cobranzas - Todos los derechos reservados
+--- CONTEXTO ---
+ 47151:                     <span style="margin-left: 15px; font-size: 12px; background: #d93025; color: white; padding: 2px 10px; border-radius: 12px;">
+ 47152:                         🚨 Escalar
+ 47153:                     </span>
+ 47154:                     <div style="font-size: 11px; color: #6c757d; margin-top: 4px;">
+ 47155:                         Estados: ${estadosUnicos}
+ 47156:                     </div>
+ 47157:                 </div>
+ 47158:             `;
+ 47159:         }
+ 47160: 
+ 47161:         html += `
+ 47162:                 </div>
+ 47163:             </div>
+ 47164:         `;
+ 47165:     }
+ 47166: 
+ 47167:     html += `
+ 47168:         </div>
+ 47169:         <div class="footer">
+ 47170:             Documento generado automáticamente por Sistema MECA - Movistar Perú<br>
+ 47171:             © Auditoría Calidad Cobranzas - Todos los derechos reservados
+ 47172:         </div>
+ 47173:     </div>
+ 47174:     </body>
+ 47175:     </html>
+ 47176:     `;
+ 47177: 
+ 47178:     return html;
+ 47179: }
+ 47180: 
+ 47181: 
+ 47182: // ======================================================
+ 47183: // 4. FUNCIÓN PRINCIPAL: GENERAR REPORTE CONSOLIDADO
+ 47184: // ======================================================
+ 47185: 
+ 47186: function generarReporteConsolidadoPDA() {
+ 47187:     console.log('📊 Generando reporte consolidado de PDA...');
+ 47188: 
+ 47189:     // Validar datos
+ 47190:     if (!window.datosPDA || window.datosPDA.length === 0) {
+ 47191:         alert('⚠️ No hay PDA registrados para generar el reporte.');
+--- FIN CONTEXTO ---
+
+Línea 23819: ║  👤 EMITIDO POR: Mesa Calidad Cobranzas${' '.repeat(29)}║
+--- CONTEXTO ---
+ 23799:     } = data;
+ 23800: 
+ 23801:     const estadoFinal = cuartil === 'Q4' ? 'NO APROBADO - Requiere Plan de Mejora' : 'APRUEBA';
+ 23802: 
+ 23803:     function padRight(str, len) {
+ 23804:         if (!str) str = '';
+ 23805:         if (str.length >= len) return str;
+ 23806:         return str + ' '.repeat(len - str.length);
+ 23807:     }
+ 23808: 
+ 23809:     return `
+ 23810: ╔═══════════════════════════════════════════════════════════════════════════════╗
+ 23811: ║                       NOTIFICACIÓN DE RESULTADOS                               ║
+ 23812: ║                 Plan de Desarrollo y Acción (PDA)                              ║
+ 23813: ╠═══════════════════════════════════════════════════════════════════════════════╣
+ 23814: ║                                                                               ║
+ 23815: ║  📄 DOCUMENTO N°: ${padRight(documentoId, 50)}║
+ 23816: ║  📅 EMITIDO: ${padRight(fechaEmision, 53)}║
+ 23817: ║  👤 GESTOR: ${padRight(agente, 53)}║
+ 23818: ║  📌 CAMPAÑA: ${padRight(campanaPrincipal, 52)}║
+ 23819: ║  👤 EMITIDO POR: Mesa Calidad Cobranzas${' '.repeat(29)}║
+ 23820: ║                                                                               ║
+ 23821: ╠═══════════════════════════════════════════════════════════════════════════════╣
+ 23822: ║ 1. RESULTADOS DE EVALUACIONES                                                 ║
+ 23823: ╠═══════════════════════════════════════════════════════════════════════════════╣
+ 23824: ║                                                                               ║
+ 23825: ║  Período analizado: ${padRight(periodoDesde + ' al ' + periodoHasta, 48)}║
+ 23826: ║  Total escuchas: ${padRight(String(totalEvals), 52)}║
+ 23827: ║                                                                               ║
+ 23828: ║  ┌───────────────┬───────────┬─────────┬───────────────────────┐             ║
+ 23829: ║  │  INDICADOR    │  PUNTAJE  │  META   │       ESTADO           │             ║
+ 23830: ║  ├───────────────┼───────────┼─────────┼───────────────────────┤             ║
+ 23831: ║  │ ENC (Cliente) │ ${padRight(promedioENC + ' (' + pctENC + '%)', 9)} │ ≥ 90%   │ ${pctENC >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+ 23832: ║  │ ECUF (Negocio)│ ${padRight(promedioECUF + ' (' + pctECUF + '%)', 9)} │ ≥ 90%   │ ${pctECUF >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+ 23833: ║  │ ECN (Proceso) │ ${padRight(promedioECN + ' (' + pctECN + '%)', 9)} │ ≥ 90%   │ ${pctECN >= 90 ? '🟢 OK' : '🔴 POR DEBAJO'}${' '.repeat(9)}│             ║
+ 23834: ║  │ NOTA FINAL    │ ${padRight(promedioFinal + '%', 9)} │ ≥ 85%   │ ${cuartil === 'Q4' ? '🔴 NO APRUEBA' : '🟢 APRUEBA'}${' '.repeat(9)}│             ║
+ 23835: ║  └───────────────┴───────────┴─────────┴───────────────────────┘             ║
+ 23836: ║                                                                               ║
+ 23837: ║  ▶ RESULTADO: ${padRight(estadoFinal, 48)}║
+ 23838: ║                                                                               ║
+ 23839: ╠═══════════════════════════════════════════════════════════════════════════════╣
+--- FIN CONTEXTO ---
+
+Línea 46906: <p>Movistar Perú - Auditoría Calidad Cobranzas | Generado: ${fecha}</p>
+--- CONTEXTO ---
+ 46886:             table { width: 100%; border-collapse: collapse; font-size: 13px; }
+ 46887:             th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+ 46888:             th { background: #f8f9fa; font-weight: 600; }
+ 46889:             .badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; color: white; display: inline-block; }
+ 46890:             .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+ 46891:             .kpi-card { background: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; }
+ 46892:             .kpi-number { font-size: 28px; font-weight: bold; }
+ 46893:             .kpi-label { font-size: 12px; color: #6c757d; }
+ 46894:             .footer { background: #f8f9fa; padding: 15px 30px; text-align: center; font-size: 11px; color: #888; border-top: 1px solid #e0e0e0; }
+ 46895:             .riesgo-item { padding: 8px 12px; background: #fff0f0; border-radius: 8px; margin: 5px 0; border-left: 4px solid #d93025; }
+ 46896:             @media print {
+ 46897:                 body { background: white; padding: 0; }
+ 46898:                 .container { box-shadow: none; border-radius: 0; }
+ 46899:             }
+ 46900:         </style>
+ 46901:     </head>
+ 46902:     <body>
+ 46903:     <div class="container">
+ 46904:         <div class="header">
+ 46905:             <h1>📊 Reporte Consolidado de PDA</h1>
+ 46906:             <p>Movistar Perú - Auditoría Calidad Cobranzas | Generado: ${fecha}</p>
+ 46907:         </div>
+ 46908:         <div class="content">
+ 46909:     `;
+ 46910: 
+ 46911:     // ============================================================
+ 46912:     // RESUMEN EJECUTIVO
+ 46913:     // ============================================================
+ 46914:     const estados = [
+ 46915:         { key: 'pendientes', label: '⏳ Pendientes', color: '#f39c12' },
+ 46916:         { key: 'notificados', label: '📨 Notificados', color: '#019DF4' },
+ 46917:         { key: 'capacitacion', label: '📚 Capacitación', color: '#7b1fa2' },
+ 46918:         { key: 'seguimiento', label: '✅ Seguimiento', color: '#28a745' },
+ 46919:         { key: 'completados', label: '🏆 Completados', color: '#1a7f37' },
+ 46920:         { key: 'escalados', label: '🚨 Escalados', color: '#d93025' }
+ 46921:     ];
+ 46922: 
+ 46923:     html += `
+ 46924:         <div class="section">
+ 46925:             <div class="section-title">📈 Resumen Ejecutivo</div>
+ 46926:             <div class="section-body">
+--- FIN CONTEXTO ---
+
+[F112-VIEW-PLACEHOLDER] views\supervisor\dashboard.html
+Coincidencias: 1
+
+Línea 3525: placeholder="Ej: Temprana, Super Temprana, Fraccionamiento"
+--- CONTEXTO ---
+  3513:                 </div>
+  3514:                 <div style="padding: 20px;">
+  3515:                     <input type="hidden" id="campanaId" value="">
+  3516:                     <div style="margin-bottom: 15px;">
+  3517:                         <label style="font-size: 12px; font-weight: 600;">Código (ej: T, ST, F) *</label>
+  3518:                         <input type="text" id="campanaCodigo" placeholder="Ej: T, ST, F" maxlength="5"
+  3519:                             style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+  3520:                         <small style="color: var(--muted);">Máximo 5 caracteres alfanuméricos</small>
+  3521:                     </div>
+  3522:                     <div style="margin-bottom: 15px;">
+  3523:                         <label style="font-size: 12px; font-weight: 600;">Descripción *</label>
+  3524:                         <input type="text" id="campanaDescripcion"
+  3525:                             placeholder="Ej: Temprana, Super Temprana, Fraccionamiento"
+  3526:                             style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+  3527:                     </div>
+  3528:                     <div style="margin-bottom: 15px;">
+  3529:                         <label style="font-size: 12px; font-weight: 600;">Estado</label>
+  3530:                         <select id="campanaActiva"
+  3531:                             style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
+  3532:                             <option value="true">✅ Activa</option>
+  3533:                             <option value="false">❌ Inactiva</option>
+  3534:                         </select>
+  3535:                     </div>
+  3536:                 </div>
+  3537:                 <div
+--- FIN CONTEXTO ---
+
+CLASIFICACIÓN MANUAL ESPERADA
+-----------------------------
+1. SUP-CATALOG
+   Determinar si T/ST/F alimenta lógica real o solo fallback/demo.
+   Buscar llamadas API cercanas, renderizado y persistencia.
+
+2. AUD-RULE
+   Determinar si la regla Cobranzas cambia cálculos o solo documenta.
+
+3. SUP-BRANDING
+   Determinar si los textos son exclusivamente presentación/exportación.
+
+4. VIEW-PLACEHOLDER
+   Confirmar si es solo ayuda visual.

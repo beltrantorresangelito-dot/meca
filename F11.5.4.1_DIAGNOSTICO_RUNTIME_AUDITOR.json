@@ -1,0 +1,15 @@
+{
+  "auditor_js_exists": true,
+  "helper_base": true,
+  "helper_apply": true,
+  "helper_from_listen": true,
+  "exposure_base": true,
+  "exposure_apply": true,
+  "exposure_from_listen": true,
+  "html_refs": [
+    {
+      "file": "views\\auditor\\dashboard.html",
+      "src": "/js/auditor.js"
+    }
+  ]
+}

@@ -148,8 +148,8 @@ async activeVersion(
             status,
             { error: error.message }
         );
-    }}  
-
+      }
+}
 async versionByDate(
     req,
     res,
