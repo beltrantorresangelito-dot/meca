@@ -32,6 +32,7 @@ test('VERLIFE-001 snapshot hereda matriz_id y queda inactivo', async () => {
   }));
 
   const result = await service.freezeVersion({
+    matriz_id: 1,
     version: 'v3.0.0',
     fecha_vigencia: '2026-09-01',
     descripcion: 'Snapshot'
@@ -50,10 +51,11 @@ test('VERLIFE-002 snapshot rechaza nombre duplicado', async () => {
 
   await assert.rejects(
     service.freezeVersion({
+      matriz_id: 1,
       version: 'v2.0.0',
       fecha_vigencia: '2026-09-01'
     }),
-    { status: 400, message: 'La versión "v2.0.0" ya existe' }
+    { status: 409, message: 'La versión "v2.0.0" ya existe en esta matriz' }
   );
 });
 

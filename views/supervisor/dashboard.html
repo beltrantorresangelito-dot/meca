@@ -2781,8 +2781,48 @@
                     <span style="font-size: 12px;">💡 Ejemplo: Si "Cliente corta llamada" = "No Cumple", marcar
                         otros campos como "No Aplica".</span>
                 </p>
+                <div class="reglas-contexto">
+                    <div class="reglas-contexto__campo">
+                        <label for="reglasMatrizSelector">
+                            Matriz
+                        </label>
+
+                        <select
+                            id="reglasMatrizSelector"
+                            onchange="cambiarMatrizReglas()"
+                        >
+                            <option value="">
+                                Seleccione una matriz
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="reglas-contexto__campo">
+                        <label for="reglasVersionSelector">
+                            Versión
+                        </label>
+
+                        <select
+                            id="reglasVersionSelector"
+                            onchange="cambiarVersionReglas()"
+                            disabled
+                        >
+                            <option value="">
+                                Seleccione primero una matriz
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <div
+                    id="reglasContextoInfo"
+                    class="reglas-contexto-info"
+                ></div>
+
                 <div id="reglasContainer">
-                    <!-- cargarReglasAdministracion() llenará esto -->
+                    <div class="reglas-placeholder">
+                        Seleccione una matriz y una versión para administrar sus reglas.
+                    </div>
                 </div>
             </div>
         </div>

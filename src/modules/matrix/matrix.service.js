@@ -2095,179 +2095,301 @@ async getActiveEvaluationStructure(
   return result;
 }
 
+async assertEvaluationRuleDraftVersion(
+    client,
+    versionId
+) {
+    const parsedVersionId =
+        Number(versionId);
+
+    if (
+        !Number.isInteger(parsedVersionId) ||
+        parsedVersionId <= 0
+    ) {
+        throw MatrixService.writeError(
+            'ID de versión inválido',
+            400
+        );
+    }
+
+    const version =
+        await this.repository
+            .getEvaluationRuleVersion(
+                client,
+                parsedVersionId
+            );
+
+    if (!version) {
+        throw MatrixService.writeError(
+            'Versión de matriz no encontrada',
+            404
+        );
+    }
+
+    /*
+     * CICLO DE VIDA MECA
+     *
+     * publicado_en = NULL
+     *     => BORRADOR
+     *     => editable
+     *
+     * publicado_en != NULL
+     *     => ACTIVA o HISTÓRICA
+     *     => inmutable
+     */
+
+    if (version.publicado_en) {
+        const estado =
+            version.activa === true
+                ? 'activa/publicada'
+                : 'histórica';
+
+        throw MatrixService.writeError(
+            `La versión ${version.version} es ${estado} y se encuentra en modo solo lectura`,
+            409,
+            {
+                error:
+                    'Las reglas de una versión publicada no pueden modificarse',
+                code:
+                    'MATRIX_VERSION_IMMUTABLE',
+                version_id:
+                    version.id,
+                version:
+                    version.version,
+                estado:
+                    estado
+            }
+        );
+    }
+
+    return version;
+}
+
 async createEvaluationRule(input = {}) {
-  if (!input.submotivo_origen) {
-    throw MatrixService.writeError(
-      'Faltan campos obligatorios',
-      400
-    );
-  }
-
-  return this.repository.withTransaction(
-    async client => {
-
-      let versionId = input.version_id || null;
-
-      const hasContext =
-        input.matriz_id !== undefined ||
-        input.version_matriz_id !== undefined;
-
-      if (hasContext) {
-        const contexto =
-          await this.resolveWriteVersion(
-            client,
-            input.matriz_id,
-            input.version_matriz_id
-          );
-
-        versionId = contexto.versionId;
-      }
-
-      if (!versionId) {
+    if (!input.submotivo_origen) {
         throw MatrixService.writeError(
-          'Faltan campos obligatorios',
-          400
+            'Faltan campos obligatorios',
+            400
         );
-      }
-
-      return this.repository.createEvaluationRule(
-        client,
-        {
-          ...input,
-          version_id: versionId
-        }
-      );
     }
-  );
+
+    const versionId =
+        Number(
+            input.version_id ??
+            input.version_matriz_id ??
+            0
+        );
+
+    if (
+        !Number.isInteger(versionId) ||
+        versionId <= 0
+    ) {
+        throw MatrixService.writeError(
+            'version_id requerido',
+            400
+        );
+    }
+
+    return this.repository.withTransaction(
+        async client => {
+
+            // ==========================================
+            // PROTEGER CICLO DE VIDA
+            // ==========================================
+
+            await this
+                .assertEvaluationRuleDraftVersion(
+                    client,
+                    versionId
+                );
+
+            // ==========================================
+            // CREAR REGLA
+            // ==========================================
+
+            return this.repository
+                .createEvaluationRule(
+                    client,
+                    {
+                        ...input,
+                        version_id:
+                            versionId
+                    }
+                );
+        }
+    );
 }
 
-async updateEvaluationRule(id, input = {}) {
-  const parsedId = Number(id);
+async updateEvaluationRule(
+    id,
+    input = {}
+) {
+    const parsedId =
+        Number(id);
 
-  if (
-    !Number.isInteger(parsedId) ||
-    parsedId <= 0
-  ) {
-    throw MatrixService.writeError(
-      'ID de regla inválido',
-      400
-    );
-  }
-
-  return this.repository.withTransaction(
-    async client => {
-
-      const hasContext =
-        input.matriz_id !== undefined ||
-        input.version_matriz_id !== undefined;
-
-      if (hasContext) {
-        const contexto =
-          await this.resolveWriteVersion(
-            client,
-            input.matriz_id,
-            input.version_matriz_id
-          );
-
-        const existing =
-          await this.repository
-            .getEvaluationRuleByIdAndVersion(
-              client,
-              parsedId,
-              contexto.versionId
-            );
-
-        if (!existing) {
-          throw MatrixService.writeError(
-            'Regla no encontrada en la versión seleccionada',
-            404
-          );
-        }
-      }
-
-      const row =
-        await this.repository.updateEvaluationRule(
-          client,
-          parsedId,
-          input
-        );
-
-      if (!row) {
+    if (
+        !Number.isInteger(parsedId) ||
+        parsedId <= 0
+    ) {
         throw MatrixService.writeError(
-          'Regla no encontrada',
-          404
+            'ID de regla inválido',
+            400
         );
-      }
-
-      return row;
     }
-  );
+
+    return this.repository.withTransaction(
+        async client => {
+
+            // ==========================================
+            // 1. OBTENER REGLA REAL DESDE BD
+            // ==========================================
+
+            const existing =
+                await this.repository
+                    .getEvaluationRuleById(
+                        client,
+                        parsedId
+                    );
+
+            if (!existing) {
+                throw MatrixService.writeError(
+                    'Regla no encontrada',
+                    404
+                );
+            }
+
+            // ==========================================
+            // 2. VALIDAR VERSIÓN PROPIETARIA
+            // ==========================================
+
+            await this
+                .assertEvaluationRuleDraftVersion(
+                    client,
+                    existing.version_id
+                );
+
+            // ==========================================
+            // 3. IMPEDIR CAMBIO DE VERSIÓN
+            // ==========================================
+
+            if (
+                input.version_id !== undefined &&
+                Number(input.version_id) !==
+                    Number(
+                        existing.version_id
+                    )
+            ) {
+                throw MatrixService.writeError(
+                    'Una regla no puede trasladarse entre versiones',
+                    409,
+                    {
+                        error:
+                            'No se permite cambiar version_id de una regla existente',
+                        code:
+                            'RULE_VERSION_CHANGE_NOT_ALLOWED'
+                    }
+                );
+            }
+
+            // ==========================================
+            // 4. ACTUALIZAR
+            // ==========================================
+
+            const row =
+                await this.repository
+                    .updateEvaluationRule(
+                        client,
+                        parsedId,
+                        input
+                    );
+
+            if (!row) {
+                throw MatrixService.writeError(
+                    'Regla no encontrada',
+                    404
+                );
+            }
+
+            return row;
+        }
+    );
 }
 
-async deleteEvaluationRule(id, input = {}) {
-  const parsedId = Number(id);
+async deleteEvaluationRule(
+    id,
+    input = {}
+) {
+    const parsedId =
+        Number(id);
 
-  if (
-    !Number.isInteger(parsedId) ||
-    parsedId <= 0
-  ) {
-    throw MatrixService.writeError(
-      'ID de regla inválido',
-      400
-    );
-  }
-
-  return this.repository.withTransaction(
-    async client => {
-
-      const hasContext =
-        input.matriz_id !== undefined ||
-        input.version_matriz_id !== undefined;
-
-      if (hasContext) {
-        const contexto =
-          await this.resolveWriteVersion(
-            client,
-            input.matriz_id,
-            input.version_matriz_id
-          );
-
-        const existing =
-          await this.repository
-            .getEvaluationRuleByIdAndVersion(
-              client,
-              parsedId,
-              contexto.versionId
-            );
-
-        if (!existing) {
-          throw MatrixService.writeError(
-            'Regla no encontrada en la versión seleccionada',
-            404
-          );
-        }
-      }
-
-      const row =
-        await this.repository.deleteEvaluationRule(
-          client,
-          parsedId
-        );
-
-      if (!row) {
+    if (
+        !Number.isInteger(parsedId) ||
+        parsedId <= 0
+    ) {
         throw MatrixService.writeError(
-          'Regla no encontrada',
-          404
+            'ID de regla inválido',
+            400
         );
-      }
-
-      return {
-        success: true,
-        message: 'Regla eliminada correctamente',
-        id: parsedId
-      };
     }
-  );
+
+    return this.repository.withTransaction(
+        async client => {
+
+            // ==========================================
+            // 1. OBTENER REGLA REAL
+            // ==========================================
+
+            const existing =
+                await this.repository
+                    .getEvaluationRuleById(
+                        client,
+                        parsedId
+                    );
+
+            if (!existing) {
+                throw MatrixService.writeError(
+                    'Regla no encontrada',
+                    404
+                );
+            }
+
+            // ==========================================
+            // 2. VALIDAR CICLO DE VIDA
+            // ==========================================
+
+            await this
+                .assertEvaluationRuleDraftVersion(
+                    client,
+                    existing.version_id
+                );
+
+            // ==========================================
+            // 3. ELIMINACIÓN FÍSICA
+            // ==========================================
+
+            const row =
+                await this.repository
+                    .deleteEvaluationRule(
+                        client,
+                        parsedId
+                    );
+
+            if (!row) {
+                throw MatrixService.writeError(
+                    'Regla no encontrada',
+                    404
+                );
+            }
+
+            return {
+                success: true,
+                message:
+                    'Regla eliminada correctamente',
+                id:
+                    parsedId
+            };
+        }
+    );
 }
 
 }

@@ -27555,8 +27555,18 @@ async function cargarYDistribuirEscuchas() {
         // ======================================================
         // 2. PROCESAR ARCHIVO
         // ======================================================
-        const todosLosTickets = await procesarArchivoEscuchas(file);
+        const resultadoArchivo = await procesarArchivoEscuchas(file);
+
+        const todosLosTickets = resultadoArchivo.tickets;
+        const plantillaCarga = resultadoArchivo.plantilla;
+
         const totalExcel = todosLosTickets.length;
+
+        console.log(
+            `📋 Plantilla asociada al lote: ${plantillaCarga.codigo} ` +
+            `${plantillaCarga.version} (ID ${plantillaCarga.version_id})`
+        );
+
         console.log(`📊 Total tickets en Excel: ${totalExcel}`);
 
         if (totalExcel === 0) {
@@ -27701,13 +27711,7 @@ async function cargarYDistribuirEscuchas() {
         console.log('📊 resultadoDistribucion:', resultadoDistribucion);
 
         // ======================================================
-        // 7. CREAR REGISTRO DE TAREA
-        // ======================================================
-        const tarea = await crearRegistroTarea(file.name, totalNuevos);
-        console.log(`📦 Tarea creada con ID: ${tarea.id}`);
-
-        // ======================================================
-        // 8. GUARDAR ASIGNACIONES
+        // 7. GUARDAR LOTE + ASIGNACIONES ATÓMICAMENTE
         // ======================================================
         infoDiv.innerHTML = `
             <div style="background: var(--accent); color: white; padding: 10px; border-radius: 8px;">
@@ -27715,10 +27719,28 @@ async function cargarYDistribuirEscuchas() {
             </div>
         `;
 
-        const asignacionesGuardadas = await guardarAsignacionesEnAPI(tarea.id, resultadoDistribucion.distribucion);
-        const totalAsignadas = asignacionesGuardadas?.total || totalNuevos;
+        const resultadoCarga =
+            await guardarCargaEscuchasAtomica(
+                file.name,
+                totalNuevos,
+                plantillaCarga.version_id,
+                resultadoDistribucion.distribucion
+            );
 
-        console.log(`✅ ${totalAsignadas} asignaciones guardadas`);
+        const tarea = resultadoCarga.tarea;
+
+        const totalAsignadas =
+            Number(resultadoCarga.insertados || 0);
+
+        console.log(
+            `📦 Lote ${tarea.id} ` +
+            `${tarea.reutilizado ? 'reutilizado' : 'creado'}`
+        );
+
+        console.log(
+            `✅ ${totalAsignadas} asignaciones guardadas ` +
+            `atómicamente`
+        );
 
         // ======================================================
         // 9. MOSTRAR RESUMEN FINAL
@@ -27788,6 +27810,284 @@ async function cargarYDistribuirEscuchas() {
 
 // ===== FIN FUNCIÓN: cargarYDistribuirEscuchas ==========================
 
+function prepararAsignacionesEscuchas(
+    tareaId,
+    distribucion
+) {
+    if (
+        !distribucion ||
+        typeof distribucion !== 'object' ||
+        Array.isArray(distribucion) ||
+        Object.keys(distribucion).length === 0
+    ) {
+        throw new Error(
+            'No existe una distribución válida para guardar'
+        );
+    }
+
+    const registros = [];
+
+    const idBase = Date.now();
+    let contador = 0;
+
+    for (
+        const [auditor, tickets]
+        of Object.entries(distribucion)
+    ) {
+        if (
+            !Array.isArray(tickets) ||
+            tickets.length === 0
+        ) {
+            continue;
+        }
+
+        for (const ticket of tickets) {
+            contador++;
+
+            const nuevoId =
+                idBase + contador;
+
+            registros.push({
+                id: nuevoId,
+
+                // El backend volverá a imponer el tarea_id
+                // definitivo dentro de la transacción.
+                tarea_id: tareaId,
+
+                ticket:
+                    String(ticket.ticket || ''),
+
+                supervisor_responsable:
+                    String(
+                        ticket.supervisor_responsable || ''
+                    ),
+
+                gestor_auditado:
+                    String(
+                        ticket.gestor_auditado || ''
+                    ),
+
+                auditor_asignado:
+                    String(auditor),
+
+                motivos:
+                    String(ticket.motivos || ''),
+
+                submotivos:
+                    String(ticket.submotivos || ''),
+
+                subnivel:
+                    String(ticket.subnivel || ''),
+
+                peticion:
+                    String(ticket.peticion || ''),
+
+                usuario_dni:
+                    String(ticket.usuario_dni || ''),
+
+                usuario_mov:
+                    String(ticket.usuario_mov || ''),
+
+                motivo_call:
+                    String(ticket.motivo_call || ''),
+
+                fecha_descarga:
+                    ticket.fecha_descarga || null,
+
+                // Se envían valores de negocio.
+                // El backend resuelve los IDs reales.
+                quiebre:
+                    String(ticket.quiebre || ''),
+
+                campana:
+                    String(ticket.campana || ''),
+
+                estado:
+                    'pendiente',
+
+                fecha_asignacion:
+                    new Date().toISOString(),
+
+                created_at:
+                    new Date().toISOString(),
+
+                updated_at:
+                    new Date().toISOString()
+            });
+        }
+    }
+
+    if (registros.length === 0) {
+        throw new Error(
+            'La distribución no produjo asignaciones para guardar'
+        );
+    }
+
+    return registros;
+}
+
+async function guardarCargaEscuchasAtomica(
+    nombreArchivo,
+    totalRegistros,
+    versionPlantillaCargaId,
+    distribucion
+) {
+    const token =
+        localStorage.getItem('meca_token');
+
+    if (!token) {
+        throw new Error(
+            'No existe una sesión válida para realizar la carga'
+        );
+    }
+
+    const versionId =
+        Number(versionPlantillaCargaId);
+
+    if (
+        !Number.isInteger(versionId) ||
+        versionId <= 0
+    ) {
+        throw new Error(
+            'No se pudo determinar la versión de plantilla utilizada'
+        );
+    }
+
+    // ==========================================================
+    // 1. PREPARAR ID DEL LOTE
+    // ==========================================================
+
+    // Compatibilidad temporal:
+    // tareas_escucha continúa utilizando ID generado
+    // desde frontend.
+    const tareaId =
+        Date.now();
+
+    // ==========================================================
+    // 2. TRANSFORMAR DISTRIBUCIÓN → ASIGNACIONES
+    // ==========================================================
+
+    const asignaciones =
+        prepararAsignacionesEscuchas(
+            tareaId,
+            distribucion
+        );
+
+    // Validación defensiva adicional.
+    if (
+        !Array.isArray(asignaciones) ||
+        asignaciones.length === 0
+    ) {
+        throw new Error(
+            'No existen asignaciones para guardar'
+        );
+    }
+
+    // ==========================================================
+    // 3. PREPARAR LOTE
+    // ==========================================================
+
+    const tarea = {
+        id: tareaId,
+
+        fecha_carga:
+            new Date().toISOString(),
+
+        nombre_archivo:
+            nombreArchivo,
+
+        total_registros:
+            totalRegistros,
+
+        estado:
+            'activo',
+
+        creado_por:
+            window.usuarioActual?.usuario ||
+            'supervisor',
+
+        version_plantilla_carga_id:
+            versionId
+    };
+
+    console.log(
+        '📦 Preparando carga atómica:',
+        {
+            tarea,
+            total_asignaciones:
+                asignaciones.length
+        }
+    );
+
+    console.log(
+        '📝 Asignaciones preparadas:',
+        asignaciones
+    );
+
+    // ==========================================================
+    // 4. UN ÚNICO REQUEST
+    // ==========================================================
+
+    const response =
+        await fetch(
+            '/api/escuchas/carga',
+            {
+                method: 'POST',
+
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+
+                    'Content-Type':
+                        'application/json'
+                },
+
+                body: JSON.stringify({
+                    tarea,
+                    asignaciones
+                })
+            }
+        );
+
+    // ==========================================================
+    // 5. LEER RESPUESTA
+    // ==========================================================
+
+    let resultado;
+
+    try {
+        resultado =
+            await response.json();
+    } catch (error) {
+        throw new Error(
+            `El servidor devolvió una respuesta inválida ` +
+            `(HTTP ${response.status})`
+        );
+    }
+
+    if (!response.ok) {
+        throw new Error(
+            resultado.error ||
+            `Error realizando la carga ` +
+            `(HTTP ${response.status})`
+        );
+    }
+
+    if (!resultado.success) {
+        throw new Error(
+            resultado.error ||
+            'La carga no pudo completarse'
+        );
+    }
+
+    console.log(
+        '✅ Carga atómica completada:',
+        resultado
+    );
+
+    return resultado;
+}
+
 // GUARDAR ASIGNACIONES EN API - VERSIÓN ÚNICA Y DEFINITIVA
 // ======================================================
 
@@ -27813,17 +28113,6 @@ async function guardarAsignacionesEnAPI(tareaId, distribucion) {
             contador++;
             const nuevoId = idBase + contador;
 
-            let campanaId = ticket.campana_id || null;
-
-            if (!campanaId && ticket.campana) {
-                try {
-                    const campana = await obtenerCampanaPorCodigo(ticket.campana);
-                    if (campana) campanaId = campana.id;
-                } catch (e) {
-                    console.warn('⚠️ No se pudo obtener campana_id para:', ticket.campana);
-                }
-            }
-
             registros.push({
                 id: nuevoId,
                 tarea_id: tareaId,
@@ -27839,8 +28128,8 @@ async function guardarAsignacionesEnAPI(tareaId, distribucion) {
                 usuario_mov: String(ticket.usuario_mov || ''),
                 motivo_call: String(ticket.motivo_call || ''),
                 fecha_descarga: ticket.fecha_descarga || null,
+                quiebre: String(ticket.quiebre || ''),
                 campana: String(ticket.campana || ''),
-                campana_id: campanaId,
                 estado: 'pendiente',
                 fecha_asignacion: new Date().toISOString(),
                 created_at: new Date().toISOString(),
@@ -28166,22 +28455,41 @@ async function distribuirTareasEquitativamenteConExclusion(tickets) {
 // ===== FIN FUNCIÓN: distribuirTareasEquitativamenteConExclusion ========
 
 // ===== 9. INICIO FUNCIÓN: crearRegistroTarea =========================
-async function crearRegistroTarea(nombreArchivo, totalRegistros) {
+async function crearRegistroTarea(
+    nombreArchivo,
+    totalRegistros,
+    versionPlantillaCargaId
+) {
     const token = localStorage.getItem('meca_token');
 
-    // 🔴 ID OBLIGATORIO (NO es SERIAL)
+    const versionId = Number(versionPlantillaCargaId);
+
+    if (!Number.isInteger(versionId) || versionId <= 0) {
+        throw new Error(
+            'No se pudo determinar la versión de plantilla utilizada en la carga'
+        );
+    }
+
+    // Compatibilidad actual:
+    // tareas_escucha todavía utiliza ID generado desde frontend.
     const nuevoId = Date.now();
 
     const nuevaTarea = {
-        id: nuevoId,  // ← OBLIGATORIO
+        id: nuevoId,
         fecha_carga: new Date().toISOString(),
         nombre_archivo: nombreArchivo,
         total_registros: totalRegistros,
         estado: 'activo',
-        creado_por: window.usuarioActual?.usuario || 'supervisor'
+        creado_por: window.usuarioActual?.usuario || 'supervisor',
+
+        // Trazabilidad de la estructura utilizada para interpretar el Excel.
+        version_plantilla_carga_id: versionId
     };
 
-    console.log('📤 Enviando tarea CON ID:', nuevaTarea);
+    console.log(
+        '📤 Enviando tarea con trazabilidad de plantilla:',
+        nuevaTarea
+    );
 
     const response = await fetch('/api/escuchas/tareas', {
         method: 'POST',
@@ -28192,12 +28500,16 @@ async function crearRegistroTarea(nombreArchivo, totalRegistros) {
         body: JSON.stringify(nuevaTarea)
     });
 
+    const resultado = await response.json();
+
     if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Error creando tarea');
+        throw new Error(
+            resultado.error ||
+            'Error creando tarea'
+        );
     }
 
-    return await response.json();
+    return resultado;
 }
 // ===== FIN FUNCIÓN: crearRegistroTarea =================================
 
@@ -55189,51 +55501,103 @@ let reglaEnEdicion = null;
 // 1. CARGAR REGLAS
 // ======================================================
 async function cargarReglasAdministracion() {
-    console.log('📋 Cargando reglas de administración...');
+    console.log(
+        '📋 Refrescando reglas del contexto seleccionado...'
+    );
 
-    const container = document.getElementById('reglasContainer');
+    const container =
+        document.getElementById(
+            'reglasContainer'
+        );
+
     if (!container) {
-        console.warn('⚠️ No se encontró reglasContainer en el DOM');
         return;
     }
 
-    container.innerHTML = '<div style="text-align: center; padding: 40px;">⏳ Cargando reglas...</div>';
+    const state =
+        window.reglasAdminState;
+
+    if (
+        !state ||
+        !Number.isInteger(
+            Number(state.matrizId)
+        ) ||
+        !Number.isInteger(
+            Number(state.versionId)
+        )
+    ) {
+        container.innerHTML = `
+            <div class="reglas-placeholder">
+                Seleccione una matriz y una versión para administrar sus reglas.
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="reglas-placeholder">
+            Cargando reglas...
+        </div>
+    `;
 
     try {
-        // 1. Obtener versión activa
-        const versionActiva = await API.getVersionActiva();
-        if (!versionActiva) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: var(--warning);">
-                    ⚠️ No hay versión activa. Crea una versión primero.
-                </div>
-            `;
-            return;
-        }
+        const versionId =
+            Number(state.versionId);
 
-        // 2. Obtener reglas de la versión activa
-        const reglas = await API.getReglasByVersion(versionActiva.id);
-        reglasData = reglas;
+        /*
+         * Refrescamos también la estructura,
+         * para evitar mantener datos obsoletos.
+         */
+        const [
+            reglas,
+            estructura
+        ] =
+            await Promise.all([
+                API.getReglasByVersion(
+                    versionId
+                ),
+                API.getEstructuraVersion(
+                    versionId
+                )
+            ]);
 
-        // 3. Obtener todos los submotivos disponibles para los selects
-        const subMotivos = await API.getSubMotivos();
-        const atributos = await API.getAtributos();
-        const frentes = await API.getFrentes();
+        state.estructura =
+            estructura;
 
-        // 4. Renderizar
-        renderizarTablaReglas(reglas, versionActiva, subMotivos, atributos, frentes);
+        reglasData =
+            Array.isArray(reglas)
+                ? reglas
+                : [];
 
-        console.log(`✅ ${reglas.length} reglas cargadas para versión ${versionActiva.version}`);
+        const {
+            frentes,
+            atributos,
+            subMotivos
+        } =
+            obtenerEstructuraReglasActual();
+
+        renderizarTablaReglas(
+            reglasData,
+            state.version,
+            subMotivos,
+            atributos,
+            frentes
+        );
+
+        console.log(
+            `✅ ${reglasData.length} reglas refrescadas para versión ${state.version?.version || versionId}`
+        );
 
     } catch (error) {
-        console.error('❌ Error cargando reglas:', error);
+        console.error(
+            '❌ Error refrescando reglas:',
+            error
+        );
+
         container.innerHTML = `
-            <div style="text-align: center; padding: 40px; color: var(--danger);">
-                ❌ Error al cargar reglas: ${error.message}
-                <br><br>
-                <button onclick="cargarReglasAdministracion()" style="padding: 10px 20px; background: var(--accent); border: none; border-radius: 8px; color: white; cursor: pointer;">
-                    🔄 Reintentar
-                </button>
+            <div class="reglas-placeholder">
+                No se pudieron refrescar las reglas de la versión seleccionada.
             </div>
         `;
     }
@@ -55378,158 +55742,837 @@ function renderizarTablaReglas(reglas, versionActiva, subMotivos, atributos, fre
 }
 
 // ======================================================
+// CICLO DE VIDA - REGLAS DE EVALUACIÓN
+// ======================================================
+
+function obtenerEstadoVersionReglas() {
+    const version =
+        window.reglasAdminState?.version;
+
+    if (!version) {
+        return {
+            editable: false,
+            estado: 'SIN_CONTEXTO',
+            texto: 'Sin versión seleccionada'
+        };
+    }
+
+    // ==============================================
+    // BORRADOR
+    // No ha sido publicada.
+    // ==============================================
+
+    if (!version.publicado_en) {
+        return {
+            editable: true,
+            estado: 'BORRADOR',
+            texto: 'Borrador'
+        };
+    }
+
+    // ==============================================
+    // ACTIVA / PUBLICADA
+    // ==============================================
+
+    if (
+        version.activa === true &&
+        version.publicado_en
+    ) {
+        return {
+            editable: false,
+            estado: 'ACTIVA',
+            texto: 'Activa / Publicada'
+        };
+    }
+
+    // ==============================================
+    // HISTÓRICA
+    // ==============================================
+
+    return {
+        editable: false,
+        estado: 'HISTORICA',
+        texto: 'Histórica'
+    };
+}
+
+
+function validarEdicionReglas(
+    accion = 'modificar'
+) {
+    const estado =
+        obtenerEstadoVersionReglas();
+
+    if (estado.editable) {
+        return true;
+    }
+
+    if (
+        estado.estado ===
+        'SIN_CONTEXTO'
+    ) {
+        alert(
+            '❌ Seleccione primero una matriz y una versión.'
+        );
+
+        return false;
+    }
+
+    alert(
+        `🔒 No se puede ${accion} reglas en esta versión.\n\n` +
+        `Estado: ${estado.texto}\n\n` +
+        `Las versiones publicadas son inmutables para preservar ` +
+        `la trazabilidad de las evaluaciones.\n\n` +
+        `Para realizar cambios, cree una nueva versión borrador.`
+    );
+
+    return false;
+}
+
+// ======================================================
+// ESTRUCTURA VERSIONADA PARA REGLAS
+// ======================================================
+
+function obtenerEstructuraReglasActual() {
+    const state =
+        window.reglasAdminState;
+
+    if (
+        !state ||
+        !state.estructura ||
+        !Array.isArray(
+            state.estructura.frentes
+        )
+    ) {
+        throw new Error(
+            'No hay una matriz y versión seleccionadas para administrar reglas'
+        );
+    }
+
+    const frentes =
+        state.estructura.frentes;
+
+    const atributos =
+        [];
+
+    const subMotivos =
+        [];
+
+    for (const frente of frentes) {
+        for (
+            const atributo of
+            (frente.atributos || [])
+        ) {
+            /*
+             * Normalizamos frente_id porque
+             * el código existente del modal
+             * ya trabaja con esa propiedad.
+             */
+            atributos.push({
+                ...atributo,
+                frente_id:
+                    frente.id
+            });
+
+            for (
+                const subMotivo of
+                (atributo.sub_motivos || [])
+            ) {
+                /*
+                 * Igual para atributo_id.
+                 */
+                subMotivos.push({
+                    ...subMotivo,
+                    atributo_id:
+                        atributo.id
+                });
+            }
+        }
+    }
+
+    return {
+        frentes,
+        atributos,
+        subMotivos
+    };
+}
+
+// ======================================================
 // 3. ABRIR MODAL PARA NUEVA REGLA
 // ======================================================
 async function abrirModalNuevaRegla() {
     reglaEnEdicion = null;
 
-    // Obtener datos para los selects
-    const [frentes, atributos, subMotivos] = await Promise.all([
-        API.getFrentes(),
-        API.getAtributos(),
-        API.getSubMotivos()
-    ]);
+    if (
+        !validarEdicionReglas(
+            'crear'
+        )
+    ) {
+        return;
+    }
+    // ==================================================
+    // 1. VALIDAR CONTEXTO DE REGLAS
+    // ==================================================
 
-    // Limpiar modal anterior
-    const modalExistente = document.getElementById('modalRegla');
-    if (modalExistente) modalExistente.remove();
+    const state =
+        window.reglasAdminState;
+
+    if (
+        !state ||
+        !Number.isInteger(
+            Number(state.matrizId)
+        ) ||
+        Number(state.matrizId) <= 0 ||
+        !Number.isInteger(
+            Number(state.versionId)
+        ) ||
+        Number(state.versionId) <= 0
+    ) {
+        alert(
+            '❌ Seleccione primero una matriz y una versión.'
+        );
+
+        return;
+    }
+
+    // ==================================================
+    // 2. OBTENER ESTRUCTURA DE LA VERSIÓN SELECCIONADA
+    // ==================================================
+
+    let frentes;
+    let atributos;
+    let subMotivos;
+
+    try {
+        ({
+            frentes,
+            atributos,
+            subMotivos
+        } =
+            obtenerEstructuraReglasActual()
+        );
+
+    } catch (error) {
+        console.error(
+            '❌ Error obteniendo estructura para nueva regla:',
+            error
+        );
+
+        alert(
+            '❌ No se pudo obtener la estructura de la versión seleccionada.'
+        );
+
+        return;
+    }
+
+    if (
+        !Array.isArray(frentes) ||
+        frentes.length === 0
+    ) {
+        alert(
+            '⚠️ La versión seleccionada no tiene frentes configurados.'
+        );
+
+        return;
+    }
+
+    console.log(
+        '➕ Nueva regla en contexto:',
+        {
+            matrizId:
+                state.matrizId,
+
+            versionId:
+                state.versionId,
+
+            version:
+                state.version?.version,
+
+            frentes:
+                frentes.length,
+
+            atributos:
+                atributos.length,
+
+            subMotivos:
+                subMotivos.length
+        }
+    );
+
+    // ==================================================
+    // 3. LIMPIAR MODAL ANTERIOR
+    // ==================================================
+
+    const modalExistente =
+        document.getElementById(
+            'modalRegla'
+        );
+
+    if (modalExistente) {
+        modalExistente.remove();
+    }
+
+    // ==================================================
+    // 4. CONSTRUIR MODAL
+    // ==================================================
 
     const modalHtml = `
-        <div id="modalRegla" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10002; display: flex; justify-content: center; align-items: center;">
-            <div style="background: white; border-radius: 16px; width: 95%; max-width: 700px; max-height: 85vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
-                <div style="padding: 15px 20px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center;">
-                    <strong style="font-size: 16px;">➕ Nueva Regla de Evaluación</strong>
-                    <button onclick="cerrarModalRegla()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
+        <div id="modalRegla"
+             style="position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0,0,0,0.6);
+                    z-index: 10002;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;">
+
+            <div style="background: white;
+                        border-radius: 16px;
+                        width: 95%;
+                        max-width: 700px;
+                        max-height: 85vh;
+                        overflow: hidden;
+                        display: flex;
+                        flex-direction: column;
+                        box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
+
+                <div style="padding: 15px 20px;
+                            background: linear-gradient(135deg, #019DF4, #00B4F0);
+                            color: white;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;">
+
+                    <strong style="font-size: 16px;">
+                        ➕ Nueva Regla de Evaluación
+                    </strong>
+
+                    <button
+                        type="button"
+                        onclick="cerrarModalRegla()"
+                        style="background: rgba(255,255,255,0.2);
+                               border: none;
+                               color: white;
+                               font-size: 20px;
+                               cursor: pointer;
+                               width: 32px;
+                               height: 32px;
+                               border-radius: 50%;">
+                        ✖
+                    </button>
+
                 </div>
-                <div style="padding: 20px; overflow-y: auto; flex: 1;">
-                    <form id="formRegla">
-                        <!-- Origen -->
-                        <div style="margin-bottom: 15px; background: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid #019DF4;">
-                            <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">📌 ORIGEN (qué campo activa la regla)</div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+
+                <div style="padding: 20px;
+                            overflow-y: auto;
+                            flex: 1;">
+
+                    <form
+                        id="formRegla"
+                        onsubmit="return false;"
+                    >
+
+                        <!-- ========================================== -->
+                        <!-- ORIGEN -->
+                        <!-- ========================================== -->
+
+                        <div style="margin-bottom: 15px;
+                                    background: #f8f9fa;
+                                    padding: 15px;
+                                    border-radius: 10px;
+                                    border-left: 4px solid #019DF4;">
+
+                            <div style="font-weight: 600;
+                                        margin-bottom: 10px;
+                                        font-size: 14px;">
+                                📌 ORIGEN
+                                (qué campo activa la regla)
+                            </div>
+
+                            <div style="display: grid;
+                                        grid-template-columns: 1fr 1fr 1fr;
+                                        gap: 10px;">
+
                                 <div>
-                                    <label style="font-size: 12px; font-weight: 600;">Bloque *</label>
-                                    <select id="reglaBloqueOrigen" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                        <option value="">Seleccionar</option>
-                                        ${frentes.map(f => `<option value="${f.codigo}">${f.codigo}</option>`).join('')}
+                                    <label style="font-size: 12px;
+                                                  font-weight: 600;">
+                                        Bloque *
+                                    </label>
+
+                                    <select
+                                        id="reglaBloqueOrigen"
+                                        required
+                                        style="width: 100%;
+                                               padding: 8px;
+                                               border-radius: 6px;
+                                               border: 1px solid var(--line);"
+                                    >
+                                        <option value="">
+                                            Seleccionar
+                                        </option>
+
+                                        ${
+                                            frentes
+                                                .map(
+                                                    frente =>
+                                                        `<option value="${frente.codigo}">
+                                                            ${frente.codigo}
+                                                        </option>`
+                                                )
+                                                .join('')
+                                        }
+
                                     </select>
                                 </div>
+
                                 <div>
-                                    <label style="font-size: 12px; font-weight: 600;">Atributo *</label>
-                                    <select id="reglaAtributoOrigen" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                        <option value="">Seleccionar bloque primero</option>
+                                    <label style="font-size: 12px;
+                                                  font-weight: 600;">
+                                        Atributo *
+                                    </label>
+
+                                    <select
+                                        id="reglaAtributoOrigen"
+                                        required
+                                        style="width: 100%;
+                                               padding: 8px;
+                                               border-radius: 6px;
+                                               border: 1px solid var(--line);"
+                                    >
+                                        <option value="">
+                                            Seleccionar bloque primero
+                                        </option>
                                     </select>
                                 </div>
+
                                 <div>
-                                    <label style="font-size: 12px; font-weight: 600;">Submotivo *</label>
-                                    <select id="reglaSubmotivoOrigen" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                        <option value="">Seleccionar atributo primero</option>
+                                    <label style="font-size: 12px;
+                                                  font-weight: 600;">
+                                        Submotivo *
+                                    </label>
+
+                                    <select
+                                        id="reglaSubmotivoOrigen"
+                                        required
+                                        style="width: 100%;
+                                               padding: 8px;
+                                               border-radius: 6px;
+                                               border: 1px solid var(--line);"
+                                    >
+                                        <option value="">
+                                            Seleccionar atributo primero
+                                        </option>
                                     </select>
                                 </div>
+
                             </div>
                         </div>
-                        
-                        <!-- Condición y Acción -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div style="background: #fff8e0; padding: 15px; border-radius: 10px; border-left: 4px solid #f39c12;">
-                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">⚡ CONDICIÓN</div>
+
+                        <!-- ========================================== -->
+                        <!-- CONDICIÓN Y ACCIÓN -->
+                        <!-- ========================================== -->
+
+                        <div style="display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 15px;
+                                    margin-bottom: 15px;">
+
+                            <div style="background: #fff8e0;
+                                        padding: 15px;
+                                        border-radius: 10px;
+                                        border-left: 4px solid #f39c12;">
+
+                                <div style="font-weight: 600;
+                                            margin-bottom: 10px;
+                                            font-size: 14px;">
+                                    ⚡ CONDICIÓN
+                                </div>
+
                                 <div>
-                                    <label style="font-size: 12px; font-weight: 600;">Valor que activa *</label>
-                                    <select id="reglaValorCondicion" required style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                        <option value="0">❌ No Cumple</option>
-                                        <option value="1">✅ Cumple</option>
-                                        <option value="NA">No Aplica</option>
+                                    <label style="font-size: 12px;
+                                                  font-weight: 600;">
+                                        Valor que activa *
+                                    </label>
+
+                                    <select
+                                        id="reglaValorCondicion"
+                                        required
+                                        style="width: 100%;
+                                               padding: 8px;
+                                               border-radius: 6px;
+                                               border: 1px solid var(--line);"
+                                    >
+                                        <option value="0">
+                                            ❌ No Cumple
+                                        </option>
+
+                                        <option value="1">
+                                            ✅ Cumple
+                                        </option>
+
+                                        <option value="NA">
+                                            No Aplica
+                                        </option>
                                     </select>
                                 </div>
                             </div>
-                            <div style="background: #e8f5e9; padding: 15px; border-radius: 10px; border-left: 4px solid #28a745;">
-                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">🎯 ACCIÓN</div>
+
+                            <div style="background: #e8f5e9;
+                                        padding: 15px;
+                                        border-radius: 10px;
+                                        border-left: 4px solid #28a745;">
+
+                                <div style="font-weight: 600;
+                                            margin-bottom: 10px;
+                                            font-size: 14px;">
+                                    🎯 ACCIÓN
+                                </div>
+
                                 <div>
-                                    <label style="font-size: 12px; font-weight: 600;">Tipo *</label>
-                                    <select id="reglaAccionTipo" required onchange="toggleAccionValor()" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                        <option value="marcar_no_aplica">📝 Marcar como "No Aplica"</option>
-                                        <option value="deshabilitar">🔒 Deshabilitar campos</option>
-                                        <option value="habilitar">🔓 Habilitar campos</option>
-                                        <option value="marcar_valor">📝 Marcar con valor específico</option>
+                                    <label style="font-size: 12px;
+                                                  font-weight: 600;">
+                                        Tipo *
+                                    </label>
+
+                                    <select
+                                        id="reglaAccionTipo"
+                                        required
+                                        onchange="toggleAccionValor()"
+                                        style="width: 100%;
+                                               padding: 8px;
+                                               border-radius: 6px;
+                                               border: 1px solid var(--line);"
+                                    >
+                                        <option value="marcar_no_aplica">
+                                            📝 Marcar como "No Aplica"
+                                        </option>
+
+                                        <option value="deshabilitar">
+                                            🔒 Deshabilitar campos
+                                        </option>
+
+                                        <option value="habilitar">
+                                            🔓 Habilitar campos
+                                        </option>
+
+                                        <option value="marcar_valor">
+                                            📝 Marcar con valor específico
+                                        </option>
                                     </select>
                                 </div>
-                                <div id="divAccionValor" style="display: none; margin-top: 8px;">
-                                    <label style="font-size: 12px; font-weight: 600;">Valor a aplicar</label>
-                                    <select id="reglaAccionValor" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                        <option value="NA">No Aplica</option>
-                                        <option value="0">No Cumple</option>
-                                        <option value="1">Cumple</option>
+
+                                <div
+                                    id="divAccionValor"
+                                    style="display: none;
+                                           margin-top: 8px;"
+                                >
+                                    <label style="font-size: 12px;
+                                                  font-weight: 600;">
+                                        Valor a aplicar
+                                    </label>
+
+                                    <select
+                                        id="reglaAccionValor"
+                                        style="width: 100%;
+                                               padding: 8px;
+                                               border-radius: 6px;
+                                               border: 1px solid var(--line);"
+                                    >
+                                        <option value="NA">
+                                            No Aplica
+                                        </option>
+
+                                        <option value="0">
+                                            No Cumple
+                                        </option>
+
+                                        <option value="1">
+                                            Cumple
+                                        </option>
                                     </select>
                                 </div>
+
                             </div>
                         </div>
-                        
-                        <!-- Afectados y Excepciones -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                            <div style="background: #f0f7ff; padding: 15px; border-radius: 10px; border-left: 4px solid #019DF4;">
-                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">📋 AFECTADOS</div>
-                                <div>
-                                    <label style="font-size: 12px; font-weight: 600;">Submotivos afectados</label>
-                                    <select id="reglaSubmotivosAfectados" multiple style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line); min-height: 80px;">
-                                        <option value="">(vacío = todos)</option>
-                                        ${subMotivos.map(s => `<option value="${s.codigo}">${s.codigo}</option>`).join('')}
-                                    </select>
-                                    <small style="color: var(--muted);">Ctrl+clic para múltiple | Vacío = todos</small>
+
+                        <!-- ========================================== -->
+                        <!-- AFECTADOS Y EXCEPCIONES -->
+                        <!-- ========================================== -->
+
+                        <div style="display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 15px;
+                                    margin-bottom: 15px;">
+
+                            <div style="background: #f0f7ff;
+                                        padding: 15px;
+                                        border-radius: 10px;
+                                        border-left: 4px solid #019DF4;">
+
+                                <div style="font-weight: 600;
+                                            margin-bottom: 10px;
+                                            font-size: 14px;">
+                                    📋 AFECTADOS
                                 </div>
+
+                                <div>
+                                    <label style="font-size: 12px;
+                                                  font-weight: 600;">
+                                        Submotivos afectados
+                                    </label>
+
+                                    <select
+                                        id="reglaSubmotivosAfectados"
+                                        multiple
+                                        style="width: 100%;
+                                               padding: 8px;
+                                               border-radius: 6px;
+                                               border: 1px solid var(--line);
+                                               min-height: 80px;"
+                                    >
+                                        <option value="">
+                                            (vacío = todos)
+                                        </option>
+
+                                        ${
+                                            subMotivos
+                                                .map(
+                                                    subMotivo =>
+                                                        `<option value="${subMotivo.codigo}">
+                                                            ${subMotivo.codigo}
+                                                        </option>`
+                                                )
+                                                .join('')
+                                        }
+
+                                    </select>
+
+                                    <small style="color: var(--muted);">
+                                        Ctrl+clic para múltiple |
+                                        Vacío = todos
+                                    </small>
+                                </div>
+
                             </div>
-                            <div style="background: #fff3e0; padding: 15px; border-radius: 10px; border-left: 4px solid #f39c12;">
-                                <div style="font-weight: 600; margin-bottom: 10px; font-size: 14px;">⏭️ EXCEPCIONES</div>
-                                <div>
-                                    <label style="font-size: 12px; font-weight: 600;">Submotivos excluidos</label>
-                                    <select id="reglaExcepciones" multiple style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line); min-height: 80px;">
-                                        ${subMotivos.map(s => `<option value="${s.codigo}">${s.codigo}</option>`).join('')}
-                                    </select>
-                                    <small style="color: var(--muted);">Ctrl+clic para múltiple | Estos NO serán afectados</small>
+
+                            <div style="background: #fff3e0;
+                                        padding: 15px;
+                                        border-radius: 10px;
+                                        border-left: 4px solid #f39c12;">
+
+                                <div style="font-weight: 600;
+                                            margin-bottom: 10px;
+                                            font-size: 14px;">
+                                    ⏭️ EXCEPCIONES
                                 </div>
+
+                                <div>
+                                    <label style="font-size: 12px;
+                                                  font-weight: 600;">
+                                        Submotivos excluidos
+                                    </label>
+
+                                    <select
+                                        id="reglaExcepciones"
+                                        multiple
+                                        style="width: 100%;
+                                               padding: 8px;
+                                               border-radius: 6px;
+                                               border: 1px solid var(--line);
+                                               min-height: 80px;"
+                                    >
+                                        ${
+                                            subMotivos
+                                                .map(
+                                                    subMotivo =>
+                                                        `<option value="${subMotivo.codigo}">
+                                                            ${subMotivo.codigo}
+                                                        </option>`
+                                                )
+                                                .join('')
+                                        }
+                                    </select>
+
+                                    <small style="color: var(--muted);">
+                                        Ctrl+clic para múltiple |
+                                        Estos NO serán afectados
+                                    </small>
+                                </div>
+
                             </div>
                         </div>
-                        
-                        <!-- Orden -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+
+                        <!-- ========================================== -->
+                        <!-- ORDEN / ESTADO -->
+                        <!-- ========================================== -->
+
+                        <div style="display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 15px;">
+
                             <div>
-                                <label style="font-size: 12px; font-weight: 600;">📊 Orden</label>
-                                <input type="number" id="reglaOrden" value="${reglasData.length + 1}" min="1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
+                                <label style="font-size: 12px;
+                                              font-weight: 600;">
+                                    📊 Orden
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="reglaOrden"
+                                    value="${reglasData.length + 1}"
+                                    min="1"
+                                    style="width: 100%;
+                                           padding: 8px;
+                                           border-radius: 6px;
+                                           border: 1px solid var(--line);"
+                                >
                             </div>
+
                             <div>
-                                <label style="font-size: 12px; font-weight: 600;">📌 Activo</label>
-                                <select id="reglaActivo" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--line);">
-                                    <option value="true">✅ Activo</option>
-                                    <option value="false">⏸️ Inactivo</option>
+                                <label style="font-size: 12px;
+                                              font-weight: 600;">
+                                    📌 Activo
+                                </label>
+
+                                <select
+                                    id="reglaActivo"
+                                    style="width: 100%;
+                                           padding: 8px;
+                                           border-radius: 6px;
+                                           border: 1px solid var(--line);"
+                                >
+                                    <option value="true">
+                                        ✅ Activo
+                                    </option>
+
+                                    <option value="false">
+                                        ⏸️ Inactivo
+                                    </option>
                                 </select>
                             </div>
+
                         </div>
+
                     </form>
                 </div>
-                <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0;">
-                    <button onclick="cerrarModalRegla()" style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white;">Cancelar</button>
-                    <button onclick="guardarRegla()" style="padding: 8px 20px; background: var(--ok); border: none; border-radius: 8px; cursor: pointer; color: white;">💾 Guardar Regla</button>
+
+                <!-- ========================================== -->
+                <!-- ACCIONES -->
+                <!-- ========================================== -->
+
+                <div style="padding: 15px 20px;
+                            background: #f8f9fa;
+                            display: flex;
+                            justify-content: flex-end;
+                            gap: 10px;
+                            border-top: 1px solid #e0e0e0;">
+
+                    <button
+                        type="button"
+                        onclick="cerrarModalRegla()"
+                        style="padding: 8px 20px;
+                               background: #6c757d;
+                               border: none;
+                               border-radius: 8px;
+                               cursor: pointer;
+                               color: white;"
+                    >
+                        Cancelar
+                    </button>
+
+                    <button
+                        type="button"
+                        onclick="guardarRegla()"
+                        style="padding: 8px 20px;
+                               background: var(--ok);
+                               border: none;
+                               border-radius: 8px;
+                               cursor: pointer;
+                               color: white;"
+                    >
+                        💾 Guardar Regla
+                    </button>
+
                 </div>
+
             </div>
         </div>
     `;
 
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    // ==================================================
+    // 5. INSERTAR MODAL
+    // ==================================================
 
-    // Configurar eventos de los selects
-    document.getElementById('reglaBloqueOrigen').addEventListener('change', function () {
-        actualizarSelectAtributos(this.value);
-    });
+    document.body.insertAdjacentHTML(
+        'beforeend',
+        modalHtml
+    );
 
-    document.getElementById('reglaAtributoOrigen').addEventListener('change', function () {
-        const bloque = document.getElementById('reglaBloqueOrigen').value;
-        actualizarSelectSubmotivos(bloque, this.value);
-    });
+    // ==================================================
+    // 6. CONFIGURAR SELECTORES DEPENDIENTES
+    // ==================================================
+
+    const bloqueSelect =
+        document.getElementById(
+            'reglaBloqueOrigen'
+        );
+
+    const atributoSelect =
+        document.getElementById(
+            'reglaAtributoOrigen'
+        );
+
+    if (bloqueSelect) {
+        bloqueSelect.addEventListener(
+            'change',
+            function () {
+                actualizarSelectAtributos(
+                    this.value
+                );
+            }
+        );
+    }
+
+    if (atributoSelect) {
+        atributoSelect.addEventListener(
+            'change',
+            function () {
+                const bloque =
+                    document
+                        .getElementById(
+                            'reglaBloqueOrigen'
+                        )
+                        ?.value;
+
+                actualizarSelectSubmotivos(
+                    bloque,
+                    this.value
+                );
+            }
+        );
+    }
+
+    console.log(
+        '✅ Modal Nueva Regla abierto para versión',
+        state.version?.version ||
+        state.versionId
+    );
 }
 
 // ======================================================
 // 4. ABRIR MODAL PARA EDITAR REGLA
 // ======================================================
 async function abrirModalEditarRegla(id) {
+    if (
+        !validarEdicionReglas(
+            'editar'
+        )
+    ) {
+        return;
+    }
     reglaEnEdicion = id;
 
     const regla = reglasData.find(r => r.id === id);
@@ -55539,11 +56582,30 @@ async function abrirModalEditarRegla(id) {
     }
 
     // Obtener datos para los selects
-    const [frentes, atributos, subMotivos] = await Promise.all([
-        API.getFrentes(),
-        API.getAtributos(),
-        API.getSubMotivos()
-    ]);
+    let frentes;
+    let atributos;
+    let subMotivos;
+
+    try {
+        ({
+            frentes,
+            atributos,
+            subMotivos
+        } =
+            obtenerEstructuraReglasActual()
+        );
+    } catch (error) {
+        console.error(
+            '❌ No se pudo obtener la estructura para nueva regla:',
+            error
+        );
+
+        alert(
+            '❌ Seleccione una matriz y una versión válidas antes de crear una regla.'
+        );
+
+        return;
+    }
 
     // Limpiar modal anterior
     const modalExistente = document.getElementById('modalRegla');
@@ -55717,59 +56779,185 @@ function toggleAccionValor() {
     div.style.display = tipo === 'marcar_valor' ? 'block' : 'none';
 }
 
-async function actualizarSelectAtributos(bloqueCodigo) {
-    const atributoSelect = document.getElementById('reglaAtributoOrigen');
-    const subMotivoSelect = document.getElementById('reglaSubmotivoOrigen');
+function actualizarSelectAtributos(
+    bloqueCodigo
+) {
+    const atributoSelect =
+        document.getElementById(
+            'reglaAtributoOrigen'
+        );
+
+    const subMotivoSelect =
+        document.getElementById(
+            'reglaSubmotivoOrigen'
+        );
+
+    if (
+        !atributoSelect ||
+        !subMotivoSelect
+    ) {
+        return;
+    }
 
     if (!bloqueCodigo) {
-        atributoSelect.innerHTML = '<option value="">Seleccionar bloque primero</option>';
-        subMotivoSelect.innerHTML = '<option value="">Seleccionar atributo primero</option>';
+        atributoSelect.innerHTML =
+            '<option value="">Seleccionar bloque primero</option>';
+
+        subMotivoSelect.innerHTML =
+            '<option value="">Seleccionar atributo primero</option>';
+
         return;
     }
 
     try {
-        const frentes = await API.getFrentes();
-        const frente = frentes.find(f => f.codigo === bloqueCodigo);
+        const {
+            frentes,
+            atributos
+        } =
+            obtenerEstructuraReglasActual();
+
+        const frente =
+            frentes.find(
+                f =>
+                    f.codigo ===
+                    bloqueCodigo
+            );
+
         if (!frente) {
-            atributoSelect.innerHTML = '<option value="">No hay atributos para este bloque</option>';
+            atributoSelect.innerHTML =
+                '<option value="">No hay atributos para este bloque</option>';
+
+            subMotivoSelect.innerHTML =
+                '<option value="">Seleccionar atributo primero</option>';
+
             return;
         }
 
-        const atributos = await API.getAtributos(frente.id);
-        atributoSelect.innerHTML = '<option value="">Seleccionar atributo</option>' +
-            atributos.map(a => `<option value="${a.nombre}">${a.nombre}</option>`).join('');
+        const atributosFiltrados =
+            atributos.filter(
+                atributo =>
+                    Number(
+                        atributo.frente_id
+                    ) ===
+                    Number(frente.id)
+            );
+
+        atributoSelect.innerHTML =
+            '<option value="">Seleccionar atributo</option>' +
+            atributosFiltrados
+                .map(
+                    atributo =>
+                        `<option value="${atributo.nombre}">${atributo.nombre}</option>`
+                )
+                .join('');
+
+        subMotivoSelect.innerHTML =
+            '<option value="">Seleccionar atributo primero</option>';
+
     } catch (error) {
-        console.error('Error cargando atributos:', error);
-        atributoSelect.innerHTML = '<option value="">Error cargando atributos</option>';
+        console.error(
+            '❌ Error cargando atributos de la versión:',
+            error
+        );
+
+        atributoSelect.innerHTML =
+            '<option value="">Error cargando atributos</option>';
     }
 }
 
-async function actualizarSelectSubmotivos(bloqueCodigo, atributoNombre) {
-    const subMotivoSelect = document.getElementById('reglaSubmotivoOrigen');
+function actualizarSelectSubmotivos(
+    bloqueCodigo,
+    atributoNombre
+) {
+    const subMotivoSelect =
+        document.getElementById(
+            'reglaSubmotivoOrigen'
+        );
 
-    if (!bloqueCodigo || !atributoNombre) {
-        subMotivoSelect.innerHTML = '<option value="">Seleccionar atributo primero</option>';
+    if (!subMotivoSelect) {
+        return;
+    }
+
+    if (
+        !bloqueCodigo ||
+        !atributoNombre
+    ) {
+        subMotivoSelect.innerHTML =
+            '<option value="">Seleccionar atributo primero</option>';
+
         return;
     }
 
     try {
-        const frentes = await API.getFrentes();
-        const frente = frentes.find(f => f.codigo === bloqueCodigo);
-        if (!frente) return;
+        const {
+            frentes,
+            atributos,
+            subMotivos
+        } =
+            obtenerEstructuraReglasActual();
 
-        const atributos = await API.getAtributos(frente.id);
-        const atributo = atributos.find(a => a.nombre === atributoNombre);
-        if (!atributo) {
-            subMotivoSelect.innerHTML = '<option value="">No hay submotivos para este atributo</option>';
+        const frente =
+            frentes.find(
+                f =>
+                    f.codigo ===
+                    bloqueCodigo
+            );
+
+        if (!frente) {
+            subMotivoSelect.innerHTML =
+                '<option value="">Bloque no encontrado</option>';
+
             return;
         }
 
-        const subMotivos = await API.getSubMotivos(atributo.id);
-        subMotivoSelect.innerHTML = '<option value="">Seleccionar submotivo</option>' +
-            subMotivos.map(s => `<option value="${s.codigo}">${s.codigo}</option>`).join('');
+        const atributo =
+            atributos.find(
+                a =>
+                    Number(
+                        a.frente_id
+                    ) ===
+                        Number(
+                            frente.id
+                        ) &&
+                    a.nombre ===
+                        atributoNombre
+            );
+
+        if (!atributo) {
+            subMotivoSelect.innerHTML =
+                '<option value="">No hay submotivos para este atributo</option>';
+
+            return;
+        }
+
+        const subMotivosFiltrados =
+            subMotivos.filter(
+                subMotivo =>
+                    Number(
+                        subMotivo.atributo_id
+                    ) ===
+                    Number(
+                        atributo.id
+                    )
+            );
+
+        subMotivoSelect.innerHTML =
+            '<option value="">Seleccionar submotivo</option>' +
+            subMotivosFiltrados
+                .map(
+                    subMotivo =>
+                        `<option value="${subMotivo.codigo}">${subMotivo.codigo}</option>`
+                )
+                .join('');
+
     } catch (error) {
-        console.error('Error cargando submotivos:', error);
-        subMotivoSelect.innerHTML = '<option value="">Error cargando submotivos</option>';
+        console.error(
+            '❌ Error cargando submotivos de la versión:',
+            error
+        );
+
+        subMotivoSelect.innerHTML =
+            '<option value="">Error cargando submotivos</option>';
     }
 }
 
@@ -55784,82 +56972,302 @@ function cerrarModalRegla() {
 // ======================================================
 async function guardarRegla() {
     try {
-        // Obtener valores del formulario
-        const bloqueOrigen = document.getElementById('reglaBloqueOrigen').value;
-        const atributoOrigen = document.getElementById('reglaAtributoOrigen').value;
-        const submotivoOrigen = document.getElementById('reglaSubmotivoOrigen').value;
-        const valorCondicion = document.getElementById('reglaValorCondicion').value;
-        const accionTipo = document.getElementById('reglaAccionTipo').value;
-        const accionValor = document.getElementById('reglaAccionValor')?.value || null;
-        const orden = parseInt(document.getElementById('reglaOrden').value) || 0;
-        const activo = document.getElementById('reglaActivo').value === 'true';
 
-        // Validar campos obligatorios
-        if (!bloqueOrigen || !atributoOrigen || !submotivoOrigen) {
-            alert('⚠️ Complete todos los campos de origen');
+        if (
+            !validarEdicionReglas(
+                reglaEnEdicion
+                    ? 'actualizar'
+                    : 'crear'
+            )
+        ) {
+            return;
+        }
+        // ==================================================
+        // 1. VALIDAR CONTEXTO MATRIZ / VERSIÓN
+        // ==================================================
+
+        const state =
+            window.reglasAdminState;
+
+        if (
+            !state ||
+            !Number.isInteger(
+                Number(state.matrizId)
+            ) ||
+            Number(state.matrizId) <= 0 ||
+            !Number.isInteger(
+                Number(state.versionId)
+            ) ||
+            Number(state.versionId) <= 0
+        ) {
+            alert(
+                '❌ Seleccione una matriz y una versión válidas.'
+            );
+
             return;
         }
 
-        // Obtener submotivos afectados y excepciones - MANEJO CORRECTO
-        const afectadosSelect = document.getElementById('reglaSubmotivosAfectados');
-        const excepcionesSelect = document.getElementById('reglaExcepciones');
+        const versionId =
+            Number(state.versionId);
 
-        // 🔴 CORREGIDO: Obtener valores seleccionados como array
-        let submotivosAfectados = null;
-        if (afectadosSelect && afectadosSelect.selectedOptions.length > 0) {
-            submotivosAfectados = Array.from(afectadosSelect.selectedOptions).map(opt => opt.value);
-            // Filtrar valores vacíos
-            submotivosAfectados = submotivosAfectados.filter(v => v && v !== '');
-            if (submotivosAfectados.length === 0) submotivosAfectados = null;
-        }
+        // ==================================================
+        // 2. OBTENER VALORES DEL FORMULARIO
+        // ==================================================
 
-        let excepciones = null;
-        if (excepcionesSelect && excepcionesSelect.selectedOptions.length > 0) {
-            excepciones = Array.from(excepcionesSelect.selectedOptions).map(opt => opt.value);
-            // Filtrar valores vacíos
-            excepciones = excepciones.filter(v => v && v !== '');
-            if (excepciones.length === 0) excepciones = null;
-        }
+        const bloqueOrigen =
+            document
+                .getElementById(
+                    'reglaBloqueOrigen'
+                )
+                ?.value;
 
-        // Obtener versión activa
-        const versionActiva = await API.getVersionActiva();
-        if (!versionActiva) {
-            alert('❌ No hay versión activa');
+        const atributoOrigen =
+            document
+                .getElementById(
+                    'reglaAtributoOrigen'
+                )
+                ?.value;
+
+        const submotivoOrigen =
+            document
+                .getElementById(
+                    'reglaSubmotivoOrigen'
+                )
+                ?.value;
+
+        const valorCondicion =
+            document
+                .getElementById(
+                    'reglaValorCondicion'
+                )
+                ?.value;
+
+        const accionTipo =
+            document
+                .getElementById(
+                    'reglaAccionTipo'
+                )
+                ?.value;
+
+        const accionValor =
+            document
+                .getElementById(
+                    'reglaAccionValor'
+                )
+                ?.value || null;
+
+        const orden =
+            parseInt(
+                document
+                    .getElementById(
+                        'reglaOrden'
+                    )
+                    ?.value,
+                10
+            ) || 0;
+
+        const activo =
+            document
+                .getElementById(
+                    'reglaActivo'
+                )
+                ?.value === 'true';
+
+        // ==================================================
+        // 3. VALIDAR ORIGEN
+        // ==================================================
+
+        if (
+            !bloqueOrigen ||
+            !atributoOrigen ||
+            !submotivoOrigen
+        ) {
+            alert(
+                '⚠️ Complete todos los campos de origen'
+            );
+
             return;
         }
 
-        // 🔴 CONSTRUIR DATOS CON JSON VÁLIDO
+        // ==================================================
+        // 4. AFECTADOS
+        // ==================================================
+
+        const afectadosSelect =
+            document.getElementById(
+                'reglaSubmotivosAfectados'
+            );
+
+        let submotivosAfectados =
+            null;
+
+        if (
+            afectadosSelect &&
+            afectadosSelect.selectedOptions.length >
+                0
+        ) {
+            submotivosAfectados =
+                Array
+                    .from(
+                        afectadosSelect
+                            .selectedOptions
+                    )
+                    .map(
+                        option =>
+                            option.value
+                    )
+                    .filter(Boolean);
+
+            if (
+                submotivosAfectados.length ===
+                0
+            ) {
+                submotivosAfectados =
+                    null;
+            }
+        }
+
+        // ==================================================
+        // 5. EXCEPCIONES
+        // ==================================================
+
+        const excepcionesSelect =
+            document.getElementById(
+                'reglaExcepciones'
+            );
+
+        let excepciones =
+            null;
+
+        if (
+            excepcionesSelect &&
+            excepcionesSelect.selectedOptions
+                .length > 0
+        ) {
+            excepciones =
+                Array
+                    .from(
+                        excepcionesSelect
+                            .selectedOptions
+                    )
+                    .map(
+                        option =>
+                            option.value
+                    )
+                    .filter(Boolean);
+
+            if (
+                excepciones.length ===
+                0
+            ) {
+                excepciones =
+                    null;
+            }
+        }
+
+        // ==================================================
+        // 6. CONSTRUIR DATOS
+        // ==================================================
+
         const data = {
-            version_id: versionActiva.id,
-            submotivo_origen: submotivoOrigen,
-            bloque_origen: bloqueOrigen,
-            atributo_origen: atributoOrigen,
-            valor_condicion: valorCondicion,
-            accion_tipo: accionTipo,
-            accion_valor: accionValor,
-            submotivos_afectados: submotivosAfectados,  // ← Array o null
-            excepciones: excepciones,                    // ← Array o null
-            orden: orden,
-            activo: activo
+            version_id:
+                versionId,
+
+            submotivo_origen:
+                submotivoOrigen,
+
+            bloque_origen:
+                bloqueOrigen,
+
+            atributo_origen:
+                atributoOrigen,
+
+            valor_condicion:
+                valorCondicion,
+
+            accion_tipo:
+                accionTipo,
+
+            accion_valor:
+                accionValor,
+
+            submotivos_afectados:
+                submotivosAfectados,
+
+            excepciones:
+                excepciones,
+
+            orden:
+                orden,
+
+            activo:
+                activo
         };
 
-        console.log('📤 Datos a enviar:', JSON.stringify(data, null, 2));
+        console.log(
+            '📤 Guardando regla en contexto:',
+            {
+                matrizId:
+                    state.matrizId,
 
-        let result;
+                versionId:
+                    state.versionId,
+
+                version:
+                    state.version?.version,
+
+                reglaId:
+                    reglaEnEdicion || null
+            }
+        );
+
+        console.log(
+            '📤 Datos regla:',
+            data
+        );
+
+        // ==================================================
+        // 7. CREAR / ACTUALIZAR
+        // ==================================================
+
         if (reglaEnEdicion) {
-            result = await API.actualizarRegla(reglaEnEdicion, data);
-            alert('✅ Regla actualizada correctamente');
+            await API.actualizarRegla(
+                reglaEnEdicion,
+                data
+            );
+
+            alert(
+                '✅ Regla actualizada correctamente'
+            );
+
         } else {
-            result = await API.crearRegla(data);
-            alert('✅ Regla creada correctamente');
+            await API.crearRegla(
+                data
+            );
+
+            alert(
+                '✅ Regla creada correctamente'
+            );
         }
 
+        // ==================================================
+        // 8. CERRAR Y REFRESCAR MISMA VERSIÓN
+        // ==================================================
+
         cerrarModalRegla();
+
         await cargarReglasAdministracion();
 
     } catch (error) {
-        console.error('❌ Error guardando regla:', error);
-        alert('❌ Error al guardar: ' + error.message);
+        console.error(
+            '❌ Error guardando regla:',
+            error
+        );
+
+        alert(
+            '❌ Error al guardar: ' +
+            error.message
+        );
     }
 }
 
@@ -55867,28 +57275,717 @@ async function guardarRegla() {
 // 7. ELIMINAR REGLA
 // ======================================================
 async function eliminarRegla(id) {
-    const regla = reglasData.find(r => r.id === id);
-    if (!regla) {
-        alert('❌ Regla no encontrada');
+
+    // ==================================================
+    // 1. VALIDAR CICLO DE VIDA
+    // ==================================================
+
+    if (
+        !validarEdicionReglas(
+            'eliminar'
+        )
+    ) {
         return;
     }
 
-    const confirmar = confirm(
-        `⚠️ ¿ELIMINAR REGLA?\n\n` +
-        `📌 Origen: ${regla.submotivo_origen}\n` +
-        `📌 Acción: ${regla.accion_tipo}\n\n` +
-        `¿Está seguro de continuar?`
-    );
+    // ==================================================
+    // 2. VALIDAR REGLA
+    // ==================================================
 
-    if (!confirmar) return;
+    const regla =
+        reglasData.find(
+            r =>
+                Number(r.id) ===
+                Number(id)
+        );
+
+    if (!regla) {
+        alert(
+            '❌ Regla no encontrada'
+        );
+
+        return;
+    }
+
+    // ==================================================
+    // 3. CONFIRMAR ELIMINACIÓN FÍSICA DEL BORRADOR
+    // ==================================================
+
+    const confirmar =
+        confirm(
+            `⚠️ ¿ELIMINAR REGLA?\n\n` +
+            `📌 Origen: ${regla.submotivo_origen}\n` +
+            `📌 Acción: ${regla.accion_tipo}\n\n` +
+            `Esta regla pertenece a una versión BORRADOR ` +
+            `y será eliminada definitivamente.\n\n` +
+            `¿Está seguro de continuar?`
+        );
+
+    if (!confirmar) {
+        return;
+    }
+
+    // ==================================================
+    // 4. ELIMINAR
+    // ==================================================
 
     try {
-        await API.eliminarRegla(id);
-        alert('✅ Regla eliminada correctamente');
+        await API.eliminarRegla(
+            id
+        );
+
+        alert(
+            '✅ Regla eliminada correctamente'
+        );
+
         await cargarReglasAdministracion();
+
     } catch (error) {
-        console.error('❌ Error eliminando regla:', error);
-        alert('❌ Error al eliminar: ' + error.message);
+        console.error(
+            '❌ Error eliminando regla:',
+            error
+        );
+
+        alert(
+            '❌ Error al eliminar: ' +
+            error.message
+        );
+    }
+}
+
+// ======================================================
+// MATRICES - ADMINISTRACIÓN DE REGLAS
+// ======================================================
+
+async function cargarMatricesReglas() {
+    const select =
+        document.getElementById(
+            'reglasMatrizSelector'
+        );
+
+    if (!select) {
+        console.warn(
+            '⚠️ No se encontró reglasMatrizSelector'
+        );
+
+        return [];
+    }
+
+    select.innerHTML =
+        '<option value="">Seleccione una matriz</option>';
+
+    try {
+        /*
+         * Reutilizamos la lógica ya existente de matrices
+         * asignables porque:
+         *
+         * - obtiene matrices de todos los quiebres;
+         * - elimina duplicados;
+         * - conserva el origen de cada matriz;
+         * - devuelve el arreglo final.
+         */
+        const matrices =
+            await cargarMatricesAsignables();
+
+        if (
+            !Array.isArray(matrices) ||
+            matrices.length === 0
+        ) {
+            select.innerHTML =
+                '<option value="">No hay matrices disponibles</option>';
+
+            console.warn(
+                '⚠️ No hay matrices disponibles para reglas'
+            );
+
+            return [];
+        }
+
+        const matricesActivas =
+            matrices.filter(
+                matriz =>
+                    matriz.activa !== false
+            );
+
+        matricesActivas.forEach(
+            matriz => {
+                const option =
+                    document.createElement(
+                        'option'
+                    );
+
+                option.value =
+                    String(matriz.id);
+
+                const codigo =
+                    matriz.codigo ||
+                    `Matriz ${matriz.id}`;
+
+                const descripcion =
+                    matriz.descripcion ||
+                    matriz.nombre ||
+                    '';
+
+                option.textContent =
+                    descripcion
+                        ? `${codigo} - ${descripcion}`
+                        : codigo;
+
+                select.appendChild(
+                    option
+                );
+            }
+        );
+
+        console.log(
+            `✅ ${matricesActivas.length} matrices cargadas para administración de reglas`
+        );
+
+        return matricesActivas;
+
+    } catch (error) {
+        console.error(
+            '❌ Error cargando matrices para reglas:',
+            error
+        );
+
+        select.innerHTML =
+            '<option value="">Error cargando matrices</option>';
+
+        return [];
+    }
+}
+
+// ======================================================
+// CAMBIO DE MATRIZ - ADMINISTRACIÓN DE REGLAS
+// ======================================================
+
+async function cambiarMatrizReglas() {
+    const matrizSelector =
+        document.getElementById(
+            'reglasMatrizSelector'
+        );
+
+    const versionSelector =
+        document.getElementById(
+            'reglasVersionSelector'
+        );
+
+    const container =
+        document.getElementById(
+            'reglasContainer'
+        );
+
+    const contextoInfo =
+        document.getElementById(
+            'reglasContextoInfo'
+        );
+
+    if (
+        !matrizSelector ||
+        !versionSelector ||
+        !container
+    ) {
+        return;
+    }
+
+    const matrizId =
+        Number(
+            matrizSelector.value
+        );
+
+    // ==================================================
+    // REINICIAR CONTEXTO DE VERSIÓN
+    // ==================================================
+
+    versionSelector.innerHTML = `
+        <option value="">
+            Seleccione una versión
+        </option>
+    `;
+
+    versionSelector.disabled =
+        true;
+
+    reglasData =
+        [];
+
+    reglaEnEdicion =
+        null;
+
+    if (contextoInfo) {
+        contextoInfo.innerHTML =
+            '';
+
+        contextoInfo.classList.remove(
+            'is-visible'
+        );
+    }
+
+    container.innerHTML = `
+        <div class="reglas-placeholder">
+            Seleccione una versión para administrar sus reglas.
+        </div>
+    `;
+
+    // ==================================================
+    // VALIDAR MATRIZ
+    // ==================================================
+
+    if (
+        !Number.isInteger(matrizId) ||
+        matrizId <= 0
+    ) {
+        return;
+    }
+
+    versionSelector.innerHTML = `
+        <option value="">
+            Cargando versiones...
+        </option>
+    `;
+
+    try {
+        const token =
+            localStorage.getItem(
+                'meca_token'
+            );
+
+        const response =
+            await fetch(
+                `/api/matriz/versiones?matrizId=${encodeURIComponent(matrizId)}`,
+                {
+                    headers: {
+                        'Authorization':
+                            `Bearer ${token}`
+                    }
+                }
+            );
+
+        if (!response.ok) {
+            let mensaje =
+                'Error al cargar versiones';
+
+            try {
+                const error =
+                    await response.json();
+
+                mensaje =
+                    error.error ||
+                    error.message ||
+                    mensaje;
+            } catch (_) {
+                // conservar mensaje por defecto
+            }
+
+            throw new Error(
+                mensaje
+            );
+        }
+
+        const versiones =
+            await response.json();
+
+        versionSelector.innerHTML = `
+            <option value="">
+                Seleccione una versión
+            </option>
+        `;
+
+        if (
+            !Array.isArray(versiones) ||
+            versiones.length === 0
+        ) {
+            versionSelector.innerHTML = `
+                <option value="">
+                    Esta matriz no tiene versiones
+                </option>
+            `;
+
+            container.innerHTML = `
+                <div class="reglas-placeholder">
+                    La matriz seleccionada todavía no tiene versiones.
+                </div>
+            `;
+
+            console.warn(
+                `⚠️ Matriz ${matrizId} sin versiones`
+            );
+
+            return;
+        }
+
+        // ==================================================
+        // ORDENAR: MÁS RECIENTE PRIMERO
+        // ==================================================
+
+        const versionesOrdenadas =
+            [...versiones].sort(
+                (a, b) => {
+                    const fechaA =
+                        new Date(
+                            a.fecha_vigencia ||
+                            a.creado_en ||
+                            0
+                        ).getTime();
+
+                    const fechaB =
+                        new Date(
+                            b.fecha_vigencia ||
+                            b.creado_en ||
+                            0
+                        ).getTime();
+
+                    if (
+                        fechaB !== fechaA
+                    ) {
+                        return (
+                            fechaB -
+                            fechaA
+                        );
+                    }
+
+                    return (
+                        Number(b.id) -
+                        Number(a.id)
+                    );
+                }
+            );
+
+        versionesOrdenadas.forEach(
+            version => {
+                const option =
+                    document.createElement(
+                        'option'
+                    );
+
+                option.value =
+                    String(version.id);
+
+                let estado =
+                    '📝 Borrador';
+
+                if (
+                    version.activa === true &&
+                    version.publicado_en
+                ) {
+                    estado =
+                        '✅ Activa';
+                } else if (
+                    version.activa === false &&
+                    version.publicado_en
+                ) {
+                    estado =
+                        '📚 Histórica';
+                }
+
+                option.textContent =
+                    `${version.version} - ${estado}`;
+
+                versionSelector.appendChild(
+                    option
+                );
+            }
+        );
+
+        versionSelector.disabled =
+            false;
+
+        console.log(
+            `✅ ${versionesOrdenadas.length} versiones cargadas para matriz ${matrizId}`
+        );
+
+    } catch (error) {
+        console.error(
+            '❌ Error cargando versiones para reglas:',
+            error
+        );
+
+        versionSelector.innerHTML = `
+            <option value="">
+                Error cargando versiones
+            </option>
+        `;
+
+        container.innerHTML = `
+            <div class="reglas-placeholder">
+                No se pudieron cargar las versiones de la matriz.
+            </div>
+        `;
+    }
+}
+
+// ======================================================
+// CAMBIO DE VERSIÓN - ADMINISTRACIÓN DE REGLAS
+// ======================================================
+
+async function cambiarVersionReglas() {
+    const matrizSelector =
+        document.getElementById(
+            'reglasMatrizSelector'
+        );
+
+    const versionSelector =
+        document.getElementById(
+            'reglasVersionSelector'
+        );
+
+    const container =
+        document.getElementById(
+            'reglasContainer'
+        );
+
+    const contextoInfo =
+        document.getElementById(
+            'reglasContextoInfo'
+        );
+
+    if (
+        !matrizSelector ||
+        !versionSelector ||
+        !container
+    ) {
+        return;
+    }
+
+    const matrizId =
+        Number(
+            matrizSelector.value
+        );
+
+    const versionId =
+        Number(
+            versionSelector.value
+        );
+
+    reglasData = [];
+    reglaEnEdicion = null;
+
+    if (contextoInfo) {
+        contextoInfo.innerHTML = '';
+        contextoInfo.classList.remove(
+            'is-visible'
+        );
+    }
+
+    if (
+        !Number.isInteger(matrizId) ||
+        matrizId <= 0 ||
+        !Number.isInteger(versionId) ||
+        versionId <= 0
+    ) {
+        container.innerHTML = `
+            <div class="reglas-placeholder">
+                Seleccione una versión para administrar sus reglas.
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="reglas-placeholder">
+            Cargando reglas...
+        </div>
+    `;
+
+    try {
+        // ==================================================
+        // 1. OBTENER VERSIONES DE LA MATRIZ
+        // ==================================================
+
+        const token =
+            localStorage.getItem(
+                'meca_token'
+            );
+
+        const responseVersiones =
+            await fetch(
+                `/api/matriz/versiones?matrizId=${encodeURIComponent(matrizId)}`,
+                {
+                    headers: {
+                        'Authorization':
+                            `Bearer ${token}`
+                    }
+                }
+            );
+
+        if (!responseVersiones.ok) {
+            throw new Error(
+                'No se pudieron obtener las versiones de la matriz'
+            );
+        }
+
+        const versiones =
+            await responseVersiones.json();
+
+        const versionSeleccionada =
+            Array.isArray(versiones)
+                ? versiones.find(
+                    version =>
+                        Number(version.id) ===
+                        versionId
+                )
+                : null;
+
+        if (!versionSeleccionada) {
+            throw new Error(
+                'La versión seleccionada no pertenece a la matriz'
+            );
+        }
+
+        // ==================================================
+        // 2. OBTENER ESTRUCTURA EXACTA DE ESA VERSIÓN
+        // ==================================================
+
+        const estructura =
+            await API.getEstructuraVersion(
+                versionId
+            );
+
+        // ==================================================
+        // 3. OBTENER REGLAS EXACTAS DE ESA VERSIÓN
+        // ==================================================
+
+        const reglas =
+            await API.getReglasByVersion(
+                versionId
+            );
+
+        reglasData =
+            Array.isArray(reglas)
+                ? reglas
+                : [];
+
+        // ==================================================
+        // 4. GUARDAR CONTEXTO PROPIO DE LA PESTAÑA
+        // ==================================================
+
+        window.reglasAdminState = {
+            matrizId:
+                matrizId,
+
+            versionId:
+                versionId,
+
+            version:
+                versionSeleccionada,
+
+            estructura:
+                estructura
+        };
+
+        // ==================================================
+        // 5. DETERMINAR ESTADO DE VERSIÓN
+        // ==================================================
+
+        let estado =
+            'Borrador';
+
+        let claseEstado =
+            'borrador';
+
+        if (
+            versionSeleccionada.activa === true &&
+            versionSeleccionada.publicado_en
+        ) {
+            estado =
+                'Activa';
+
+            claseEstado =
+                'activa';
+
+        } else if (
+            versionSeleccionada.activa === false &&
+            versionSeleccionada.publicado_en
+        ) {
+            estado =
+                'Histórica';
+
+            claseEstado =
+                'historica';
+        }
+
+        // ==================================================
+        // 6. MOSTRAR CONTEXTO
+        // ==================================================
+
+        if (contextoInfo) {
+            contextoInfo.innerHTML = `
+                <strong>
+                    Matriz:
+                </strong>
+                ${
+                    matrizSelector
+                        .options[
+                            matrizSelector.selectedIndex
+                        ]?.textContent || matrizId
+                }
+
+                &nbsp; | &nbsp;
+
+                <strong>
+                    Versión:
+                </strong>
+                ${versionSeleccionada.version}
+
+                &nbsp; | &nbsp;
+
+                <strong>
+                    Estado:
+                </strong>
+                ${estado}
+            `;
+
+            contextoInfo.dataset.estado =
+                claseEstado;
+
+            contextoInfo.classList.add(
+                'is-visible'
+            );
+        }
+
+        // ==================================================
+        // 7. RENDERIZAR REGLAS
+        // ==================================================
+
+        /*
+         * De momento reutilizamos el renderer existente.
+         * En el siguiente paso vamos a ajustarlo para
+         * trabajar con la estructura versionada y bloquear
+         * edición en versiones históricas.
+         */
+        renderizarTablaReglas(
+            reglasData,
+            versionSeleccionada,
+            [],
+            [],
+            []
+        );
+
+        console.log(
+            `✅ ${reglasData.length} reglas cargadas para matriz ${matrizId}, versión ${versionSeleccionada.version}`
+        );
+
+        console.log(
+            '📦 Estructura de versión cargada:',
+            estructura
+        );
+
+    } catch (error) {
+        console.error(
+            '❌ Error cargando versión para reglas:',
+            error
+        );
+
+        window.reglasAdminState =
+            null;
+
+        container.innerHTML = `
+            <div class="reglas-placeholder">
+                No se pudo cargar la información de la versión seleccionada.
+            </div>
+        `;
     }
 }
 
@@ -55896,14 +57993,95 @@ async function eliminarRegla(id) {
 // 8. INICIALIZAR ADMINISTRACIÓN DE REGLAS
 // ======================================================
 async function inicializarReglasAdmin() {
-    // Verificar si existe el contenedor
-    const container = document.getElementById('reglasContainer');
+    console.log(
+        '📋 Inicializando administración de reglas...'
+    );
+
+    const container =
+        document.getElementById(
+            'reglasContainer'
+        );
+
+    const matrizSelector =
+        document.getElementById(
+            'reglasMatrizSelector'
+        );
+
+    const versionSelector =
+        document.getElementById(
+            'reglasVersionSelector'
+        );
+
+    const contextoInfo =
+        document.getElementById(
+            'reglasContextoInfo'
+        );
+
     if (!container) {
-        console.warn('⚠️ No se encontró reglasContainer. Asegúrate de agregarlo en el HTML.');
+        console.warn(
+            '⚠️ No se encontró reglasContainer en el DOM'
+        );
+
         return;
     }
 
-    await cargarReglasAdministracion();
+    if (
+        !matrizSelector ||
+        !versionSelector
+    ) {
+        console.warn(
+            '⚠️ No se encontraron los selectores de contexto de reglas'
+        );
+
+        return;
+    }
+
+    // ==================================================
+    // REINICIAR CONTEXTO
+    // ==================================================
+
+    matrizSelector.innerHTML =
+        '<option value="">Cargando matrices...</option>';
+
+    versionSelector.innerHTML = `
+        <option value="">
+            Seleccione primero una matriz
+        </option>
+    `;
+
+    versionSelector.disabled =
+        true;
+
+    if (contextoInfo) {
+        contextoInfo.innerHTML =
+            '';
+
+        contextoInfo.classList.remove(
+            'is-visible'
+        );
+    }
+
+    reglasData =
+        [];
+
+    reglaEnEdicion =
+        null;
+
+    container.innerHTML = `
+        <div class="reglas-placeholder">
+            Seleccione una matriz y una versión para administrar sus reglas.
+        </div>
+    `;
+
+    // ==================================================
+    // CARGAR MATRICES
+    // ==================================================
+
+    await cargarMatricesReglas();
+
+    console.log(
+        '✅ Administración de reglas inicializada'
+    );
 }
 
 // ====================== CIERRE BLOQUE 15 =============================================
@@ -60549,6 +62727,491 @@ async function reactivarCampanaUI(id) {
     }
 }
 
+function normalizarValorPlantilla(valor) {
+    if (valor === null || valor === undefined) {
+        return '';
+    }
+
+    return valor;
+}
+
+function convertirValorSegunTipo(valor, tipoDato) {
+    const tipo = String(tipoDato || 'texto').trim().toLowerCase();
+
+    if (valor === null || valor === undefined || valor === '') {
+        return {
+            valido: true,
+            valor: ''
+        };
+    }
+
+    switch (tipo) {
+        case 'texto':
+            return {
+                valido: true,
+                valor: String(valor).trim()
+            };
+
+        case 'entero': {
+            const numero = Number(valor);
+
+            if (!Number.isInteger(numero)) {
+                return {
+                    valido: false,
+                    error: `se esperaba un entero y se recibió "${valor}"`
+                };
+            }
+
+            return {
+                valido: true,
+                valor: numero
+            };
+        }
+
+        case 'decimal': {
+            const numero = Number(
+                String(valor)
+                    .replace(',', '.')
+                    .trim()
+            );
+
+            if (!Number.isFinite(numero)) {
+                return {
+                    valido: false,
+                    error: `se esperaba un número decimal y se recibió "${valor}"`
+                };
+            }
+
+            return {
+                valido: true,
+                valor: numero
+            };
+        }
+
+        case 'booleano': {
+            if (typeof valor === 'boolean') {
+                return {
+                    valido: true,
+                    valor
+                };
+            }
+
+            const texto = String(valor)
+                .trim()
+                .toLowerCase();
+
+            if (['true', '1', 'si', 'sí', 's'].includes(texto)) {
+                return {
+                    valido: true,
+                    valor: true
+                };
+            }
+
+            if (['false', '0', 'no', 'n'].includes(texto)) {
+                return {
+                    valido: true,
+                    valor: false
+                };
+            }
+
+            return {
+                valido: false,
+                error: `se esperaba un booleano y se recibió "${valor}"`
+            };
+        }
+
+        case 'fecha':
+            return convertirFechaPlantilla(valor);
+
+        default:
+            return {
+                valido: false,
+                error: `tipo de dato no soportado: "${tipoDato}"`
+            };
+    }
+}
+
+function convertirFechaPlantilla(valor) {
+    if (
+        valor === null ||
+        valor === undefined ||
+        valor === ''
+    ) {
+        return {
+            valido: true,
+            valor: ''
+        };
+    }
+
+    const anioActual = new Date().getFullYear();
+
+    // ==========================================================
+    // AUXILIAR: validar que una fecha realmente exista
+    // ==========================================================
+    function validarFechaReal(anio, mes, dia) {
+        const fecha = new Date(
+            Date.UTC(anio, mes - 1, dia)
+        );
+
+        return (
+            fecha.getUTCFullYear() === anio &&
+            fecha.getUTCMonth() === mes - 1 &&
+            fecha.getUTCDate() === dia
+        );
+    }
+
+    // ==========================================================
+    // AUXILIAR: validar año esperado
+    // ==========================================================
+    function validarAnio(anio, fechaOriginal) {
+        if (anio !== anioActual) {
+            return {
+                valido: false,
+                error:
+                    `la fecha "${fechaOriginal}" pertenece al año ${anio}. ` +
+                    `Para esta carga se esperan fechas del año ${anioActual}`
+            };
+        }
+
+        return null;
+    }
+
+    // ==========================================================
+    // 1. FECHA NUMÉRICA DE EXCEL
+    // ==========================================================
+    if (typeof valor === 'number') {
+        const fechaConvertida = excelSerialToDate(valor);
+
+        if (!fechaConvertida) {
+            return {
+                valido: false,
+                error:
+                    `no se pudo interpretar la fecha Excel "${valor}"`
+            };
+        }
+
+        const match =
+            fechaConvertida.match(
+                /^(\d{4})-(\d{2})-(\d{2})$/
+            );
+
+        if (!match) {
+            return {
+                valido: false,
+                error:
+                    `la fecha Excel "${valor}" produjo un formato inválido`
+            };
+        }
+
+        const anio = Number(match[1]);
+        const mes = Number(match[2]);
+        const dia = Number(match[3]);
+
+        if (!validarFechaReal(anio, mes, dia)) {
+            return {
+                valido: false,
+                error:
+                    `la fecha "${fechaConvertida}" no es una fecha válida`
+            };
+        }
+
+        const errorAnio =
+            validarAnio(anio, fechaConvertida);
+
+        if (errorAnio) {
+            return errorAnio;
+        }
+
+        return {
+            valido: true,
+            valor: fechaConvertida
+        };
+    }
+
+    const texto = String(valor).trim();
+
+    // ==========================================================
+    // 2. FORMATO YYYY-MM-DD
+    // ==========================================================
+    const matchISO =
+        texto.match(
+            /^(\d{4})-(\d{2})-(\d{2})$/
+        );
+
+    if (matchISO) {
+        const anio = Number(matchISO[1]);
+        const mes = Number(matchISO[2]);
+        const dia = Number(matchISO[3]);
+
+        if (!validarFechaReal(anio, mes, dia)) {
+            return {
+                valido: false,
+                error:
+                    `la fecha "${texto}" no es una fecha válida`
+            };
+        }
+
+        const errorAnio =
+            validarAnio(anio, texto);
+
+        if (errorAnio) {
+            return errorAnio;
+        }
+
+        return {
+            valido: true,
+            valor:
+                `${anio}-` +
+                `${String(mes).padStart(2, '0')}-` +
+                `${String(dia).padStart(2, '0')}`
+        };
+    }
+
+    // ==========================================================
+    // 3. FORMATO DD/MM/YYYY
+    // ==========================================================
+    const matchSlash =
+        texto.match(
+            /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+        );
+
+    if (matchSlash) {
+        const dia = Number(matchSlash[1]);
+        const mes = Number(matchSlash[2]);
+        const anio = Number(matchSlash[3]);
+
+        if (!validarFechaReal(anio, mes, dia)) {
+            return {
+                valido: false,
+                error:
+                    `la fecha "${texto}" no es una fecha válida`
+            };
+        }
+
+        const errorAnio =
+            validarAnio(anio, texto);
+
+        if (errorAnio) {
+            return errorAnio;
+        }
+
+        return {
+            valido: true,
+            valor:
+                `${anio}-` +
+                `${String(mes).padStart(2, '0')}-` +
+                `${String(dia).padStart(2, '0')}`
+        };
+    }
+
+    // ==========================================================
+    // 4. FECHA SIN AÑO
+    // ==========================================================
+    if (
+        /^\d{1,2}-[A-Za-zÁÉÍÓÚáéíóú]{3,}$/i.test(texto)
+    ) {
+        return {
+            valido: false,
+            error:
+                `la fecha "${texto}" no contiene año. ` +
+                `Debe utilizar DD/MM/${anioActual} o ${anioActual}-MM-DD`
+        };
+    }
+
+    // ==========================================================
+    // 5. FORMATO NO RECONOCIDO
+    // ==========================================================
+    return {
+        valido: false,
+        error:
+            `formato de fecha no reconocido: "${texto}". ` +
+            `Use DD/MM/YYYY o YYYY-MM-DD`
+    };
+}
+
+function validarYConvertirFilaSegunPlantilla(
+    datosFila,
+    plantilla,
+    numeroFilaExcel
+) {
+    const resultado = {};
+    const errores = [];
+
+    for (const campo of plantilla.campos || []) {
+        const campoDestino =
+            String(campo.campo_destino || '').trim();
+
+        if (!campoDestino) {
+            continue;
+        }
+
+        const valorOriginal =
+            normalizarValorPlantilla(
+                datosFila[campoDestino]
+            );
+
+        const valorVacio =
+            valorOriginal === '' ||
+            String(valorOriginal).trim() === '';
+
+        if (campo.obligatorio && valorVacio) {
+            errores.push(
+                `Fila ${numeroFilaExcel}: ` +
+                `"${campo.cabecera_origen}" es obligatorio`
+            );
+
+            continue;
+        }
+
+        if (valorVacio) {
+            resultado[campoDestino] = '';
+            continue;
+        }
+
+        const conversion =
+            convertirValorSegunTipo(
+                valorOriginal,
+                campo.tipo_dato
+            );
+
+        if (!conversion.valido) {
+            errores.push(
+                `Fila ${numeroFilaExcel}: ` +
+                `"${campo.cabecera_origen}" ${conversion.error}`
+            );
+
+            continue;
+        }
+
+        resultado[campoDestino] =
+            conversion.valor;
+    }
+
+    return {
+        valido: errores.length === 0,
+        datos: resultado,
+        errores
+    };
+}
+
+function mapearFilaSegunPlantilla(row, plantilla) {
+    const resultado = {};
+
+    const columnasFila = new Map(
+        Object.keys(row || {}).map(columna => [
+            String(columna).trim().toUpperCase(),
+            columna
+        ])
+    );
+
+    for (const campo of plantilla.campos || []) {
+        const cabeceraEsperada =
+            String(campo.cabecera_origen || '').trim();
+
+        const campoDestino =
+            String(campo.campo_destino || '').trim();
+
+        if (!cabeceraEsperada || !campoDestino) {
+            continue;
+        }
+
+        const columnaReal = columnasFila.get(
+            cabeceraEsperada.toUpperCase()
+        );
+
+        let valor = '';
+
+        if (columnaReal !== undefined) {
+            valor = row[columnaReal];
+        }
+
+        resultado[campoDestino] = valor;
+    }
+
+    return resultado;
+}
+
+async function obtenerPlantillaCargaEscuchas() {
+    const token = localStorage.getItem('meca_token');
+
+    if (!token) {
+        throw new Error('No existe una sesión válida para obtener la plantilla de carga');
+    }
+
+    const response = await fetch('/api/escuchas/plantilla-carga', {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.error ||
+            `No se pudo obtener la plantilla de carga (HTTP ${response.status})`
+        );
+    }
+
+    if (
+        !data.success ||
+        !data.plantilla ||
+        !Array.isArray(data.plantilla.campos)
+    ) {
+        throw new Error('La configuración de la plantilla de carga es inválida');
+    }
+
+    return data.plantilla;
+}
+
+function validarCabecerasPlantillaEscuchas(columnasExcel, plantilla) {
+    const columnasNormalizadas = new Map(
+        columnasExcel.map(columna => [
+            String(columna).trim().toUpperCase(),
+            String(columna).trim()
+        ])
+    );
+
+    const camposActivos = Array.isArray(plantilla.campos)
+        ? plantilla.campos
+        : [];
+
+    const faltantes = [];
+
+    for (const campo of camposActivos) {
+        if (!campo.obligatorio) {
+            continue;
+        }
+
+        const cabeceraEsperada =
+            String(campo.cabecera_origen || '').trim();
+
+        if (!cabeceraEsperada) {
+            continue;
+        }
+
+        const existe = columnasNormalizadas.has(
+            cabeceraEsperada.toUpperCase()
+        );
+
+        if (!existe) {
+            faltantes.push(cabeceraEsperada);
+        }
+    }
+
+    if (faltantes.length > 0) {
+        throw new Error(
+            `El archivo no cumple con la plantilla "${plantilla.nombre}" ` +
+            `(${plantilla.version}).\n\n` +
+            `Columnas obligatorias faltantes:\n` +
+            faltantes.map(c => `• ${c}`).join('\n')
+        );
+    }
+
+    return true;
+}
+
 // ======================================================
 // 3. MODIFICACIÓN DE LA FUNCIÓN DE PROCESAMIENTO DE ARCHIVOS
 // ======================================================
@@ -60557,182 +63220,405 @@ async function reactivarCampanaUI(id) {
 const originalProcesarArchivoEscuchas = window.procesarArchivoEscuchas || function () { };
 
 window.procesarArchivoEscuchas = async function (file) {
-    console.log('📁 Iniciando procesamiento del archivo con validación de campaña:', file.name);
+    console.log('📁 Iniciando procesamiento del archivo:', file.name);
+
+    // ======================================================
+    // 1. OBTENER PLANTILLA ACTIVA/PUBLICADA DESDE BACKEND
+    // ======================================================
+
+    const plantilla = await obtenerPlantillaCargaEscuchas();
+
+    console.log(
+        `📋 Plantilla de carga: ${plantilla.codigo} ${plantilla.version}`
+    );
+
+    console.log(
+        `📋 Campos configurados: ${plantilla.campos.length}`
+    );
 
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
 
         reader.onload = async function (e) {
             try {
+                // ======================================================
+                // 2. LEER EXCEL
+                // ======================================================
+
                 const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { raw: true, defval: "" });
 
-                console.log('📊 Total de filas leídas:', jsonData.length);
-                console.log('📋 Columnas encontradas:', Object.keys(jsonData[0] || {}));
+                const workbook = XLSX.read(data, {
+                    type: 'array'
+                });
 
-                // 🔴 MAPEO DE COLUMNAS - INCLUYENDO CAMPAÑA
+                const firstSheet =
+                    workbook.Sheets[workbook.SheetNames[0]];
+
+                const jsonData = XLSX.utils.sheet_to_json(
+                    firstSheet,
+                    {
+                        raw: true,
+                        defval: ""
+                    }
+                );
+
+                console.log(
+                    '📊 Total de filas leídas:',
+                    jsonData.length
+                );
+
+                // ======================================================
+                // 3. VALIDAR QUE EL ARCHIVO TENGA REGISTROS
+                // ======================================================
+
+                if (!Array.isArray(jsonData) || jsonData.length === 0) {
+                    throw new Error(
+                        'El archivo no contiene registros para procesar.'
+                    );
+                }
+
+                // ======================================================
+                // 4. OBTENER Y VALIDAR CABECERAS
+                // ======================================================
+
+                const columnas = Object.keys(jsonData[0] || {});
+
+                console.log(
+                    '📋 Columnas encontradas:',
+                    columnas
+                );
+
+                validarCabecerasPlantillaEscuchas(
+                    columnas,
+                    plantilla
+                );
+
+                console.log(
+                    '✅ Cabeceras del Excel validadas contra la plantilla de BD'
+                );
+
+                // ======================================================
+                // 5. PROCESAR FILAS
+                //
+                // IMPORTANTE:
+                // En este paso todavía conservamos el mapeo legacy.
+                // El siguiente paso reemplazará este hardcodeo por
+                // cabecera_origen → campo_destino.
+                // ======================================================
+
                 const tickets = [];
                 const errores = [];
-                const campanasValidas = new Set();
-                const campanasInvalidas = new Set();
-
-                // 1. Obtener todas las campañas válidas para validación
-                try {
-                    const campanas = await obtenerCampanas();
-                    campanas.forEach(c => {
-                        if (c.activa) campanasValidas.add(c.codigo);
-                    });
-                    console.log(`📋 ${campanasValidas.size} campañas activas en el sistema`);
-                } catch (e) {
-                    console.warn('⚠️ No se pudieron obtener campañas:', e);
-                }
 
                 for (let i = 0; i < jsonData.length; i++) {
                     const row = jsonData[i];
+                    const numeroFilaExcel = i + 2;
 
-                    // Mapear columnas incluyendo CAMPAÑA
-                    let ticket = row['Consulta[ticket]'] || row['ticket'] || row['Ticket'] || '';
-                    let supervisor = row['Consulta[responsable]'] || row['responsable'] || row['Responsable'] || '';
-                    let gestor = row['Consulta[UsuarioMov]'] || row['UsuarioMov'] || row['usuario_mov'] || '';
-                    let auditor = row['Auditor'] || row['auditor'] || '';
-                    let motivos = row['Consulta[Motivos]'] || row['Motivos'] || row['motivos'] || '';
-                    let submotivos = row['Consulta[Submotivos]'] || row['Submotivos'] || row['submotivos'] || '';
-                    let subnivel = row['Consulta[SubNivel]'] || row['SubNivel]'] || row['subnivel'] || '';
-                    let peticion = row['PETICION'] || row['peticion'] || '';
-                    let usuario_dni = row['Consulta[UsuarioDNI]'] || row['UsuarioDNI'] || row['usuario_dni'] || '';
-                    let motivo_call = row['Consulta[motivo_call]'] || row['motivo_call'] || '';
+                    const datosFila = mapearFilaSegunPlantilla(
+                        row,
+                        plantilla
+                    );
 
-                    // 🔴 NUEVA COLUMNA: CAMPAÑA
-                    let campana = row['Campana'] || row['Campaña'] || row['campana'] || '';
+                    const validacionFila =
+                        validarYConvertirFilaSegunPlantilla(
+                            datosFila,
+                            plantilla,
+                            numeroFilaExcel
+                        );
 
-                    // Normalizar campaña (trim y upper)
-                    campana = campana.toString().trim().toUpperCase();
+                    if (!validacionFila.valido) {
+                        errores.push(
+                            ...validacionFila.errores
+                        );
 
-                    // CONVERTIR FECHA DE EXCEL
-                    let fecha_descarga_raw = row['Fecha Descarga'] || row['fecha_descarga'] || '';
-                    let fecha_descarga = '';
+                        continue;
+                    }
+
+                    const datosValidados =
+                        validacionFila.datos;
+
+                    let ticket =
+                        datosValidados.ticket || '';
+
+                    let supervisor =
+                        datosValidados.supervisor_responsable || '';
+
+                    let gestor =
+                        datosValidados.usuario_mov || '';
+
+                    let auditor =
+                        datosValidados.auditor_asignado || '';
+
+                    let motivos =
+                        datosValidados.motivos || '';
+
+                    let submotivos =
+                        datosValidados.submotivos || '';
+
+                    let subnivel =
+                        datosValidados.subnivel || '';
+
+                    let peticion =
+                        datosValidados.peticion || '';
+
+                    let usuario_dni =
+                        datosValidados.usuario_dni || '';
+
+                    let motivo_call =
+                        datosValidados.motivo_call || '';
+
+                    let quiebre =
+                        String(datosValidados.quiebre || '').trim();
+
+                    let campana =
+                        String(datosValidados.campana || '').trim();
+
+                    let fecha_descarga =
+                        datosValidados.fecha_descarga || '';
 
                     if (typeof fecha_descarga_raw === 'number') {
-                        fecha_descarga = excelSerialToDate(fecha_descarga_raw);
-                    } else if (typeof fecha_descarga_raw === 'string' && fecha_descarga_raw.match(/^\d{4}-\d{2}-\d{2}/)) {
-                        fecha_descarga = fecha_descarga_raw.split('T')[0];
-                    } else if (typeof fecha_descarga_raw === 'string' && fecha_descarga_raw.includes('/')) {
-                        const partes = fecha_descarga_raw.split('/');
+                        fecha_descarga =
+                            excelSerialToDate(fecha_descarga_raw);
+
+                    } else if (
+                        typeof fecha_descarga_raw === 'string' &&
+                        fecha_descarga_raw.match(/^\d{4}-\d{2}-\d{2}/)
+                    ) {
+                        fecha_descarga =
+                            fecha_descarga_raw.split('T')[0];
+
+                    } else if (
+                        typeof fecha_descarga_raw === 'string' &&
+                        fecha_descarga_raw.includes('/')
+                    ) {
+                        const partes =
+                            fecha_descarga_raw.split('/');
+
                         if (partes.length === 3) {
-                            fecha_descarga = `${partes[2]}-${partes[1]}-${partes[0]}`;
+                            const dia =
+                                partes[0].padStart(2, '0');
+
+                            const mes =
+                                partes[1].padStart(2, '0');
+
+                            const anio =
+                                partes[2];
+
+                            fecha_descarga =
+                                `${anio}-${mes}-${dia}`;
                         }
                     }
 
-                    // Validar ticket
-                    if (!ticket || ticket === '') {
-                        errores.push(`Fila ${i + 2}: Ticket vacío`);
+                    // ==================================================
+                    // VALIDACIONES DE FILA
+                    // ==================================================
+
+                    if (
+                        ticket === null ||
+                        ticket === undefined ||
+                        String(ticket).trim() === ''
+                    ) {
+                        errores.push(
+                            `Fila ${numeroFilaExcel}: Ticket vacío`
+                        );
+
                         continue;
                     }
 
-                    // 🔴 VALIDACIÓN DE CAMPAÑA - CRÍTICA
-                    let campanaValida = false;
-                    let campanaData = null;
-                    let errorCampana = '';
+                    if (!quiebre) {
+                        errores.push(
+                            `Fila ${numeroFilaExcel}: Quiebre vacío`
+                        );
 
-                    if (campana && campana !== '') {
-                        // Verificar si existe en la base de datos
-                        try {
-                            const resultado = await validarCampana(campana);
-                            if (resultado.valido) {
-                                campanaValida = true;
-                                campanaData = resultado.data;
-                            } else {
-                                errorCampana = resultado.error;
-                                campanasInvalidas.add(campana);
-                            }
-                        } catch (e) {
-                            errorCampana = 'Error al validar campaña: ' + e.message;
-                            campanasInvalidas.add(campana);
-                        }
-                    } else {
-                        errorCampana = 'Campaña no especificada en el archivo';
-                        campanasInvalidas.add('(vacío)');
-                    }
-
-                    // 🔴 SI LA CAMPAÑA NO ES VÁLIDA, REGISTRAR ERROR
-                    if (!campanaValida) {
-                        errores.push(`Fila ${i + 2}: Campaña inválida "${campana || '(vacío)'}" - ${errorCampana}`);
                         continue;
                     }
 
-                    // Validar auditor
-                    if (!auditor || auditor === '') {
+                    if (!campana) {
+                        errores.push(
+                            `Fila ${numeroFilaExcel}: Campaña vacía`
+                        );
+
+                        continue;
+                    }
+
+                    // La existencia y relación Quiebre ↔ Campaña
+                    // NO se valida aquí.
+                    //
+                    // Esa validación corresponde al backend mediante:
+                    // resolver_contexto_carga_escucha().
+
+                    if (
+                        !auditor ||
+                        String(auditor).trim() === ''
+                    ) {
                         auditor = 'sin_asignar';
                     }
 
+                    // ==================================================
+                    // CONSTRUIR TICKET
+                    // ==================================================
+
                     tickets.push({
-                        ticket: ticket,
-                        supervisor_responsable: supervisor,
-                        gestor_auditado: gestor,
-                        auditor_asignado: auditor,
-                        motivos: motivos,
-                        submotivos: submotivos,
-                        subnivel: subnivel,
-                        peticion: peticion,
-                        usuario_dni: usuario_dni,
-                        usuario_mov: gestor,
-                        motivo_call: motivo_call,
-                        fecha_descarga: fecha_descarga,
-                        estado: 'pendiente',
-                        // 🔴 NUEVO CAMPO
-                        campana: campana,
-                        campana_id: campanaData ? campanaData.id : null
+                        ticket: String(ticket).trim(),
+
+                        supervisor_responsable:
+                            String(supervisor || '').trim(),
+
+                        gestor_auditado:
+                            String(gestor || '').trim(),
+
+                        auditor_asignado:
+                            String(auditor || '').trim(),
+
+                        motivos:
+                            String(motivos || '').trim(),
+
+                        submotivos:
+                            String(submotivos || '').trim(),
+
+                        subnivel:
+                            String(subnivel || '').trim(),
+
+                        peticion:
+                            String(peticion || '').trim(),
+
+                        // IMPORTANTE:
+                        // mantener como texto para conservar
+                        // ceros iniciales del DNI.
+                        usuario_dni:
+                            String(usuario_dni || '').trim(),
+
+                        usuario_mov:
+                            String(gestor || '').trim(),
+
+                        motivo_call:
+                            String(motivo_call || '').trim(),
+
+                        fecha_descarga:
+                            fecha_descarga || null,
+
+                        estado:
+                            'pendiente',
+
+                        // Contexto de negocio.
+                        // Los IDs se resolverán en backend.
+                        quiebre:
+                            quiebre,
+
+                        campana:
+                            campana
                     });
                 }
 
-                console.log(`✅ Tickets procesados: ${tickets.length}`);
-                console.log(`⚠️ Errores encontrados: ${errores.length}`);
+                // ======================================================
+                // 6. RESULTADO DE VALIDACIÓN
+                // ======================================================
 
-                // 🔴 SI HAY ERRORES DE CAMPAÑA, RECHAZAR LA CARGA
+                console.log(
+                    `✅ Tickets procesados: ${tickets.length}`
+                );
+
+                console.log(
+                    `⚠️ Errores encontrados: ${errores.length}`
+                );
+
+                // ======================================================
+                // 7. RECHAZAR ARCHIVO COMPLETO SI EXISTEN ERRORES
+                // ======================================================
+
                 if (errores.length > 0) {
-                    const mensajeError = `
-❌ ERRORES EN EL ARCHIVO (${errores.length}):
+                    const primerosErrores =
+                        errores.slice(0, 10).join('\n');
 
-${errores.slice(0, 10).join('\n')}
-${errores.length > 10 ? `\n... y ${errores.length - 10} más` : ''}
+                    const erroresRestantes =
+                        errores.length > 10
+                            ? `\n... y ${errores.length - 10} más`
+                            : '';
 
-📌 SOLUCIÓN:
-1. Revise que la columna "Campaña" exista en el archivo
-2. Verifique que los valores coincidan con los registrados en el sistema (T, ST, F)
-3. Administre las campañas en el botón "📋 Administrar Campañas"
+                    const mensajeError =
+`❌ ERRORES EN EL ARCHIVO (${errores.length}):
 
-⚠️ CARGA RECHAZADA - No se distribuirá ningún ticket.
-`;
-                    reject(new Error(mensajeError));
+${primerosErrores}${erroresRestantes}
+
+📌 Revise los datos indicados antes de volver a realizar la carga.
+
+⚠️ CARGA RECHAZADA - No se distribuirá ningún ticket.`;
+
+                    reject(
+                        new Error(mensajeError)
+                    );
+
                     return;
                 }
+
+                // ======================================================
+                // 8. VALIDAR QUE HAYA TICKETS
+                // ======================================================
 
                 if (tickets.length === 0) {
-                    reject(new Error('No se encontraron tickets válidos en el archivo. Verifique que exista la columna "Consulta[ticket]" y "Campaña".'));
+                    reject(
+                        new Error(
+                            'No se encontraron tickets válidos en el archivo.'
+                        )
+                    );
+
                     return;
                 }
 
-                // 🔴 LOG DE DISTRIBUCIÓN POR CAMPAÑA
-                const distribucionCampanas = {};
-                tickets.forEach(t => {
-                    const key = t.campana || 'sin_campana';
-                    distribucionCampanas[key] = (distribucionCampanas[key] || 0) + 1;
-                });
-                console.log('📊 Distribución por campaña:', distribucionCampanas);
+                // ======================================================
+                // 9. LOG DE DISTRIBUCIÓN POR CONTEXTO
+                // ======================================================
 
-                resolve(tickets);
+                const distribucionContexto = {};
+
+                tickets.forEach(ticketActual => {
+                    const key =
+                        `${ticketActual.quiebre || 'sin_quiebre'} | ` +
+                        `${ticketActual.campana || 'sin_campana'}`;
+
+                    distribucionContexto[key] =
+                        (distribucionContexto[key] || 0) + 1;
+                });
+
+                console.log(
+                    '📊 Distribución por Quiebre/Campaña:',
+                    distribucionContexto
+                );
+
+                // ======================================================
+                // 10. DEVOLVER TICKETS
+                // ======================================================
+
+                resolve({
+                    tickets,
+                    plantilla
+                });
 
             } catch (error) {
-                console.error('❌ Error procesando el archivo:', error);
-                reject(new Error('Error al leer el archivo: ' + error.message));
+                console.error(
+                    '❌ Error procesando el archivo:',
+                    error
+                );
+
+                reject(
+                    new Error(
+                        'Error al procesar el archivo: ' +
+                        error.message
+                    )
+                );
             }
         };
 
         reader.onerror = function (error) {
-            console.error('❌ Error de lectura del archivo:', error);
-            reject(new Error('Error al leer el archivo'));
+            console.error(
+                '❌ Error de lectura del archivo:',
+                error
+            );
+
+            reject(
+                new Error(
+                    'Error al leer el archivo'
+                )
+            );
         };
 
         reader.readAsArrayBuffer(file);

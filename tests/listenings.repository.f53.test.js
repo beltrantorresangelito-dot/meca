@@ -16,36 +16,91 @@ test('LISTREPO-001 duplicado usa ticket+tarea', async () => {
   });
 
   assert.equal(await repo.assignmentExists('T1', 7), true);
-  assert.match(call.sql, /ticket = \$1 AND tarea_id = \$2/);
+  assert.match(call.sql,/ticket = \$1\s+AND tarea_id = \$2/);
   assert.deepEqual(call.params, ['T1', 7]);
 });
 
-test('LISTREPO-002 insert assignment conserva estado pendiente', async () => {
-  let params;
-  const repo = new ListeningsRepository({
-    async query(_sql, p) {
-      params = p;
-      return { rows: [{ id: 'A1' }] };
-    }
-  });
+test(
+  'LISTREPO-002 insert assignment conserva estado pendiente',
+  async () => {
+    let call;
 
-  await repo.insertAssignment({ id: 'A1', tarea_id: 2, ticket: 'T' });
-  assert.equal(params[16], 'pendiente');
-});
+    const repo = new ListeningsRepository({
+      async query(sql, params) {
+        call = {
+          sql: String(sql),
+          params
+        };
 
-test('LISTREPO-003 lote reciente conserva ventana 5 minutos', async () => {
-  let sql;
-  const repo = new ListeningsRepository({
-    async query(q) {
-      sql = String(q);
-      return { rows: [] };
-    }
-  });
+        return {
+          rows: [{ id: 'A1' }]
+        };
+      }
+    });
 
-  await repo.findRecentTaskByFilename('x.xlsx');
-  assert.match(sql, /INTERVAL '5 minutes'/);
-  assert.match(sql, /LIMIT 1/);
-});
+    await repo.insertAssignment({
+      id: 'A1',
+      tarea_id: 2,
+      ticket: 'T',
+      estado: 'pendiente'
+    });
+
+    assert.match(
+      call.sql,
+      /estado/
+    );
+
+    assert.ok(
+      call.params.includes('pendiente'),
+      'El INSERT debe conservar el estado pendiente'
+    );
+  }
+);
+
+test(
+  'LISTREPO-003 lote reciente conserva ventana 5 minutos y versión de plantilla',
+  async () => {
+    let call;
+
+    const repo = new ListeningsRepository({
+      async query(sql, params) {
+        call = {
+          sql: String(sql),
+          params
+        };
+
+        return {
+          rows: []
+        };
+      }
+    });
+
+    await repo.findRecentTaskByFilename(
+      'x.xlsx',
+      1
+    );
+
+    assert.match(
+      call.sql,
+      /INTERVAL '5 minutes'/
+    );
+
+    assert.match(
+      call.sql,
+      /version_plantilla_carga_id = \$2/
+    );
+
+    assert.match(
+      call.sql,
+      /LIMIT 1/
+    );
+
+    assert.deepEqual(
+      call.params,
+      ['x.xlsx', 1]
+    );
+  }
+);
 
 test('LISTREPO-004 transacción hace commit', async () => {
   const calls = [];

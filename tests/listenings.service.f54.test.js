@@ -69,37 +69,88 @@ test('LISTSVC-003 createTask valida obligatorios', async () => {
   );
 });
 
-test('LISTSVC-004 createTask reutiliza lote reciente', async () => {
-  const service = new ListeningsService(repository({
-    findRecentTaskByFilename: async () => ({
-      id: 10,
-      total_registros: 50
-    })
-  }));
+test(
+  'LISTSVC-004 createTask reutiliza lote reciente',
+  async () => {
+    const service =
+      new ListeningsService(
+        repository({
+          findRecentTaskByFilename:
+            async (
+              filename,
+              versionPlantillaCargaId
+            ) => {
+              assert.equal(
+                filename,
+                'x.xlsx'
+              );
 
-  const result = await service.createTask({
-    id: 20,
-    fecha_carga: '2026-08-22',
-    nombre_archivo: 'x.xlsx'
-  });
+              assert.equal(
+                versionPlantillaCargaId,
+                1
+              );
 
-  assert.equal(result.reutilizado, true);
-  assert.equal(result.id, 10);
-  assert.equal(result.total_registros, 50);
-});
+              return {
+                id: 10,
+                total_registros: 50,
+                version_plantilla_carga_id: 1
+              };
+            }
+        })
+      );
 
-test('LISTSVC-005 createTask crea lote nuevo', async () => {
-  const service = new ListeningsService(repository());
+    const result =
+      await service.createTask({
+        id: 20,
+        fecha_carga: '2026-08-22',
+        nombre_archivo: 'x.xlsx',
+        version_plantilla_carga_id: 1
+      });
 
-  const result = await service.createTask({
-    id: 20,
-    fecha_carga: '2026-08-22',
-    nombre_archivo: 'x.xlsx'
-  });
+    assert.equal(
+      result.reutilizado,
+      true
+    );
 
-  assert.equal(result.reutilizado, false);
-  assert.equal(result.id, 20);
-});
+    assert.equal(
+      result.id,
+      10
+    );
+
+    assert.equal(
+      result.total_registros,
+      50
+    );
+  }
+);
+
+test(
+  'LISTSVC-005 createTask crea lote nuevo',
+  async () => {
+    const service =
+      new ListeningsService(
+        repository()
+      );
+
+    const result =
+      await service.createTask({
+        id: 20,
+        fecha_carga: '2026-08-22',
+        nombre_archivo: 'x.xlsx',
+        version_plantilla_carga_id: 1
+      });
+
+    assert.equal(
+      result.reutilizado,
+      false
+    );
+
+    assert.equal(
+      result.id,
+      20
+    );
+  }
+);
 
 test('LISTSVC-006 deleteTask conserva 404 y success', async () => {
   const missing = new ListeningsService(repository({

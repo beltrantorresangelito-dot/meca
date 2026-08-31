@@ -1541,6 +1541,54 @@ async getEvaluationRuleByIdAndVersion(
   return result.rows[0] || null;
 }
 
+async getEvaluationRuleById(client, id) {
+    const result =
+        await client.query(
+            `
+                SELECT
+                    id,
+                    version_id,
+                    submotivo_origen,
+                    bloque_origen,
+                    atributo_origen,
+                    valor_condicion,
+                    accion_tipo,
+                    accion_valor,
+                    submotivos_afectados,
+                    excepciones,
+                    orden,
+                    activo
+                FROM reglas_evaluacion
+                WHERE id = $1
+                LIMIT 1
+            `,
+            [id]
+        );
+
+    return result.rows[0] || null;
+}
+
+
+async getEvaluationRuleVersion(client, versionId) {
+    const result =
+        await client.query(
+            `
+                SELECT
+                    id,
+                    matriz_id,
+                    version,
+                    activa,
+                    publicado_en
+                FROM versiones_matriz
+                WHERE id = $1
+                LIMIT 1
+            `,
+            [versionId]
+        );
+
+    return result.rows[0] || null;
+}
+
 async createEvaluationRule(client, data) {
   const affected = data.submotivos_afectados == null
     ? null

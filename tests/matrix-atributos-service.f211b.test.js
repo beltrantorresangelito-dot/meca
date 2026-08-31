@@ -4,10 +4,29 @@ const MatrixService = require('../src/modules/matrix/matrix.service');
 
 function repo(overrides = {}) {
   return {
-    withTransaction: async work => work({}),
+    withTransaction: async work => work({
+      query: async (_sql, params) => ({
+        rows: [{
+          id: Number(params[0]),
+          matriz_id: Number(params[1]),
+          version: 'vTEST',
+          activa: true,
+          publicado_en: null
+        }]
+      })
+    }),
     getActiveVersionId: async () => 4,
 
     getActiveFront: async () => ({
+      id: 10,
+      codigo: 'ENC',
+      nombre: 'Errores No Críticos',
+      peso_maximo: '15.00',
+      orden: 1,
+      activo: true
+    }),
+
+    getFrontByIdAndVersion: async () => ({
       id: 10,
       codigo: 'ENC',
       nombre: 'Errores No Críticos',
@@ -65,6 +84,9 @@ test('ATTRWRITE-001 create valida obligatorios y peso', async () => {
 
   await assert.rejects(
     service.createAttribute({
+      matriz_id: 1,
+      version_matriz_id: 4,
+      frente_id: 10,
       nombre: 'X'
     }),
     {
@@ -75,6 +97,8 @@ test('ATTRWRITE-001 create valida obligatorios y peso', async () => {
 
   await assert.rejects(
     service.createAttribute({
+      matriz_id: 1,
+      version_matriz_id: 4,
       frente_id: 10,
       nombre: 'X',
       peso_maximo: 0
@@ -93,6 +117,8 @@ test('ATTRWRITE-002 create rechaza si supera peso del frente', async () => {
 
   await assert.rejects(
     service.createAttribute({
+      matriz_id: 1,
+      version_matriz_id: 4,
       frente_id: 10,
       nombre: 'Nuevo',
       peso_maximo: 2
@@ -123,11 +149,13 @@ test('ATTRWRITE-003 create inserta atributo en frente de versión activa', async
   }));
 
   const result = await service.createAttribute({
+    matriz_id: 1,
+    version_matriz_id: 4,
     frente_id: 10,
     nombre: 'NUEVO ATRIBUTO',
     peso_maximo: 2,
     orden: 6
-  });
+  });;
 
   assert.equal(result.id, 50);
   assert.equal(inserted.frontId, 10);

@@ -6,6 +6,13 @@ function repo(overrides = {}) {
   return {
     withTransaction: async work => work({}),
     getActiveVersionId: async () => 4,
+    getVersionById: async (_client, versionId) => ({
+      id: versionId,
+      matriz_id: 1,
+      version: 'vTEST',
+      activa: true,
+      publicado_en: null
+    }),
     findFrontByCode: async () => null,
     sumActiveFrontWeights: async () => 70,
     insertFront: async (_client, data) => ({
@@ -44,13 +51,21 @@ test('FRWRITE-001 create valida obligatorios y peso', async () => {
   const service = new MatrixService(repo());
 
   await assert.rejects(
-    () => service.createFront({ codigo: 'X' }),
+    () => service.createFront({
+      matriz_id: 1,
+      version_matriz_id: 4,
+      codigo: 'X'
+    }),
     e => e.status === 400 && /Faltan campos/.test(e.message)
   );
 
   await assert.rejects(
     () => service.createFront({
-      codigo: 'X', nombre: 'X', peso_maximo: 101
+      matriz_id: 1,
+      version_matriz_id: 4,
+      codigo: 'X',
+      nombre: 'X',
+      peso_maximo: 101
     }),
     e => e.status === 400 && /peso debe/.test(e.message)
   );
@@ -63,7 +78,11 @@ test('FRWRITE-002 create conserva validación suma <= 100', async () => {
 
   await assert.rejects(
     () => service.createFront({
-      codigo: 'X', nombre: 'X', peso_maximo: 10
+      matriz_id: 1,
+      version_matriz_id: 4,
+      codigo: 'X',
+      nombre: 'X',
+      peso_maximo: 10
     }),
     e => e.status === 400 &&
          e.payload.suma_actual === 95 &&
@@ -82,11 +101,13 @@ test('FRWRITE-003 create inserta en versión activa', async () => {
   }));
 
   const result = await service.createFront({
+    matriz_id: 1,
+    version_matriz_id: 4,
     codigo: 'NVO',
     nombre: 'Nuevo',
     peso_maximo: 5,
     orden: 4
-  });
+  });;
 
   assert.equal(result.id, 20);
   assert.equal(inserted.versionId, 4);

@@ -3,28 +3,141 @@ class ListeningsRepository {
     this.db = db;
   }
 
-  async assignmentExists(ticket, taskId) {
-    const result = await this.db.query(
-      `SELECT id FROM asignaciones_escucha
-       WHERE ticket = $1 AND tarea_id = $2`,
-      [ticket || '', taskId]
-    );
-    return result.rows.length > 0;
+ async assignmentExists(
+  ticket,
+  taskId,
+  executor = this.db
+) {
+  const result = await executor.query(
+    `
+      SELECT id
+      FROM asignaciones_escucha
+      WHERE ticket = $1
+        AND tarea_id = $2
+    `,
+    [
+      ticket || '',
+      taskId
+    ]
+  );
+
+  return result.rows.length > 0;
+}
+
+async resolveListeningDomain(
+  quiebre,
+  campana,
+  executor = this.db
+) {
+  const result = await executor.query(
+    `
+      SELECT
+        quiebre_id,
+        quiebre_codigo,
+        quiebre_nombre,
+        campana_id,
+        campana_codigo,
+        campana_descripcion
+      FROM public.resolver_contexto_carga_escucha($1, $2)
+    `,
+    [
+      quiebre,
+      campana
+    ]
+  );
+
+  return result.rows[0] || null;
+}
+
+async getPublishedLoadTemplate(codigo) {
+  const result = await this.db.query(
+    `
+      SELECT
+        p.id AS plantilla_id,
+        p.codigo,
+        p.nombre,
+        p.descripcion,
+        vp.id AS version_id,
+        vp.version,
+        vp.publicado_en
+      FROM public.plantillas_carga p
+      INNER JOIN public.versiones_plantilla_carga vp
+        ON vp.plantilla_id = p.id
+      WHERE UPPER(TRIM(p.codigo)) = UPPER(TRIM($1))
+        AND p.activa = TRUE
+        AND vp.activa = TRUE
+        AND vp.publicado_en IS NOT NULL
+      ORDER BY vp.publicado_en DESC, vp.id DESC
+      LIMIT 1
+    `,
+    [codigo]
+  );
+
+  const template = result.rows[0];
+
+  if (!template) {
+    return null;
   }
 
-  async insertAssignment(data) {
-    const result = await this.db.query(`
+  const fieldsResult = await this.db.query(
+    `
+      SELECT
+        id,
+        cabecera_origen,
+        campo_destino,
+        tipo_dato,
+        obligatorio,
+        orden
+      FROM public.campos_plantilla_carga
+      WHERE version_plantilla_id = $1
+        AND activo = TRUE
+      ORDER BY orden ASC, id ASC
+    `,
+    [template.version_id]
+  );
+
+  return {
+    ...template,
+    campos: fieldsResult.rows || []
+  };
+}
+
+async insertAssignment(
+  data,
+  executor = this.db
+) {
+  const result = await executor.query(
+    `
       INSERT INTO asignaciones_escucha (
-        id, tarea_id, ticket, supervisor_responsable, gestor_auditado,
-        auditor_asignado, motivos, submotivos, subnivel, peticion,
-        usuario_dni, usuario_mov, motivo_call, fecha_descarga,
-        campana, campana_id, estado, fecha_asignacion, created_at, updated_at
-      ) VALUES (
+        id,
+        tarea_id,
+        ticket,
+        supervisor_responsable,
+        gestor_auditado,
+        auditor_asignado,
+        motivos,
+        submotivos,
+        subnivel,
+        peticion,
+        usuario_dni,
+        usuario_mov,
+        motivo_call,
+        fecha_descarga,
+        campana,
+        campana_id,
+        quiebre_id,
+        estado,
+        fecha_asignacion,
+        created_at,
+        updated_at
+      )
+      VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
-        $11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+        $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
       )
       RETURNING id
-    `, [
+    `,
+    [
       data.id,
       data.tarea_id,
       data.ticket || '',
@@ -41,13 +154,16 @@ class ListeningsRepository {
       data.fecha_descarga || null,
       data.campana || '',
       data.campana_id || null,
+      data.quiebre_id || null,
       data.estado || 'pendiente',
       data.fecha_asignacion || new Date().toISOString(),
       data.created_at || new Date().toISOString(),
       data.updated_at || new Date().toISOString()
-    ]);
-    return result.rows[0] || null;
-  }
+    ]
+  );
+
+  return result.rows[0] || null;
+}
 
   async listAssignments() {
     const result = await this.db.query('SELECT * FROM asignaciones_escucha');
@@ -61,35 +177,69 @@ class ListeningsRepository {
     return result.rows || [];
   }
 
-  async findRecentTaskByFilename(filename) {
-    const result = await this.db.query(`
-      SELECT id, fecha_carga, total_registros
+async findRecentTaskByFilename(
+  filename,
+  versionPlantillaCargaId,
+  executor = this.db
+) {
+  const result = await executor.query(
+    `
+      SELECT
+        id,
+        fecha_carga,
+        total_registros,
+        version_plantilla_carga_id
       FROM tareas_escucha
       WHERE nombre_archivo = $1
+        AND version_plantilla_carga_id = $2
         AND fecha_carga > NOW() - INTERVAL '5 minutes'
-      ORDER BY id DESC
+      ORDER BY fecha_carga DESC
       LIMIT 1
-    `, [filename || '']);
-    return result.rows[0] || null;
-  }
+    `,
+    [
+      filename || '',
+      versionPlantillaCargaId
+    ]
+  );
 
-  async insertTask(data) {
-    const result = await this.db.query(`
+  return result.rows[0] || null;
+}
+
+async insertTask(
+  data,
+  executor = this.db
+) {
+  const result = await executor.query(
+    `
       INSERT INTO tareas_escucha (
-        id, fecha_carga, nombre_archivo,
-        total_registros, estado, creado_por
-      ) VALUES ($1,$2,$3,$4,$5,$6)
-      RETURNING id
-    `, [
+        id,
+        fecha_carga,
+        nombre_archivo,
+        total_registros,
+        estado,
+        creado_por,
+        version_plantilla_carga_id
+      )
+      VALUES (
+        $1,$2,$3,$4,$5,$6,$7
+      )
+      RETURNING
+        id,
+        version_plantilla_carga_id
+    `,
+    [
       data.id,
       data.fecha_carga,
       data.nombre_archivo || null,
       data.total_registros || 0,
       data.estado || 'activo',
-      data.creado_por || 'supervisor'
-    ]);
-    return result.rows[0] || null;
-  }
+      data.creado_por || 'supervisor',
+      data.version_plantilla_carga_id
+    ]
+  );
+
+  return result.rows[0] || null;
+}
 
   async withTransaction(work) {
     const client = await this.db.connect();

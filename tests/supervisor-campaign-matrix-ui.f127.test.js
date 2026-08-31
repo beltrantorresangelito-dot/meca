@@ -38,11 +38,31 @@ const html =
 
 
 test(
-    'F127-UI-001 existe bloque asignación',
+    'F127-UI-001 existe bloque funcional de asignación',
     () => {
         assert.match(
             html,
-            /id=["']bloqueAsignacionCampanaMatriz["']/
+            /id=["']asignacionQuiebre["']/
+        );
+
+        assert.match(
+            html,
+            /id=["']asignacionCampana["']/
+        );
+
+        assert.match(
+            html,
+            /id=["']asignacionMatrizActualCard["']/
+        );
+
+        assert.match(
+            html,
+            /id=["']formAsignacionMatriz["']/
+        );
+
+        assert.match(
+            html,
+            /id=["']tablaHistorialCampanaMatriz["']/
         );
     }
 );

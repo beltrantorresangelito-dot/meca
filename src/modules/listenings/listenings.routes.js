@@ -31,13 +31,42 @@ function createListeningsHandler({ db } = {}) {
   const service = new ListeningsService(repository);
   const controller = new ListeningsController(service);
 
-  return async function handleListeningsRequest({
-    ruta,
-    metodo,
-    peticion,
-    respuesta,
-    query = {}
-  }) {
+  return async function handleListeningsRequest({ruta,metodo,peticion,respuesta,query = {}}) {
+    
+    if (ruta === '/api/escuchas/plantilla-carga' && metodo === 'GET') {
+      await controller.getLoadTemplate(peticion, respuesta);
+      return true;
+    }
+    
+    if (
+      ruta === '/api/escuchas/carga' &&
+      metodo === 'POST'
+    ) {
+      let body;
+
+      try {
+        body = await readJsonBody(peticion);
+      } catch (error) {
+        ListeningsController.json(
+          respuesta,
+          400,
+          {
+            error: 'JSON inválido'
+          }
+        );
+
+        return true;
+      }
+
+      await controller.createAtomicLoad(
+        peticion,
+        respuesta,
+        body
+      );
+
+      return true;
+    }
+
     if (ruta === '/api/escuchas/asignaciones' && metodo === 'POST') {
       let body;
       try {

@@ -32,6 +32,54 @@ class ListeningsController {
     }
   }
 
+async createAtomicLoad(req, res, body) {
+  if (!this.requireToken(req, res)) return;
+
+  try {
+    const result =
+      await this.service.createAtomicLoad(body);
+
+    ListeningsController.json(
+      res,
+      result.tarea?.reutilizado ? 200 : 201,
+      result
+    );
+  } catch (error) {
+    console.error(
+      'Error realizando carga atómica de escuchas:',
+      error
+    );
+
+    ListeningsController.json(
+      res,
+      error.status || 500,
+      {
+        error: error.message
+      }
+    );
+  }
+}
+
+async getLoadTemplate(req, res) {
+  if (!this.requireToken(req, res)) return;
+
+  try {
+    ListeningsController.json(
+      res,
+      200,
+      await this.service.getLoadTemplate()
+    );
+  } catch (error) {
+    console.error('Error obteniendo plantilla de carga:', error);
+
+    ListeningsController.json(
+      res,
+      error.status || 500,
+      { error: error.message }
+    );
+  }
+}
+
   async listAssignments(req, res) {
     if (!this.requireToken(req, res)) return;
 

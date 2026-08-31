@@ -5,14 +5,40 @@ const MatrixService = require('../src/modules/matrix/matrix.service');
 function repo(overrides = {}) {
   return {
     withTransaction: async work => work({}),
+
     getActiveEvaluationStructure: async () => ({
       version: 'v2.1.0',
       frentes: [{ id: 10 }],
       reglas: [{ id: 4 }]
     }),
-    createEvaluationRule: async (_c, data) => ({ id: 10, ...data }),
-    updateEvaluationRule: async (_c, id, data) => ({ id, ...data }),
-    deleteEvaluationRule: async (_c, id) => ({ id }),
+
+    getEvaluationRuleById: async (_c, id) => ({
+      id,
+      version_id: 5,
+      submotivo_origen: 'TEST'
+    }),
+
+    getEvaluationRuleVersion: async (_c, versionId) => ({
+      id: versionId,
+      version: 'vTEST',
+      activa: false,
+      publicado_en: null
+    }),
+
+    createEvaluationRule: async (_c, data) => ({
+      id: 10,
+      ...data
+    }),
+
+    updateEvaluationRule: async (_c, id, data) => ({
+      id,
+      ...data
+    }),
+
+    deleteEvaluationRule: async (_c, id) => ({
+      id
+    }),
+
     ...overrides
   };
 }
