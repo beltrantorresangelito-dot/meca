@@ -22,7 +22,7 @@ test('F11512-001 exporta contrato moderno y legacy', () => {
   );
 });
 
-test('F11512-002 adapter legacy registra seis GET', () => {
+test('F11512-002 adapter legacy registra siete GET', () => {
   const routes = {};
 
   const service = {};
@@ -35,7 +35,7 @@ test('F11512-002 adapter legacy registra seis GET', () => {
 
   assert.equal(
     registered.length,
-    6
+    7
   );
 
   for (const route of registered) {

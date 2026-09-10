@@ -29,11 +29,11 @@ function response() {
   };
 }
 
-test('DOMAPI-001 registra seis endpoints GET sin tocar rutas existentes', () => {
+test('DOMAPI-001 registra siete endpoints GET sin tocar rutas existentes', () => {
   const routes = { '/api/legacy': { GET: () => {} } };
-  const paths = registerDomainRoutes(routes, { service: service() });
+  const registered = registerDomainRoutes(routes, { service: service() });
 
-  assert.equal(paths.length, 6);
+  assert.equal(registered.length, 7);
   assert.equal(typeof routes['/api/domain/quiebres'].GET, 'function');
   assert.equal(typeof routes['/api/domain/contexto-evaluacion'].GET, 'function');
   assert.equal(typeof routes['/api/legacy'].GET, 'function');
@@ -103,7 +103,7 @@ test('DOMAPI-005 contexto pasa campanaId y fecha al Service', async () => {
   );
 
   assert.equal(res.status, 200);
-  assert.deepEqual(received, { campaignId: '7', date: '2026-08-22' });
+  assert.deepEqual(received, { campaignId: '7',breakId: null, date: '2026-08-22' });
 });
 
 test('DOMAPI-006 consistencia devuelve 409 si hay violaciones', async () => {

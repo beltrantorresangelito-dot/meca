@@ -227,101 +227,152 @@ class DomainService {
     return this.repository.listCampaignMatrixAssignments(id);
   }
 
-  async resolveContext({
-    campaignId,
-    date = null
-  }) {
+    async getBreakMatrixHistory(breakId) {
     const id =
+      DomainService.parsePositiveId(
+        breakId,
+        'quiebreId'
+      );
+
+    return this.repository
+      .listBreakMatrixAssignments(id);
+  }
+
+  async resolveContext({
+  campaignId = null,
+  breakId = null,
+  date = null
+}) {
+  const hasCampaign =
+    campaignId !== null &&
+    campaignId !== undefined &&
+    String(campaignId).trim() !== '';
+
+  const hasBreak =
+    breakId !== null &&
+    breakId !== undefined &&
+    String(breakId).trim() !== '';
+
+  // Se mantiene la prioridad histórica de campaña.
+  // El quiebre directo solo se utiliza cuando no existe campaña.
+  let normalizedCampaignId = null;
+  let normalizedBreakId = null;
+
+  if (hasCampaign) {
+    normalizedCampaignId =
       DomainService.parsePositiveId(
         campaignId,
         'campanaId'
       );
+  } else if (hasBreak) {
+    normalizedBreakId =
+      DomainService.parsePositiveId(
+        breakId,
+        'quiebreId'
+      );
+  } else {
+    const error =
+      new Error(
+        'Se requiere campanaId o quiebreId para resolver el contexto de evaluación'
+      );
 
-    const normalizedDate =
-      DomainService.normalizeDate(date);
+    error.code = 'VALIDATION_ERROR';
+    error.status = 400;
 
-    let rows;
+    throw error;
+  }
 
-    try {
-      rows =
-        await this.repository
-          .resolveEvaluationContext(
-            id,
-            normalizedDate
-          );
+  const normalizedDate =
+    DomainService.normalizeDate(date);
 
-    } catch (error) {
+  let rows;
 
-      if (
-        error?.code === 'P0001' &&
-        /No existe matriz vigente/i.test(
-          error.message || ''
-        )
-      ) {
-        const domainError =
-          new Error(error.message);
-
-        domainError.code =
-          'CONTEXT_NOT_FOUND';
-
-        domainError.status = 404;
-
-        throw domainError;
-      }
-
-      if (
-        error?.code === 'P0001' &&
-        /más de una matriz vigente/i.test(
-          error.message || ''
-        )
-      ) {
-        const domainError =
-          new Error(error.message);
-
-        domainError.code =
-          'CONTEXT_CONFLICT';
-
-        domainError.status = 409;
-
-        throw domainError;
-      }
-
-      if (
-        error?.code === 'P0001' &&
-        /no existe una versión de matriz aplicable/i.test(
-          error.message || ''
-        )
-      ) {
-        const domainError =
-          new Error(error.message);
-
-        domainError.code =
-          'VERSION_NOT_FOUND';
-
-        domainError.status = 404;
-
-        throw domainError;
-      }
-
-      throw error;
-    }
-
-    if (rows.length !== 1) {
-      const error =
-        new Error(
-          `El contexto de evaluación para campaña ${id} esperaba 1 resultado y obtuvo ${rows.length}`
+  try {
+    rows =
+      await this.repository
+        .resolveEvaluationContext(
+          normalizedCampaignId,
+          normalizedDate,
+          normalizedBreakId
         );
 
-      error.code =
-        'DOMAIN_CONFIGURATION_ERROR';
+  } catch (error) {
 
-      error.status = 409;
+    if (
+      error?.code === 'P0001' &&
+      /No existe matriz vigente/i.test(
+        error.message || ''
+      )
+    ) {
+      const domainError =
+        new Error(error.message);
 
-      throw error;
+      domainError.code =
+        'CONTEXT_NOT_FOUND';
+
+      domainError.status = 404;
+
+      throw domainError;
     }
 
-    return rows[0];
+    if (
+      error?.code === 'P0001' &&
+      /más de una matriz vigente/i.test(
+        error.message || ''
+      )
+    ) {
+      const domainError =
+        new Error(error.message);
+
+      domainError.code =
+        'CONTEXT_CONFLICT';
+
+      domainError.status = 409;
+
+      throw domainError;
+    }
+
+    if (
+      error?.code === 'P0001' &&
+      /no existe una versión de matriz aplicable/i.test(
+        error.message || ''
+      )
+    ) {
+      const domainError =
+        new Error(error.message);
+
+      domainError.code =
+        'VERSION_NOT_FOUND';
+
+      domainError.status = 404;
+
+      throw domainError;
+    }
+
+    throw error;
   }
+
+  if (rows.length !== 1) {
+    const contextDescription =
+      normalizedCampaignId !== null
+        ? `campaña ${normalizedCampaignId}`
+        : `quiebre ${normalizedBreakId}`;
+
+    const error =
+      new Error(
+        `El contexto de evaluación para ${contextDescription} esperaba 1 resultado y obtuvo ${rows.length}`
+      );
+
+    error.code =
+      'DOMAIN_CONFIGURATION_ERROR';
+
+    error.status = 409;
+
+    throw error;
+  }
+
+  return rows[0];
+}
 
   async validateConsistency() {
     const checks = await this.repository.getDomainConsistency();
@@ -1373,6 +1424,472 @@ class DomainService {
 
     return this.repository
       .setCampaignMatrixAssignmentActive(
+        assignmentId,
+        normalizedActive
+      );
+  }
+
+    async createBreakMatrixAssignment(
+    data = {}
+  ) {
+    const quiebreId =
+      DomainService.parsePositiveId(
+        data.quiebreId ??
+        data.quiebre_id,
+        'quiebreId'
+      );
+
+    const matrizId =
+      DomainService.parsePositiveId(
+        data.matrizId ??
+        data.matriz_id,
+        'matrizId'
+      );
+
+    const vigenteDesde =
+      DomainService.normalizeDateOnly(
+        data.vigenteDesde ??
+        data.vigente_desde,
+        'vigenteDesde'
+      );
+
+    const vigenteHasta =
+      DomainService.normalizeDateOnly(
+        data.vigenteHasta ??
+        data.vigente_hasta,
+        'vigenteHasta',
+        {
+          required: false
+        }
+      );
+
+    if (
+      vigenteHasta &&
+      vigenteHasta < vigenteDesde
+    ) {
+      const error =
+        new Error(
+          'vigenteHasta no puede ser anterior a vigenteDesde'
+        );
+
+      error.code = 'VALIDATION_ERROR';
+      error.status = 400;
+
+      throw error;
+    }
+
+    const quiebre =
+      await this.repository.getBreakById(
+        quiebreId
+      );
+
+    if (!quiebre) {
+      const error =
+        new Error('Quiebre no encontrado');
+
+      error.code = 'NOT_FOUND';
+      error.status = 404;
+
+      throw error;
+    }
+
+    if (!quiebre.activo) {
+      const error =
+        new Error(
+          'No se puede asignar una matriz a un quiebre inactivo'
+        );
+
+      error.code = 'VALIDATION_ERROR';
+      error.status = 400;
+
+      throw error;
+    }
+
+    const matriz =
+      await this.repository.getMatrixById(
+        matrizId
+      );
+
+    if (!matriz) {
+      const error =
+        new Error('Matriz no encontrada');
+
+      error.code = 'NOT_FOUND';
+      error.status = 404;
+
+      throw error;
+    }
+
+    if (!matriz.activa) {
+      const error =
+        new Error(
+          'No se puede asignar una matriz inactiva'
+        );
+
+      error.code = 'VALIDATION_ERROR';
+      error.status = 400;
+
+      throw error;
+    }
+
+    const activa =
+      DomainService.normalizeBoolean(
+        data.activa,
+        true
+      );
+
+    if (activa) {
+      const overlaps =
+        await this.repository
+          .findBreakMatrixOverlaps({
+            quiebreId,
+            vigenteDesde,
+            vigenteHasta
+          });
+
+      if (
+        Array.isArray(overlaps) &&
+        overlaps.length > 0
+      ) {
+        const error =
+          new Error(
+            'El quiebre ya tiene una matriz activa con vigencia solapada'
+          );
+
+        error.code =
+          'ASSIGNMENT_OVERLAP';
+
+        error.status = 409;
+
+        throw error;
+      }
+    }
+
+    try {
+      return await this.repository
+        .createBreakMatrixAssignment({
+          quiebreId,
+          matrizId,
+          vigenteDesde,
+          vigenteHasta,
+          activa
+        });
+
+    } catch (error) {
+
+      if (
+        error?.message &&
+        /vigencia solapada/i.test(
+          error.message
+        )
+      ) {
+        const overlapError =
+          new Error(
+            'El quiebre ya tiene una matriz activa con vigencia solapada'
+          );
+
+        overlapError.code =
+          'ASSIGNMENT_OVERLAP';
+
+        overlapError.status = 409;
+
+        throw overlapError;
+      }
+
+      throw error;
+    }
+  }
+
+
+  async updateBreakMatrixAssignment(
+    id,
+    data = {}
+  ) {
+    const assignmentId =
+      DomainService.parsePositiveId(
+        id,
+        'asignacionId'
+      );
+
+    const existing =
+      await this.repository
+        .getBreakMatrixAssignmentById(
+          assignmentId
+        );
+
+    if (!existing) {
+      const error =
+        new Error(
+          'Asignación quiebre-matriz no encontrada'
+        );
+
+      error.code = 'NOT_FOUND';
+      error.status = 404;
+
+      throw error;
+    }
+
+    const quiebreId =
+      DomainService.parsePositiveId(
+        data.quiebreId ??
+        data.quiebre_id ??
+        existing.quiebre_id,
+        'quiebreId'
+      );
+
+    const matrizId =
+      DomainService.parsePositiveId(
+        data.matrizId ??
+        data.matriz_id ??
+        existing.matriz_id,
+        'matrizId'
+      );
+
+    const vigenteDesde =
+      DomainService.normalizeDateOnly(
+        data.vigenteDesde ??
+        data.vigente_desde ??
+        existing.vigente_desde,
+        'vigenteDesde'
+      );
+
+    const vigenteHastaInput =
+      data.vigenteHasta !== undefined
+        ? data.vigenteHasta
+        : data.vigente_hasta !== undefined
+          ? data.vigente_hasta
+          : existing.vigente_hasta;
+
+    const vigenteHasta =
+      DomainService.normalizeDateOnly(
+        vigenteHastaInput,
+        'vigenteHasta',
+        {
+          required: false
+        }
+      );
+
+    if (
+      vigenteHasta &&
+      vigenteHasta < vigenteDesde
+    ) {
+      const error =
+        new Error(
+          'vigenteHasta no puede ser anterior a vigenteDesde'
+        );
+
+      error.code = 'VALIDATION_ERROR';
+      error.status = 400;
+
+      throw error;
+    }
+
+    const quiebre =
+      await this.repository.getBreakById(
+        quiebreId
+      );
+
+    if (!quiebre) {
+      const error =
+        new Error('Quiebre no encontrado');
+
+      error.code = 'NOT_FOUND';
+      error.status = 404;
+
+      throw error;
+    }
+
+    const matriz =
+      await this.repository.getMatrixById(
+        matrizId
+      );
+
+    if (!matriz) {
+      const error =
+        new Error('Matriz no encontrada');
+
+      error.code = 'NOT_FOUND';
+      error.status = 404;
+
+      throw error;
+    }
+
+    const activa =
+      DomainService.normalizeBoolean(
+        data.activa,
+        existing.activa
+      );
+
+    if (activa && !quiebre.activo) {
+      const error =
+        new Error(
+          'No se puede activar una asignación para un quiebre inactivo'
+        );
+
+      error.code = 'VALIDATION_ERROR';
+      error.status = 400;
+
+      throw error;
+    }
+
+    if (activa && !matriz.activa) {
+      const error =
+        new Error(
+          'No se puede activar una asignación con una matriz inactiva'
+        );
+
+      error.code = 'VALIDATION_ERROR';
+      error.status = 400;
+
+      throw error;
+    }
+
+    if (activa) {
+      const overlaps =
+        await this.repository
+          .findBreakMatrixOverlaps({
+            quiebreId,
+            vigenteDesde,
+            vigenteHasta,
+            excludeId: assignmentId
+          });
+
+      if (
+        Array.isArray(overlaps) &&
+        overlaps.length > 0
+      ) {
+        const error =
+          new Error(
+            'El quiebre ya tiene una matriz activa con vigencia solapada'
+          );
+
+        error.code =
+          'ASSIGNMENT_OVERLAP';
+
+        error.status = 409;
+
+        throw error;
+      }
+    }
+
+    return this.repository
+      .updateBreakMatrixAssignment(
+        assignmentId,
+        {
+          quiebreId,
+          matrizId,
+          vigenteDesde,
+          vigenteHasta,
+          activa
+        }
+      );
+  }
+
+
+  async setBreakMatrixAssignmentActive(
+    id,
+    activa
+  ) {
+    const assignmentId =
+      DomainService.parsePositiveId(
+        id,
+        'asignacionId'
+      );
+
+    const existing =
+      await this.repository
+        .getBreakMatrixAssignmentById(
+          assignmentId
+        );
+
+    if (!existing) {
+      const error =
+        new Error(
+          'Asignación quiebre-matriz no encontrada'
+        );
+
+      error.code = 'NOT_FOUND';
+      error.status = 404;
+
+      throw error;
+    }
+
+    const normalizedActive =
+      DomainService.normalizeBoolean(
+        activa
+      );
+
+    if (normalizedActive) {
+      const quiebre =
+        await this.repository.getBreakById(
+          existing.quiebre_id
+        );
+
+      const matriz =
+        await this.repository.getMatrixById(
+          existing.matriz_id
+        );
+
+      if (!quiebre?.activo) {
+        const error =
+          new Error(
+            'No se puede activar una asignación para un quiebre inactivo'
+          );
+
+        error.code = 'VALIDATION_ERROR';
+        error.status = 400;
+
+        throw error;
+      }
+
+      if (!matriz?.activa) {
+        const error =
+          new Error(
+            'No se puede activar una asignación con una matriz inactiva'
+          );
+
+        error.code = 'VALIDATION_ERROR';
+        error.status = 400;
+
+        throw error;
+      }
+
+      const overlaps =
+        await this.repository
+          .findBreakMatrixOverlaps({
+            quiebreId:
+              existing.quiebre_id,
+
+            vigenteDesde:
+              existing.vigente_desde,
+
+            vigenteHasta:
+              existing.vigente_hasta,
+
+            excludeId:
+              assignmentId
+          });
+
+      if (
+        Array.isArray(overlaps) &&
+        overlaps.length > 0
+      ) {
+        const error =
+          new Error(
+            'El quiebre ya tiene una matriz activa con vigencia solapada'
+          );
+
+        error.code =
+          'ASSIGNMENT_OVERLAP';
+
+        error.status = 409;
+
+        throw error;
+      }
+    }
+
+    return this.repository
+      .setBreakMatrixAssignmentActive(
         assignmentId,
         normalizedActive
       );

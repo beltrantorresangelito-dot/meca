@@ -39,78 +39,125 @@ class MatrixRepository {
     return result.rows[0] || null;
   }
 
-async getLegacyMatrixStructure(versionId) {
-  const versionResult = await this.db.query(
-    'SELECT * FROM versiones_matriz WHERE id = $1',
-    [versionId]
-  );
+  async getLegacyMatrixStructure(versionId) {
+    const versionResult = await this.db.query(
+      'SELECT * FROM versiones_matriz WHERE id = $1',
+      [versionId]
+    );
 
-  if (versionResult.rows.length === 0) {
-    return null;
-  }
+    if (versionResult.rows.length === 0) {
+      return null;
+    }
 
-  const version = versionResult.rows[0];
+    const version = versionResult.rows[0];
 
-  const frentesResult = await this.db.query(`
+    const frentesResult = await this.db.query(`
     SELECT id, codigo, nombre, peso_maximo, orden
     FROM version_frentes
     WHERE version_id = $1 AND activo = TRUE
     ORDER BY orden
   `, [versionId]);
 
-  const estructura = {
-    version,
-    frentes: []
-  };
+    const estructura = {
+      version,
+      frentes: []
+    };
 
-  for (const frente of frentesResult.rows) {
-    const atributosResult = await this.db.query(`
+    for (const frente of frentesResult.rows) {
+      const atributosResult = await this.db.query(`
       SELECT id, nombre, peso_maximo, orden
       FROM version_atributos
       WHERE version_frente_id = $1 AND activo = TRUE
       ORDER BY orden
     `, [frente.id]);
 
-    const frenteData = {
-      ...frente,
-      atributos: []
-    };
+      const frenteData = {
+        ...frente,
+        atributos: []
+      };
 
-    for (const atributo of atributosResult.rows) {
-      const subMotivosResult = await this.db.query(`
-        SELECT id, codigo, descripcion, peso_individual, orden
-        FROM version_sub_motivos
-        WHERE version_atributo_id = $1 AND activo = TRUE
-        ORDER BY orden
-      `, [atributo.id]);
+      for (const atributo of atributosResult.rows) {
+        const subMotivosResult = await this.db.query(`
+    SELECT
+        vsm.id,
+        vsm.codigo,
+        vsm.descripcion,
+        vsm.peso_individual,
+        vsm.orden,
+        vsm.clasificacion,
 
-      frenteData.atributos.push({
-        ...atributo,
-        sub_motivos: subMotivosResult.rows
-      });
+        cp.id AS clasificacion_pda_id,
+        cp.codigo AS clasificacion_pda_codigo,
+        cp.nombre AS clasificacion_pda_nombre
+
+    FROM version_sub_motivos vsm
+
+    LEFT JOIN pda_clasificaciones cp
+        ON cp.id = vsm.clasificacion_pda_id
+
+    WHERE vsm.version_atributo_id = $1
+      AND vsm.activo = TRUE
+
+    ORDER BY vsm.orden
+`, [atributo.id]);
+
+        frenteData.atributos.push({
+          ...atributo,
+
+          sub_motivos:
+            subMotivosResult.rows.map(
+              subMotivo => ({
+                id: subMotivo.id,
+                codigo: subMotivo.codigo,
+                descripcion: subMotivo.descripcion,
+                peso_individual:
+                  subMotivo.peso_individual,
+                orden: subMotivo.orden,
+
+                // Legacy temporal
+                clasificacion:
+                  subMotivo.clasificacion,
+
+                // Nueva clasificación normalizada
+                clasificacion_pda:
+                  subMotivo.clasificacion_pda_id
+                    ? {
+                      id:
+                        subMotivo.clasificacion_pda_id,
+
+                      codigo:
+                        subMotivo.clasificacion_pda_codigo,
+
+                      nombre:
+                        subMotivo.clasificacion_pda_nombre
+                    }
+                    : null
+              })
+            )
+        });
+      }
+
+      estructura.frentes.push(frenteData);
     }
 
-    estructura.frentes.push(frenteData);
+    return estructura;
   }
 
-  return estructura;
-}
 
 
-
-async matrixVersionsTableExists() {
-  const result = await this.db.query(`
+  async matrixVersionsTableExists() {
+    const result = await this.db.query(`
     SELECT EXISTS (
       SELECT FROM information_schema.tables
       WHERE table_name = 'versiones_matriz'
     );
   `);
 
-  return Boolean(result.rows[0]?.exists);
-}
+    return Boolean(result.rows[0]?.exists);
+  }
 
-async listLegacyMatrixVersions() {
-  const result = await this.db.query(`
+  async listLegacyMatrixVersions() {
+    const result = await this.db.query(`
     SELECT
       id,
       version,
@@ -125,23 +172,23 @@ async listLegacyMatrixVersions() {
     ORDER BY creado_en DESC
   `);
 
-  return result.rows;
-}
+    return result.rows;
+  }
 
 
-async getLegacyEvaluationRulesByVersion(versionId) {
-  const checkTable = await this.db.query(`
+  async getLegacyEvaluationRulesByVersion(versionId) {
+    const checkTable = await this.db.query(`
     SELECT EXISTS (
       SELECT FROM information_schema.tables
       WHERE table_name = 'reglas_evaluacion'
     );
   `);
 
-  if (!checkTable.rows[0].exists) {
-    return [];
-  }
+    if (!checkTable.rows[0].exists) {
+      return [];
+    }
 
-  const result = await this.db.query(`
+    const result = await this.db.query(`
     SELECT
       id,
       version_id,
@@ -160,12 +207,12 @@ async getLegacyEvaluationRulesByVersion(versionId) {
     ORDER BY orden
   `, [versionId]);
 
-  return result.rows;
-}
+    return result.rows;
+  }
 
 
-async listLegacyFrentes() {
-  const result = await this.db.query(`
+  async listLegacyFrentes() {
+    const result = await this.db.query(`
     SELECT
       vf.id,
       vf.codigo,
@@ -179,11 +226,11 @@ async listLegacyFrentes() {
     ORDER BY vf.orden
   `);
 
-  return result.rows;
-}
+    return result.rows;
+  }
 
-async listLegacyAtributos(frenteId = null) {
-  let sql = `
+  async listLegacyAtributos(frenteId = null) {
+    let sql = `
     SELECT
       va.id,
       va.version_frente_id AS frente_id,
@@ -196,21 +243,21 @@ async listLegacyAtributos(frenteId = null) {
     JOIN versiones_matriz vm ON vm.id = vf.version_id
     WHERE vm.activa = TRUE
   `;
-  const params = [];
+    const params = [];
 
-  if (frenteId) {
-    sql += ' AND va.version_frente_id = $1 ORDER BY va.orden';
-    params.push(frenteId);
-  } else {
-    sql += ' ORDER BY va.version_frente_id, va.orden';
+    if (frenteId) {
+      sql += ' AND va.version_frente_id = $1 ORDER BY va.orden';
+      params.push(frenteId);
+    } else {
+      sql += ' ORDER BY va.version_frente_id, va.orden';
+    }
+
+    const result = await this.db.query(sql, params);
+    return result.rows;
   }
 
-  const result = await this.db.query(sql, params);
-  return result.rows;
-}
-
-async listLegacySubMotivos(atributoId = null) {
-  let sql = `
+  async listLegacySubMotivos(atributoId = null) {
+    let sql = `
     SELECT
       vsm.id,
       vsm.version_atributo_id AS atributo_id,
@@ -225,21 +272,21 @@ async listLegacySubMotivos(atributoId = null) {
     JOIN versiones_matriz vm ON vm.id = vf.version_id
     WHERE vm.activa = TRUE
   `;
-  const params = [];
+    const params = [];
 
-  if (atributoId) {
-    sql += ' AND vsm.version_atributo_id = $1 ORDER BY vsm.orden';
-    params.push(atributoId);
-  } else {
-    sql += ' ORDER BY vsm.version_atributo_id, vsm.orden';
+    if (atributoId) {
+      sql += ' AND vsm.version_atributo_id = $1 ORDER BY vsm.orden';
+      params.push(atributoId);
+    } else {
+      sql += ' ORDER BY vsm.version_atributo_id, vsm.orden';
+    }
+
+    const result = await this.db.query(sql, params);
+    return result.rows;
   }
 
-  const result = await this.db.query(sql, params);
-  return result.rows;
-}
-
-async listLegacyEvaluationRulesAdmin() {
-  const result = await this.db.query(`
+  async listLegacyEvaluationRulesAdmin() {
+    const result = await this.db.query(`
     SELECT
       re.*,
       vm.version as version_nombre
@@ -248,83 +295,83 @@ async listLegacyEvaluationRulesAdmin() {
     ORDER BY vm.id, re.orden
   `);
 
-  return result.rows;
-}
+    return result.rows;
+  }
 
 
-async withTransaction(work) {
-  // Producción: pool.connect(). Tests: si el fake no expone connect,
-  // se usa la misma dependencia con BEGIN/COMMIT/ROLLBACK.
-  const client = typeof this.db.connect === 'function'
-    ? await this.db.connect()
-    : this.db;
+  async withTransaction(work) {
+    // Producción: pool.connect(). Tests: si el fake no expone connect,
+    // se usa la misma dependencia con BEGIN/COMMIT/ROLLBACK.
+    const client = typeof this.db.connect === 'function'
+      ? await this.db.connect()
+      : this.db;
 
-  const shouldRelease = client !== this.db && typeof client.release === 'function';
+    const shouldRelease = client !== this.db && typeof client.release === 'function';
 
-  try {
-    await client.query('BEGIN');
-    const result = await work(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
     try {
-      await client.query('ROLLBACK');
-    } catch (_) {
-      // No ocultar el error original.
+      await client.query('BEGIN');
+      const result = await work(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) {
+        // No ocultar el error original.
+      }
+      throw error;
+    } finally {
+      if (shouldRelease) client.release();
     }
-    throw error;
-  } finally {
-    if (shouldRelease) client.release();
-  }
-}
-
-async getActiveVersionId(client) {
-  const result = await client.query(
-    'SELECT id FROM versiones_matriz WHERE activa = TRUE LIMIT 1'
-  );
-  return result.rows[0]?.id || null;
-}
-
-async findFrontByCode(client, versionId, codigo, excludeId = null) {
-  const params = [versionId, codigo];
-  let sql =
-    'SELECT id FROM version_frentes WHERE version_id = $1 AND codigo = $2';
-
-  if (excludeId !== null) {
-    params.push(excludeId);
-    sql += ' AND id != $3';
   }
 
-  const result = await client.query(sql, params);
-  return result.rows[0] || null;
-}
+  async getActiveVersionId(client) {
+    const result = await client.query(
+      'SELECT id FROM versiones_matriz WHERE activa = TRUE LIMIT 1'
+    );
+    return result.rows[0]?.id || null;
+  }
 
-async getFrontByIdAndVersion(client, id, versionId) {
-  const result = await client.query(
-    `SELECT id, codigo, nombre, peso_maximo, orden, activo
+  async findFrontByCode(client, versionId, codigo, excludeId = null) {
+    const params = [versionId, codigo];
+    let sql =
+      'SELECT id FROM version_frentes WHERE version_id = $1 AND codigo = $2';
+
+    if (excludeId !== null) {
+      params.push(excludeId);
+      sql += ' AND id != $3';
+    }
+
+    const result = await client.query(sql, params);
+    return result.rows[0] || null;
+  }
+
+  async getFrontByIdAndVersion(client, id, versionId) {
+    const result = await client.query(
+      `SELECT id, codigo, nombre, peso_maximo, orden, activo
      FROM version_frentes
      WHERE id = $1 AND version_id = $2`,
-    [id, versionId]
-  );
-  return result.rows[0] || null;
-}
-
-async sumActiveFrontWeights(client, versionId, excludeId = null) {
-  const params = [versionId];
-  let sql =
-    'SELECT COALESCE(SUM(peso_maximo), 0) AS total FROM version_frentes WHERE version_id = $1 AND activo = TRUE';
-
-  if (excludeId !== null) {
-    params.push(excludeId);
-    sql += ' AND id != $2';
+      [id, versionId]
+    );
+    return result.rows[0] || null;
   }
 
-  const result = await client.query(sql, params);
-  return parseFloat(result.rows[0]?.total || 0);
-}
+  async sumActiveFrontWeights(client, versionId, excludeId = null) {
+    const params = [versionId];
+    let sql =
+      'SELECT COALESCE(SUM(peso_maximo), 0) AS total FROM version_frentes WHERE version_id = $1 AND activo = TRUE';
 
-async insertFront(client, data) {
-  const result = await client.query(`
+    if (excludeId !== null) {
+      params.push(excludeId);
+      sql += ' AND id != $2';
+    }
+
+    const result = await client.query(sql, params);
+    return parseFloat(result.rows[0]?.total || 0);
+  }
+
+  async insertFront(client, data) {
+    const result = await client.query(`
     INSERT INTO version_frentes (
       version_id,
       codigo,
@@ -337,19 +384,19 @@ async insertFront(client, data) {
     ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
     RETURNING id, codigo, nombre, peso_maximo, orden, activo
   `, [
-    data.versionId,
-    data.codigo,
-    data.nombre,
-    data.pesoMaximo,
-    data.orden,
-    data.activo
-  ]);
+      data.versionId,
+      data.codigo,
+      data.nombre,
+      data.pesoMaximo,
+      data.orden,
+      data.activo
+    ]);
 
-  return result.rows[0];
-}
+    return result.rows[0];
+  }
 
-async updateFront(client, id, data) {
-  const result = await client.query(`
+  async updateFront(client, id, data) {
+    const result = await client.query(`
     UPDATE version_frentes
     SET codigo = $1,
         nombre = $2,
@@ -360,24 +407,24 @@ async updateFront(client, id, data) {
     WHERE id = $6
     RETURNING id, codigo, nombre, peso_maximo, orden, activo
   `, [
-    data.codigo,
-    data.nombre,
-    data.pesoMaximo,
-    data.orden,
-    data.activo,
-    id
-  ]);
+      data.codigo,
+      data.nombre,
+      data.pesoMaximo,
+      data.orden,
+      data.activo,
+      id
+    ]);
 
-  return result.rows[0] || null;
-}
+    return result.rows[0] || null;
+  }
 
-async deleteFrontTree(client, id, versionId) {
-  const front = await this.getFrontByIdAndVersion(client, id, versionId);
-  if (!front) return null;
+  async deleteFrontTree(client, id, versionId) {
+    const front = await this.getFrontByIdAndVersion(client, id, versionId);
+    if (!front) return null;
 
-  // Borrado explícito y transaccional para no depender de la configuración
-  // ON DELETE CASCADE del entorno.
-  await client.query(`
+    // Borrado explícito y transaccional para no depender de la configuración
+    // ON DELETE CASCADE del entorno.
+    await client.query(`
     DELETE FROM version_sub_motivos
     WHERE version_atributo_id IN (
       SELECT va.id
@@ -386,18 +433,18 @@ async deleteFrontTree(client, id, versionId) {
     )
   `, [id]);
 
-  await client.query(
-    'DELETE FROM version_atributos WHERE version_frente_id = $1',
-    [id]
-  );
+    await client.query(
+      'DELETE FROM version_atributos WHERE version_frente_id = $1',
+      [id]
+    );
 
-  await client.query(
-    'DELETE FROM version_frentes WHERE id = $1 AND version_id = $2',
-    [id, versionId]
-  );
+    await client.query(
+      'DELETE FROM version_frentes WHERE id = $1 AND version_id = $2',
+      [id, versionId]
+    );
 
-  return front;
-}
+    return front;
+  }
 
 }
 

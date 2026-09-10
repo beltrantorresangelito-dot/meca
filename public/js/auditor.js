@@ -1745,18 +1745,33 @@ async function finalizarAuditoria() {
         escuchaActual.campanaId ??
         null;
 
+    const quiebreId =
+        escuchaActual.quiebre_id ??
+        escuchaActual.quiebreId ??
+        null;
+
     const campana =
         escuchaActual.campana ??
         null;
 
-    if (!campanaId) {
+    const tieneCampana =
+        campanaId !== null &&
+        campanaId !== undefined &&
+        String(campanaId).trim() !== '';
+
+    const tieneQuiebre =
+        quiebreId !== null &&
+        quiebreId !== undefined &&
+        String(quiebreId).trim() !== '';
+
+    if (!tieneCampana && !tieneQuiebre) {
         console.error(
-            '❌ La escucha no tiene campana_id:',
+            '❌ La escucha no tiene campana_id ni quiebre_id:',
             escuchaActual
         );
 
         alert(
-            '❌ La escucha seleccionada no tiene una campaña asociada.'
+            '❌ La escucha seleccionada no tiene un contexto de dominio válido.'
         );
 
         return;
@@ -1767,7 +1782,12 @@ async function finalizarAuditoria() {
         {
             ticket: ticketPSI,
             escucha_id: escuchaActual.id,
-            campana_id: campanaId,
+            quiebre_id: tieneQuiebre
+                ? quiebreId
+                : null,
+            campana_id: tieneCampana
+                ? campanaId
+                : null,
             campana: campana
         }
     );
@@ -1885,6 +1905,55 @@ async function finalizarAuditoria() {
 
         selects.forEach(select => {
             if (select.value) {
+                                const frenteId =
+                    Number.parseInt(
+                        select.dataset.frenteId,
+                        10
+                    );
+
+                const atributoId =
+                    Number.parseInt(
+                        select.dataset.atributoId,
+                        10
+                    );
+
+                const criterioId =
+                    Number.parseInt(
+                        select.dataset.criterioId,
+                        10
+                    );
+
+
+                if (
+                    !Number.isInteger(frenteId) ||
+                    frenteId <= 0
+                ) {
+                    throw new Error(
+                        `frente_id inválido para ${select.dataset.submotivo}`
+                    );
+                }
+
+
+                if (
+                    !Number.isInteger(atributoId) ||
+                    atributoId <= 0
+                ) {
+                    throw new Error(
+                        `atributo_id inválido para ${select.dataset.submotivo}`
+                    );
+                }
+
+
+                if (
+                    !Number.isInteger(criterioId) ||
+                    criterioId <= 0
+                ) {
+                    throw new Error(
+                        `criterio_id inválido para ${select.dataset.submotivo}`
+                    );
+                }
+
+
                 detalles.push({
                     bloque:
                         select.dataset.bloque,
@@ -1895,10 +1964,22 @@ async function finalizarAuditoria() {
                     submotivo:
                         select.dataset.submotivo,
 
+                    frente_id:
+                        frenteId,
+
+                    atributo_id:
+                        atributoId,
+
+                    criterio_id:
+                        criterioId,
+
                     peso:
                         parseFloat(
                             select.dataset.peso
                         ),
+
+                    valor_respuesta:
+                        select.value,
 
                     cumple:
                         select.value === '1' ||
@@ -1989,8 +2070,15 @@ async function finalizarAuditoria() {
         campana:
             campana,
 
+        quiebre_id:
+            tieneQuiebre
+                ? Number(quiebreId)
+                : null,
+
         campana_id:
-            Number(campanaId),
+            tieneCampana
+                ? Number(campanaId)
+                : null,
 
         // Se completará en enriquecerEvaluacionConContexto
         matriz_id:
@@ -2038,7 +2126,12 @@ async function finalizarAuditoria() {
 
         version_matriz_id:
             window.versionMatrizActualId ??
-            null
+            null,
+
+        escucha_id:
+            window.gestionEscuchaActiva
+                ? window.idEscuchaGestionando ?? null
+                : null
     };
 
     // ======================================================
@@ -2228,48 +2321,27 @@ async function finalizarAuditoria() {
     }
 
     // ======================================================
-    // 11. MARCAR ESCUCHA COMO GESTIONADA
+    // 11. CERRAR GESTIÓN DE ESCUCHA
     // ======================================================
     if (
         evaluacionGuardada &&
         window.gestionEscuchaActiva &&
         window.idEscuchaGestionando
     ) {
-        try {
-            await API.marcarEscuchaGestionada(
-                window.idEscuchaGestionando
-            );
+        console.log(
+            '✅ Evaluación y escucha guardadas ' +
+            'en una única transacción'
+        );
 
-            console.log(
-                '✅ Escucha marcada como gestionada'
-            );
+        window.gestionEscuchaActiva = false;
+        window.idEscuchaGestionando = null;
 
-            window.gestionEscuchaActiva = false;
-            window.idEscuchaGestionando = null;
+        await cargarMisEscuchas();
 
-            await cargarMisEscuchas();
-
-            showTab(
-                'misEscuchas',
-                null
-            );
-
-        } catch (error) {
-            // La evaluación YA fue guardada.
-            // No debe indicarse al usuario que se perdió.
-            console.error(
-                '⚠️ La evaluación se guardó, ' +
-                'pero no se pudo marcar la escucha ' +
-                'como gestionada:',
-                error
-            );
-
-            alert(
-                '⚠️ La evaluación fue guardada correctamente, ' +
-                'pero no se pudo actualizar el estado de la escucha.\n\n' +
-                `Detalle: ${error.message}`
-            );
-        }
+        showTab(
+            'misEscuchas',
+            null
+        );
     }
 
     // ======================================================
@@ -7813,12 +7885,24 @@ async function editarEvaluacion(id) {
             tiempoAuditoria: evaluacion.tiempo_auditoria,
             tiempoAuditoriaFormateado: evaluacion.tiempo_auditoria_formateado,
             vecesEditado: evaluacion.veces_editado || 0,
+            campana: evaluacion.campana ?? null,
+            campana_id: evaluacion.campana_id ?? null,
+            quiebre_id: evaluacion.quiebre_id ?? null,
+            matriz_id: evaluacion.matriz_id ?? null,
+            version_matriz_id: evaluacion.version_matriz_id ?? null,
             detalles: detalles.map(d => ({
                 bloque: d.bloque,
                 atributo: d.atributo,
                 submotivo: d.submotivo,
                 peso: d.peso,
-                cumple: d.cumple === true || d.cumple === 1 || d.cumple === 'true'
+
+                valor_respuesta:
+                    d.valor_respuesta ?? null,
+
+                cumple:
+                    d.cumple === true ||
+                    d.cumple === 1 ||
+                    d.cumple === 'true'
             }))
         };
 
@@ -7847,15 +7931,99 @@ async function editarEvaluacion(id) {
         showTab('evaluacion', null);
 
         // ======================================================
-        // 2i. ACTIVAR MODO EDICIÓN
+        // 2i. PREPARAR CONTEXTO HISTÓRICO DE LA EVALUACIÓN
+        // ======================================================
+        const matrizId =
+            Number(evaluacion.matriz_id);
+
+        const versionMatrizId =
+            Number(evaluacion.version_matriz_id);
+
+        if (
+            !Number.isInteger(matrizId) ||
+            matrizId <= 0 ||
+            !Number.isInteger(versionMatrizId) ||
+            versionMatrizId <= 0
+        ) {
+            throw new Error(
+                'La evaluación no tiene un contexto de matriz ' +
+                'y versión válido para edición'
+            );
+        }
+
+        window.contextoAuditoriaActual = {
+            quiebre_id:
+                evaluacion.quiebre_id ?? null,
+
+            campana_id:
+                evaluacion.campana_id ?? null,
+
+            campana:
+                evaluacion.campana ?? null,
+
+            matriz_id:
+                matrizId,
+
+            version_matriz_id:
+                versionMatrizId
+        };
+
+        window.matrizActualId =
+            matrizId;
+
+        window.versionMatrizActualId =
+            versionMatrizId;
+
+        console.log(
+            '🎯 Contexto histórico preparado para edición:',
+            {
+                evaluacion_id: evaluacion.id,
+                quiebre_id: evaluacion.quiebre_id ?? null,
+                campana_id: evaluacion.campana_id ?? null,
+                matriz_id: matrizId,
+                version_matriz_id: versionMatrizId
+            }
+        );
+
+        // ======================================================
+        // 2j. GENERAR FORMULARIO DE LA VERSIÓN HISTÓRICA
+        // ======================================================
+        const formularioGenerado =
+            await generarFormularioDinamico();
+
+        if (!formularioGenerado) {
+            throw new Error(
+                'No se pudo generar la estructura histórica ' +
+                'de la evaluación'
+            );
+        }
+
+        const selectsGenerados =
+            document.querySelectorAll('.cumple-select');
+
+        if (selectsGenerados.length === 0) {
+            throw new Error(
+                'La versión histórica no generó campos de evaluación'
+            );
+        }
+
+        console.log(
+            `✅ Estructura histórica cargada: ` +
+            `${selectsGenerados.length} campos`
+        );
+
+        // ======================================================
+        // 2k. ACTIVAR MODO EDICIÓN
         // ======================================================
         modoEdicionActivo = true;
         idEvaluacionEditando = id;
 
         // ======================================================
-        // 2j. CARGAR DATOS EN FORMULARIO
+        // 2l. CARGAR DATOS SOBRE EL FORMULARIO YA GENERADO
         // ======================================================
-        cargarDatosEvaluacionEnFormulario(evaluacionFormateada);
+        cargarDatosEvaluacionEnFormulario(
+            evaluacionFormateada
+        );
 
         // ======================================================
         // 2k. CONFIGURAR UI PARA MODO EDICIÓN
@@ -8043,10 +8211,36 @@ function cargarDatosEvaluacionEnFormulario(evaluacion) {
                 `.cumple-select[data-bloque="${detalle.bloque}"][data-submotivo="${detalle.submotivo}"]`
             );
             if (select) {
-                const valor = (detalle.cumple === true || detalle.cumple === 'true' || detalle.cumple === 1 || detalle.cumple === '1') ? '1' : '0';
-                select.value = valor;
-                const evento = new Event('change', { bubbles: true });
-                select.dispatchEvent(evento);
+                let valor = null;
+
+                if (
+                    detalle.valor_respuesta === '0' ||
+                    detalle.valor_respuesta === '1' ||
+                    detalle.valor_respuesta === 'NA'
+                ) {
+                    valor = detalle.valor_respuesta;
+                } else {
+                    const cumple =
+                        detalle.cumple === true ||
+                        detalle.cumple === 'true' ||
+                        detalle.cumple === 1 ||
+                        detalle.cumple === '1';
+
+                    if (!cumple) {
+                        valor = '0';
+                    }
+                }
+
+                if (valor !== null) {
+                    select.value = valor;
+
+                    const evento = new Event(
+                        'change',
+                        { bubbles: true }
+                    );
+
+                    select.dispatchEvent(evento);
+                }
             }
         });
     }
@@ -8099,6 +8293,7 @@ async function actualizarEvaluacionExistente() {
     }
 
     let evaluador;
+
     if (usuarioActual && usuarioActual.rol === 'AUDITOR') {
         evaluador = usuarioActual.nombre_completo;
     } else {
@@ -8119,114 +8314,276 @@ async function actualizarEvaluacionExistente() {
 
     const todosLosSelects = document.querySelectorAll('.cumple-select');
     const selectsVacios = [];
+
     todosLosSelects.forEach(select => {
         if (!select.disabled && (!select.value || select.value === '')) {
             selectsVacios.push(select);
+
+            // Se mantienen temporalmente estos estilos existentes.
+            // Su limpieza se realizará en la etapa posterior de refactor visual.
             select.style.border = '2px solid var(--danger)';
             select.style.backgroundColor = '#fff0f0';
         }
     });
 
     if (selectsVacios.length > 0) {
-        alert(`⚠️ Faltan ${selectsVacios.length} campos por evaluar. Complete todos los campos.`);
-        selectsVacios[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        alert(
+            `⚠️ Faltan ${selectsVacios.length} campos por evaluar. ` +
+            'Complete todos los campos.'
+        );
+
+        selectsVacios[0].scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+
         return;
     }
 
-    // Recalcular todos los frentes dinámicamente
+    // ======================================================
+    // RECALCULAR RESULTADO
+    // ======================================================
+
     const frentes = document.querySelectorAll('.frente-container');
+
     let totalGeneral = 0;
+
     frentes.forEach(frenteContainer => {
         const frenteCodigo = frenteContainer.dataset.frente;
+
         if (frenteCodigo) {
             totalGeneral += recalcularFrente(frenteCodigo);
         }
     });
 
     const notaFinal = totalGeneral;
-    let rango = '';
-    if (notaFinal >= 97) rango = 'Excelente';
-    else if (notaFinal >= 90) rango = 'Bien';
-    else if (notaFinal >= 85) rango = 'Regular';
-    else rango = 'Bajo';
 
-    // Obtener detalles
+    let rango = '';
+
+    if (notaFinal >= 97) {
+        rango = 'Excelente';
+    } else if (notaFinal >= 90) {
+        rango = 'Bien';
+    } else if (notaFinal >= 85) {
+        rango = 'Regular';
+    } else {
+        rango = 'Bajo';
+    }
+
+    // ======================================================
+    // CONSTRUIR DETALLES
+    // ======================================================
+
     const detalles = [];
+
     todosLosSelects.forEach(select => {
-        if (select.value) {
-            detalles.push({
-                bloque: select.dataset.bloque,
-                atributo: select.dataset.atributo,
-                submotivo: select.dataset.submotivo,
-                peso: parseFloat(select.dataset.peso),
-                cumple: select.value === '1' || select.value === 'NA'
-            });
+        if (!select.value) {
+            return;
         }
+
+        const valorRespuesta = String(select.value)
+            .trim()
+            .toUpperCase();
+
+        if (!['0', '1', 'NA'].includes(valorRespuesta)) {
+            throw new Error(
+                `Valor de evaluación inválido: ${valorRespuesta}`
+            );
+        }
+
+        const bloque =
+            select.dataset.bloque;
+
+        const atributo =
+            select.dataset.atributo;
+
+        const submotivo =
+            select.dataset.submotivo;
+
+        const peso =
+            Number.parseFloat(
+                select.dataset.peso
+            );
+
+
+        const frenteId =
+            Number.parseInt(
+                select.dataset.frenteId,
+                10
+            );
+
+        const atributoId =
+            Number.parseInt(
+                select.dataset.atributoId,
+                10
+            );
+
+        const criterioId =
+            Number.parseInt(
+                select.dataset.criterioId,
+                10
+            );
+
+
+        if (
+            !bloque ||
+            !atributo ||
+            !submotivo
+        ) {
+            throw new Error(
+                'No se pudo determinar la estructura de uno de los criterios evaluados'
+            );
+        }
+
+
+        if (
+            !Number.isFinite(peso)
+        ) {
+            throw new Error(
+                `Peso inválido para el criterio ${submotivo}`
+            );
+        }
+
+
+        if (
+            !Number.isInteger(frenteId) ||
+            frenteId <= 0
+        ) {
+            throw new Error(
+                `frente_id inválido para ${submotivo}`
+            );
+        }
+
+
+        if (
+            !Number.isInteger(atributoId) ||
+            atributoId <= 0
+        ) {
+            throw new Error(
+                `atributo_id inválido para ${submotivo}`
+            );
+        }
+
+
+        if (
+            !Number.isInteger(criterioId) ||
+            criterioId <= 0
+        ) {
+            throw new Error(
+                `criterio_id inválido para ${submotivo}`
+            );
+        }
+
+
+        detalles.push({
+            bloque,
+            atributo,
+            submotivo,
+
+            frente_id:
+                frenteId,
+
+            atributo_id:
+                atributoId,
+
+            criterio_id:
+                criterioId,
+
+            peso,
+
+            valor_respuesta:
+                valorRespuesta,
+
+            cumple:
+                valorRespuesta === '1' ||
+                valorRespuesta === 'NA'
+        });
     });
 
+    if (detalles.length === 0) {
+        alert('⚠️ La evaluación no contiene detalles para actualizar');
+        return;
+    }
+
+    // ======================================================
+    // FECHA
+    // ======================================================
+
     const fechaObj = new Date(fechaRaw);
-    const fechaFormateada = `${fechaObj.getDate().toString().padStart(2, '0')}/${(fechaObj.getMonth() + 1).toString().padStart(2, '0')}/${fechaObj.getFullYear()} ${fechaObj.getHours().toString().padStart(2, '0')}:${fechaObj.getMinutes().toString().padStart(2, '0')}`;
+
+    if (Number.isNaN(fechaObj.getTime())) {
+        alert('⚠️ La fecha de evaluación no es válida');
+        return;
+    }
+
+    const fechaFormateada =
+        `${fechaObj.getDate().toString().padStart(2, '0')}/` +
+        `${(fechaObj.getMonth() + 1).toString().padStart(2, '0')}/` +
+        `${fechaObj.getFullYear()} ` +
+        `${fechaObj.getHours().toString().padStart(2, '0')}:` +
+        `${fechaObj.getMinutes().toString().padStart(2, '0')}`;
+
+    // ======================================================
+    // PAYLOAD
+    // ======================================================
+
+    const evaluacionActualizada = {
+        total_enc: 0,
+        total_ecuf: 0,
+        total_ecn: 0,
+
+        nota_final: Number(notaFinal.toFixed(1)),
+        rango,
+
+        fecha: fechaRaw,
+        fecha_formateada: fechaFormateada,
+
+        detalles
+    };
+
+    // ======================================================
+    // ACTUALIZACIÓN TRANSACCIONAL
+    // ======================================================
 
     try {
-        const client = getDB();
-        if (!client || typeof client.from !== 'function') {
-            throw new Error('Base de datos no disponible');
+        const resultado = await API.actualizarEvaluacion(
+            idEvaluacionEditando,
+            evaluacionActualizada
+        );
+
+        const vecesEditado =
+            resultado?.veces_editado ??
+            resultado?.vecesEditado ??
+            null;
+
+        let mensaje =
+            `✅ Evaluación actualizada correctamente\n\n` +
+            `🎯 Nueva nota: ${notaFinal.toFixed(1)}% (${rango})`;
+
+        if (vecesEditado !== null) {
+            mensaje += `\n✏️ Veces editado: ${vecesEditado}`;
         }
 
-        const { data: evaluacionOriginal } = await client
-            .from('evaluaciones')
-            .select('veces_editado')
-            .eq('id', idEvaluacionEditando)
-            .single();
-
-        const nuevasEdiciones = (evaluacionOriginal?.veces_editado || 0) + 1;
-
-        // 🔴 USAR EL TOTAL GENERAL DINÁMICO
-        const { error: updateError } = await client
-            .from('evaluaciones')
-            .update({
-                total_enc: 0, // Ya no se usa, se calcula dinámicamente
-                total_ecuf: 0,
-                total_ecn: 0,
-                nota_final: notaFinal.toFixed(1),
-                rango: rango,
-                fecha: fechaRaw,
-                fecha_formateada: fechaFormateada,
-                fecha_modificacion: new Date().toLocaleString('es-ES'),
-                veces_editado: nuevasEdiciones
-            })
-            .eq('id', idEvaluacionEditando);
-
-        if (updateError) throw updateError;
-
-        await client
-            .from('detalles_evaluacion')
-            .delete()
-            .eq('evaluacion_id', idEvaluacionEditando);
-
-        const detallesParaInsertar = detalles.map(d => ({
-            evaluacion_id: idEvaluacionEditando,
-            bloque: d.bloque,
-            atributo: d.atributo,
-            submotivo: d.submotivo,
-            peso: d.peso,
-            cumple: d.cumple
-        }));
-
-        await client
-            .from('detalles_evaluacion')
-            .insert(detallesParaInsertar);
-
-        alert(`✅ Evaluación actualizada correctamente\n\n🎯 Nueva nota: ${notaFinal.toFixed(1)}% (${rango})\n✏️ Veces editado: ${nuevasEdiciones}`);
+        alert(mensaje);
 
         await actualizarContadorHeader();
+
         salirModoEdicion();
-        cargarHistorialEvaluaciones();
+
+        await cargarHistorialEvaluaciones();
+
         limpiarFormularioCompleto();
 
     } catch (error) {
-        console.error('Error al actualizar:', error);
-        alert(`❌ Error al actualizar: ${error.message}`);
+        console.error(
+            '❌ Error al actualizar evaluación:',
+            error
+        );
+
+        alert(
+            `❌ No se pudo actualizar la evaluación.\n\n` +
+            `${error?.message || 'Error desconocido'}`
+        );
     }
 }
 
@@ -9331,14 +9688,23 @@ async function generarFormularioDinamico() {
                     html += `
                         <div class="eval-row" data-submotivo="${sub.codigo}">
                             <span>${sub.descripcion} (${sub.peso_individual}%)</span>
-                            <select class="cumple-select" 
-                                    data-bloque="${frente.codigo}"
-                                    data-atributo="${atributo.nombre}"
-                                    data-submotivo="${sub.codigo}"
-                                    data-peso="${sub.peso_individual}"
-                                    data-version-id="${estructura.version.id}"
-                                    disabled
-                                    onchange="manejarCambioSelectConReglas(this)">
+                            <select class="cumple-select"
+                                data-bloque="${frente.codigo}"
+
+                                data-frente-id="${frente.id}"
+
+                                data-atributo="${atributo.nombre}"
+                                data-atributo-id="${atributo.id}"
+
+                                data-submotivo="${sub.codigo}"
+                                data-criterio-id="${sub.id}"
+
+                                data-peso="${sub.peso_individual}"
+
+                                data-version-id="${estructura.version.id}"
+
+                                disabled
+                                onchange="manejarCambioSelectConReglas(this)">
                                 <option value="">Seleccione</option>
                                 <option value="1">Cumple</option>
                                 <option value="0">No Cumple</option>
@@ -11250,12 +11616,23 @@ function normalizarFechaParaContexto(
 }
 
 async function resolverContextoAuditoria(
-    campanaId,
-    fecha = null
+    campanaId = null,
+    fecha = null,
+    quiebreId = null
 ) {
-    if (!campanaId) {
+    const tieneCampana =
+        campanaId !== null &&
+        campanaId !== undefined &&
+        String(campanaId).trim() !== '';
+
+    const tieneQuiebre =
+        quiebreId !== null &&
+        quiebreId !== undefined &&
+        String(quiebreId).trim() !== '';
+
+    if (!tieneCampana && !tieneQuiebre) {
         throw new Error(
-            'campanaId es obligatorio para resolver el contexto de auditoría'
+            'Se requiere campanaId o quiebreId para resolver el contexto de auditoría'
         );
     }
 
@@ -11266,10 +11643,20 @@ async function resolverContextoAuditoria(
             fecha
         );
 
-    params.set(
-        'campanaId',
-        String(campanaId)
-    );
+    // Prioridad contractual:
+    // si existe Campaña, resolver por Campaña.
+    // Solo si no existe, resolver directamente por Quiebre.
+    if (tieneCampana) {
+        params.set(
+            'campanaId',
+            String(campanaId)
+        );
+    } else {
+        params.set(
+            'quiebreId',
+            String(quiebreId)
+        );
+    }
 
     if (fechaContexto) {
         params.set(
@@ -11335,13 +11722,15 @@ async function resolverContextoAuditoria(
 }
 
 async function aplicarContextoAuditoria(
-    campanaId,
-    fecha = null
+    campanaId = null,
+    fecha = null,
+    quiebreId = null
 ) {
     const contexto =
         await resolverContextoAuditoria(
             campanaId,
-            fecha
+            fecha,
+            quiebreId
         );
 
     window.contextoAuditoriaActual =
@@ -11375,16 +11764,43 @@ async function resolverContextoDesdeEscucha(
         escucha.campanaId ??
         null;
 
+    const quiebreId =
+        escucha.quiebre_id ??
+        escucha.quiebreId ??
+        null;
+
     const fecha =
         escucha.fecha ??
         escucha.fecha_escucha ??
+        escucha.fecha_descarga ??
         escucha.fecha_gestion ??
         escucha.fecha_asignacion ??
         null;
 
+    const tieneCampana =
+        campanaId !== null &&
+        campanaId !== undefined &&
+        String(campanaId).trim() !== '';
+
+    const tieneQuiebre =
+        quiebreId !== null &&
+        quiebreId !== undefined &&
+        String(quiebreId).trim() !== '';
+
+    if (!tieneCampana && !tieneQuiebre) {
+        throw new Error(
+            'La escucha no tiene campana_id ni quiebre_id para resolver su contexto'
+        );
+    }
+
     return aplicarContextoAuditoria(
-        campanaId,
-        fecha
+        tieneCampana
+            ? campanaId
+            : null,
+        fecha,
+        tieneCampana
+            ? null
+            : quiebreId
     );
 }
 
@@ -11512,6 +11928,15 @@ async function enriquecerEvaluacionConContexto(
         contexto?.campanaId ??
         null;
 
+    let quiebreId =
+        evaluacion.quiebre_id ??
+        evaluacion.quiebreId ??
+        escucha?.quiebre_id ??
+        escucha?.quiebreId ??
+        contexto?.quiebre_id ??
+        contexto?.quiebreId ??
+        null;
+
     const ticketPSI =
         evaluacion.ticketPSI ??
         evaluacion.ticket_psi ??
@@ -11520,20 +11945,30 @@ async function enriquecerEvaluacionConContexto(
         escucha?.ticketPSI ??
         null;
 
-    if (!campanaId && ticketPSI) {
+    // Compatibilidad con evaluaciones legacy:
+    // si todavía no tenemos contexto, intentar recuperar
+    // la escucha real por ticket.
+    if (!campanaId && !quiebreId && ticketPSI) {
         const resuelta =
             await resolverCampanaDesdeAsignacion(
                 ticketPSI
             );
 
-        if (resuelta?.campana_id) {
-            campanaId =
-                resuelta.campana_id;
-
+        if (resuelta?.escucha) {
             if (!escucha) {
                 escucha =
                     resuelta.escucha;
             }
+
+            campanaId =
+                resuelta.escucha.campana_id ??
+                resuelta.escucha.campanaId ??
+                null;
+
+            quiebreId =
+                resuelta.escucha.quiebre_id ??
+                resuelta.escucha.quiebreId ??
+                null;
         }
     }
 
@@ -11541,6 +11976,7 @@ async function enriquecerEvaluacionConContexto(
         evaluacion.fecha ??
         escucha?.fecha ??
         escucha?.fecha_escucha ??
+        escucha?.fecha_descarga ??
         escucha?.fecha_gestion ??
         null;
 
@@ -11551,11 +11987,27 @@ async function enriquecerEvaluacionConContexto(
             ? Number(campanaId)
             : null;
 
-    if (!contexto && campanaIdNormalizado) {
+    const quiebreIdNormalizado =
+        quiebreId !== null &&
+        quiebreId !== undefined &&
+        String(quiebreId).trim() !== ''
+            ? Number(quiebreId)
+            : null;
+
+    if (
+        !contexto &&
+        (
+            campanaIdNormalizado ||
+            quiebreIdNormalizado
+        )
+    ) {
         contexto =
             await aplicarContextoAuditoria(
                 campanaIdNormalizado,
-                fecha
+                fecha,
+                campanaIdNormalizado
+                    ? null
+                    : quiebreIdNormalizado
             );
     }
 
@@ -11572,9 +12024,21 @@ async function enriquecerEvaluacionConContexto(
         window.versionMatrizActualId ??
         null;
 
-    if (!campanaIdNormalizado) {
+    const quiebreContexto =
+        contexto?.quiebre_id ??
+        contexto?.quiebreId ??
+        quiebreIdNormalizado ??
+        null;
+
+    const campanaContexto =
+        contexto?.campana_id ??
+        contexto?.campanaId ??
+        campanaIdNormalizado ??
+        null;
+
+    if (!campanaContexto && !quiebreContexto) {
         throw new Error(
-            'No se puede guardar la evaluación sin campana_id'
+            'No se puede guardar la evaluación sin campana_id o quiebre_id'
         );
     }
 
@@ -11592,10 +12056,21 @@ async function enriquecerEvaluacionConContexto(
 
     return {
         ...evaluacion,
-        campana_id: campanaIdNormalizado,
-        matriz_id: matrizId,
-        versionMatrizId: versionMatrizId,
-        version_matriz_id: versionMatrizId
+
+        quiebre_id:
+            quiebreContexto,
+
+        campana_id:
+            campanaContexto,
+
+        matriz_id:
+            matrizId,
+
+        versionMatrizId:
+            versionMatrizId,
+
+        version_matriz_id:
+            versionMatrizId
     };
 }
 
@@ -11614,6 +12089,11 @@ function validarContextoPersistenciaEvaluacion(
         evaluacion.campanaId ??
         null;
 
+    const quiebreId =
+        evaluacion.quiebre_id ??
+        evaluacion.quiebreId ??
+        null;
+
     const matrizId =
         evaluacion.matriz_id ??
         evaluacion.matrizId ??
@@ -11624,10 +12104,10 @@ function validarContextoPersistenciaEvaluacion(
         evaluacion.versionMatrizId ??
         null;
 
-    if (!campanaId) {
+    if (!campanaId && !quiebreId) {
         return {
             ok: false,
-            error: 'campana_id requerido'
+            error: 'campana_id o quiebre_id requerido'
         };
     }
 
@@ -11647,9 +12127,14 @@ function validarContextoPersistenciaEvaluacion(
 
     return {
         ok: true,
-        campana_id: campanaId,
-        matriz_id: matrizId,
-        version_matriz_id: versionMatrizId
+        quiebre_id:
+            quiebreId || null,
+        campana_id:
+            campanaId || null,
+        matriz_id:
+            matrizId,
+        version_matriz_id:
+            versionMatrizId
     };
 }
 

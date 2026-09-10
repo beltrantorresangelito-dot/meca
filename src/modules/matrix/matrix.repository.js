@@ -16,7 +16,7 @@ class MatrixRepository {
     `, [matrizId]);
 
     return result.rows[0] || null;
-}
+  }
 
 
   async getLegacyEvaluationActiveVersion(matrizId) {
@@ -30,9 +30,9 @@ class MatrixRepository {
     `, [matrizId]);
 
     return result.rows[0] || null;
-}
+  }
 
-async getLegacyMatrixVersionByDate(matrizId, date) {
+  async getLegacyMatrixVersionByDate(matrizId, date) {
     const result = await this.db.query(`
         SELECT *
         FROM versiones_matriz
@@ -41,86 +41,348 @@ async getLegacyMatrixVersionByDate(matrizId, date) {
         ORDER BY fecha_vigencia DESC, id DESC
         LIMIT 1
     `, [
-        matrizId,
-        date
+      matrizId,
+      date
     ]);
     return result.rows[0] || null;
-}
+  }
 
 async getLegacyMatrixStructure(versionId) {
+
+  // =========================================================
+  // 1. OBTENER VERSIÓN DE MATRIZ
+  // =========================================================
+
   const versionResult = await this.db.query(
-    'SELECT * FROM versiones_matriz WHERE id = $1',
+    `
+      SELECT *
+      FROM versiones_matriz
+      WHERE id = $1
+    `,
     [versionId]
   );
+
 
   if (versionResult.rows.length === 0) {
     return null;
   }
 
-  const version = versionResult.rows[0];
 
-  const frentesResult = await this.db.query(`
-    SELECT id, codigo, nombre, peso_maximo, orden
-    FROM version_frentes
-    WHERE version_id = $1 AND activo = TRUE
-    ORDER BY orden
-  `, [versionId]);
+  const version =
+    versionResult.rows[0];
+
+
+  // =========================================================
+  // 2. RESOLVER CONTEXTO MAESTRO
+  //    MATRIZ -> QUIEBRE
+  // =========================================================
+  //
+  // versiones_matriz.matriz_id
+  //          ↓
+  // matrices.id
+  //          ↓
+  // matrices.quiebre_id
+  //          ↓
+  // quiebres.id
+  //
+  // Esto permite que el frontend NO tenga que resolver
+  // nombres a partir de IDs ni consultar directamente la BD.
+  // =========================================================
+
+  let matriz = null;
+  let quiebre = null;
+
+
+  if (version.matriz_id) {
+
+    const contextoResult =
+      await this.db.query(
+        `
+          SELECT
+            m.id AS matriz_id,
+            m.codigo AS matriz_codigo,
+            m.nombre AS matriz_nombre,
+            m.descripcion AS matriz_descripcion,
+            m.activa AS matriz_activa,
+
+            q.id AS quiebre_id,
+            q.codigo AS quiebre_codigo,
+            q.nombre AS quiebre_nombre,
+            q.descripcion AS quiebre_descripcion,
+            q.activo AS quiebre_activo
+
+          FROM matrices m
+
+          JOIN quiebres q
+            ON q.id = m.quiebre_id
+
+          WHERE m.id = $1
+
+          LIMIT 1
+        `,
+        [
+          version.matriz_id
+        ]
+      );
+
+
+    const contexto =
+      contextoResult.rows[0] ||
+      null;
+
+
+    if (contexto) {
+
+      matriz = {
+        id:
+          contexto.matriz_id,
+
+        codigo:
+          contexto.matriz_codigo,
+
+        nombre:
+          contexto.matriz_nombre,
+
+        descripcion:
+          contexto.matriz_descripcion,
+
+        activa:
+          contexto.matriz_activa,
+
+        quiebre_id:
+          contexto.quiebre_id
+      };
+
+
+      quiebre = {
+        id:
+          contexto.quiebre_id,
+
+        codigo:
+          contexto.quiebre_codigo,
+
+        nombre:
+          contexto.quiebre_nombre,
+
+        descripcion:
+          contexto.quiebre_descripcion,
+
+        activo:
+          contexto.quiebre_activo
+      };
+    }
+  }
+
+
+  // =========================================================
+  // 3. FRENTES DE LA VERSIÓN
+  // =========================================================
+
+  const frentesResult =
+    await this.db.query(
+      `
+        SELECT
+          id,
+          codigo,
+          nombre,
+          peso_maximo,
+          orden
+
+        FROM version_frentes
+
+        WHERE version_id = $1
+          AND activo = TRUE
+
+        ORDER BY orden
+      `,
+      [versionId]
+    );
+
+
+  // =========================================================
+  // 4. CONSTRUIR ESTRUCTURA BASE
+  // =========================================================
 
   const estructura = {
+
+    // Se conserva el contrato existente.
     version,
+
+    // Nuevo contexto resuelto desde backend.
+    matriz,
+
+    quiebre,
+
     frentes: []
   };
 
+
+  // =========================================================
+  // 5. ATRIBUTOS
+  // =========================================================
+
   for (const frente of frentesResult.rows) {
-    const atributosResult = await this.db.query(`
-      SELECT id, nombre, peso_maximo, orden
-      FROM version_atributos
-      WHERE version_frente_id = $1 AND activo = TRUE
-      ORDER BY orden
-    `, [frente.id]);
+
+    const atributosResult =
+      await this.db.query(
+        `
+          SELECT
+            id,
+            nombre,
+            peso_maximo,
+            orden
+
+          FROM version_atributos
+
+          WHERE version_frente_id = $1
+            AND activo = TRUE
+
+          ORDER BY orden
+        `,
+        [
+          frente.id
+        ]
+      );
+
 
     const frenteData = {
       ...frente,
+
       atributos: []
     };
 
+
+    // =======================================================
+    // 6. SUBMOTIVOS / CRITERIOS
+    // =======================================================
+
     for (const atributo of atributosResult.rows) {
-      const subMotivosResult = await this.db.query(`
-        SELECT id, codigo, descripcion, peso_individual, orden
-        FROM version_sub_motivos
-        WHERE version_atributo_id = $1 AND activo = TRUE
-        ORDER BY orden
-      `, [atributo.id]);
+
+      const subMotivosResult =
+        await this.db.query(
+          `
+            SELECT
+              vsm.id,
+              vsm.codigo,
+              vsm.descripcion,
+              vsm.peso_individual,
+              vsm.orden,
+              vsm.clasificacion,
+
+              cp.id
+                AS clasificacion_pda_id,
+
+              cp.codigo
+                AS clasificacion_pda_codigo,
+
+              cp.nombre
+                AS clasificacion_pda_nombre
+
+            FROM version_sub_motivos vsm
+
+            LEFT JOIN clasificaciones_pda cp
+              ON cp.id =
+                vsm.clasificacion_pda_id
+
+            WHERE
+              vsm.version_atributo_id = $1
+
+              AND vsm.activo = TRUE
+
+            ORDER BY
+              vsm.orden
+          `,
+          [
+            atributo.id
+          ]
+        );
+
 
       frenteData.atributos.push({
+
         ...atributo,
-        sub_motivos: subMotivosResult.rows
+
+
+        sub_motivos:
+          subMotivosResult.rows.map(
+            subMotivo => ({
+
+              id:
+                subMotivo.id,
+
+              codigo:
+                subMotivo.codigo,
+
+              descripcion:
+                subMotivo.descripcion,
+
+              peso_individual:
+                subMotivo.peso_individual,
+
+              orden:
+                subMotivo.orden,
+
+              // Compatibilidad histórica.
+              clasificacion:
+                subMotivo.clasificacion,
+
+
+              // Clasificación PDA normalizada.
+              clasificacion_pda:
+                subMotivo
+                  .clasificacion_pda_id
+
+                  ? {
+                    id:
+                      subMotivo
+                        .clasificacion_pda_id,
+
+                    codigo:
+                      subMotivo
+                        .clasificacion_pda_codigo,
+
+                    nombre:
+                      subMotivo
+                        .clasificacion_pda_nombre
+                  }
+
+                  : null
+            })
+          )
       });
     }
 
-    estructura.frentes.push(frenteData);
+
+    estructura.frentes.push(
+      frenteData
+    );
   }
+
+
+  // =========================================================
+  // 7. RESULTADO
+  // =========================================================
 
   return estructura;
 }
 
 
 
-async matrixVersionsTableExists() {
-  const result = await this.db.query(`
+  async matrixVersionsTableExists() {
+    const result = await this.db.query(`
     SELECT EXISTS (
       SELECT FROM information_schema.tables
       WHERE table_name = 'versiones_matriz'
     );
   `);
 
-  return Boolean(result.rows[0]?.exists);
-}
+    return Boolean(result.rows[0]?.exists);
+  }
 
-async listLegacyMatrixVersions(matrizId = null) {
-  const params = [];
+  async listLegacyMatrixVersions(matrizId = null) {
+    const params = [];
 
-  let sql = `
+    let sql = `
     SELECT
       id,
       matriz_id,
@@ -135,43 +397,43 @@ async listLegacyMatrixVersions(matrizId = null) {
     FROM versiones_matriz
   `;
 
-  if (matrizId !== null && matrizId !== undefined) {
-    params.push(matrizId);
+    if (matrizId !== null && matrizId !== undefined) {
+      params.push(matrizId);
 
-    sql += `
+      sql += `
       WHERE matriz_id = $1
       ORDER BY fecha_vigencia DESC, creado_en DESC, id DESC
     `;
-  } else {
-    /*
-     * Compatibilidad legacy:
-     * el endpoint histórico sin matriz conserva
-     * exactamente su orden original.
-     */
-    sql += `
+    } else {
+      /*
+       * Compatibilidad legacy:
+       * el endpoint histórico sin matriz conserva
+       * exactamente su orden original.
+       */
+      sql += `
       ORDER BY creado_en DESC
     `;
+    }
+
+    const result = await this.db.query(sql, params);
+
+    return result.rows;
   }
 
-  const result = await this.db.query(sql, params);
 
-  return result.rows;
-}
-
-
-async getLegacyEvaluationRulesByVersion(versionId) {
-  const checkTable = await this.db.query(`
+  async getLegacyEvaluationRulesByVersion(versionId) {
+    const checkTable = await this.db.query(`
     SELECT EXISTS (
       SELECT FROM information_schema.tables
       WHERE table_name = 'reglas_evaluacion'
     );
   `);
 
-  if (!checkTable.rows[0].exists) {
-    return [];
-  }
+    if (!checkTable.rows[0].exists) {
+      return [];
+    }
 
-  const result = await this.db.query(`
+    const result = await this.db.query(`
     SELECT
       id,
       version_id,
@@ -190,19 +452,19 @@ async getLegacyEvaluationRulesByVersion(versionId) {
     ORDER BY orden
   `, [versionId]);
 
-  return result.rows;
-}
+    return result.rows;
+  }
 
 
-async listLegacyFrentes(matrizId = null) {
-  const hasMatrizId =
-    matrizId !== null &&
-    matrizId !== undefined &&
-    matrizId !== '';
+  async listLegacyFrentes(matrizId = null) {
+    const hasMatrizId =
+      matrizId !== null &&
+      matrizId !== undefined &&
+      matrizId !== '';
 
-  const params = [];
+    const params = [];
 
-  let sql = `
+    let sql = `
     SELECT
       vf.id,
       vf.codigo,
@@ -216,24 +478,24 @@ async listLegacyFrentes(matrizId = null) {
     WHERE vm.activa = TRUE
   `;
 
-  if (hasMatrizId) {
-    params.push(Number(matrizId));
-    sql += ` AND vm.matriz_id = $1`;
+    if (hasMatrizId) {
+      params.push(Number(matrizId));
+      sql += ` AND vm.matriz_id = $1`;
+    }
+
+    sql += ` ORDER BY vf.orden`;
+
+    const result =
+      await this.db.query(sql, params);
+
+    return result.rows;
   }
 
-  sql += ` ORDER BY vf.orden`;
-
-  const result =
-    await this.db.query(sql, params);
-
-  return result.rows;
-}
-
-async listLegacyAtributos(
-  frenteId = null,
-  matrizId = null
-) {
-  let sql = `
+  async listLegacyAtributos(
+    frenteId = null,
+    matrizId = null
+  ) {
+    let sql = `
     SELECT
       va.id,
       va.version_frente_id AS frente_id,
@@ -249,48 +511,48 @@ async listLegacyAtributos(
     WHERE vm.activa = TRUE
   `;
 
-  const params = [];
+    const params = [];
 
-  const hasMatrizId =
-    matrizId !== null &&
-    matrizId !== undefined &&
-    matrizId !== '';
+    const hasMatrizId =
+      matrizId !== null &&
+      matrizId !== undefined &&
+      matrizId !== '';
 
-  if (hasMatrizId) {
-    params.push(Number(matrizId));
+    if (hasMatrizId) {
+      params.push(Number(matrizId));
 
-    sql +=
-      ` AND vm.matriz_id = $${params.length}`;
+      sql +=
+        ` AND vm.matriz_id = $${params.length}`;
+    }
+
+    if (frenteId) {
+      params.push(frenteId);
+
+      sql +=
+        ` AND va.version_frente_id = $${params.length}`;
+    }
+
+    if (frenteId) {
+      sql += ` ORDER BY va.orden`;
+    } else {
+      sql +=
+        ` ORDER BY va.version_frente_id, va.orden`;
+    }
+
+    const result =
+      await this.db.query(
+        sql,
+        params
+      );
+
+    return result.rows;
   }
 
-  if (frenteId) {
-    params.push(frenteId);
-
-    sql +=
-      ` AND va.version_frente_id = $${params.length}`;
-  }
-
-  if (frenteId) {
-    sql += ` ORDER BY va.orden`;
-  } else {
-    sql +=
-      ` ORDER BY va.version_frente_id, va.orden`;
-  }
-
-  const result =
-    await this.db.query(
-      sql,
-      params
-    );
-
-  return result.rows;
-}
-
-async listLegacySubMotivos(
-  atributoId = null,
-  matrizId = null
-) {
-  let sql = `
+  async listLegacySubMotivos(
+    atributoId = null,
+    matrizId = null
+  ) {
+    let sql = `
     SELECT
       vsm.id,
       vsm.version_atributo_id AS atributo_id,
@@ -309,47 +571,47 @@ async listLegacySubMotivos(
     WHERE vm.activa = TRUE
   `;
 
-  const params = [];
+    const params = [];
 
-  const hasMatrizId =
-    matrizId !== null &&
-    matrizId !== undefined &&
-    matrizId !== '';
+    const hasMatrizId =
+      matrizId !== null &&
+      matrizId !== undefined &&
+      matrizId !== '';
 
-  if (hasMatrizId) {
-    params.push(Number(matrizId));
+    if (hasMatrizId) {
+      params.push(Number(matrizId));
 
-    sql +=
-      ` AND vm.matriz_id = $${params.length}`;
+      sql +=
+        ` AND vm.matriz_id = $${params.length}`;
+    }
+
+    if (atributoId) {
+      params.push(atributoId);
+
+      sql +=
+        ` AND vsm.version_atributo_id = $${params.length}`;
+    }
+
+    if (atributoId) {
+      sql += ` ORDER BY vsm.orden`;
+    } else {
+      sql +=
+        ` ORDER BY vsm.version_atributo_id, vsm.orden`;
+    }
+
+    const result =
+      await this.db.query(
+        sql,
+        params
+      );
+
+    return result.rows;
   }
 
-  if (atributoId) {
-    params.push(atributoId);
+  async listLegacyEvaluationRulesAdmin(matrizId = null) {
+    const params = [];
 
-    sql +=
-      ` AND vsm.version_atributo_id = $${params.length}`;
-  }
-
-  if (atributoId) {
-    sql += ` ORDER BY vsm.orden`;
-  } else {
-    sql +=
-      ` ORDER BY vsm.version_atributo_id, vsm.orden`;
-  }
-
-  const result =
-    await this.db.query(
-      sql,
-      params
-    );
-
-  return result.rows;
-}
-
-async listLegacyEvaluationRulesAdmin(matrizId = null) {
-  const params = [];
-
-  let sql = `
+    let sql = `
     SELECT
       re.*,
       vm.version AS version_nombre
@@ -358,101 +620,101 @@ async listLegacyEvaluationRulesAdmin(matrizId = null) {
       ON re.version_id = vm.id
   `;
 
-  if (
-    matrizId !== null &&
-    matrizId !== undefined &&
-    matrizId !== ''
-  ) {
-    params.push(Number(matrizId));
+    if (
+      matrizId !== null &&
+      matrizId !== undefined &&
+      matrizId !== ''
+    ) {
+      params.push(Number(matrizId));
 
-    sql += `
+      sql += `
       WHERE vm.matriz_id = $1
     `;
-  }
+    }
 
-  sql += `
+    sql += `
     ORDER BY vm.id, re.orden
   `;
 
-  const result = await this.db.query(sql, params);
+    const result = await this.db.query(sql, params);
 
-  return result.rows;
-}
+    return result.rows;
+  }
 
 
-async withTransaction(work) {
-  // Producción: pool.connect(). Tests: si el fake no expone connect,
-  // se usa la misma dependencia con BEGIN/COMMIT/ROLLBACK.
-  const client = typeof this.db.connect === 'function'
-    ? await this.db.connect()
-    : this.db;
+  async withTransaction(work) {
+    // Producción: pool.connect(). Tests: si el fake no expone connect,
+    // se usa la misma dependencia con BEGIN/COMMIT/ROLLBACK.
+    const client = typeof this.db.connect === 'function'
+      ? await this.db.connect()
+      : this.db;
 
-  const shouldRelease = client !== this.db && typeof client.release === 'function';
+    const shouldRelease = client !== this.db && typeof client.release === 'function';
 
-  try {
-    await client.query('BEGIN');
-    const result = await work(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
     try {
-      await client.query('ROLLBACK');
-    } catch (_) {
-      // No ocultar el error original.
+      await client.query('BEGIN');
+      const result = await work(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (_) {
+        // No ocultar el error original.
+      }
+      throw error;
+    } finally {
+      if (shouldRelease) client.release();
     }
-    throw error;
-  } finally {
-    if (shouldRelease) client.release();
-  }
-}
-
-async getActiveVersionId(client) {
-  const result = await client.query(
-    'SELECT id FROM versiones_matriz WHERE activa = TRUE LIMIT 1'
-  );
-  return result.rows[0]?.id || null;
-}
-
-async findFrontByCode(client, versionId, codigo, excludeId = null) {
-  const params = [versionId, codigo];
-  let sql =
-    'SELECT id FROM version_frentes WHERE version_id = $1 AND codigo = $2';
-
-  if (excludeId !== null) {
-    params.push(excludeId);
-    sql += ' AND id != $3';
   }
 
-  const result = await client.query(sql, params);
-  return result.rows[0] || null;
-}
+  async getActiveVersionId(client) {
+    const result = await client.query(
+      'SELECT id FROM versiones_matriz WHERE activa = TRUE LIMIT 1'
+    );
+    return result.rows[0]?.id || null;
+  }
 
-async getFrontByIdAndVersion(client, id, versionId) {
-  const result = await client.query(
-    `SELECT id, codigo, nombre, peso_maximo, orden, activo
+  async findFrontByCode(client, versionId, codigo, excludeId = null) {
+    const params = [versionId, codigo];
+    let sql =
+      'SELECT id FROM version_frentes WHERE version_id = $1 AND codigo = $2';
+
+    if (excludeId !== null) {
+      params.push(excludeId);
+      sql += ' AND id != $3';
+    }
+
+    const result = await client.query(sql, params);
+    return result.rows[0] || null;
+  }
+
+  async getFrontByIdAndVersion(client, id, versionId) {
+    const result = await client.query(
+      `SELECT id, codigo, nombre, peso_maximo, orden, activo
      FROM version_frentes
      WHERE id = $1 AND version_id = $2`,
-    [id, versionId]
-  );
-  return result.rows[0] || null;
-}
-
-async sumActiveFrontWeights(client, versionId, excludeId = null) {
-  const params = [versionId];
-  let sql =
-    'SELECT COALESCE(SUM(peso_maximo), 0) AS total FROM version_frentes WHERE version_id = $1 AND activo = TRUE';
-
-  if (excludeId !== null) {
-    params.push(excludeId);
-    sql += ' AND id != $2';
+      [id, versionId]
+    );
+    return result.rows[0] || null;
   }
 
-  const result = await client.query(sql, params);
-  return parseFloat(result.rows[0]?.total || 0);
-}
+  async sumActiveFrontWeights(client, versionId, excludeId = null) {
+    const params = [versionId];
+    let sql =
+      'SELECT COALESCE(SUM(peso_maximo), 0) AS total FROM version_frentes WHERE version_id = $1 AND activo = TRUE';
 
-async insertFront(client, data) {
-  const result = await client.query(`
+    if (excludeId !== null) {
+      params.push(excludeId);
+      sql += ' AND id != $2';
+    }
+
+    const result = await client.query(sql, params);
+    return parseFloat(result.rows[0]?.total || 0);
+  }
+
+  async insertFront(client, data) {
+    const result = await client.query(`
     INSERT INTO version_frentes (
       version_id,
       codigo,
@@ -465,19 +727,19 @@ async insertFront(client, data) {
     ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
     RETURNING id, codigo, nombre, peso_maximo, orden, activo
   `, [
-    data.versionId,
-    data.codigo,
-    data.nombre,
-    data.pesoMaximo,
-    data.orden,
-    data.activo
-  ]);
+      data.versionId,
+      data.codigo,
+      data.nombre,
+      data.pesoMaximo,
+      data.orden,
+      data.activo
+    ]);
 
-  return result.rows[0];
-}
+    return result.rows[0];
+  }
 
-async updateFront(client, id, data) {
-  const result = await client.query(`
+  async updateFront(client, id, data) {
+    const result = await client.query(`
     UPDATE version_frentes
     SET codigo = $1,
         nombre = $2,
@@ -488,24 +750,24 @@ async updateFront(client, id, data) {
     WHERE id = $6
     RETURNING id, codigo, nombre, peso_maximo, orden, activo
   `, [
-    data.codigo,
-    data.nombre,
-    data.pesoMaximo,
-    data.orden,
-    data.activo,
-    id
-  ]);
+      data.codigo,
+      data.nombre,
+      data.pesoMaximo,
+      data.orden,
+      data.activo,
+      id
+    ]);
 
-  return result.rows[0] || null;
-}
+    return result.rows[0] || null;
+  }
 
-async deleteFrontTree(client, id, versionId) {
-  const front = await this.getFrontByIdAndVersion(client, id, versionId);
-  if (!front) return null;
+  async deleteFrontTree(client, id, versionId) {
+    const front = await this.getFrontByIdAndVersion(client, id, versionId);
+    if (!front) return null;
 
-  // Borrado explícito y transaccional para no depender de la configuración
-  // ON DELETE CASCADE del entorno.
-  await client.query(`
+    // Borrado explícito y transaccional para no depender de la configuración
+    // ON DELETE CASCADE del entorno.
+    await client.query(`
     DELETE FROM version_sub_motivos
     WHERE version_atributo_id IN (
       SELECT va.id
@@ -514,32 +776,32 @@ async deleteFrontTree(client, id, versionId) {
     )
   `, [id]);
 
-  await client.query(
-    'DELETE FROM version_atributos WHERE version_frente_id = $1',
-    [id]
-  );
+    await client.query(
+      'DELETE FROM version_atributos WHERE version_frente_id = $1',
+      [id]
+    );
 
-  await client.query(
-    'DELETE FROM version_frentes WHERE id = $1 AND version_id = $2',
-    [id, versionId]
-  );
+    await client.query(
+      'DELETE FROM version_frentes WHERE id = $1 AND version_id = $2',
+      [id, versionId]
+    );
 
-  return front;
-}
+    return front;
+  }
 
 
-async getActiveFront(client, frontId, versionId) {
-  const result = await client.query(
-    `SELECT id, codigo, nombre, peso_maximo, orden, activo
+  async getActiveFront(client, frontId, versionId) {
+    const result = await client.query(
+      `SELECT id, codigo, nombre, peso_maximo, orden, activo
      FROM version_frentes
      WHERE id = $1 AND version_id = $2 AND activo = TRUE`,
-    [frontId, versionId]
-  );
-  return result.rows[0] || null;
-}
+      [frontId, versionId]
+    );
+    return result.rows[0] || null;
+  }
 
-async getAttributeInActiveVersion(client, attributeId, versionId) {
-  const result = await client.query(`
+  async getAttributeInActiveVersion(client, attributeId, versionId) {
+    const result = await client.query(`
     SELECT
       va.id,
       va.version_frente_id AS frente_id,
@@ -553,18 +815,18 @@ async getAttributeInActiveVersion(client, attributeId, versionId) {
       AND vf.version_id = $2
   `, [attributeId, versionId]);
 
-  return result.rows[0] || null;
-}
+    return result.rows[0] || null;
+  }
 
-async findAttributeByName(
-  client,
-  versionId,
-  frontId,
-  nombre,
-  excludeId = null
-) {
-  const params = [versionId, frontId, nombre];
-  let sql = `
+  async findAttributeByName(
+    client,
+    versionId,
+    frontId,
+    nombre,
+    excludeId = null
+  ) {
+    const params = [versionId, frontId, nombre];
+    let sql = `
     SELECT va.id
     FROM version_atributos va
     JOIN version_frentes vf ON vf.id = va.version_frente_id
@@ -573,23 +835,23 @@ async findAttributeByName(
       AND va.nombre = $3
   `;
 
-  if (excludeId !== null) {
-    params.push(excludeId);
-    sql += ' AND va.id != $4';
+    if (excludeId !== null) {
+      params.push(excludeId);
+      sql += ' AND va.id != $4';
+    }
+
+    const result = await client.query(sql, params);
+    return result.rows[0] || null;
   }
 
-  const result = await client.query(sql, params);
-  return result.rows[0] || null;
-}
-
-async sumActiveAttributeWeights(
-  client,
-  versionId,
-  frontId,
-  excludeId = null
-) {
-  const params = [versionId, frontId];
-  let sql = `
+  async sumActiveAttributeWeights(
+    client,
+    versionId,
+    frontId,
+    excludeId = null
+  ) {
+    const params = [versionId, frontId];
+    let sql = `
     SELECT COALESCE(SUM(va.peso_maximo), 0) AS total
     FROM version_atributos va
     JOIN version_frentes vf ON vf.id = va.version_frente_id
@@ -598,17 +860,17 @@ async sumActiveAttributeWeights(
       AND va.activo = TRUE
   `;
 
-  if (excludeId !== null) {
-    params.push(excludeId);
-    sql += ' AND va.id != $3';
+    if (excludeId !== null) {
+      params.push(excludeId);
+      sql += ' AND va.id != $3';
+    }
+
+    const result = await client.query(sql, params);
+    return parseFloat(result.rows[0]?.total || 0);
   }
 
-  const result = await client.query(sql, params);
-  return parseFloat(result.rows[0]?.total || 0);
-}
-
-async insertAttribute(client, data) {
-  const result = await client.query(`
+  async insertAttribute(client, data) {
+    const result = await client.query(`
     INSERT INTO version_atributos (
       version_frente_id,
       nombre,
@@ -625,18 +887,18 @@ async insertAttribute(client, data) {
               orden,
               activo
   `, [
-    data.frontId,
-    data.nombre,
-    data.pesoMaximo,
-    data.orden,
-    data.activo
-  ]);
+      data.frontId,
+      data.nombre,
+      data.pesoMaximo,
+      data.orden,
+      data.activo
+    ]);
 
-  return result.rows[0];
-}
+    return result.rows[0];
+  }
 
-async updateAttribute(client, id, data) {
-  const result = await client.query(`
+  async updateAttribute(client, id, data) {
+    const result = await client.query(`
     UPDATE version_atributos
     SET version_frente_id = $1,
         nombre = $2,
@@ -652,64 +914,111 @@ async updateAttribute(client, id, data) {
               orden,
               activo
   `, [
-    data.frontId,
-    data.nombre,
-    data.pesoMaximo,
-    data.orden,
-    data.activo,
-    id
-  ]);
+      data.frontId,
+      data.nombre,
+      data.pesoMaximo,
+      data.orden,
+      data.activo,
+      id
+    ]);
 
-  return result.rows[0] || null;
-}
+    return result.rows[0] || null;
+  }
 
-async countAttributeSubReasons(client, attributeId) {
-  const result = await client.query(
-    `SELECT COUNT(*)::int AS total
+  async countAttributeSubReasons(client, attributeId) {
+    const result = await client.query(
+      `SELECT COUNT(*)::int AS total
      FROM version_sub_motivos
      WHERE version_atributo_id = $1`,
-    [attributeId]
-  );
-  return Number(result.rows[0]?.total || 0);
-}
+      [attributeId]
+    );
+    return Number(result.rows[0]?.total || 0);
+  }
 
-async deleteAttributeTree(client, attributeId, versionId) {
-  const attribute = await this.getAttributeInActiveVersion(
-    client,
-    attributeId,
-    versionId
-  );
+  async deleteAttributeTree(client, attributeId, versionId) {
+    const attribute = await this.getAttributeInActiveVersion(
+      client,
+      attributeId,
+      versionId
+    );
 
-  if (!attribute) return null;
+    if (!attribute) return null;
 
-  const totalSubReasons = await this.countAttributeSubReasons(
-    client,
-    attributeId
-  );
+    const totalSubReasons = await this.countAttributeSubReasons(
+      client,
+      attributeId
+    );
 
-  await client.query(
-    'DELETE FROM version_sub_motivos WHERE version_atributo_id = $1',
-    [attributeId]
-  );
+    await client.query(
+      'DELETE FROM version_sub_motivos WHERE version_atributo_id = $1',
+      [attributeId]
+    );
 
-  await client.query(
-    `DELETE FROM version_atributos va
+    await client.query(
+      `DELETE FROM version_atributos va
      USING version_frentes vf
      WHERE va.id = $1
        AND va.version_frente_id = vf.id
        AND vf.version_id = $2`,
-    [attributeId, versionId]
-  );
+      [attributeId, versionId]
+    );
 
-  return {
-    attribute,
-    totalSubReasons
-  };
-}
+    return {
+      attribute,
+      totalSubReasons
+    };
+  }
+
+  async findPdaClassificationById(
+    client,
+    classificationId
+  ) {
+    const result = await client.query(`
+    SELECT
+      id,
+      codigo,
+      nombre,
+      activo
+
+    FROM clasificaciones_pda
+
+    WHERE id = $1
+      AND activo = TRUE
+  `, [
+      classificationId
+    ]);
+
+    return result.rows[0] || null;
+  }
 
 
-async getSubReasonInActiveVersion(client, subReasonId, versionId) {
-  const result = await client.query(`
+  async findPdaClassificationByCode(
+    client,
+    codigo
+  ) {
+    const result = await client.query(`
+    SELECT
+      id,
+      codigo,
+      nombre,
+      activo
+
+    FROM clasificaciones_pda
+
+    WHERE UPPER(TRIM(codigo)) =
+          UPPER(TRIM($1))
+      AND activo = TRUE
+
+    LIMIT 1
+  `, [
+      codigo
+    ]);
+
+    return result.rows[0] || null;
+  }
+
+  async getSubReasonInActiveVersion(client, subReasonId, versionId) {
+    const result = await client.query(`
     SELECT
       vsm.id,
       vsm.version_atributo_id AS atributo_id,
@@ -718,7 +1027,8 @@ async getSubReasonInActiveVersion(client, subReasonId, versionId) {
       vsm.peso_individual,
       vsm.orden,
       vsm.activo,
-      vsm.clasificacion
+      vsm.clasificacion,
+      vsm.clasificacion_pda_id
     FROM version_sub_motivos vsm
     JOIN version_atributos va ON va.id = vsm.version_atributo_id
     JOIN version_frentes vf ON vf.id = va.version_frente_id
@@ -726,18 +1036,18 @@ async getSubReasonInActiveVersion(client, subReasonId, versionId) {
       AND vf.version_id = $2
   `, [subReasonId, versionId]);
 
-  return result.rows[0] || null;
-}
+    return result.rows[0] || null;
+  }
 
-async findSubReasonByCode(
-  client,
-  versionId,
-  attributeId,
-  codigo,
-  excludeId = null
-) {
-  const params = [versionId, codigo, attributeId];
-  let sql = `
+  async findSubReasonByCode(
+    client,
+    versionId,
+    attributeId,
+    codigo,
+    excludeId = null
+  ) {
+    const params = [versionId, codigo, attributeId];
+    let sql = `
     SELECT vsm.id
     FROM version_sub_motivos vsm
     JOIN version_atributos va ON va.id = vsm.version_atributo_id
@@ -747,23 +1057,23 @@ async findSubReasonByCode(
       AND vsm.version_atributo_id = $3
   `;
 
-  if (excludeId !== null) {
-    params.push(excludeId);
-    sql += ' AND vsm.id != $4';
+    if (excludeId !== null) {
+      params.push(excludeId);
+      sql += ' AND vsm.id != $4';
+    }
+
+    const result = await client.query(sql, params);
+    return result.rows[0] || null;
   }
 
-  const result = await client.query(sql, params);
-  return result.rows[0] || null;
-}
-
-async sumActiveSubReasonWeights(
-  client,
-  versionId,
-  attributeId,
-  excludeId = null
-) {
-  const params = [versionId, attributeId];
-  let sql = `
+  async sumActiveSubReasonWeights(
+    client,
+    versionId,
+    attributeId,
+    excludeId = null
+  ) {
+    const params = [versionId, attributeId];
+    let sql = `
     SELECT COALESCE(SUM(vsm.peso_individual), 0) AS total
     FROM version_sub_motivos vsm
     JOIN version_atributos va ON va.id = vsm.version_atributo_id
@@ -773,17 +1083,17 @@ async sumActiveSubReasonWeights(
       AND vsm.activo = TRUE
   `;
 
-  if (excludeId !== null) {
-    params.push(excludeId);
-    sql += ' AND vsm.id != $3';
+    if (excludeId !== null) {
+      params.push(excludeId);
+      sql += ' AND vsm.id != $3';
+    }
+
+    const result = await client.query(sql, params);
+    return parseFloat(result.rows[0]?.total || 0);
   }
 
-  const result = await client.query(sql, params);
-  return parseFloat(result.rows[0]?.total || 0);
-}
-
-async insertSubReason(client, data) {
-  const result = await client.query(`
+  async insertSubReason(client, data) {
+    const result = await client.query(`
     INSERT INTO version_sub_motivos (
       version_atributo_id,
       codigo,
@@ -791,71 +1101,105 @@ async insertSubReason(client, data) {
       peso_individual,
       orden,
       activo,
+
+      clasificacion,
+      clasificacion_pda_id,
+
       created_at,
       updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-    RETURNING id,
-              version_atributo_id AS atributo_id,
-              codigo,
-              descripcion,
-              peso_individual,
-              orden,
-              activo,
-              clasificacion
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      $6,
+      $7,
+      $8,
+      NOW(),
+      NOW()
+    )
+    RETURNING
+      id,
+      version_atributo_id AS atributo_id,
+      codigo,
+      descripcion,
+      peso_individual,
+      orden,
+      activo,
+      clasificacion,
+      clasificacion_pda_id
   `, [
-    data.attributeId,
-    data.codigo,
-    data.descripcion,
-    data.peso,
-    data.orden,
-    data.activo
-  ]);
+      data.attributeId,
+      data.codigo,
+      data.descripcion,
+      data.peso,
+      data.orden,
+      data.activo,
 
-  return result.rows[0];
-}
+      data.clasificacionLegacy,
+      data.clasificacionPdaId
+    ]);
 
-async updateSubReason(client, id, data) {
-  const result = await client.query(`
+    return result.rows[0];
+  }
+
+  async updateSubReason(client, id, data) {
+    const result = await client.query(`
     UPDATE version_sub_motivos
-    SET version_atributo_id = $1,
-        codigo = $2,
-        descripcion = $3,
-        peso_individual = $4,
-        orden = $5,
-        activo = $6,
-        updated_at = NOW()
-    WHERE id = $7
-    RETURNING id,
-              version_atributo_id AS atributo_id,
-              codigo,
-              descripcion,
-              peso_individual,
-              orden,
-              activo,
-              clasificacion
+    SET
+      version_atributo_id = $1,
+      codigo = $2,
+      descripcion = $3,
+      peso_individual = $4,
+      orden = $5,
+      activo = $6,
+
+      clasificacion = $7,
+      clasificacion_pda_id = $8,
+
+      updated_at = NOW()
+
+    WHERE id = $9
+
+    RETURNING
+      id,
+      version_atributo_id AS atributo_id,
+      codigo,
+      descripcion,
+      peso_individual,
+      orden,
+      activo,
+      clasificacion,
+      clasificacion_pda_id
   `, [
-    data.attributeId,
-    data.codigo,
-    data.descripcion,
-    data.peso,
-    data.orden,
-    data.activo,
-    id
-  ]);
+      data.attributeId,
+      data.codigo,
+      data.descripcion,
+      data.peso,
+      data.orden,
+      data.activo,
 
-  return result.rows[0] || null;
-}
+      data.clasificacionLegacy,
+      data.clasificacionPdaId,
 
-async deleteSubReason(client, id, versionId) {
-  const current = await this.getSubReasonInActiveVersion(
-    client,
-    id,
-    versionId
-  );
+      id
+    ]);
 
-  if (!current) return null;
+    return result.rows[0] || null;
+  }
 
-  await client.query(`
+  async deleteSubReason(client, id, versionId) {
+    const current = await this.getSubReasonInActiveVersion(
+      client,
+      id,
+      versionId
+    );
+
+    if (!current) return null;
+
+    await client.query(`
     DELETE FROM version_sub_motivos vsm
     USING version_atributos va, version_frentes vf
     WHERE vsm.id = $1
@@ -864,28 +1208,28 @@ async deleteSubReason(client, id, versionId) {
       AND vf.version_id = $2
   `, [id, versionId]);
 
-  return current;
-}
+    return current;
+  }
 
 
-async getActiveVersionSource(client, matrizId = null) {
-  const hasMatrizId =
-    matrizId !== null &&
-    matrizId !== undefined &&
-    matrizId !== '';
+  async getActiveVersionSource(client, matrizId = null) {
+    const hasMatrizId =
+      matrizId !== null &&
+      matrizId !== undefined &&
+      matrizId !== '';
 
-  if (hasMatrizId) {
-    const parsedMatrizId = Number(matrizId);
+    if (hasMatrizId) {
+      const parsedMatrizId = Number(matrizId);
 
-    if (
-      !Number.isInteger(parsedMatrizId) ||
-      parsedMatrizId <= 0
-    ) {
-      return null;
-    }
+      if (
+        !Number.isInteger(parsedMatrizId) ||
+        parsedMatrizId <= 0
+      ) {
+        return null;
+      }
 
-    const result = await client.query(
-      `
+      const result = await client.query(
+        `
         SELECT
           id,
           matriz_id,
@@ -896,18 +1240,18 @@ async getActiveVersionSource(client, matrizId = null) {
         ORDER BY fecha_vigencia DESC, id DESC
         LIMIT 1
       `,
-      [parsedMatrizId]
-    );
+        [parsedMatrizId]
+      );
 
-    return result.rows[0] || null;
-  }
+      return result.rows[0] || null;
+    }
 
-  /*
-   * Compatibilidad legacy temporal.
-   * Mientras existan consumidores que todavía no transportan
-   * matriz_id, se conserva el comportamiento histórico.
-   */
-  const result = await client.query(`
+    /*
+     * Compatibilidad legacy temporal.
+     * Mientras existan consumidores que todavía no transportan
+     * matriz_id, se conserva el comportamiento histórico.
+     */
+    const result = await client.query(`
     SELECT
       id,
       matriz_id,
@@ -917,26 +1261,26 @@ async getActiveVersionSource(client, matrizId = null) {
     LIMIT 1
   `);
 
-  return result.rows[0] || null;
-}
+    return result.rows[0] || null;
+  }
 
-async getVersionById(client, id) {
-  const result = await client.query(`
+  async getVersionById(client, id) {
+    const result = await client.query(`
     SELECT id, matriz_id, version, descripcion, fecha_vigencia, activa
     FROM versiones_matriz
     WHERE id = $1
   `, [id]);
-  return result.rows[0] || null;
-}
+    return result.rows[0] || null;
+  }
 
-async findVersionByName(
-  client,
-  matrizId,
-  version
-) {
-  const result =
-    await client.query(
-      `
+  async findVersionByName(
+    client,
+    matrizId,
+    version
+  ) {
+    const result =
+      await client.query(
+        `
         SELECT
           id,
           matriz_id,
@@ -946,23 +1290,23 @@ async findVersionByName(
           AND version = $2
         LIMIT 1
       `,
-      [
-        matrizId,
-        version
-      ]
-    );
+        [
+          matrizId,
+          version
+        ]
+      );
 
-  return result.rows[0] || null;
-}
+    return result.rows[0] || null;
+  }
 
-async insertVersion(client, {
-  matrizId,
-  version,
-  descripcion,
-  fechaVigencia = null,
-  activa = false
-}) {
-  const result = await client.query(`
+  async insertVersion(client, {
+    matrizId,
+    version,
+    descripcion,
+    fechaVigencia = null,
+    activa = false
+  }) {
+    const result = await client.query(`
     INSERT INTO versiones_matriz (
       matriz_id,
       version,
@@ -974,111 +1318,164 @@ async insertVersion(client, {
     ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
     RETURNING *
   `, [
-    matrizId,
-    version,
-    descripcion,
-    fechaVigencia,
-    activa,
-    'Sistema'
-  ]);
-  return result.rows[0];
-}
+      matrizId,
+      version,
+      descripcion,
+      fechaVigencia,
+      activa,
+      'Sistema'
+    ]);
+    return result.rows[0];
+  }
 
-async copyVersionTree(client, sourceVersionId, targetVersionId) {
-  const frentes = await client.query(`
+  async copyVersionTree(client, sourceVersionId, targetVersionId) {
+    const frentes = await client.query(`
     SELECT id, codigo, nombre, peso_maximo, orden, activo
     FROM version_frentes
     WHERE version_id = $1
     ORDER BY orden, id
   `, [sourceVersionId]);
 
-  const frontMap = new Map();
-  let totalAttributes = 0;
-  let totalSubReasons = 0;
+    const frontMap = new Map();
+    let totalAttributes = 0;
+    let totalSubReasons = 0;
 
-  for (const front of frentes.rows) {
-    const insertedFront = await client.query(`
+    for (const front of frentes.rows) {
+      const insertedFront = await client.query(`
       INSERT INTO version_frentes (
         version_id, codigo, nombre, peso_maximo, orden, activo,
         created_at, updated_at
       ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
       RETURNING id
     `, [
-      targetVersionId,
-      front.codigo,
-      front.nombre,
-      front.peso_maximo,
-      front.orden,
-      front.activo
-    ]);
+        targetVersionId,
+        front.codigo,
+        front.nombre,
+        front.peso_maximo,
+        front.orden,
+        front.activo
+      ]);
 
-    frontMap.set(front.id, insertedFront.rows[0].id);
-  }
+      frontMap.set(front.id, insertedFront.rows[0].id);
+    }
 
-  for (const [oldFrontId, newFrontId] of frontMap.entries()) {
-    const attrs = await client.query(`
+    for (const [oldFrontId, newFrontId] of frontMap.entries()) {
+      const attrs = await client.query(`
       SELECT id, nombre, peso_maximo, orden, activo
       FROM version_atributos
       WHERE version_frente_id = $1
       ORDER BY orden, id
     `, [oldFrontId]);
 
-    for (const attr of attrs.rows) {
-      const insertedAttr = await client.query(`
+      for (const attr of attrs.rows) {
+        const insertedAttr = await client.query(`
         INSERT INTO version_atributos (
           version_frente_id, nombre, peso_maximo, orden, activo,
           created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
         RETURNING id
       `, [
-        newFrontId,
-        attr.nombre,
-        attr.peso_maximo,
-        attr.orden,
-        attr.activo
-      ]);
-
-      totalAttributes++;
-      const newAttrId = insertedAttr.rows[0].id;
-
-      const subs = await client.query(`
-        SELECT codigo, descripcion, peso_individual, orden, activo, clasificacion
-        FROM version_sub_motivos
-        WHERE version_atributo_id = $1
-        ORDER BY orden, id
-      `, [attr.id]);
-
-      for (const sub of subs.rows) {
-        await client.query(`
-          INSERT INTO version_sub_motivos (
-            version_atributo_id, codigo, descripcion, peso_individual,
-            orden, activo, clasificacion, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-        `, [
-          newAttrId,
-          sub.codigo,
-          sub.descripcion,
-          sub.peso_individual,
-          sub.orden,
-          sub.activo,
-          sub.clasificacion
+          newFrontId,
+          attr.nombre,
+          attr.peso_maximo,
+          attr.orden,
+          attr.activo
         ]);
-        totalSubReasons++;
+
+        totalAttributes++;
+        const newAttrId = insertedAttr.rows[0].id;
+
+        const subs = await client.query(`
+  SELECT
+    codigo,
+    descripcion,
+    peso_individual,
+    orden,
+    activo,
+    clasificacion,
+    clasificacion_pda_id
+
+  FROM version_sub_motivos
+
+  WHERE version_atributo_id = $1
+
+  ORDER BY
+    orden,
+    id
+`, [attr.id]);
+
+
+        for (const sub of subs.rows) {
+
+          await client.query(`
+    INSERT INTO version_sub_motivos (
+      version_atributo_id,
+      codigo,
+      descripcion,
+      peso_individual,
+      orden,
+      activo,
+
+      /*
+       * Compatibilidad legacy.
+       */
+      clasificacion,
+
+      /*
+       * Clasificación normalizada PDA.
+       */
+      clasificacion_pda_id,
+
+      created_at,
+      updated_at
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      $6,
+      $7,
+      $8,
+      NOW(),
+      NOW()
+    )
+  `, [
+            newAttrId,
+
+            sub.codigo,
+
+            sub.descripcion,
+
+            sub.peso_individual,
+
+            sub.orden,
+
+            sub.activo,
+
+            sub.clasificacion,
+
+            sub.clasificacion_pda_id
+          ]);
+
+
+          totalSubReasons++;
+        }
       }
     }
-  }
 
-  // Las reglas son versionadas. Si existen, el snapshot debe conservarlas.
-  const rulesTable = await client.query(`
+    // Las reglas son versionadas. Si existen, el snapshot debe conservarlas.
+    const rulesTable = await client.query(`
     SELECT EXISTS (
       SELECT FROM information_schema.tables
       WHERE table_name = 'reglas_evaluacion'
     )
   `);
 
-  let totalRules = 0;
-  if (rulesTable.rows[0]?.exists) {
-    const rules = await client.query(`
+    let totalRules = 0;
+    if (rulesTable.rows[0]?.exists) {
+      const rules = await client.query(`
       SELECT
         submotivo_origen, bloque_origen, atributo_origen,
         valor_condicion, accion_tipo, accion_valor,
@@ -1088,51 +1485,51 @@ async copyVersionTree(client, sourceVersionId, targetVersionId) {
       ORDER BY orden, id
     `, [sourceVersionId]);
 
-    for (const rule of rules.rows) {
-      await client.query(`
+      for (const rule of rules.rows) {
+        await client.query(`
         INSERT INTO reglas_evaluacion (
           version_id, submotivo_origen, bloque_origen, atributo_origen,
           valor_condicion, accion_tipo, accion_valor,
           submotivos_afectados, excepciones, orden, activo
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
       `, [
-        targetVersionId,
-        rule.submotivo_origen,
-        rule.bloque_origen,
-        rule.atributo_origen,
-        rule.valor_condicion,
-        rule.accion_tipo,
-        rule.accion_valor,
-        rule.submotivos_afectados == null
-          ? null
-          : JSON.stringify(rule.submotivos_afectados),
-        rule.excepciones == null
-          ? null
-          : JSON.stringify(rule.excepciones),
-        rule.orden,
-        rule.activo
-      ]);
-      totalRules++;
+          targetVersionId,
+          rule.submotivo_origen,
+          rule.bloque_origen,
+          rule.atributo_origen,
+          rule.valor_condicion,
+          rule.accion_tipo,
+          rule.accion_valor,
+          rule.submotivos_afectados == null
+            ? null
+            : JSON.stringify(rule.submotivos_afectados),
+          rule.excepciones == null
+            ? null
+            : JSON.stringify(rule.excepciones),
+          rule.orden,
+          rule.activo
+        ]);
+        totalRules++;
+      }
     }
+
+    return {
+      frentes: frentes.rows.length,
+      atributos: totalAttributes,
+      sub_motivos: totalSubReasons,
+      reglas: totalRules
+    };
   }
 
-  return {
-    frentes: frentes.rows.length,
-    atributos: totalAttributes,
-    sub_motivos: totalSubReasons,
-    reglas: totalRules
-  };
-}
-
-async activateVersion(client, id) {
+  async activateVersion(client, id) {
     const versionId =
-        Number(id);
+      Number(id);
 
     if (
-        !Number.isInteger(versionId) ||
-        versionId <= 0
+      !Number.isInteger(versionId) ||
+      versionId <= 0
     ) {
-        return null;
+      return null;
     }
 
     // ==================================================
@@ -1140,27 +1537,27 @@ async activateVersion(client, id) {
     // ==================================================
 
     const target =
-        await this.getVersionById(
-            client,
-            versionId
-        );
+      await this.getVersionById(
+        client,
+        versionId
+      );
 
     if (!target) {
-        return null;
+      return null;
     }
 
     const matrizId =
-        Number(
-            target.matriz_id
-        );
+      Number(
+        target.matriz_id
+      );
 
     if (
-        !Number.isInteger(matrizId) ||
-        matrizId <= 0
+      !Number.isInteger(matrizId) ||
+      matrizId <= 0
     ) {
-        throw new Error(
-            `La versión ${versionId} no tiene una matriz válida asociada`
-        );
+      throw new Error(
+        `La versión ${versionId} no tiene una matriz válida asociada`
+      );
     }
 
 
@@ -1170,17 +1567,17 @@ async activateVersion(client, id) {
     // ==================================================
 
     await client.query(
-        `
+      `
         UPDATE versiones_matriz
         SET activa = FALSE
         WHERE matriz_id = $1
           AND activa = TRUE
           AND id <> $2
         `,
-        [
-            matrizId,
-            versionId
-        ]
+      [
+        matrizId,
+        versionId
+      ]
     );
 
 
@@ -1189,8 +1586,8 @@ async activateVersion(client, id) {
     // ==================================================
 
     const result =
-        await client.query(
-            `
+      await client.query(
+        `
             UPDATE versiones_matriz
             SET
                 activa = TRUE,
@@ -1204,186 +1601,186 @@ async activateVersion(client, id) {
               AND matriz_id = $3
             RETURNING *
             `,
-            [
-                versionId,
-                'Sistema',
-                matrizId
-            ]
-        );
+        [
+          versionId,
+          'Sistema',
+          matrizId
+        ]
+      );
 
 
     return (
-        result.rows[0] ||
-        null
+      result.rows[0] ||
+      null
     );
-}
+  }
 
-async getVersionIntegrity(client, versionId) {
-  const version = await this.getVersionById(client, versionId);
-  if (!version) return null;
+  async getVersionIntegrity(client, versionId) {
+    const version = await this.getVersionById(client, versionId);
+    if (!version) return null;
 
-  const fronts = await client.query(`
+    const fronts = await client.query(`
     SELECT id, codigo, nombre, peso_maximo
     FROM version_frentes
     WHERE version_id = $1 AND activo = TRUE
     ORDER BY orden, id
   `, [versionId]);
 
-  const violations = [];
-  const frontTotal = fronts.rows.reduce(
-    (sum, f) => sum + Number(f.peso_maximo || 0), 0
-  );
+    const violations = [];
+    const frontTotal = fronts.rows.reduce(
+      (sum, f) => sum + Number(f.peso_maximo || 0), 0
+    );
 
-  if (Math.abs(frontTotal - 100) > 0.0001) {
-    violations.push({
-      nivel: 'frentes',
-      mensaje: `La suma total de frentes es ${frontTotal}% y debe ser 100%`
-    });
-  }
+    if (Math.abs(frontTotal - 100) > 0.0001) {
+      violations.push({
+        nivel: 'frentes',
+        mensaje: `La suma total de frentes es ${frontTotal}% y debe ser 100%`
+      });
+    }
 
-  for (const front of fronts.rows) {
-    const attrs = await client.query(`
+    for (const front of fronts.rows) {
+      const attrs = await client.query(`
       SELECT id, nombre, peso_maximo
       FROM version_atributos
       WHERE version_frente_id = $1 AND activo = TRUE
       ORDER BY orden, id
     `, [front.id]);
 
-    const attrTotal = attrs.rows.reduce(
-      (sum, a) => sum + Number(a.peso_maximo || 0), 0
-    );
+      const attrTotal = attrs.rows.reduce(
+        (sum, a) => sum + Number(a.peso_maximo || 0), 0
+      );
 
-    if (Math.abs(attrTotal - Number(front.peso_maximo)) > 0.0001) {
-      violations.push({
-        nivel: 'atributos',
-        frente_id: front.id,
-        frente: front.codigo,
-        mensaje: `Los atributos suman ${attrTotal}% y el frente tiene ${front.peso_maximo}%`
-      });
-    }
+      if (Math.abs(attrTotal - Number(front.peso_maximo)) > 0.0001) {
+        violations.push({
+          nivel: 'atributos',
+          frente_id: front.id,
+          frente: front.codigo,
+          mensaje: `Los atributos suman ${attrTotal}% y el frente tiene ${front.peso_maximo}%`
+        });
+      }
 
-    for (const attr of attrs.rows) {
-      const subs = await client.query(`
+      for (const attr of attrs.rows) {
+        const subs = await client.query(`
         SELECT id, codigo, peso_individual
         FROM version_sub_motivos
         WHERE version_atributo_id = $1 AND activo = TRUE
         ORDER BY orden, id
       `, [attr.id]);
 
-      const subTotal = subs.rows.reduce(
-        (sum, s) => sum + Number(s.peso_individual || 0), 0
-      );
+        const subTotal = subs.rows.reduce(
+          (sum, s) => sum + Number(s.peso_individual || 0), 0
+        );
 
-      if (Math.abs(subTotal - Number(attr.peso_maximo)) > 0.0001) {
-        violations.push({
-          nivel: 'sub_motivos',
-          atributo_id: attr.id,
-          atributo: attr.nombre,
-          mensaje: `Los sub-motivos suman ${subTotal}% y el atributo tiene ${attr.peso_maximo}%`
-        });
+        if (Math.abs(subTotal - Number(attr.peso_maximo)) > 0.0001) {
+          violations.push({
+            nivel: 'sub_motivos',
+            atributo_id: attr.id,
+            atributo: attr.nombre,
+            mensaje: `Los sub-motivos suman ${subTotal}% y el atributo tiene ${attr.peso_maximo}%`
+          });
+        }
       }
     }
+
+    return {
+      ok: violations.length === 0,
+      version_id: versionId,
+      total_frentes: frontTotal,
+      violations
+    };
   }
 
-  return {
-    ok: violations.length === 0,
-    version_id: versionId,
-    total_frentes: frontTotal,
-    violations
-  };
-}
+  async validateFrontWeight(client, {
+    frenteId,
+    nuevoPeso,
+    excluirId,
+    versionId = null
+  }) {
+    let resolvedVersionId = versionId;
 
-async validateFrontWeight(client, {
-  frenteId,
-  nuevoPeso,
-  excluirId,
-  versionId = null
-}) {
-  let resolvedVersionId = versionId;
+    // Compatibilidad legacy temporal
+    if (!resolvedVersionId) {
+      const source =
+        await this.getActiveVersionSource(client);
 
-  // Compatibilidad legacy temporal
-  if (!resolvedVersionId) {
-    const source =
-      await this.getActiveVersionSource(client);
+      if (!source) {
+        return {
+          notFound: 'No hay versión activa'
+        };
+      }
 
-    if (!source) {
-      return {
-        notFound: 'No hay versión activa'
-      };
+      resolvedVersionId = source.id;
     }
 
-    resolvedVersionId = source.id;
-  }
+    const params = [resolvedVersionId];
 
-  const params = [resolvedVersionId];
-
-  let sql = `
+    let sql = `
     SELECT COALESCE(SUM(peso_maximo), 0) AS total
     FROM version_frentes
     WHERE version_id = $1
       AND activo = TRUE
   `;
 
-  if (excluirId) {
-    params.push(excluirId);
-    sql += ` AND id != $2`;
-  }
-
-  const sum = await client.query(
-    sql,
-    params
-  );
-
-  const total =
-    Number(sum.rows[0]?.total || 0) +
-    Number(nuevoPeso || 0);
-
-  return {
-    total,
-    max: 100
-  };
-}
-
-async validateAttributeWeight(client, {
-  frenteId,
-  nuevoPeso,
-  excluirId,
-  versionId = null
-}) {
-  let resolvedVersionId = versionId;
-
-  if (!resolvedVersionId) {
-    const source =
-      await this.getActiveVersionSource(client);
-
-    if (!source) {
-      return {
-        notFound: 'No hay versión activa'
-      };
+    if (excluirId) {
+      params.push(excluirId);
+      sql += ` AND id != $2`;
     }
 
-    resolvedVersionId = source.id;
-  }
-
-  const front =
-    await this.getActiveFront(
-      client,
-      frenteId,
-      resolvedVersionId
+    const sum = await client.query(
+      sql,
+      params
     );
 
-  if (!front) {
+    const total =
+      Number(sum.rows[0]?.total || 0) +
+      Number(nuevoPeso || 0);
+
     return {
-      notFound: 'Frente no encontrado'
+      total,
+      max: 100
     };
   }
 
-  const params = [
-    resolvedVersionId,
-    frenteId
-  ];
+  async validateAttributeWeight(client, {
+    frenteId,
+    nuevoPeso,
+    excluirId,
+    versionId = null
+  }) {
+    let resolvedVersionId = versionId;
 
-  let sql = `
+    if (!resolvedVersionId) {
+      const source =
+        await this.getActiveVersionSource(client);
+
+      if (!source) {
+        return {
+          notFound: 'No hay versión activa'
+        };
+      }
+
+      resolvedVersionId = source.id;
+    }
+
+    const front =
+      await this.getActiveFront(
+        client,
+        frenteId,
+        resolvedVersionId
+      );
+
+    if (!front) {
+      return {
+        notFound: 'Frente no encontrado'
+      };
+    }
+
+    const params = [
+      resolvedVersionId,
+      frenteId
+    ];
+
+    let sql = `
     SELECT
       COALESCE(SUM(va.peso_maximo), 0) AS total
     FROM version_atributos va
@@ -1394,65 +1791,65 @@ async validateAttributeWeight(client, {
       AND va.activo = TRUE
   `;
 
-  if (excluirId) {
-    params.push(excluirId);
-    sql += ` AND va.id != $3`;
-  }
-
-  const sum = await client.query(
-    sql,
-    params
-  );
-
-  return {
-    total:
-      Number(sum.rows[0]?.total || 0) +
-      Number(nuevoPeso || 0),
-
-    max: Number(front.peso_maximo)
-  };
-}
-
-async validateSubReasonWeight(client, {
-  atributoId,
-  nuevoPeso,
-  excluirId,
-  versionId = null
-}) {
-  let resolvedVersionId = versionId;
-
-  if (!resolvedVersionId) {
-    const source =
-      await this.getActiveVersionSource(client);
-
-    if (!source) {
-      return {
-        notFound: 'No hay versión activa'
-      };
+    if (excluirId) {
+      params.push(excluirId);
+      sql += ` AND va.id != $3`;
     }
 
-    resolvedVersionId = source.id;
-  }
-
-  const attr =
-    await this.getActiveAttribute(
-      client,
-      atributoId,
-      resolvedVersionId
+    const sum = await client.query(
+      sql,
+      params
     );
 
-  if (!attr) {
     return {
-      notFound: 'Atributo no encontrado'
+      total:
+        Number(sum.rows[0]?.total || 0) +
+        Number(nuevoPeso || 0),
+
+      max: Number(front.peso_maximo)
     };
   }
 
-  const params = [
-    resolvedVersionId,
-    atributoId
-  ];
+  async validateSubReasonWeight(client, {
+    atributoId,
+    nuevoPeso,
+    excluirId,
+    versionId = null
+  }) {
+    let resolvedVersionId = versionId;
 
-  let sql = `
+    if (!resolvedVersionId) {
+      const source =
+        await this.getActiveVersionSource(client);
+
+      if (!source) {
+        return {
+          notFound: 'No hay versión activa'
+        };
+      }
+
+      resolvedVersionId = source.id;
+    }
+
+    const attr =
+      await this.getActiveAttribute(
+        client,
+        atributoId,
+        resolvedVersionId
+      );
+
+    if (!attr) {
+      return {
+        notFound: 'Atributo no encontrado'
+      };
+    }
+
+    const params = [
+      resolvedVersionId,
+      atributoId
+    ];
+
+    let sql = `
     SELECT
       COALESCE(SUM(vsm.peso_individual), 0) AS total
     FROM version_sub_motivos vsm
@@ -1465,28 +1862,28 @@ async validateSubReasonWeight(client, {
       AND vsm.activo = TRUE
   `;
 
-  if (excluirId) {
-    params.push(excluirId);
-    sql += ` AND vsm.id != $3`;
+    if (excluirId) {
+      params.push(excluirId);
+      sql += ` AND vsm.id != $3`;
+    }
+
+    const sum = await client.query(
+      sql,
+      params
+    );
+
+    return {
+      total:
+        Number(sum.rows[0]?.total || 0) +
+        Number(nuevoPeso || 0),
+
+      max: Number(attr.peso_maximo)
+    };
   }
 
-  const sum = await client.query(
-    sql,
-    params
-  );
-
-  return {
-    total:
-      Number(sum.rows[0]?.total || 0) +
-      Number(nuevoPeso || 0),
-
-    max: Number(attr.peso_maximo)
-  };
-}
-
-async getEvaluationRuleById(client, id) {
-  const result = await client.query(
-    `
+  async getEvaluationRuleById(client, id) {
+    const result = await client.query(
+      `
       SELECT
         id,
         version_id,
@@ -1504,19 +1901,19 @@ async getEvaluationRuleById(client, id) {
       WHERE id = $1
       LIMIT 1
     `,
-    [id]
-  );
+      [id]
+    );
 
-  return result.rows[0] || null;
-}
+    return result.rows[0] || null;
+  }
 
-async getEvaluationRuleByIdAndVersion(
-  client,
-  id,
-  versionId
-) {
-  const result = await client.query(
-    `
+  async getEvaluationRuleByIdAndVersion(
+    client,
+    id,
+    versionId
+  ) {
+    const result = await client.query(
+      `
       SELECT
         id,
         version_id,
@@ -1535,16 +1932,16 @@ async getEvaluationRuleByIdAndVersion(
         AND version_id = $2
       LIMIT 1
     `,
-    [id, versionId]
-  );
+      [id, versionId]
+    );
 
-  return result.rows[0] || null;
-}
+    return result.rows[0] || null;
+  }
 
-async getEvaluationRuleById(client, id) {
+  async getEvaluationRuleById(client, id) {
     const result =
-        await client.query(
-            `
+      await client.query(
+        `
                 SELECT
                     id,
                     version_id,
@@ -1562,17 +1959,17 @@ async getEvaluationRuleById(client, id) {
                 WHERE id = $1
                 LIMIT 1
             `,
-            [id]
-        );
+        [id]
+      );
 
     return result.rows[0] || null;
-}
+  }
 
 
-async getEvaluationRuleVersion(client, versionId) {
+  async getEvaluationRuleVersion(client, versionId) {
     const result =
-        await client.query(
-            `
+      await client.query(
+        `
                 SELECT
                     id,
                     matriz_id,
@@ -1583,22 +1980,22 @@ async getEvaluationRuleVersion(client, versionId) {
                 WHERE id = $1
                 LIMIT 1
             `,
-            [versionId]
-        );
+        [versionId]
+      );
 
     return result.rows[0] || null;
-}
+  }
 
-async createEvaluationRule(client, data) {
-  const affected = data.submotivos_afectados == null
-    ? null
-    : JSON.stringify(data.submotivos_afectados);
+  async createEvaluationRule(client, data) {
+    const affected = data.submotivos_afectados == null
+      ? null
+      : JSON.stringify(data.submotivos_afectados);
 
-  const exceptions = data.excepciones == null
-    ? null
-    : JSON.stringify(data.excepciones);
+    const exceptions = data.excepciones == null
+      ? null
+      : JSON.stringify(data.excepciones);
 
-  const result = await client.query(`
+    const result = await client.query(`
     INSERT INTO reglas_evaluacion (
       version_id,
       submotivo_origen,
@@ -1618,32 +2015,32 @@ async createEvaluationRule(client, data) {
     )
     RETURNING *
   `, [
-    data.version_id,
-    data.submotivo_origen,
-    data.bloque_origen,
-    data.atributo_origen,
-    data.valor_condicion || '0',
-    data.accion_tipo || 'marcar_no_aplica',
-    data.accion_valor || 'NA',
-    affected,
-    exceptions,
-    data.orden || 0,
-    data.activo !== false
-  ]);
+      data.version_id,
+      data.submotivo_origen,
+      data.bloque_origen,
+      data.atributo_origen,
+      data.valor_condicion || '0',
+      data.accion_tipo || 'marcar_no_aplica',
+      data.accion_valor || 'NA',
+      affected,
+      exceptions,
+      data.orden || 0,
+      data.activo !== false
+    ]);
 
-  return result.rows[0];
-}
+    return result.rows[0];
+  }
 
-async updateEvaluationRule(client, id, data) {
-  const affected = data.submotivos_afectados == null
-    ? null
-    : JSON.stringify(data.submotivos_afectados);
+  async updateEvaluationRule(client, id, data) {
+    const affected = data.submotivos_afectados == null
+      ? null
+      : JSON.stringify(data.submotivos_afectados);
 
-  const exceptions = data.excepciones == null
-    ? null
-    : JSON.stringify(data.excepciones);
+    const exceptions = data.excepciones == null
+      ? null
+      : JSON.stringify(data.excepciones);
 
-  const result = await client.query(`
+    const result = await client.query(`
     UPDATE reglas_evaluacion
     SET
       submotivo_origen = $1,
@@ -1660,66 +2057,66 @@ async updateEvaluationRule(client, id, data) {
     WHERE id = $11
     RETURNING *
   `, [
-    data.submotivo_origen,
-    data.bloque_origen,
-    data.atributo_origen,
-    data.valor_condicion || '0',
-    data.accion_tipo || 'marcar_no_aplica',
-    data.accion_valor || 'NA',
-    affected,
-    exceptions,
-    data.orden || 0,
-    data.activo !== false,
-    id
-  ]);
+      data.submotivo_origen,
+      data.bloque_origen,
+      data.atributo_origen,
+      data.valor_condicion || '0',
+      data.accion_tipo || 'marcar_no_aplica',
+      data.accion_valor || 'NA',
+      affected,
+      exceptions,
+      data.orden || 0,
+      data.activo !== false,
+      id
+    ]);
 
-  return result.rows[0] || null;
-}
-
-async deleteEvaluationRule(client, id) {
-  const result = await client.query(
-    'DELETE FROM reglas_evaluacion WHERE id = $1 RETURNING id',
-    [id]
-  );
-  return result.rows[0] || null;
-}
-
-async getActiveEvaluationStructure(versionId = null) {
-  const tableExists =
-    await this.matrixVersionsTableExists();
-
-  if (!tableExists) {
-    return {
-      version: 'default',
-      frentes: [],
-      reglas: [],
-      message:
-        'Tablas de estructura no configuradas aún'
-    };
+    return result.rows[0] || null;
   }
 
-  let selectedVersion = null;
+  async deleteEvaluationRule(client, id) {
+    const result = await client.query(
+      'DELETE FROM reglas_evaluacion WHERE id = $1 RETURNING id',
+      [id]
+    );
+    return result.rows[0] || null;
+  }
 
-  // ========================================================
-  // NUEVO CONTRATO
-  // ========================================================
-  if (
-    versionId !== null &&
-    versionId !== undefined &&
-    versionId !== ''
-  ) {
-    const parsedVersionId =
-      Number(versionId);
+  async getActiveEvaluationStructure(versionId = null) {
+    const tableExists =
+      await this.matrixVersionsTableExists();
 
-    if (
-      !Number.isInteger(parsedVersionId) ||
-      parsedVersionId <= 0
-    ) {
-      return null;
+    if (!tableExists) {
+      return {
+        version: 'default',
+        frentes: [],
+        reglas: [],
+        message:
+          'Tablas de estructura no configuradas aún'
+      };
     }
 
-    const result = await this.db.query(
-      `
+    let selectedVersion = null;
+
+    // ========================================================
+    // NUEVO CONTRATO
+    // ========================================================
+    if (
+      versionId !== null &&
+      versionId !== undefined &&
+      versionId !== ''
+    ) {
+      const parsedVersionId =
+        Number(versionId);
+
+      if (
+        !Number.isInteger(parsedVersionId) ||
+        parsedVersionId <= 0
+      ) {
+        return null;
+      }
+
+      const result = await this.db.query(
+        `
         SELECT
           id,
           matriz_id,
@@ -1730,69 +2127,107 @@ async getActiveEvaluationStructure(versionId = null) {
         WHERE id = $1
         LIMIT 1
       `,
-      [parsedVersionId]
-    );
-
-    selectedVersion =
-      result.rows[0] || null;
-  }
-
-  // ========================================================
-  // FALLBACK LEGACY
-  // ========================================================
-  if (!selectedVersion) {
-    /*
-    * Compatibilidad legacy:
-    * sin version_matriz_id explícita conservamos
-    * la resolución histórica de una versión activa global.
-    *
-    * getActiveVersionSource() ya encapsula ese fallback.
-    */
-    selectedVersion =
-      await this.getActiveVersionSource(
-        this.db
+        [parsedVersionId]
       );
-  }
 
-  if (!selectedVersion) {
+      selectedVersion =
+        result.rows[0] || null;
+    }
+
+    // ========================================================
+    // FALLBACK LEGACY
+    // ========================================================
+    if (!selectedVersion) {
+      /*
+      * Compatibilidad legacy:
+      * sin version_matriz_id explícita conservamos
+      * la resolución histórica de una versión activa global.
+      *
+      * getActiveVersionSource() ya encapsula ese fallback.
+      */
+      selectedVersion =
+        await this.getActiveVersionSource(
+          this.db
+        );
+    }
+
+    if (!selectedVersion) {
+      return {
+        version: 'default',
+        frentes: [],
+        reglas: [],
+        message:
+          'No hay versión activa configurada'
+      };
+    }
+
+    const structure =
+      await this.getLegacyMatrixStructure(
+        selectedVersion.id
+      );
+
+    const rules =
+      await this.getLegacyEvaluationRulesByVersion(
+        selectedVersion.id
+      );
+
     return {
-      version: 'default',
-      frentes: [],
-      reglas: [],
-      message:
-        'No hay versión activa configurada'
+      version:
+        selectedVersion.version ||
+        'default',
+
+      version_matriz_id:
+        selectedVersion.id,
+
+      matriz_id:
+        selectedVersion.matriz_id || null,
+
+      frentes:
+        structure?.frentes || [],
+
+      reglas:
+        rules || []
     };
   }
 
-  const structure =
-    await this.getLegacyMatrixStructure(
-      selectedVersion.id
-    );
+  async findPdaClassificationById(
+    client,
+    classificationId
+  ) {
+    const result = await client.query(`
+    SELECT
+      id,
+      codigo,
+      nombre,
+      activo
+    FROM clasificaciones_pda
+    WHERE id = $1
+  `, [
+      classificationId
+    ]);
 
-  const rules =
-    await this.getLegacyEvaluationRulesByVersion(
-      selectedVersion.id
-    );
+    return result.rows[0] || null;
+  }
 
-  return {
-    version:
-      selectedVersion.version ||
-      'default',
+  async listPdaClassifications() {
+    const result = await this.db.query(`
+    SELECT
+      id,
+      codigo,
+      nombre,
+      descripcion,
+      activo
 
-    version_matriz_id:
-      selectedVersion.id,
+    FROM clasificaciones_pda
 
-    matriz_id:
-      selectedVersion.matriz_id || null,
+    WHERE activo = TRUE
 
-    frentes:
-      structure?.frentes || [],
+    ORDER BY
+      id ASC
+  `);
 
-    reglas:
-      rules || []
-  };
-}
-
+    return result.rows || [];
+  }
 }
 
 module.exports = MatrixRepository;

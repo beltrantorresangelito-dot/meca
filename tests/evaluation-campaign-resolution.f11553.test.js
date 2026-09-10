@@ -87,14 +87,14 @@ test(
 );
 
 test(
-    'F11553-004 payload persiste campana normalizada',
+    'F11553-004 payload persiste campaña resuelta del contexto',
     () => {
         const block =
             obtenerBloqueEnriquecedor();
 
         assert.match(
             block,
-            /campana_id:\s*campanaIdNormalizado/
+            /campana_id:\s*campanaContexto/
         );
     }
 );

@@ -1,0 +1,5 @@
+-- ============================================================
+-- 0028 DOWN
+-- No se revierte la sincronización de secuencias.
+-- Retroceder secuencias podría provocar colisiones de PK.
+-- ============================================================

@@ -94,6 +94,377 @@ class PdaController {
       PdaController.json(res, error.status || 500, []);
     }
   }
+
+  async create(res, payload) {
+    try {
+      const creado =
+        await this.service.create(
+          payload
+        );
+
+      PdaController.json(
+        res,
+        201,
+        creado
+      );
+
+    } catch (error) {
+      console.error(
+        'Error en POST /api/pda:',
+        error
+      );
+
+      PdaController.json(
+        res,
+        error.status || 500,
+        {
+          error:
+            error.message ||
+            'Error creando PDA'
+        }
+      );
+    }
+  }
+  async registerFeedback(
+    peticion,
+    respuesta,
+    pdaId,
+    body
+  ) {
+    try {
+      const resultado =
+        await this.service
+          .registerFeedback(
+            pdaId,
+            body
+          );
+
+
+      PdaController.json(
+        respuesta,
+        200,
+        {
+          success:
+            true,
+
+          data:
+            resultado
+        }
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        'Error registrando feedback PDA:',
+        error
+      );
+
+
+      PdaController.json(
+        respuesta,
+        error.status ||
+        500,
+        {
+          success:
+            false,
+
+          error:
+            error.message
+        }
+      );
+    }
+  }
+  async evaluateTracking(
+    respuesta,
+    pdaId
+  ) {
+    try {
+
+      const resultado =
+        await this.service
+          .evaluateTracking(
+            pdaId
+          );
+
+
+      PdaController.json(
+        respuesta,
+        200,
+        {
+          success:
+            true,
+
+          data:
+            resultado
+        }
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        'Error evaluando seguimiento PDA:',
+        error
+      );
+
+
+      PdaController.json(
+        respuesta,
+        error.status ||
+        500,
+        {
+          success:
+            false,
+
+          error:
+            error.message
+        }
+      );
+    }
+  }
+
+  async registerTrackingCycle(
+    peticion,
+    respuesta,
+    pdaId,
+    body
+  ) {
+    try {
+      const resultado =
+        await this.service
+          .registerTrackingCycle(
+            pdaId,
+            body
+          );
+
+      PdaController.json(
+        respuesta,
+        200,
+        {
+          success: true,
+          data: resultado
+        }
+      );
+
+    } catch (error) {
+      console.error(
+        'Error registrando ciclo de seguimiento PDA:',
+        error
+      );
+
+      PdaController.json(
+        respuesta,
+        error.status || 500,
+        {
+          success: false,
+          error: error.message
+        }
+      );
+    }
+  }
+
+  async sendToTraining(
+    respuesta,
+    pdaId,
+    body
+  ) {
+    try {
+
+      const resultado =
+        await this.service
+          .sendToTraining(
+            pdaId,
+            body
+          );
+
+
+      PdaController.json(
+        respuesta,
+        200,
+        {
+          success:
+            true,
+
+          data:
+            resultado
+        }
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        'Error derivando PDA a capacitación:',
+        error
+      );
+
+
+      PdaController.json(
+        respuesta,
+        error.status ||
+        500,
+        {
+          success:
+            false,
+
+          error:
+            error.message
+        }
+      );
+    }
+  }
+  async closeForImprovement(
+    respuesta,
+    pdaId,
+    body
+  ) {
+    try {
+
+      const resultado =
+        await this.service
+          .closeForImprovement(
+            pdaId,
+            body
+          );
+
+
+      PdaController.json(
+        respuesta,
+        200,
+        {
+          success:
+            true,
+
+          data:
+            resultado
+        }
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        'Error cerrando PDA por mejora:',
+        error
+      );
+
+
+      PdaController.json(
+        respuesta,
+        error.status ||
+        500,
+        {
+          success:
+            false,
+
+          error:
+            error.message
+        }
+      );
+    }
+  }
+  async registerTraining(
+    respuesta,
+    pdaId,
+    body
+  ) {
+    try {
+
+      const resultado =
+        await this.service
+          .registerTraining(
+            pdaId,
+            body
+          );
+
+
+      PdaController.json(
+        respuesta,
+        200,
+        {
+          success:
+            true,
+
+          data:
+            resultado
+        }
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        'Error registrando capacitación PDA:',
+        error
+      );
+
+
+      PdaController.json(
+        respuesta,
+        error.status ||
+        500,
+        {
+          success:
+            false,
+
+          error:
+            error.message
+        }
+      );
+    }
+  }
+
+  async escalate(
+    respuesta,
+    pdaId,
+    body
+  ) {
+    try {
+
+      const resultado =
+        await this.service
+          .escalate(
+            pdaId,
+            body
+          );
+
+
+      PdaController.json(
+        respuesta,
+        200,
+        {
+          success:
+            true,
+
+          data:
+            resultado
+        }
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        'Error escalando PDA:',
+        error
+      );
+
+
+      PdaController.json(
+        respuesta,
+        error.status ||
+        500,
+        {
+          success:
+            false,
+
+          error:
+            error.message
+        }
+      );
+    }
+  }
 }
 
 module.exports = PdaController;

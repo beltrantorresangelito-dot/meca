@@ -43,6 +43,33 @@ class EvaluationsController {
     }
   }
 
+  async update(res, id, evaluation) {
+  try {
+    const result =
+      await this.service.update(id, evaluation);
+
+    EvaluationsController.json(
+      res,
+      200,
+      result
+    );
+  } catch (error) {
+    console.error(
+      'Error actualizando evaluación:',
+      error
+    );
+
+    EvaluationsController.json(
+      res,
+      error.status || 500,
+      {
+        error: error.message,
+        code: error.code || null
+      }
+    );
+  }
+}
+
   async delete(res, id) {
     try {
       const result = await this.service.delete(id);

@@ -47,6 +47,7 @@ function createDomainHandler({
     ['/api/domain/quiebres', controller.listBreaks.bind(controller)],
     ['/api/domain/campanas', controller.listCampaigns.bind(controller)],
     ['/api/domain/matrices', controller.listMatrices.bind(controller)],
+    ['/api/domain/quiebre-matriz', controller.breakMatrixHistory.bind(controller)],
     ['/api/domain/campana-matriz', controller.campaignMatrixHistory.bind(controller)],
     ['/api/domain/contexto-evaluacion', controller.resolveContext.bind(controller)],
     ['/api/domain/consistencia', controller.consistency.bind(controller)]
@@ -356,7 +357,7 @@ function createDomainHandler({
       return true;
     }
 
-        // ======================================================
+    // ======================================================
     // F12.5 - ASIGNACIÓN CAMPAÑA ↔ MATRIZ
     // ======================================================
 
@@ -464,6 +465,114 @@ function createDomainHandler({
       return true;
     }
 
+        // ======================================================
+    // ASIGNACIÓN QUIEBRE ↔ MATRIZ
+    // ======================================================
+
+    if (
+      ruta === '/api/domain/quiebre-matriz' &&
+      metodo === 'POST'
+    ) {
+      let body;
+
+      try {
+        body =
+          await readJsonBody(
+            peticion
+          );
+      } catch (error) {
+        DomainController.handleError(
+          respuesta,
+          error
+        );
+
+        return true;
+      }
+
+      await controller
+        .createBreakMatrixAssignment(
+          peticion,
+          respuesta,
+          body
+        );
+
+      return true;
+    }
+
+
+    const breakMatrixMatch =
+      ruta.match(
+        /^\/api\/domain\/quiebre-matriz\/(\d+)$/
+      );
+
+    if (
+      breakMatrixMatch &&
+      metodo === 'PUT'
+    ) {
+      let body;
+
+      try {
+        body =
+          await readJsonBody(
+            peticion
+          );
+      } catch (error) {
+        DomainController.handleError(
+          respuesta,
+          error
+        );
+
+        return true;
+      }
+
+      await controller
+        .updateBreakMatrixAssignment(
+          peticion,
+          respuesta,
+          breakMatrixMatch[1],
+          body
+        );
+
+      return true;
+    }
+
+
+    const breakMatrixStatusMatch =
+      ruta.match(
+        /^\/api\/domain\/quiebre-matriz\/(\d+)\/estado$/
+      );
+
+    if (
+      breakMatrixStatusMatch &&
+      metodo === 'PATCH'
+    ) {
+      let body;
+
+      try {
+        body =
+          await readJsonBody(
+            peticion
+          );
+      } catch (error) {
+        DomainController.handleError(
+          respuesta,
+          error
+        );
+
+        return true;
+      }
+
+      await controller
+        .setBreakMatrixAssignmentActive(
+          peticion,
+          respuesta,
+          breakMatrixStatusMatch[1],
+          body
+        );
+
+      return true;
+    }
+
     if (metodo !== 'GET') {
       return false;
     }
@@ -510,6 +619,12 @@ function registerDomainRoutes(
     [
       '/api/domain/matrices',
       controller.listMatrices.bind(controller)
+    ],
+    [
+      '/api/domain/quiebre-matriz',
+      controller.breakMatrixHistory.bind(
+        controller
+      )
     ],
     [
       '/api/domain/campana-matriz',
@@ -620,6 +735,35 @@ function registerDomainRoutes(
     }
 
         if (
+      routePath ===
+      '/api/domain/quiebre-matriz'
+    ) {
+      targetRoutes[routePath].POST =
+        async (req, res) => {
+          let body;
+
+          try {
+            body =
+              await readJsonBody(req);
+          } catch (error) {
+            DomainController.handleError(
+              res,
+              error
+            );
+
+            return;
+          }
+
+          await controller
+            .createBreakMatrixAssignment(
+              req,
+              res,
+              body
+            );
+        };
+    }
+
+    if (
       routePath ===
       '/api/domain/campana-matriz'
     ) {

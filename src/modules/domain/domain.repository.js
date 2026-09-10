@@ -538,7 +538,184 @@ class DomainRepository {
     return result.rows[0] || null;
   }
 
-  async resolveEvaluationContext(campaignId, date = null) {
+  async listBreakMatrixAssignments(breakId) {
+    return (await this.db.query(
+      `
+        SELECT
+          qm.id,
+          qm.quiebre_id,
+          qm.matriz_id,
+          qm.vigente_desde,
+          qm.vigente_hasta,
+          qm.activa,
+          m.codigo AS matriz_codigo,
+          m.nombre AS matriz_nombre
+        FROM quiebre_matriz qm
+        JOIN matrices m
+          ON m.id = qm.matriz_id
+        WHERE qm.quiebre_id = $1
+        ORDER BY
+          qm.vigente_desde DESC,
+          qm.id DESC
+      `,
+      [breakId]
+    )).rows;
+  }
+
+
+  async getBreakMatrixAssignmentById(id) {
+    const result = await this.db.query(
+      `
+        SELECT
+          qm.id,
+          qm.quiebre_id,
+          qm.matriz_id,
+          qm.vigente_desde,
+          qm.vigente_hasta,
+          qm.activa,
+          qm.created_at,
+          qm.updated_at,
+
+          q.codigo AS quiebre_codigo,
+          q.nombre AS quiebre_nombre,
+
+          m.codigo AS matriz_codigo,
+          m.nombre AS matriz_nombre,
+          m.quiebre_id AS matriz_quiebre_id
+
+        FROM quiebre_matriz qm
+
+        JOIN quiebres q
+          ON q.id = qm.quiebre_id
+
+        JOIN matrices m
+          ON m.id = qm.matriz_id
+
+        WHERE qm.id = $1
+      `,
+      [id]
+    );
+
+    return result.rows[0] || null;
+  }
+
+
+  async createBreakMatrixAssignment(data) {
+    const result = await this.db.query(
+      `
+        INSERT INTO quiebre_matriz (
+          quiebre_id,
+          matriz_id,
+          vigente_desde,
+          vigente_hasta,
+          activa
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING
+          id,
+          quiebre_id,
+          matriz_id,
+          vigente_desde,
+          vigente_hasta,
+          activa,
+          created_at,
+          updated_at
+      `,
+      [
+        data.quiebreId,
+        data.matrizId,
+        data.vigenteDesde,
+        data.vigenteHasta ?? null,
+        data.activa !== false
+      ]
+    );
+
+    return result.rows[0];
+  }
+
+
+  async updateBreakMatrixAssignment(id, data) {
+    const result = await this.db.query(
+      `
+        UPDATE quiebre_matriz
+        SET
+          quiebre_id = $1,
+          matriz_id = $2,
+          vigente_desde = $3,
+          vigente_hasta = $4,
+          activa = $5,
+          updated_at = NOW()
+        WHERE id = $6
+        RETURNING
+          id,
+          quiebre_id,
+          matriz_id,
+          vigente_desde,
+          vigente_hasta,
+          activa,
+          created_at,
+          updated_at
+      `,
+      [
+        data.quiebreId,
+        data.matrizId,
+        data.vigenteDesde,
+        data.vigenteHasta ?? null,
+        data.activa,
+        id
+      ]
+    );
+
+    return result.rows[0] || null;
+  }
+
+
+  async setBreakMatrixAssignmentActive(
+    id,
+    activa
+  ) {
+    const result = await this.db.query(
+      `
+        UPDATE quiebre_matriz
+        SET
+          activa = $1,
+          updated_at = NOW()
+        WHERE id = $2
+        RETURNING
+          id,
+          quiebre_id,
+          matriz_id,
+          vigente_desde,
+          vigente_hasta,
+          activa,
+          created_at,
+          updated_at
+      `,
+      [
+        Boolean(activa),
+        id
+      ]
+    );
+
+    return result.rows[0] || null;
+  }
+
+async resolveEvaluationContext(campaignId, date = null, breakId = null) {
+  const hasCampaign =
+    campaignId !== null &&
+    campaignId !== undefined &&
+    String(campaignId).trim() !== '';
+
+  const hasBreak =
+    breakId !== null &&
+    breakId !== undefined &&
+    String(breakId).trim() !== '';
+
+  // ==========================================================
+  // 1. CONTEXTO MEDIANTE CAMPAÑA
+  //    Mantiene exactamente el comportamiento existente.
+  // ==========================================================
+  if (hasCampaign) {
     const result = date
       ? await this.db.query(
         `SELECT * FROM resolver_contexto_evaluacion($1, $2::date)`,
@@ -551,6 +728,37 @@ class DomainRepository {
 
     return result.rows;
   }
+
+  // ==========================================================
+  // 2. CONTEXTO DIRECTO MEDIANTE QUIEBRE
+  //    Se utiliza únicamente cuando NO existe campaña.
+  // ==========================================================
+  if (hasBreak) {
+    const result = date
+      ? await this.db.query(
+        `SELECT * FROM resolver_contexto_evaluacion_quiebre($1, $2::date)`,
+        [breakId, date]
+      )
+      : await this.db.query(
+        `SELECT * FROM resolver_contexto_evaluacion_quiebre($1, CURRENT_DATE)`,
+        [breakId]
+      );
+
+    return result.rows;
+  }
+
+  // ==========================================================
+  // 3. CONTEXTO INSUFICIENTE
+  // ==========================================================
+  const error = new Error(
+    'Se requiere campanaId o quiebreId para resolver el contexto de evaluación'
+  );
+
+  error.status = 400;
+  error.code = 'EVALUATION_CONTEXT_REQUIRED';
+
+  throw error;
+}
 
   async getDomainConsistency() {
     return (await this.db.query(`
@@ -625,6 +833,60 @@ class DomainRepository {
     `,
       [
         campanaId,
+        vigenteDesde,
+        vigenteHasta,
+        excludeId
+      ]
+    );
+
+    return result.rows;
+  }
+
+    async findBreakMatrixOverlaps({
+    quiebreId,
+    vigenteDesde,
+    vigenteHasta = null,
+    excludeId = null
+  }) {
+    const result = await this.db.query(
+      `
+        SELECT
+          qm.id,
+          qm.quiebre_id,
+          qm.matriz_id,
+          qm.vigente_desde,
+          qm.vigente_hasta,
+          qm.activa
+        FROM quiebre_matriz qm
+        WHERE qm.quiebre_id = $1
+          AND qm.activa = TRUE
+          AND (
+            $4::bigint IS NULL
+            OR qm.id <> $4
+          )
+          AND daterange(
+                qm.vigente_desde,
+                COALESCE(
+                  qm.vigente_hasta + 1,
+                  'infinity'::date
+                ),
+                '[)'
+              )
+              &&
+              daterange(
+                $2::date,
+                COALESCE(
+                  $3::date + 1,
+                  'infinity'::date
+                ),
+                '[)'
+              )
+        ORDER BY
+          qm.vigente_desde,
+          qm.id
+      `,
+      [
+        quiebreId,
         vigenteDesde,
         vigenteHasta,
         excludeId

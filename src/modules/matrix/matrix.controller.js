@@ -408,6 +408,39 @@ async listSubMotivos(req, res, query = {}) {
   }
 }
 
+async listPdaClassifications(req, res) {
+  if (!this.requireToken(req, res)) {
+    return;
+  }
+
+  try {
+    const rows =
+      await this.service
+        .listPdaClassifications();
+
+    MatrixController.json(
+      res,
+      200,
+      rows
+    );
+
+  } catch (error) {
+    console.error(
+      'Error en /api/matriz/clasificaciones-pda:',
+      error
+    );
+
+    MatrixController.json(
+      res,
+      500,
+      {
+        error:
+          error.message
+      }
+    );
+  }
+}
+
 async listEvaluationRulesAdmin(req, res, query = {}) {
   if (!this.requireToken(req, res)) return;
 

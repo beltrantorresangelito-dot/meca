@@ -17,7 +17,7 @@ let vistaAtributosActual = 'general';
 let chartEvolutivoCuartiles = null;
 let auditoresExcluidosGlobal = [];
 let todosLosAuditoresGlobal = [];
-let rankingOriginalCompleto = [];
+
 let lotesHistorialGlobal = [];
 let liderSeleccionadoActual = 'todos';
 let filtroPeriodoActual = 'todos';
@@ -39,6 +39,8 @@ let filtroFechaFinActual = null;
 let evaluacionesGlobales = [];
 let cuartilActivoGlobal = 'todos';
 let rankingCompletoGlobal = [];
+
+
 let datosAgrupadosActualesGlobal = [];
 let auditoresExcluidos = [];
 let todosLosAuditores = [];
@@ -89,6 +91,7 @@ let agentesListaCompleta = [];
 let timeoutBusquedaGestor = null;
 let agenteSeleccionadoActual = null;
 let dropdownVisible = false;
+
 
 const CACHE_PRODUCTIVIDAD_DURACION = 2 * 60 * 1000; // 2 minutos
 const MATRIZ_CACHE_DURACION = 10 * 60 * 1000; // 10 minutos
@@ -846,7 +849,7 @@ function mostrarModalSesionesUsuario(usuarioNombre, sesiones, soloActivas = true
                                     <td style="padding: 8px; text-align: center; font-weight: bold; color: ${sesion.estado === 'activa' && diffHoras > 6 ? '#d93025' : '#28a745'};">${duracion}</td>
                                     ${soloActivas ? `
                                     <td style="padding: 8px; text-align: center;">
-                                        <button onclick="cerrarSesionEspecifica('${sesion.session_token}', '${usuarioNombre}')" 
+                                        <button onclick="cerrarSesionEspecifica('${sesion.session_token}', '${usuarioNombre}')"
                                                 style="background: var(--danger); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
                                             🔒 Cerrar
                                         </button>
@@ -869,31 +872,31 @@ function mostrarModalSesionesUsuario(usuarioNombre, sesiones, soloActivas = true
                     <strong style="font-size: 18px;">${titulo}</strong>
                     <div style="font-size: 13px; opacity: 0.9; margin-top: 3px;">Usuario: ${escapeHtml(usuarioNombre)} | ${subtitulo}</div>
                 </div>
-                <button onclick="cerrarModalSesionesUsuario()" 
+                <button onclick="cerrarModalSesionesUsuario()"
                         style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">
                     ✖
                 </button>
             </div>
-            
+
             <!-- Tabs para cambiar entre Activas e Historial -->
             <div style="padding: 0 20px; background: white; border-bottom: 1px solid #e0e0e0;">
                 <div style="display: flex; gap: 20px;">
-                    <button onclick="cargarSesionesUsuario(${usuarioSesionesSeleccionado?.id}, '${escapeHtml(usuarioNombre)}', true)" 
+                    <button onclick="cargarSesionesUsuario(${usuarioSesionesSeleccionado?.id}, '${escapeHtml(usuarioNombre)}', true)"
                             style="background: none; border: none; padding: 12px 0; font-size: 14px; cursor: pointer; color: ${soloActivas ? 'var(--accent)' : 'var(--muted)'}; border-bottom: 2px solid ${soloActivas ? 'var(--accent)' : 'transparent'};">
                         🔐 Sesiones Activas
                     </button>
-                    <button onclick="cargarSesionesUsuario(${usuarioSesionesSeleccionado?.id}, '${escapeHtml(usuarioNombre)}', false)" 
+                    <button onclick="cargarSesionesUsuario(${usuarioSesionesSeleccionado?.id}, '${escapeHtml(usuarioNombre)}', false)"
                             style="background: none; border: none; padding: 12px 0; font-size: 14px; cursor: pointer; color: ${!soloActivas ? 'var(--accent)' : 'var(--muted)'}; border-bottom: 2px solid ${!soloActivas ? 'var(--accent)' : 'transparent'};">
                         📋 Historial de Sesiones
                     </button>
                 </div>
             </div>
-            
+
             <!-- Body -->
             <div style="padding: 20px; overflow-y: auto; flex: 1;">
                 ${sesionesHtml}
             </div>
-            
+
             <!-- Footer con estadísticas -->
             <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e0e0e0;">
                 <div>
@@ -1011,7 +1014,7 @@ function actualizarContenidoSesionesModal(usuarioNombre, sesiones) {
                                     </td>
                                     <td style="padding: 8px; text-align: center; font-weight: bold; color: ${duracionColor};">${duracion}</td>
                                     <td style="padding: 8px; text-align: center;">
-                                        <button onclick="cerrarSesionEspecifica('${sesion.session_token}', '${usuarioNombre}')" 
+                                        <button onclick="cerrarSesionEspecifica('${sesion.session_token}', '${usuarioNombre}')"
                                                 style="background: var(--danger); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
                                             🔒 Cerrar
                                         </button>
@@ -1321,7 +1324,7 @@ async function refrescarSesionesAdmin() {
                     <td style="padding: 8px; text-align: center; font-size: 11px; font-weight: bold;">${duracion}</td>
                     <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
                     <td style="padding: 8px; text-align: center;">
-                        <button onclick="cerrarSesionEspecifica('${sesion.session_token}', '${escapeHtml(nombreUsuario)}')" 
+                        <button onclick="cerrarSesionEspecifica('${sesion.session_token}', '${escapeHtml(nombreUsuario)}')"
                                 style="background: #d93025; padding: 4px 10px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 11px;">
                             🔒 Cerrar
                         </button>
@@ -1930,6 +1933,7 @@ async function showTab(tabName, event) {
         if (tabName === 'gestionPDA') {
             if (typeof cargarDatosPDA === 'function') await cargarDatosPDA();
             if (typeof llenarSelectAgentes === 'function') llenarSelectAgentes();
+            if (typeof inicializarPdaDashboard === 'function') {await inicializarPdaDashboard();}
         }
 
         if (tabName === 'gestionAgentes') {
@@ -1975,52 +1979,159 @@ async function showTab(tabName, event) {
             if (typeof inicializarFormVersiones === 'function') inicializarFormVersiones();
         }
 
-        if (tabName === 'historialAgente') {
-            console.log('🔄 Forzando carga de PDA para Avance Gestores...');
-            if (typeof cargarDatosPDA === 'function') {
-                await cargarDatosPDA();
-                console.log('✅ PDA cargados:', window.datosPDA?.length || 0);
-            }
-            if (typeof cargarSelectAgentesHistorial === 'function') cargarSelectAgentesHistorial();
-            if (typeof cargarLideresEnSelectRanking === 'function') await cargarLideresEnSelectRanking();
-            if (typeof inicializarBuscadorGestores === 'function') inicializarBuscadorGestores();
+        if (
+    tabName ===
+        'historialAgente'
+    ) {
+        console.log(
+            '🔄 Cargando datos necesarios para Gestores 2.0...'
+        );
 
-            const resumenAgente = document.getElementById('resumenAgente');
-            const historialContainer = document.getElementById('historialContainer');
-            const btnExportar = document.getElementById('btnExportarHistorial');
-            if (resumenAgente) resumenAgente.style.display = 'none';
-            if (historialContainer) historialContainer.style.display = 'none';
-            if (btnExportar) btnExportar.style.display = 'none';
 
-            if (typeof cargarMesesParaSelectorQ4 === 'function') {
-                await cargarMesesParaSelectorQ4();
-                console.log('✅ Meses Q4 cargados');
-            }
-            if (typeof cargarMesesParaSelectorQ3 === 'function') {
-                await cargarMesesParaSelectorQ3();
-                console.log('✅ Meses Q3 cargados');
-            }
+        // ==================================================
+        // PDA PARA GESTORES
+        //
+        // Gestores necesita los PDA,
+        // pero no necesita los reportes Python.
+        // ==================================================
 
-            await new Promise(resolve => setTimeout(resolve, 100));
+        if (
+            typeof cargarDatosPDA ===
+            'function'
+        ) {
+            await cargarDatosPDA({
+                cargarReportes:
+                    false
+            });
 
-            if (typeof cargarAgentesQ4PorMes === 'function') {
-                await cargarAgentesQ4PorMes();
-                console.log('✅ Agentes Q4 cargados');
-            }
-            if (typeof cargarAgentesQ3PorMes === 'function') {
-                await cargarAgentesQ3PorMes();
-                console.log('✅ Agentes Q3 cargados');
-            }
 
-            setTimeout(() => {
-                if (typeof cargarEvolucionCuartilesPorGestor === 'function') {
+            console.log(
+                '✅ PDA disponibles para Gestores:',
+                window.datosPDA?.length ||
+                0
+            );
+        }
+
+
+        // ==================================================
+        // GESTORES 2.0
+        // ==================================================
+
+        if (
+            typeof renderizarGestoresDashboard ===
+            'function'
+        ) {
+            await renderizarGestoresDashboard();
+        }
+
+
+        // ==================================================
+        // OCULTAR ELEMENTOS LEGACY
+        // ==================================================
+
+        const resumenAgente =
+            document.getElementById(
+                'resumenAgente'
+            );
+
+
+        const historialContainer =
+            document.getElementById(
+                'historialContainer'
+            );
+
+
+        const btnExportar =
+            document.getElementById(
+                'btnExportarHistorial'
+            );
+
+
+        if (
+            resumenAgente
+        ) {
+            resumenAgente.style.display =
+                'none';
+        }
+
+
+        if (
+            historialContainer
+        ) {
+            historialContainer.style.display =
+                'none';
+        }
+
+
+        if (
+            btnExportar
+        ) {
+            btnExportar.style.display =
+                'none';
+        }
+
+
+        // ==================================================
+        // Q3 / EVOLUCIÓN
+        // ==================================================
+
+        if (
+            typeof cargarMesesParaSelectorQ3 ===
+            'function'
+        ) {
+            await cargarMesesParaSelectorQ3();
+
+
+            console.log(
+                '✅ Meses Q3 cargados'
+            );
+        }
+
+
+        await new Promise(
+            resolve =>
+                setTimeout(
+                    resolve,
+                    100
+                )
+        );
+
+
+        if (
+            typeof cargarAgentesQ3PorMes ===
+            'function'
+        ) {
+            await cargarAgentesQ3PorMes();
+
+
+            console.log(
+                '✅ Agentes Q3 cargados'
+            );
+        }
+
+
+        setTimeout(
+            () => {
+
+                if (
+                    typeof cargarEvolucionCuartilesPorGestor ===
+                    'function'
+                ) {
                     cargarEvolucionCuartilesPorGestor();
                 }
-                if (typeof inicializarFiltrosEvolucionCuartiles === 'function') {
+
+
+                if (
+                    typeof inicializarFiltrosEvolucionCuartiles ===
+                    'function'
+                ) {
                     inicializarFiltrosEvolucionCuartiles();
                 }
-            }, 200);
-        }
+
+            },
+            200
+        );
+    }
 
         if (tabName === 'cuartiles') {
             if (typeof cargarCriteriosCuartilesTabla === 'function') {
@@ -2135,19 +2246,13 @@ async function showTab(tabName, event) {
         }
 
         if (tabName === 'reportes') {
-            if (typeof cargarCampanasEnFiltroReportes === 'function') {
-                await cargarCampanasEnFiltroReportes();
+            if (
+                typeof inicializarAnalyticsDashboard ===
+                'function'
+            ) {
+                inicializarAnalyticsDashboard();
             }
-            if ((!window.evaluacionesGlobales || window.evaluacionesGlobales.length === 0) &&
-                typeof obtenerEvaluacionesConCache === 'function') {
-                await obtenerEvaluacionesConCache(false);
-            }
-            if (typeof generarReportes === 'function') {
-                await generarReportes();
-            }
-            if (typeof cargarResumenPorLider === 'function') {
-                await cargarResumenPorLider();
-            }
+
         }
 
         if (tabName === 'reglas') {
@@ -2228,15 +2333,19 @@ async function showTab(tabName, event) {
 
 const accionesPestanas = {
     'reportes': async () => {
-        console.log('📊 Inicializando pestaña Reportes');
-        if (window.evaluacionesGlobales && window.evaluacionesGlobales.length > 0) {
-            if (typeof generarReportes === 'function') await generarReportes();
-            if (typeof cargarResumenPorLider === 'function') await cargarResumenPorLider();
+        console.log(
+            '📊 Inicializando MECA Analytics 2.0'
+        );
+
+        if (
+            typeof inicializarAnalyticsDashboard ===
+            'function'
+        ) {
+            inicializarAnalyticsDashboard();
         }
     },
     'historialAgente': async () => {
         console.log('📋 Inicializando pestaña Avance Gestores');
-        if (typeof cargarRankingAgentesCompleto === 'function') await cargarRankingAgentesCompleto();
         if (typeof cargarEvolucionCuartilesPorGestor === 'function') cargarEvolucionCuartilesPorGestor();
         if (typeof inicializarBuscadorGestores === 'function') inicializarBuscadorGestores();
     },
@@ -2463,7 +2572,11 @@ async function cargarEvaluacionesDesdePostgreSQL() {
                 fechaDescarga: evalItem.fecha_descarga || null,
                 // 🔴 NUEVO: CAMPOS DE CAMPAÑA
                 campana: evalItem.campana || '',
-                campana_id: evalItem.campana_id || null,
+                campana_id: evalItem.campana_id ?? null,
+                // Contexto multidominio de la evaluación
+                quiebre_id: evalItem.quiebre_id ?? null,
+                matriz_id: evalItem.matriz_id ?? null,
+                version_matriz_id: evalItem.version_matriz_id ?? null,
                 notaFinal: Number(evalItem.nota_final) || 0,
                 rango: evalItem.rango || '',
                 totalENC: Number(evalItem.total_enc) || 0,
@@ -2482,6 +2595,15 @@ async function cargarEvaluacionesDesdePostgreSQL() {
         console.log(`✅ ${window.evaluacionesGlobales.length} evaluaciones cargadas`);
         console.log(`📋 Evaluaciones con campaña: ${conCampana}`);
         console.log(`📋 Evaluaciones con detalles: ${evaluacionesFormateadas.filter(e => e.detalles && e.detalles.length > 0).length}`);
+        console.log('📊 Ejemplo de contexto analítico:', {
+            id: evaluacionesFormateadas[0]?.id,
+            ticketPSI: evaluacionesFormateadas[0]?.ticketPSI,
+            quiebre_id: evaluacionesFormateadas[0]?.quiebre_id,
+            campana: evaluacionesFormateadas[0]?.campana,
+            campana_id: evaluacionesFormateadas[0]?.campana_id,
+            matriz_id: evaluacionesFormateadas[0]?.matriz_id,
+            version_matriz_id: evaluacionesFormateadas[0]?.version_matriz_id
+        });
 
         if (evaluacionesFormateadas.length > 0) {
             console.log('📊 Ejemplo de campaña:', {
@@ -2992,35 +3114,7 @@ async function cargarRoles() {
     }
 }
 
-// ======4.5. Fechas y Períodos==========
-async function cargarMesesDisponiblesRanking() {
-    console.log('📅 Cargando meses disponibles para filtro de ranking...');
 
-    const select = document.getElementById('filtroMesRanking');
-    if (!select) return;
-
-    try {
-        const meses = await API.getMesesDisponibles();
-
-        select.innerHTML = '<option value="todos">📅 Todos los períodos</option>';
-
-        if (meses.length === 0) {
-            select.innerHTML += '<option disabled>⚠️ No hay meses con evaluaciones</option>';
-        } else {
-            meses.forEach(mes => {
-                // 🔴 CORREGIDO: usar 'valor' no 'value'
-                const valor = mes.valor || `${mes.anio}-${mes.mes.toString().padStart(2, '0')}`;
-                select.innerHTML += `<option value="${valor}">📅 ${mes.label}</option>`;
-            });
-        }
-
-        console.log(`✅ ${meses.length} meses cargados para filtro`);
-
-    } catch (error) {
-        console.error('Error cargando meses:', error);
-        select.innerHTML = '<option value="todos">📅 Todos los períodos</option><option disabled>❌ Error</option>';
-    }
-}
 
 async function obtenerMesesDisponiblesDinamicos() {
     try {
@@ -3110,201 +3204,7 @@ async function obtenerDiasDisponiblesDinamicos() {
     }
 }
 
-function inicializarFiltroReportes() {
-    console.log('🔧 Inicializando filtro de reportes mejorado...');
 
-    const selectPeriodo = document.getElementById('filtroPeriodoReportes');
-    if (!selectPeriodo) {
-        console.warn('⚠️ No se encontró el selector de período');
-        return;
-    }
-
-    // 🔴 NUEVO: Cargar campañas en el selector
-    cargarCampanasEnFiltroReportes();
-
-    // Valores por defecto
-    const ahora = new Date();
-    filtroSemanaAnio = ahora.getFullYear();
-    filtroSemanaNumero = obtenerNumeroSemana(ahora);
-    filtroMesAnio = ahora.getFullYear();
-    filtroMesNumero = ahora.getMonth() + 1;
-    filtroTrimestreAnio = ahora.getFullYear();
-    filtroTrimestreNumero = Math.floor(ahora.getMonth() / 3) + 1;
-    filtroAnio = ahora.getFullYear();
-
-    // Renderizar controles iniciales
-    renderizarControlesPeriodo();
-
-    // Evento para cambiar los controles según el período
-    selectPeriodo.addEventListener('change', () => {
-        renderizarControlesPeriodo();
-    });
-
-    // 🔴 NUEVO: Evento para cambiar la campaña
-    const selectCampana = document.getElementById('filtroCampanaReportes');
-    if (selectCampana) {
-        selectCampana.addEventListener('change', () => {
-            console.log('📌 Campaña filtro cambiado a:', selectCampana.value);
-            aplicarFiltroReportes();
-        });
-    }
-
-    console.log('✅ Filtro de período mejorado inicializado');
-}
-
-// ======================================================
-// FUNCIÓN: cargarCampanasEnFiltroReportes()
-// ======================================================
-// 📌 PROPÓSITO: Cargar las campañas activas en el selector de reportes
-// 📌 UBICACIÓN: supervisor.js - después de inicializarFiltroReportes()
-// ======================================================
-
-async function cargarCampanasEnFiltroReportes() {
-    const select =
-        document.getElementById('filtroCampanaReportes');
-
-    if (!select) {
-        return;
-    }
-
-    try {
-        const campanas = await obtenerCampanas();
-
-        const activas =
-            Array.isArray(campanas)
-                ? campanas.filter(c => c.activa)
-                : [];
-
-        // ======================================================
-        // 1. CONSERVAR SELECCIÓN ACTUAL
-        // ======================================================
-        // El selector puede encontrarse temporalmente en uno de
-        // estos dos estados:
-        //
-        // LEGACY:
-        // value = T / ST / F
-        //
-        // NUEVO:
-        // value = campana_id
-        // ======================================================
-
-        const valorAnterior =
-            String(select.value || 'todos');
-
-        let idSeleccionado = 'todos';
-
-        if (valorAnterior !== 'todos') {
-
-            // Primero asumimos que ya contiene campana_id
-            const encontradaPorId =
-                activas.find(
-                    c =>
-                        String(c.id) ===
-                        valorAnterior
-                );
-
-            if (encontradaPorId) {
-                idSeleccionado =
-                    String(encontradaPorId.id);
-
-            } else {
-
-                // Compatibilidad temporal con selector legacy
-                const encontradaPorCodigo =
-                    activas.find(
-                        c =>
-                            String(c.codigo) ===
-                            valorAnterior
-                    );
-
-                if (encontradaPorCodigo) {
-                    idSeleccionado =
-                        String(encontradaPorCodigo.id);
-                }
-            }
-        }
-
-        // ======================================================
-        // 2. RECONSTRUIR SELECT
-        //    CONTRATO NUEVO:
-        //
-        //    value        = campana_id
-        //    data-codigo  = código de campaña
-        // ======================================================
-
-        select.innerHTML = '';
-
-        const opcionTodos =
-            document.createElement('option');
-
-        opcionTodos.value = 'todos';
-        opcionTodos.textContent =
-            '📊 Todas las campañas';
-
-        select.appendChild(opcionTodos);
-
-        activas.forEach(campana => {
-
-            const option =
-                document.createElement('option');
-
-            // Fuente real para lógica/filtros
-            option.value =
-                String(campana.id);
-
-            // Código solamente como metadato/UI
-            option.dataset.codigo =
-                String(campana.codigo || '');
-
-            option.dataset.descripcion =
-                String(campana.descripcion || '');
-
-            option.textContent =
-                `${campana.codigo} - ${campana.descripcion}`;
-
-            select.appendChild(option);
-        });
-
-        // ======================================================
-        // 3. RESTAURAR SELECCIÓN
-        // ======================================================
-
-        const existeSeleccion =
-            [...select.options].some(
-                option =>
-                    option.value ===
-                    idSeleccionado
-            );
-
-        select.value =
-            existeSeleccion
-                ? idSeleccionado
-                : 'todos';
-
-        console.log(
-            `✅ ${activas.length} campañas cargadas ` +
-            'en filtro de reportes usando campana_id'
-        );
-
-    } catch (error) {
-
-        console.error(
-            '❌ Error cargando campañas en filtro:',
-            error
-        );
-
-        select.innerHTML = '';
-
-        const option =
-            document.createElement('option');
-
-        option.value = 'todos';
-        option.textContent =
-            '⚠️ Error cargando campañas';
-
-        select.appendChild(option);
-    }
-}
 
 async function renderizarControlesPeriodo() {
     const container = document.getElementById('periodoControlesContainer');
@@ -3332,10 +3232,10 @@ async function renderizarControlesPeriodo() {
         html = `
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
                 <span style="font-size: 12px; color: #64748b; font-weight: 500;">Desde:</span>
-                <input type="date" id="filtroFechaInicioReportes" value="${filtroDiaDesde || ''}" 
+                <input type="date" id="filtroFechaInicioReportes" value="${filtroDiaDesde || ''}"
                     style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none;">
                 <span style="color: #94a3b8;">→</span>
-                <input type="date" id="filtroFechaFinReportes" value="${filtroDiaHasta || ''}" 
+                <input type="date" id="filtroFechaFinReportes" value="${filtroDiaHasta || ''}"
                     style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none;">
             </div>
         `;
@@ -4200,303 +4100,6 @@ async function preprocesarDatosParaGraficos(evaluaciones) {
 async function cargarEvaluacionesConOptimizacion() {
     return await obtenerEvaluacionesConCache(false);
 }
-
-function agregarBotonRefreshPDA() {
-    const headerPendientes = document.querySelector('#tab-gestionPDA .card:first-child h3');
-    if (headerPendientes && !document.getElementById('btnRefreshPDA')) {
-        const refreshBtn = document.createElement('button');
-        refreshBtn.id = 'btnRefreshPDA';
-        refreshBtn.innerHTML = '🔄 Refrescar';
-        refreshBtn.style.background = 'var(--accent)';
-        refreshBtn.style.padding = '4px 12px';
-        refreshBtn.style.fontSize = '12px';
-        refreshBtn.style.borderRadius = '8px';
-        refreshBtn.style.marginLeft = '10px';
-        refreshBtn.style.cursor = 'pointer';
-        refreshBtn.style.border = 'none';
-        refreshBtn.onclick = async () => {
-            refreshBtn.disabled = true;
-            refreshBtn.innerHTML = '⏳ Cargando...';
-            await refrescarPendientesDesdePostgreSQL();
-            refreshBtn.innerHTML = '🔄 Refrescar';
-            refreshBtn.disabled = false;
-            alert('✅ Datos de PDA actualizados');
-        };
-        headerPendientes.appendChild(refreshBtn);
-    }
-}
-
-// ======================================================
-// 5. PESTAÑA "REPORTES"
-// ======================================================
-
-// ======5.1. Evaluaciones==========
-// ======================================================
-// GENERAR REPORTES - VERSIÓN UNIFICADA
-// ======================================================
-
-async function generarReportes() {
-    console.log('📊 generarReportes - Iniciando...');
-
-    // ======================================================
-    // PASO 1: Asegurar que tenemos evaluaciones cargadas
-    // ======================================================
-    let evaluaciones = window.evaluacionesGlobales;
-
-    if (!evaluaciones || evaluaciones.length === 0) {
-        console.log('⚠️ No hay evaluaciones en window.evaluacionesGlobales, cargando...');
-        evaluaciones = await obtenerEvaluacionesConCache(false);
-        window.evaluacionesGlobales = evaluaciones;
-    }
-
-    // ======================================================
-    // PASO 2: Validación robusta
-    // ======================================================
-    if (!evaluaciones || evaluaciones.length === 0) {
-        console.log('⚠️ No hay evaluaciones para generar reportes');
-        const sinDatosDiv = document.getElementById('reportesSinDatos');
-        const conDatosDiv = document.getElementById('reportesConDatos');
-        if (sinDatosDiv) sinDatosDiv.style.display = 'block';
-        if (conDatosDiv) conDatosDiv.style.display = 'none';
-        resetearKPIs();
-        return;
-    }
-
-    console.log(`📊 Evaluaciones obtenidas: ${evaluaciones.length}`);
-    if (evaluaciones.length > 0 && evaluaciones[0]) {
-        console.log('📊 Primera evaluación (debug):', {
-            id: evaluaciones[0].id,
-            notaFinal: evaluaciones[0].notaFinal,
-            totalENC: evaluaciones[0].totalENC,
-            tieneDetalles: !!evaluaciones[0].detalles,
-            cantidadDetalles: evaluaciones[0].detalles?.length || 0
-        });
-    } else {
-        console.error('❌ evaluaciones[0] es undefined o null');
-        return;
-    }
-
-    // ======================================================
-    // PASO 3: Mostrar contenedores
-    // ======================================================
-    const sinDatosDiv = document.getElementById('reportesSinDatos');
-    const conDatosDiv = document.getElementById('reportesConDatos');
-    if (sinDatosDiv) sinDatosDiv.style.display = 'none';
-    if (conDatosDiv) conDatosDiv.style.display = 'block';
-
-    // ======================================================
-    // PASO 4: Calcular estadísticas
-    // ======================================================
-    const totalEval = evaluaciones.length;
-    const promedioGeneral = Math.round(evaluaciones.reduce((sum, e) => sum + (e.notaFinal || 0), 0) / totalEval);
-
-    const excelentes = evaluaciones.filter(e => (e.notaFinal || 0) >= 97).length;
-    const bajos = evaluaciones.filter(e => (e.notaFinal || 0) < 85).length;
-
-    // CALCULAR PORCENTAJES
-    const conteosMotivos = contarMotivosPorDebajoDePeso(evaluaciones);
-    const conENC = conteosMotivos.conENC;
-    const conECUF = conteosMotivos.conECUF;
-    const conECN = conteosMotivos.conECN;
-
-    const porcentajeECUF = totalEval > 0 ? Math.round((conECUF / totalEval) * 100) : 0;
-    const porcentajeECN = totalEval > 0 ? Math.round((conECN / totalEval) * 100) : 0;
-    const porcentajeENC = totalEval > 0 ? Math.round((conENC / totalEval) * 100) : 0;
-
-    // Calcular total de gestores únicos
-    const gestoresUnicos = new Set();
-    evaluaciones.forEach(e => { if (e.agente) gestoresUnicos.add(e.agente); });
-    const totalGestores = gestoresUnicos.size;
-
-    // ======================================================
-    // PASO 5: Actualizar KPI principales
-    // ======================================================
-    const kpiTotalEval = document.getElementById('kpiTotalEval');
-    const kpiPromedio = document.getElementById('kpiPromedio');
-    const kpiConECUF = document.getElementById('kpiConECUF');
-    const kpiConECN = document.getElementById('kpiConECN');
-    const kpiConENC = document.getElementById('kpiConENC');
-    const kpiTotalGestores = document.getElementById('kpiTotalGestores');
-    const kpiConECUFDetalle = document.getElementById('kpiConECUFDetalle');
-    const kpiConECNDetalle = document.getElementById('kpiConECNDetalle');
-    const kpiConENCDetalle = document.getElementById('kpiConENCDetalle');
-    const kpiTotalGestoresDetalle = document.getElementById('kpiTotalGestoresDetalle');
-
-    if (kpiTotalEval) kpiTotalEval.textContent = totalEval;
-    if (kpiPromedio) kpiPromedio.textContent = promedioGeneral + '%';
-    if (kpiConECUF) {
-        kpiConECUF.textContent = porcentajeECUF + '%';
-        kpiConECUF.setAttribute('title', `${conECUF} de ${totalEval} llamadas (${porcentajeECUF}%)`);
-    }
-    if (kpiConECN) {
-        kpiConECN.textContent = porcentajeECN + '%';
-        kpiConECN.setAttribute('title', `${conECN} de ${totalEval} llamadas (${porcentajeECN}%)`);
-    }
-    if (kpiConENC) {
-        kpiConENC.textContent = porcentajeENC + '%';
-        kpiConENC.setAttribute('title', `${conENC} de ${totalEval} llamadas (${porcentajeENC}%)`);
-    }
-    if (kpiConENCDetalle) kpiConENCDetalle.textContent = `${conENC} de ${totalEval} llamadas`;
-    if (kpiTotalGestores) kpiTotalGestores.textContent = totalGestores;
-    if (kpiTotalGestoresDetalle) kpiTotalGestoresDetalle.textContent = totalGestores === 1 ? '1 agente único' : `${totalGestores} gestores únicos`;
-    if (kpiConECUFDetalle) kpiConECUFDetalle.textContent = `${conECUF} de ${totalEval} llamadas`;
-    if (kpiConECNDetalle) kpiConECNDetalle.textContent = `${conECN} de ${totalEval} llamadas`;
-
-    // ======================================================
-    // PASO 6: Promedios por motivo
-    // ======================================================
-    const promedioRawENC = (evaluaciones.reduce((sum, e) => sum + (e.totalENC || 0), 0) / totalEval).toFixed(1);
-    const promedioRawECUF = (evaluaciones.reduce((sum, e) => sum + (e.totalECUF || 0), 0) / totalEval).toFixed(1);
-    const promedioRawECN = (evaluaciones.reduce((sum, e) => sum + (e.totalECN || 0), 0) / totalEval).toFixed(1);
-
-    const porcentajes = calcularPromediosMotivosPorcentaje(evaluaciones);
-    const pctENC = Math.round(Number(porcentajes.promedioENC));
-    const pctECUF = Math.round(Number(porcentajes.promedioECUF));
-    const pctECN = Math.round(Number(porcentajes.promedioECN));
-
-    const matrizDominante = obtenerMatrizDominante(evaluaciones);
-    const detalleENC = matrizDominante ? `${promedioRawENC}/${matrizDominante.pesos.ENC} pts` : `${promedioRawENC} pts`;
-    const detalleECUF = matrizDominante ? `${promedioRawECUF}/${matrizDominante.pesos.ECUF} pts` : `${promedioRawECUF} pts`;
-    const detalleECN = matrizDominante ? `${promedioRawECN}/${matrizDominante.pesos.ECN} pts` : `${promedioRawECN} pts`;
-
-    const kpiPromedioENC = document.getElementById('kpiPromedioENC');
-    const kpiPromedioENCDetalle = document.getElementById('kpiPromedioENCDetalle');
-    const kpiPromedioECUF = document.getElementById('kpiPromedioECUF');
-    const kpiPromedioECUFDetalle = document.getElementById('kpiPromedioECUFDetalle');
-    const kpiPromedioECN = document.getElementById('kpiPromedioECN');
-    const kpiPromedioECNDetalle = document.getElementById('kpiPromedioECNDetalle');
-
-    if (kpiPromedioENC) kpiPromedioENC.textContent = pctENC + '%';
-    if (kpiPromedioENCDetalle) kpiPromedioENCDetalle.textContent = detalleENC;
-    if (kpiPromedioECUF) kpiPromedioECUF.textContent = pctECUF + '%';
-    if (kpiPromedioECUFDetalle) kpiPromedioECUFDetalle.textContent = detalleECUF;
-    if (kpiPromedioECN) kpiPromedioECN.textContent = pctECN + '%';
-    if (kpiPromedioECNDetalle) kpiPromedioECNDetalle.textContent = detalleECN;
-
-    // ======================================================
-    // PASO 7: Porcentaje de quiebres
-    // ======================================================
-    const quiebresCount = evaluaciones.filter(e => (e.notaFinal || 0) < 85).length;
-    const pctQuiebres = totalEval > 0 ? Math.round((quiebresCount / totalEval) * 100) : 0;
-    const kpiPorcentajeQuiebres = document.getElementById('kpiPorcentajeQuiebres');
-    const kpiPorcentajeQuiebresDetalle = document.getElementById('kpiPorcentajeQuiebresDetalle');
-    if (kpiPorcentajeQuiebres) kpiPorcentajeQuiebres.textContent = pctQuiebres + '%';
-    if (kpiPorcentajeQuiebresDetalle) kpiPorcentajeQuiebresDetalle.textContent = quiebresCount + ' de ' + totalEval + ' evaluaciones';
-
-    // ======================================================
-    // PASO 8: Ranking de agentes
-    // ======================================================
-    const ranking = await construirRankingAgentes(evaluaciones);
-    const cobertura = calcularCobertura(evaluaciones, ranking);
-    const coberturaElem = document.getElementById('kpiCobertura');
-    const coberturaDetalle = document.getElementById('kpiCoberturaDetalle');
-    if (coberturaElem) coberturaElem.textContent = cobertura.porcentaje + '%';
-    if (coberturaDetalle) coberturaDetalle.textContent = `${cobertura.auditados}/${cobertura.total}`;
-
-    const tasaQuiebre = calcularTasaQuiebre(ranking);
-    const tasaElem = document.getElementById('kpiTasaQuiebre');
-    const tasaDetalle = document.getElementById('kpiTasaQuiebreDetalle');
-    if (tasaElem) tasaElem.textContent = tasaQuiebre.porcentaje + '%';
-    if (tasaDetalle) tasaDetalle.textContent = `${tasaQuiebre.quiebres} agentes`;
-
-    // Calcular porcentajes para Q1, Q2, Q3
-    const totalAgentes = ranking.length;
-    const q1 = ranking.filter(a => a.cuartil === 'Q1').length;
-    const q2 = ranking.filter(a => a.cuartil === 'Q2').length;
-    const q3 = ranking.filter(a => a.cuartil === 'Q3').length;
-
-    const pctQ1 = totalAgentes > 0 ? Math.round((q1 / totalAgentes) * 100) : 0;
-    const pctQ2 = totalAgentes > 0 ? Math.round((q2 / totalAgentes) * 100) : 0;
-    const pctQ3 = totalAgentes > 0 ? Math.round((q3 / totalAgentes) * 100) : 0;
-
-    const kpiQ1 = document.getElementById('kpiPorcentajeQ1');
-    const kpiQ1Detalle = document.getElementById('kpiPorcentajeQ1Detalle');
-    if (kpiQ1) kpiQ1.textContent = pctQ1 + '%';
-    if (kpiQ1Detalle) kpiQ1Detalle.textContent = `${q1} agentes`;
-
-    const kpiQ2 = document.getElementById('kpiPorcentajeQ2');
-    const kpiQ2Detalle = document.getElementById('kpiPorcentajeQ2Detalle');
-    if (kpiQ2) kpiQ2.textContent = pctQ2 + '%';
-    if (kpiQ2Detalle) kpiQ2Detalle.textContent = `${q2} agentes`;
-
-    const kpiQ3 = document.getElementById('kpiPorcentajeQ3');
-    const kpiQ3Detalle = document.getElementById('kpiPorcentajeQ3Detalle');
-    if (kpiQ3) kpiQ3.textContent = pctQ3 + '%';
-    if (kpiQ3Detalle) kpiQ3Detalle.textContent = `${q3} agentes`;
-
-    // ======================================================
-    // PASO 9: PDA y productividad
-    // ======================================================
-    const eficacia = calcularEficaciaPDA();
-    const eficaciaElem = document.getElementById('kpiEficaciaPDA');
-    const eficaciaDetalle = document.getElementById('kpiEficaciaDetalle');
-    if (eficaciaElem) eficaciaElem.textContent = eficacia.porcentaje + '%';
-    if (eficaciaDetalle) eficaciaDetalle.textContent = `${eficacia.corregidos}/${eficacia.total}`;
-
-    const agentesRiesgo = calcularAgentesEnRiesgo();
-    const riesgoElem = document.getElementById('kpiAgentesRiesgo');
-    if (riesgoElem) riesgoElem.textContent = agentesRiesgo;
-
-    const productividad = await calcularProductividadAuditor(evaluaciones);
-    const prodElem = document.getElementById('kpiProductividad');
-    const capElem = document.getElementById('kpiCapacidadTotal');
-    if (prodElem) prodElem.textContent = productividad.porAuditor;
-    if (capElem) capElem.textContent = productividad.capacidadTotal;
-
-    // ======================================================
-    // PASO 10: Tablas y gráficos
-    // ======================================================
-    await actualizarTablaRanking(ranking);
-
-    // Obtener top submotivos para alertas
-    const topSubmotivosData = obtenerTopSubmotivos(evaluaciones);
-    const topSubmotivos = topSubmotivosData.items || [];
-
-    // Generar tabla jerárquica de fallas
-    generarTablaJerarquicaFallas(evaluaciones);
-
-    // Generar alertas operativas
-    const alertas = construirAlertasOperativas(evaluaciones, ranking, topSubmotivos);
-    const alertasDiv = document.getElementById('alertasOperativas');
-    if (alertasDiv) {
-        alertasDiv.innerHTML = alertas.length
-            ? alertas.map(a => `<div style="padding:12px; border-radius:10px; background:#fff4e5; border-left:4px solid #f39c12;">${a}</div>`).join('')
-            : `<div style="padding:12px; border-radius:10px; background:#f8f9fa;">Sin alertas aún.</div>`;
-    }
-
-    // ======================================================
-    // PASO 11: Generar gráficos
-    // ======================================================
-    generarGraficosReportes(evaluaciones);
-    generarGraficoGestionLlamadas(evaluaciones);
-
-    // Actualizar todos los nuevos gráficos
-    actualizarCardsPromedioMotivos(evaluaciones);
-    actualizarCardPorcentajeQuiebres(evaluaciones);
-    const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluaciones, 'mes');
-    generarEvolutivoAudiosAgrupado(datosAgrupados, 'mes');
-    generarDistribucionRangosAgrupado(evaluaciones);
-    generarEvolutivoAtributosAgrupado(evaluaciones, datosAgrupados, 'mes');
-    generarEvolutivoQuiebresAgrupado(datosAgrupados);
-    generarEvolutivoCuartiles(evaluaciones, null, 'mes');
-    generarGraficoComparativaAgrupado(evaluaciones);
-    await renderizarEvolutivoConDatosFiltrados(evaluaciones);
-    const evaluacionesParaTabla = window.evaluacionesFiltradasGlobal || window.evaluacionesGlobales || [];
-    await generarTablaEvolutivaIndicadores(evaluacionesParaTabla);
-
-    // ======================================================
-    // ✅ PASO 12: CALCULAR FRENTES DE IMPACTO
-    // ======================================================
-    calcularFrentesImpacto();
-
-    // ======================================================
-    // ✅ PASO 13: RESETEAR RANKING COMPLETO
-    // ======================================================
-    resetearRankingCompleto();
-
-    console.log('✅ Reportes generados correctamente');
-}
-
 
 function resetearKPIs() {
     const elementos = [
@@ -5632,19 +5235,6 @@ function calcularTasaQuiebre(ranking) {
     };
 }
 
-function calcularEficaciaPDA() {
-    if (typeof datosPDA === 'undefined' || !datosPDA) {
-        return { porcentaje: 0, corregidos: 0, total: 0 };
-    }
-    const totalFinalizados = datosPDA.filter(p => p.estado !== 'pendiente').length;
-    const corregidos = datosPDA.filter(p => p.estado === 'corregido').length;
-    const eficacia = totalFinalizados > 0 ? Math.round((corregidos / totalFinalizados) * 100) : 0;
-    return {
-        porcentaje: eficacia,
-        corregidos: corregidos,
-        total: totalFinalizados
-    };
-}
 
 function calcularAgentesEnRiesgo() {
     if (typeof datosPDA === 'undefined' || !datosPDA) return 0;
@@ -6054,169 +5644,6 @@ function obtenerTopSubmotivos(evaluaciones) {
     };
 }
 
-// ======5.3. Gráficos de Reportes==========
-function generarGraficosReportes(evaluaciones) {
-    if (chartResultados) chartResultados.destroy();
-    if (chartTendencias) chartTendencias.destroy();
-
-    const rangos = {
-        Excelente: evaluaciones.filter(e => numeroSeguro(e.notaFinal) >= 97).length,
-        Bien: evaluaciones.filter(e => numeroSeguro(e.notaFinal) >= 90 && numeroSeguro(e.notaFinal) < 97).length,
-        Regular: evaluaciones.filter(e => numeroSeguro(e.notaFinal) >= 85 && numeroSeguro(e.notaFinal) < 90).length,
-        Bajo: evaluaciones.filter(e => numeroSeguro(e.notaFinal) < 85).length
-    };
-
-    const ctxRangos = document.getElementById('chartRangos')?.getContext('2d');
-    if (ctxRangos) {
-        chartResultados = new Chart(ctxRangos, {
-            type: 'doughnut',
-            data: {
-                labels: Object.keys(rangos),
-                datasets: [{
-                    data: Object.values(rangos),
-                    backgroundColor: ['#1a7f37', '#019DF4', '#f39c12', '#d93025'],
-                    borderWidth: 2,
-                    borderColor: '#ffffff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom' },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => `${ctx.label}: ${ctx.raw} (${((ctx.raw / evaluaciones.length) * 100).toFixed(1)}%)`
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    // ======================================================
-    // GRÁFICO DE TENDENCIA - CORREGIDO
-    // ======================================================
-    const agrupadoPorFecha = {};
-
-    evaluaciones.forEach(e => {
-        // Obtener la fecha original en formato DD/MM/YYYY
-        let fechaCompleta = e.fechaOriginal || e.fecha || '';
-        let fechaSoloDia = '';
-
-        // Extraer solo la fecha (DD/MM/YYYY) sin la hora
-        if (fechaCompleta.includes(' ')) {
-            fechaSoloDia = fechaCompleta.split(' ')[0];
-        } else if (fechaCompleta.includes('T')) {
-            // Si es formato ISO, convertir a DD/MM/YYYY
-            const partes = fechaCompleta.split('T')[0];
-            const [anio, mes, dia] = partes.split('-');
-            fechaSoloDia = `${dia}/${mes}/${anio}`;
-        } else {
-            fechaSoloDia = fechaCompleta;
-        }
-
-        if (!fechaSoloDia) return;
-
-        if (!agrupadoPorFecha[fechaSoloDia]) {
-            agrupadoPorFecha[fechaSoloDia] = {
-                suma: 0,
-                count: 0,
-                fecha: fechaSoloDia
-            };
-        }
-        agrupadoPorFecha[fechaSoloDia].suma += numeroSeguro(e.notaFinal);
-        agrupadoPorFecha[fechaSoloDia].count++;
-    });
-
-    // Convertir a array y ordenar cronológicamente
-    let fechasArray = Object.values(agrupadoPorFecha);
-
-    // Función para convertir DD/MM/YYYY a timestamp
-    function fechaToTimestamp(fechaStr) {
-        if (!fechaStr) return 0;
-        const partes = fechaStr.split('/');
-        if (partes.length !== 3) return 0;
-        const dia = parseInt(partes[0], 10);
-        const mes = parseInt(partes[1], 10) - 1;
-        const anio = parseInt(partes[2], 10);
-        return new Date(anio, mes, dia).getTime();
-    }
-
-    // Ordenar por fecha
-    fechasArray.sort((a, b) => fechaToTimestamp(a.fecha) - fechaToTimestamp(b.fecha));
-
-    const labels = fechasArray.map(item => item.fecha);
-    const data = fechasArray.map(item => Number((item.suma / item.count).toFixed(1)));
-
-    const ctxTendencia = document.getElementById('chartTendencia')?.getContext('2d');
-    if (ctxTendencia && labels.length > 0) {
-        if (chartTendencias) chartTendencias.destroy();
-
-        chartTendencias = new Chart(ctxTendencia, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Promedio diario',
-                    data: data,
-                    borderColor: '#019DF4',
-                    backgroundColor: 'rgba(1,157,244,0.1)',
-                    tension: 0.3,
-                    fill: true,
-                    pointBackgroundColor: '#019DF4',
-                    pointBorderColor: '#fff',
-                    pointRadius: 5,
-                    pointHoverRadius: 7
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function (context) {
-                                const fecha = context.label;
-                                const item = fechasArray.find(i => i.fecha === fecha);
-                                const promedio = context.raw;
-                                return `📊 Promedio: ${promedio}% (${item?.count || 0} evaluaciones)`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        min: 0,
-                        max: 100,
-                        title: {
-                            display: true,
-                            text: 'Nota Promedio (%)',
-                            color: 'var(--muted)',
-                            font: { size: 12 }
-                        },
-                        grid: { color: 'rgba(0,0,0,0.05)' }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Fecha',
-                            color: 'var(--muted)',
-                            font: { size: 12 }
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45,
-                            autoSkip: true,
-                            maxTicksLimit: 10
-                        }
-                    }
-                }
-            }
-        });
-    }
-}
 
 function generarGraficoGestionLlamadas(evaluacionesFiltradas, periodo) {
     console.log('📞 generarGraficoGestionLlamadas - INICIANDO...');
@@ -6512,7 +5939,7 @@ function generarEvolutivoAudiosAgrupado(datosAgrupados, periodo) {
         return;
     }
 
-    // 🔴 USAR EL PERÍODO RECIBIDO (YA VIENE DE aplicarFiltroReportes)
+
     const periodoEfectivo = periodo || 'mes';
     console.log(`📊 Generando gráfico de audios con período: ${periodoEfectivo}`);
 
@@ -9502,291 +8929,6 @@ function procesarErroresPorAuditorOptimizado(evaluacionesConDetalles) {
     };
 }
 
-// ======5.4. Filtros y Agrupación==========
-async function aplicarFiltroReportes() {
-    console.log('🔄 Aplicando filtro de reportes...');
-    console.log(`📊 Período seleccionado: ${filtroPeriodoActual}`);
-
-    const loadingDiv = document.createElement('div');
-    loadingDiv.textContent = '⏳ Aplicando filtro...';
-    loadingDiv.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 15px 25px; border-radius: 30px; z-index: 10000; font-size: 14px;';
-    document.body.appendChild(loadingDiv);
-
-    try {
-        const evaluaciones = await obtenerEvaluacionesConCache(false);
-
-        if (evaluaciones.length === 0) {
-            console.warn('⚠️ No hay evaluaciones para filtrar');
-            mostrarMensajeSinDatosEnGraficos();
-            loadingDiv.remove();
-            return;
-        }
-
-        const evaluacionesFiltradas = obtenerEvaluacionesFiltradasPorPeriodo(evaluaciones);
-
-        console.log(`📊 Evaluaciones filtradas: ${evaluacionesFiltradas.length} de ${evaluaciones.length}`);
-
-        // Guardar en variable global
-        window.evaluacionesFiltradasGlobal = evaluacionesFiltradas;
-
-        // Actualizar resumen agrupado con los datos filtrados
-        if (typeof cambiarAgrupacion === 'function') {
-            await cambiarAgrupacion();
-        }
-
-        actualizarInfoFiltro();
-
-        if (evaluacionesFiltradas.length === 0) {
-            mostrarMensajeSinDatosEnGraficos();
-            loadingDiv.remove();
-            return;
-        }
-
-        // 1. Actualizar KPIs
-        await actualizarKPIsConFiltro(evaluacionesFiltradas);
-
-        // 2. Actualizar ranking
-        const ranking = await construirRankingAgentes(evaluacionesFiltradas);
-        rankingCompletoGlobal = ranking;
-        await actualizarTablaRanking(ranking);
-
-        // 3. Actualizar tabla jerárquica de fallas
-        generarTablaJerarquicaFallas(evaluacionesFiltradas);
-
-        // 4. Obtener el período seleccionado sin modificaciones
-        let periodo = filtroPeriodoActual || document.getElementById('filtroPeriodoReportes')?.value || 'mes';
-        console.log(`📊 Período para agrupar: ${periodo}`);
-
-        // 🔴 IMPORTANTE: Definir periodoGraficos correctamente
-        let periodoGraficos = periodo;
-
-        // 🔴 SI ES 'rango', VERIFICAR QUÉ TIPO DE RANGO ESTÁ SELECCIONADO
-        if (periodo === 'rango') {
-            const tipoRango = document.getElementById('filtroRangoTipo')?.value;
-            if (tipoRango === 'mes') periodoGraficos = 'mes';
-            else if (tipoRango === 'trimestre') periodoGraficos = 'trimestre';
-            else if (tipoRango === 'anio') periodoGraficos = 'anio';
-            else if (tipoRango === 'dia') periodoGraficos = 'dia';
-            else periodoGraficos = 'mes';
-            console.log(`📊 Rango mapeado a período: ${periodoGraficos}`);
-        }
-
-        // 🔴 SI ES 'multiples', VERIFICAR QUÉ TIPO DE MÚLTIPLES ESTÁ SELECCIONADO
-        if (periodo === 'multiples') {
-            const tipoMultiples = document.getElementById('filtroMultiplesTipo')?.value;
-            if (tipoMultiples === 'mes') periodoGraficos = 'mes';
-            else if (tipoMultiples === 'trimestre') periodoGraficos = 'trimestre';
-            else if (tipoMultiples === 'anio') periodoGraficos = 'anio';
-            else if (tipoMultiples === 'dia') periodoGraficos = 'dia';
-            else periodoGraficos = 'mes';
-            console.log(`📊 Múltiples mapeado a período: ${periodoGraficos}`);
-        }
-
-        // Si es 'todos', usar 'mes' (porque 'todos' no es un período de agrupación)
-        if (periodo === 'todos') {
-            periodoGraficos = 'mes';
-            console.log('📊 "todos" seleccionado, usando "mes" para agrupar los gráficos');
-        }
-
-        console.log(`📊 periodoGraficos FINAL: ${periodoGraficos}`);
-
-        // 5. Obtener datos agrupados con el período correcto
-        const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesFiltradas, periodoGraficos);
-        datosAgrupadosActualesGlobal = datosAgrupados;
-
-        // 6. Actualizar cards
-        actualizarCardsPromedioMotivosAgrupados(datosAgrupados);
-        actualizarCardPorcentajeQuiebresAgrupados(datosAgrupados);
-
-        // ======================================================
-        // 7. DESTRUIR GRÁFICOS EXISTENTES
-        // ======================================================
-        destruirTodosLosGraficosCompleto();
-
-        // ======================================================
-        // 8. ACTUALIZAR GRÁFICOS - UNA SOLA VEZ CADA UNO
-        // ======================================================
-        generarEvolutivoAudiosAgrupado(datosAgrupados, periodoGraficos);
-        generarDistribucionRangosAgrupado(evaluacionesFiltradas, periodoGraficos);
-        generarEvolutivoQuiebresAgrupado(datosAgrupados);
-        generarGraficoComparativaAgrupado(evaluacionesFiltradas, periodoGraficos);
-        generarGraficoGestionLlamadas(evaluacionesFiltradas, periodoGraficos);
-        renderizarEvolutivoConDatosFiltrados(evaluacionesFiltradas, periodoGraficos);
-        generarEvolutivoCuartiles(evaluacionesFiltradas, datosAgrupados, periodoGraficos);
-
-        // ======================================================
-        // 9. ATRIBUTOS - SEGÚN VISTA
-        // ======================================================
-        if (vistaAtributosActual === 'general') {
-            generarEvolutivoAtributosAgrupado(evaluacionesFiltradas, datosAgrupados, periodoGraficos);
-        } else {
-            generarEvolutivoSubmotivosAgrupado(evaluacionesFiltradas, datosAgrupados, periodoGraficos);
-        }
-
-        // ======================================================
-        // 10. GRÁFICOS DE REPORTES (no dependen del período)
-        // ======================================================
-        if (window.chartResultados) window.chartResultados.destroy();
-        if (window.chartTendencias) window.chartTendencias.destroy();
-        generarGraficosReportes(evaluacionesFiltradas);
-
-        // ======================================================
-        // 11. Actualizar tabla evolutiva de indicadores
-        // ======================================================
-        console.log('📊 Actualizando tabla evolutiva con datos filtrados...');
-        if (typeof actualizarTablaEvolutivaIndicadores === 'function') {
-            await actualizarTablaEvolutivaIndicadores();
-        }
-
-        // ======================================================
-        // 12. Forzar actualización del resumen por líder
-        // ======================================================
-        await cambiarAgrupacion();
-
-        console.log('✅ Filtro aplicado correctamente');
-
-        const mensajeTemporal = document.createElement('div');
-        mensajeTemporal.textContent = `📊 Mostrando ${evaluacionesFiltradas.length} evaluaciones`;
-        mensajeTemporal.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--ok); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1000; animation: fadeOut 2s ease forwards;';
-        document.body.appendChild(mensajeTemporal);
-        setTimeout(() => mensajeTemporal.remove(), 2000);
-
-    } catch (error) {
-        console.error('Error aplicando filtro:', error);
-        alert('❌ Error al aplicar el filtro: ' + error.message);
-    } finally {
-        loadingDiv.remove();
-    }
-}
-
-async function limpiarFiltrosReportes() {
-    console.log('🧹 Limpiando filtros de reportes...');
-
-    // ======================================================
-    // 1. RESETEAR EL SELECTOR A "TODOS"
-    // ======================================================
-    const periodoSelect = document.getElementById('filtroPeriodoReportes');
-    if (periodoSelect) periodoSelect.value = 'todos';
-
-    // ======================================================
-    // 2. RESETEAR TODAS LAS VARIABLES DE FILTRO
-    // ======================================================
-    filtroPeriodoActual = 'todos';
-    filtroCantidadActual = 'all';
-    filtroFechaInicioActual = null;
-    filtroFechaFinActual = null;
-
-    filtroDiaDesde = null;
-    filtroDiaHasta = null;
-    filtroSemanaAnio = null;
-    filtroSemanaNumero = null;
-    filtroMesAnio = null;
-    filtroMesNumero = null;
-    filtroTrimestreAnio = null;
-    filtroTrimestreNumero = null;
-    filtroAnio = null;
-    filtroRangoInicio = null;
-    filtroRangoFin = null;
-    filtroMultiples = [];
-
-    // ======================================================
-    // 3. RENDERIZAR CONTROLES Y ACTUALIZAR INFO
-    // ======================================================
-    renderizarControlesPeriodo();
-    actualizarInfoFiltro();
-
-    // ======================================================
-    // 4. RESETEAR FILTRO POR LÍDER
-    // ======================================================
-    liderSeleccionadoActual = 'todos';
-    const selectLider = document.getElementById('selectFiltrarLider');
-    if (selectLider) selectLider.value = 'todos';
-
-    // ======================================================
-    // 5. RESETEAR FILTRO POR CUARTIL
-    // ======================================================
-    if (typeof cuartilActivoGlobal !== 'undefined') {
-        cuartilActivoGlobal = 'todos';
-        actualizarEstiloBotonesCuartil('todos');
-    }
-
-    // ======================================================
-    // 6. RECARGAR DATOS COMPLETOS
-    // ======================================================
-    if (!window.evaluacionesGlobales || window.evaluacionesGlobales.length === 0) {
-        await cargarEvaluacionesDesdePostgreSQL();
-    }
-
-    const evaluacionesCompletas = window.evaluacionesGlobales || [];
-
-    if (evaluacionesCompletas.length === 0) {
-        console.warn('⚠️ No hay evaluaciones cargadas');
-        mostrarMensajeSinDatosEnGraficos();
-        return;
-    }
-
-    // ======================================================
-    // 7. ACTUALIZAR DATOS FILTRADOS CON TODOS LOS DATOS
-    // ======================================================
-    window.evaluacionesFiltradasGlobal = evaluacionesCompletas;
-
-    // ======================================================
-    // 8. ACTUALIZAR KPIs CON DATOS COMPLETOS
-    // ======================================================
-    console.log('🔄 Actualizando KPIs con datos completos...');
-    await actualizarKPIsConFiltro(evaluacionesCompletas);
-
-    // ======================================================
-    // 9. RECALCULAR TARJETAS DE PROMEDIOS
-    // ======================================================
-    console.log('🔄 Recalculando tarjetas de promedios...');
-    actualizarCardsPromedioMotivos(evaluacionesCompletas);
-    actualizarCardPorcentajeQuiebres(evaluacionesCompletas);
-
-    // ======================================================
-    // 10. REGENERAR GRÁFICOS
-    // ======================================================
-    const datosAgrupados = agruparEvaluacionesPorPeriodo(evaluacionesCompletas, 'mes');
-    datosAgrupadosActualesGlobal = datosAgrupados;
-
-    setTimeout(() => {
-        generarEvolutivoAudiosAgrupado(datosAgrupados, 'mes');
-        generarDistribucionRangosAgrupado(evaluacionesCompletas);
-        generarEvolutivoAtributosAgrupado(evaluacionesCompletas, datosAgrupados, 'mes');
-        generarEvolutivoQuiebresAgrupado(datosAgrupados);
-        generarGraficoComparativaAgrupado(evaluacionesCompletas);
-        generarEvolutivoCuartiles(evaluacionesCompletas, datosAgrupados, 'mes');
-        generarGraficoGestionLlamadas(evaluacionesCompletas);
-        renderizarEvolutivoConDatosFiltrados(evaluacionesCompletas);
-    }, 50);
-
-    // ======================================================
-    // 11. ACTUALIZAR TABLA DE LÍDERES Y RANKING
-    // ======================================================
-    await cargarResumenPorLider();
-
-    const rankingCompleto = await construirRankingAgentes(evaluacionesCompletas);
-    rankingCompletoGlobal = rankingCompleto;
-    actualizarTablaRanking(rankingCompleto);
-
-    // ======================================================
-    // 12. ACTUALIZAR TABLA EVOLUTIVA Y JERARQUÍA
-    // ======================================================
-    console.log('📊 Actualizando tabla evolutiva con TODOS los datos...');
-    if (typeof actualizarTablaEvolutivaIndicadores === 'function') {
-        await actualizarTablaEvolutivaIndicadores();
-    }
-
-    console.log('📊 Actualizando análisis jerárquico con TODOS los datos...');
-    if (typeof generarTablaJerarquicaFallas === 'function') {
-        await generarTablaJerarquicaFallas(evaluacionesCompletas);
-    }
-
-    window.evaluacionesFiltradasPorLider = null;
-
-    console.log('✅ Filtros limpiados, mostrando todos los datos');
-}
-
 function filtrarEvaluacionesPorRangoFechas(evaluaciones, fechaInicio, fechaFin) {
     const inicio = new Date(fechaInicio + 'T00:00:00');
     const fin = new Date(fechaFin + 'T23:59:59');
@@ -10027,50 +9169,8 @@ function filtrarEvaluacionesPorMes(evaluaciones, mesKey) {
     });
 }
 
-async function aplicarFiltroMesRanking() {
-    const select = document.getElementById('filtroMesRanking');
-    const mesSeleccionado = select?.value || 'todos';
 
-    console.log(`📅 Aplicando filtro de mes: ${mesSeleccionado}`);
 
-    filtroMesRankingActual = mesSeleccionado;
-
-    const evaluaciones = await API.getHistorial();
-    const evaluacionesFiltradas = filtrarEvaluacionesPorMes(evaluaciones, mesSeleccionado);
-
-    if (evaluacionesFiltradas.length === 0) {
-        const tablaRanking = document.getElementById('tablaRanking');
-        if (tablaRanking) {
-            tablaRanking.innerHTML = `<tbody><tr><td colspan="15" style="text-align: center; padding: 40px;">
-                📅 No hay evaluaciones para el período seleccionado
-            <\/td><\/tr><\/tbody>`;
-        }
-        return;
-    }
-
-    const ranking = await construirRankingAgentes(evaluacionesFiltradas);
-
-    // 🔴 ACTUALIZAR rankingOriginalCompleto con los cuartiles CORRECTOS
-    rankingOriginalCompleto = ranking;
-
-    await actualizarTablaRanking(ranking);
-
-    const nombreMes = select?.options[select.selectedIndex]?.text || mesSeleccionado;
-    const mensajeTemporal = document.createElement('div');
-    mensajeTemporal.textContent = `📅 Mostrando datos de ${nombreMes} (${evaluacionesFiltradas.length} evaluaciones)`;
-    mensajeTemporal.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--accent); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1000; animation: fadeOut 2s ease forwards;';
-    document.body.appendChild(mensajeTemporal);
-    setTimeout(() => mensajeTemporal.remove(), 2000);
-
-    console.log(`✅ Ranking actualizado para ${mesSeleccionado}: ${ranking.length} agentes`);
-}
-
-function limpiarFiltroMesRanking() {
-    const select = document.getElementById('filtroMesRanking');
-    if (select) select.value = 'todos';
-
-    aplicarFiltroMesRanking();
-}
 
 async function actualizarTodosLosGraficosConFiltroMejorado() {
     console.log('🔄 Actualizando gráficos con filtro mejorado...');
@@ -10125,8 +9225,7 @@ async function actualizarTodosLosGraficosConFiltroMejorado() {
         mostrarMensajeSinDatosEnGraficos();
 
         // 🔴 NUEVO: Limpiar tablas cuando no hay datos
-        const tablaRanking = document.getElementById('tablaRanking');
-        if (tablaRanking) tablaRanking.innerHTML = '<tr><td colspan="13" style="text-align: center;">📊 No hay datos en el período seleccionado</td></tr>';
+
 
         const agentesQ4Container = document.getElementById('agentesQ4Container');
         if (agentesQ4Container) {
@@ -10893,11 +9992,11 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
         ">
             <span style="font-weight: 600; color: #333;">📌 Matriz:</span>
             <span style="
-                background: #e3f2fd; 
-                padding: 3px 14px; 
-                border-radius: 20px; 
-                display: inline-flex; 
-                align-items: center; 
+                background: #e3f2fd;
+                padding: 3px 14px;
+                border-radius: 20px;
+                display: inline-flex;
+                align-items: center;
                 gap: 5px;
                 font-size: 12px;
             ">
@@ -10905,11 +10004,11 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                 <span style="font-size: 10px; color: #6c757d; font-weight: 400;">(ANTERIOR)</span>
             </span>
             <span style="
-                background: #e8f5e9; 
-                padding: 3px 14px; 
-                border-radius: 20px; 
-                display: inline-flex; 
-                align-items: center; 
+                background: #e8f5e9;
+                padding: 3px 14px;
+                border-radius: 20px;
+                display: inline-flex;
+                align-items: center;
                 gap: 5px;
                 font-size: 12px;
             ">
@@ -10945,7 +10044,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
     // ======================================================
     return `
         ${leyendaMatriz}
-        
+
         <div id="tablaEvolutivaIndicadores" style="margin-top: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 style="margin: 0; font-size: 16px;">📈 EVOLUCIÓN MENSUAL DE INDICADORES</h3>
@@ -10955,7 +10054,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                     <button id="exportarIndicadoresCSV" style="background: var(--ok); border: none; padding: 4px 12px; border-radius: 16px; font-size: 11px; cursor: pointer; color: white;">📥 Exportar CSV</button>
                 </div>
             </div>
-            
+
             <!-- ====================================================== -->
             <!-- SECCIÓN VOLUMEN -->
             <!-- ====================================================== -->
@@ -10991,7 +10090,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                     </table>
                 </div>
             </div>
-            
+
             <!-- ====================================================== -->
             <!-- SECCIÓN CALIDAD -->
             <!-- ====================================================== -->
@@ -11021,7 +10120,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                     </table>
                 </div>
             </div>
-            
+
             <!-- ====================================================== -->
             <!-- SECCIÓN NOTA PROMEDIO POR MOTIVO -->
             <!-- ====================================================== -->
@@ -11061,7 +10160,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                     </table>
                 </div>
             </div>
-            
+
             <!-- ====================================================== -->
             <!-- SECCIÓN DISTRIBUCIÓN POR CATEGORIA -->
             <!-- ====================================================== -->
@@ -11107,7 +10206,7 @@ function generarHTMLTablaEvolutiva(mesesData, indicadoresPorMes) {
                 </div>
             </div>
         </div>
-        
+
         ${leyendaBadge}
     `;
 }
@@ -11706,7 +10805,7 @@ function renderizarJerarquiaEvolutiva(container, datosEvolutivos) {
                     padding: 4px;
                 }
             </style>
-            
+
             <!-- Sección MOTIVOS (Top 3) -->
             <div class="jerarquia-seccion-evolutiva ${window.jerarquiaExpandido.motivos ? 'expanded' : ''}" data-seccion="motivos">
                 <div class="jerarquia-header-evolutivo" onclick="toggleSeccionJerarquia('motivos')">
@@ -11735,7 +10834,7 @@ function renderizarJerarquiaEvolutiva(container, datosEvolutivos) {
                     <div class="info-scroll">← → Scrollea horizontalmente para ver más meses</div>
                 </div>
             </div>
-            
+
             <!-- Sección ATRIBUTOS (Top 10) -->
             <div class="jerarquia-seccion-evolutiva ${window.jerarquiaExpandido.atributos ? 'expanded' : ''}" data-seccion="atributos">
                 <div class="jerarquia-header-evolutivo" onclick="toggleSeccionJerarquia('atributos')">
@@ -11765,7 +10864,7 @@ function renderizarJerarquiaEvolutiva(container, datosEvolutivos) {
                     <div class="info-scroll">← → Scrollea horizontalmente para ver más meses</div>
                 </div>
             </div>
-            
+
             <!-- Sección SUBMOTIVOS (Top 10) -->
             <div class="jerarquia-seccion-evolutiva ${window.jerarquiaExpandido.submotivos ? 'expanded' : ''}" data-seccion="submotivos">
                 <div class="jerarquia-header-evolutivo" onclick="toggleSeccionJerarquia('submotivos')">
@@ -12669,7 +11768,7 @@ function renderizarFallasHorizontales(container, evaluaciones) {
                     }
                 </style>
         <!-- ===== FIN BLOQUE: ESTILOS CSS ===== -->
-    
+
     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
         <!-- Columna 1: BLOQUES -->
         <div style="border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: white;">
@@ -12684,7 +11783,7 @@ function renderizarFallasHorizontales(container, evaluaciones) {
                 ${generarTablaBloquesCompactaConGestores(bloquesOrdenados, totalFallas)}
             </div>
         </div>
-        
+
         <!-- Columna 2: ATRIBUTOS -->
         <div style="border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: white;">
             <div style="padding: 12px 15px; background: linear-gradient(135deg, #7b1fa2, #ab47bc); color: white;">
@@ -12698,7 +11797,7 @@ function renderizarFallasHorizontales(container, evaluaciones) {
                 ${generarTablaAtributosCompactaConGestores(atributosOrdenados, totalFallas)}
             </div>
         </div>
-        
+
         <!-- Columna 3: SUBMOTIVOS -->
         <div style="border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: white;">
             <div style="padding: 12px 15px; background: linear-gradient(135deg, #fd7e14, #ffc107); color: white;">
@@ -12752,7 +11851,7 @@ function generarTablaBloquesCompactaConGestores(bloques, totalFallas) {
             </td>
             <td style="padding: 6px; text-align: center; font-weight: bold; color: var(--danger);">${item.fallas}</td>
             <td style="padding: 6px; text-align: center;">
-                <button onclick="mostrarGestoresPopup('${tituloEscapado}', ${gestoresJSON})" 
+                <button onclick="mostrarGestoresPopup('${tituloEscapado}', ${gestoresJSON})"
                         style="cursor: pointer; background: #019DF4; color: white; border: none; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
                     👥 ${item.gestoresUnicos}
                 </button>
@@ -12819,7 +11918,7 @@ function generarTablaAtributosCompactaConGestores(atributos, totalFallas) {
             </td>
             <td style="padding: 6px; text-align: center; font-weight: bold; color: var(--danger);">${item.fallas}</td>
             <td style="padding: 6px; text-align: center;">
-                <button onclick="mostrarGestoresPopup('${tituloEscapado}', ${gestoresJSON})" 
+                <button onclick="mostrarGestoresPopup('${tituloEscapado}', ${gestoresJSON})"
                         style="cursor: pointer; background: #019DF4; color: white; border: none; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
                     👥 ${item.gestoresUnicos}
                 </button>
@@ -12879,7 +11978,7 @@ function generarTablaSubmotivosCompactaConGestores(submotivos, totalFallas) {
             </td>
             <td style="padding: 6px; text-align: center; font-weight: bold; color: var(--danger);">${item.fallas}</td>
             <td style="padding: 6px; text-align: center;">
-                <button onclick="mostrarGestoresPopup('${tituloEscapado}', ${gestoresJSON})" 
+                <button onclick="mostrarGestoresPopup('${tituloEscapado}', ${gestoresJSON})"
                         style="cursor: pointer; background: #019DF4; color: white; border: none; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold;">
                     👥 ${item.gestoresUnicos}
                 </button>
@@ -12928,10 +12027,7 @@ async function regenerarGraficosConFiltroLider(evaluacionesFiltradas, lider) {
 
     if (evaluacionesFiltradas.length === 0) {
         mostrarMensajeSinDatosEnGraficos();
-        const tablaRanking = document.getElementById('tablaRanking');
-        if (tablaRanking) {
-            tablaRanking.innerHTML = '<tr><td colspan="13" style="text-align: center;">📊 No hay datos para el líder seleccionado<\/td><\/tr>';
-        }
+
         const agentesQ4Container = document.getElementById('agentesQ4Container');
         if (agentesQ4Container) {
             agentesQ4Container.innerHTML = '<div class="card" style="background: #fff4e5;"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 24px;">📊</span><div><strong>No hay datos para el líder seleccionado</strong><br><span style="font-size: 13px;">Seleccione otro líder o ajuste los filtros.</span></div></div></div>';
@@ -12951,7 +12047,7 @@ async function regenerarGraficosConFiltroLider(evaluacionesFiltradas, lider) {
     // Actualizar ranking de agentes con los datos filtrados
     const ranking = await construirRankingAgentes(evaluacionesFiltradas);
     rankingCompletoGlobal = ranking;
-    actualizarTablaRanking(ranking);
+
 
     // Actualizar tabla jerárquica de fallas
     generarTablaJerarquicaFallas(evaluacionesFiltradas);
@@ -13392,7 +12488,7 @@ async function generarDetalleErroresAuditorHTML(auditor) {
                     ${totalDias} días | ${totalErrores} errores
                 </span>
             </div>
-            
+
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
                 <div style="background: #f8f9fa; border-radius: 8px; padding: 8px; text-align: center;">
                     <div style="font-size: 20px; font-weight: bold; color: var(--danger);">${totalErrores}</div>
@@ -13407,7 +12503,7 @@ async function generarDetalleErroresAuditorHTML(auditor) {
                     <div style="font-size: 10px; color: var(--muted);">Días con errores</div>
                 </div>
             </div>
-            
+
             <div style="font-weight: bold; margin-bottom: 10px; font-size: 13px; color: #333;">
                 📋 SUBMOTIVOS CON ERRORES
             </div>
@@ -13433,7 +12529,7 @@ async function generarDetalleErroresAuditorHTML(auditor) {
                     `;
     }).join('')}
             </div>
-            
+
             <div style="margin-top: 10px; font-size: 10px; color: var(--muted); text-align: center; border-top: 1px solid #e0e0e0; padding-top: 8px;">
                 💡 Submotivos ordenados por frecuencia de error
             </div>
@@ -13925,115 +13021,6 @@ async function obtenerTipoAccionPorSubmotivo(submotivo, fechaEvaluacion = null) 
 }
 
 // ======================================================
-// FUNCIÓN: clasificarPDAporTipo (ACTUALIZADA)
-// ======================================================
-
-async function clasificarPDAporTipo(submotivosFallados, fechaEvaluacion = null) {
-    console.log(`📋 Clasificando PDA para ${submotivosFallados.length} submotivos...`);
-    console.log(`   📅 Fecha de referencia: ${fechaEvaluacion || 'actual'}`);
-
-    const matriz = await obtenerMatrizParaFecha(fechaEvaluacion);
-
-    if (!matriz) {
-        console.warn('⚠️ No se pudo cargar matriz, usando clasificación por defecto');
-        return clasificarPDAporTipoFallback(submotivosFallados);
-    }
-
-    const version = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
-    if (version) {
-        const estado = version.activa ? 'ACTIVA' : 'HISTÓRICA';
-        console.log(`   📌 Usando matriz: ${version.version} (${estado}) - vigente desde ${version.fecha_vigencia}`);
-    }
-
-    const resultado = {
-        tipo: null,
-        requiereProcesos: false,
-        requiereHabilidades: false,
-        requiereFeedback: false,
-        detalle: {
-            procesos: [],
-            habilidades: [],
-            feedback: []
-        },
-        mensaje: '',
-        resumenTipos: []
-    };
-
-    for (const submotivo of submotivosFallados) {
-        const info = matriz[submotivo];
-        const tipo = info ? info.tipo : 'proceso';
-
-        switch (tipo) {
-            case 'procesos':
-                resultado.requiereProcesos = true;
-                if (!resultado.detalle.procesos.includes(submotivo)) {
-                    resultado.detalle.procesos.push(submotivo);
-                }
-                break;
-            case 'habilidades':
-                resultado.requiereHabilidades = true;
-                if (!resultado.detalle.habilidades.includes(submotivo)) {
-                    resultado.detalle.habilidades.push(submotivo);
-                }
-                break;
-            case 'feedback':
-                resultado.requiereFeedback = true;
-                if (!resultado.detalle.feedback.includes(submotivo)) {
-                    resultado.detalle.feedback.push(submotivo);
-                }
-                break;
-        }
-    }
-
-    const tiposRequeridos = [];
-    if (resultado.requiereProcesos) tiposRequeridos.push('procesos');
-    if (resultado.requiereHabilidades) tiposRequeridos.push('habilidades');
-    if (resultado.requiereFeedback) tiposRequeridos.push('feedback');
-
-    resultado.resumenTipos = tiposRequeridos;
-
-    if (tiposRequeridos.length === 0) {
-        resultado.tipo = 'ninguno';
-        resultado.mensaje = 'No se requiere ningún tipo de PDA';
-    } else if (tiposRequeridos.length === 1) {
-        resultado.tipo = tiposRequeridos[0];
-        const nombres = {
-            'procesos': 'Capacitación de Procesos',
-            'habilidades': 'Capacitación de Habilidades Blandas',
-            'feedback': 'Feedback Directo'
-        };
-        resultado.mensaje = `PDA de tipo: ${nombres[tiposRequeridos[0]]}`;
-    } else {
-        resultado.tipo = 'ambos';
-        const nombres = tiposRequeridos.map(t => {
-            const map = {
-                'procesos': 'Procesos',
-                'habilidades': 'Habilidades Blandas',
-                'feedback': 'Feedback'
-            };
-            return map[t];
-        });
-        resultado.mensaje = `PDA combinado: ${nombres.join(' + ')}`;
-    }
-
-    console.log(`✅ Clasificación: ${resultado.tipo} | ${resultado.mensaje}`);
-    return resultado;
-}
-
-function clasificarPDAporTipoFallback(submotivosFallados) {
-    const resultado = {
-        tipo: 'procesos',
-        requiereProcesos: true,
-        requiereHabilidades: false,
-        requiereFeedback: false,
-        detalle: { procesos: submotivosFallados, habilidades: [], feedback: [] },
-        mensaje: 'PDA de tipo: Procesos (fallback)',
-        resumenTipos: ['procesos']
-    };
-    return resultado;
-}
-
-// ======================================================
 // FUNCIÓN: obtenerDetalleQuiebresPorEvaluacion (VERSIÓN CORREGIDA)
 // ======================================================
 async function obtenerDetalleQuiebresPorEvaluacion(evaluacionesCiclo) {
@@ -14272,115 +13259,6 @@ async function obtenerDetalleQuiebresPorEvaluacion(evaluacionesCiclo) {
 }
 
 // ======================================================
-// FUNCIÓN: generarEstructuraInformePDA (ACTUALIZADA)
-// ======================================================
-
-async function generarEstructuraInformePDA(agente, cicloBasal) {
-    console.log(`📄 Generando estructura de informe PDA para ${agente} - Ciclo #${cicloBasal.numero}`);
-
-    // OBTENER LA FECHA DE REFERENCIA
-    const primeraEvaluacion = cicloBasal.evaluaciones[0];
-    const fechaEvaluacion = primeraEvaluacion?.fechaOriginal || primeraEvaluacion?.fecha || null;
-    console.log(`   📅 Fecha de referencia para matriz: ${fechaEvaluacion || 'actual'}`);
-
-    // 🔴 NUEVO: Obtener campañas del agente en este ciclo
-    const campanasSet = new Set();
-    let campanaPrincipal = 'Sin campaña';
-    for (const evalItem of cicloBasal.evaluaciones) {
-        if (evalItem.campana && evalItem.campana !== 'Sin campaña') {
-            campanasSet.add(evalItem.campana);
-        }
-    }
-    const campanasList = Array.from(campanasSet).sort();
-    campanaPrincipal = campanasList.length > 0 ? campanasList.join(', ') : 'Sin campaña';
-
-    // OBTENER LA MATRIZ DINÁMICA DESDE LA BD
-    const matriz = await obtenerMatrizParaFecha(fechaEvaluacion);
-
-    if (matriz) {
-        console.log(`   📌 Matriz cargada: ${Object.keys(matriz).length} submotivos mapeados`);
-    } else {
-        console.warn('   ⚠️ No se pudo cargar la matriz, usando clasificación por defecto');
-    }
-
-    // OBTENER DETALLE DE QUIEBRES
-    const detalleQuiebres = await obtenerDetalleQuiebresPorEvaluacion(cicloBasal.evaluaciones);
-
-    // Extraer todos los submotivos fallados
-    const todosSubmotivos = [];
-    for (const ev of detalleQuiebres.evaluaciones) {
-        for (const falla of ev.fallas) {
-            if (falla.submotivo && !todosSubmotivos.includes(falla.submotivo)) {
-                todosSubmotivos.push(falla.submotivo);
-            }
-        }
-    }
-
-    // CLASIFICAR EL PDA
-    const clasificacion = await clasificarPDAporTipo(todosSubmotivos);
-
-    // Construir la estructura completa
-    const estructura = {
-        agente: agente,
-        // 🔴 NUEVO: Campañas del ciclo
-        campanas: campanasList,
-        campanaPrincipal: campanaPrincipal,
-        ciclo: {
-            numero: cicloBasal.numero,
-            fechaInicio: cicloBasal.fechaInicio,
-            fechaFin: cicloBasal.fechaFin,
-            totalEvaluaciones: cicloBasal.totalEvaluaciones,
-            promedio: cicloBasal.promedio,
-            cuartil: cicloBasal.cuartil
-        },
-        clasificacion: clasificacion,
-        detalleQuiebres: detalleQuiebres,
-        resumen: {
-            totalAudiosConFallas: detalleQuiebres.evaluaciones.length,
-            totalFallas: detalleQuiebres.resumen.totalFallas,
-            promedioFallasPorAudio: detalleQuiebres.evaluaciones.length > 0
-                ? (detalleQuiebres.resumen.totalFallas / detalleQuiebres.evaluaciones.length).toFixed(1)
-                : 0,
-            fallasPorBloque: detalleQuiebres.resumen.fallasPorBloque,
-            topSubmotivos: Object.keys(detalleQuiebres.resumen.submotivosMasFrecuentes).slice(0, 5),
-            resumenPorTipo: detalleQuiebres.resumen.resumenPorTipo || clasificacion.detalle,
-            submotivosPorTipo: detalleQuiebres.resumen.submotivosPorTipo || clasificacion.detalle
-        },
-        audiosQuiebre: detalleQuiebres.audiosQuiebre,
-        evaluaciones: detalleQuiebres.evaluaciones,
-        fechaGeneracion: new Date().toISOString(),
-        versionMatriz: {
-            id: null,
-            nombre: null,
-            fecha_vigencia: null
-        }
-    };
-
-    // AGREGAR INFORMACIÓN DE LA VERSIÓN DE MATRIZ
-    try {
-        const version = await obtenerVersionMatrizPorFecha(fechaEvaluacion);
-        if (version) {
-            estructura.versionMatriz.id = version.id;
-            estructura.versionMatriz.nombre = version.version;
-            estructura.versionMatriz.fecha_vigencia = version.fecha_vigencia;
-            console.log(`   📌 Matriz usada: ${version.version} (vigente desde ${version.fecha_vigencia})`);
-        }
-    } catch (e) {
-        console.warn('   ⚠️ No se pudo obtener la versión de matriz:', e);
-    }
-
-    console.log(`✅ Estructura de informe generada`);
-    console.log(`   - ${estructura.evaluaciones.length} evaluaciones con fallas`);
-    console.log(`   - ${estructura.audiosQuiebre.length} audios con quiebres`);
-    console.log(`   - ${estructura.resumen.totalFallas} fallas totales`);
-    console.log(`   - Tipo PDA: ${estructura.clasificacion.tipo}`);
-    console.log(`   - Campañas: ${estructura.campanaPrincipal}`);
-
-    return estructura;
-}
-
-
-// ======================================================
 // FUNCIÓN: obtenerInfoCompletaSubmotivo
 // ======================================================
 
@@ -14531,483 +13409,6 @@ async function clasificarPDAporTipo(submotivosFallados) {
 
 
 // ======================================================
-// FUNCIÓN: generarInformePDATXT (CORREGIDA)
-// ======================================================
-
-function generarInformePDATXT(informe) {
-    const { agente, ciclo, clasificacion, resumen, audiosQuiebre, evaluaciones } = informe;
-
-    // Función auxiliar para padding seguro
-    function padRight(str, len) {
-        if (!str) str = '';
-        const strLen = str.length;
-        if (strLen >= len) return str.substring(0, len);
-        return str + ' '.repeat(len - strLen);
-    }
-
-    function padLeft(str, len) {
-        if (!str) str = '';
-        const strLen = str.length;
-        if (strLen >= len) return str.substring(0, len);
-        return ' '.repeat(len - strLen) + str;
-    }
-
-    let txt = '';
-    txt += '╔═══════════════════════════════════════════════════════════════════════════════╗\n';
-    txt += '║                    NOTIFICACIÓN DE RESULTADOS - PDA                          ║\n';
-    txt += '║                    Plan de Desarrollo y Acción                              ║\n';
-    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
-    txt += '║                                                                               ║\n';
-    txt += `║  👤 GESTOR: ${padRight(agente, 53)}║\n`;
-    txt += `║  📊 CICLO BASAL: #${padRight(String(ciclo.numero), 48)}║\n`;
-    txt += `║  📅 PERÍODO: ${padRight(`${ciclo.fechaInicio} → ${ciclo.fechaFin}`, 48)}║\n`;
-    txt += `║  📞 EVALUACIONES: ${padRight(`${ciclo.totalEvaluaciones}/5`, 48)}║\n`;
-    txt += `║  📈 PROMEDIO: ${padRight(`${ciclo.promedio}% (Q4 - RIESGO)`, 48)}║\n`;
-    txt += `║  📋 TIPO PDA: ${padRight(clasificacion.tipo.toUpperCase(), 48)}║\n`;
-    txt += `║  📅 FECHA INFORME: ${padRight(new Date().toLocaleDateString('es-ES'), 48)}║\n`;
-    txt += '║                                                                               ║\n';
-    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
-    txt += '║  🎧 AUDIOS CON QUIEBRES                                                        ║\n';
-    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
-    txt += '║                                                                               ║\n';
-    txt += `║  Total audios: ${audiosQuiebre.length} | Total fallas: ${resumen.totalFallas} | Promedio: ${resumen.promedioFallasPorAudio}/audio${' '.repeat(10)}║\n`;
-    txt += '║                                                                               ║\n';
-    txt += '║  ┌──────┬─────────────────────┬──────────────┬──────────┬──────────┬───────────║\n';
-    txt += '║  │  #   │ ID Audio           │ Fecha        │ Nota     │ Fallas   │ Submotivos║\n';
-    txt += '║  ├──────┼─────────────────────┼──────────────┼──────────┼──────────┼───────────║\n';
-
-    for (let i = 0; i < Math.min(evaluaciones.length, 10); i++) {
-        const ev = evaluaciones[i];
-        const submotivosResum = ev.fallas.map(f => f.submotivo).join(', ');
-        const submotivosTrunc = submotivosResum.length > 28 ? submotivosResum.substring(0, 25) + '...' : submotivosResum;
-        txt += `║  │ ${padLeft(String(i + 1), 2)} │ ${padRight(ev.idAudio, 19)} │ ${padRight(ev.fecha, 12)} │ ${padLeft(String(ev.nota), 4)}%   │ ${padLeft(String(ev.fallas.length), 4)}    │ ${padRight(submotivosTrunc, 28)}║\n`;
-    }
-    if (evaluaciones.length > 10) {
-        txt += `║  │ ... │ ...                 │ ...          │ ...      │ ...      │ ...       ║\n`;
-    }
-    txt += '║  └──────┴─────────────────────┴──────────────┴──────────┴──────────┴───────────║\n';
-    txt += '║                                                                               ║\n';
-    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
-    txt += '║  📊 DESGLOSE POR TIPO DE ACCIÓN                                                ║\n';
-    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
-    txt += '║                                                                               ║\n';
-
-    // Desglose por tipo
-    const tipos = ['procesos', 'habilidades', 'feedback'];
-    const nombresTipo = {
-        'procesos': '📚 Capacitación de Procesos (ECN)',
-        'habilidades': '🎯 Capacitación de Habilidades Blandas (ENC)',
-        'feedback': '💬 Feedback Directo (ENC/ECUF)'
-    };
-
-    for (const tipo of tipos) {
-        const data = resumen.resumenPorTipo[tipo];
-        const submotivos = resumen.submotivosPorTipo[tipo] || [];
-
-        if (data && data.total > 0) {
-            const titulo = `${nombresTipo[tipo]} (${data.total} fallas)`;
-            txt += `║  ${padRight(titulo, 63)}║\n`;
-            txt += '║                                                                               ║\n';
-            const submotivosOrdenados = Object.entries(data.submotivos || {})
-                .sort((a, b) => b[1] - a[1]);
-
-            for (const [sub, count] of submotivosOrdenados) {
-                const line = `     • ${sub} (${count} veces)`;
-                txt += `║  ${padRight(line, 63)}║\n`;
-            }
-            txt += '║                                                                               ║\n';
-        }
-    }
-
-    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
-    txt += '║  💡 RECOMENDACIÓN DE ACCIÓN                                                   ║\n';
-    txt += '╠═══════════════════════════════════════════════════════════════════════════════╣\n';
-    txt += '║                                                                               ║\n';
-    txt += `║  ${padRight(clasificacion.mensaje, 63)}║\n`;
-    txt += '║                                                                               ║\n';
-    txt += '║  Próximo paso: Enviar este informe al área de Operaciones para su gestión.    ║\n';
-    txt += '║                                                                               ║\n';
-    txt += '╚═══════════════════════════════════════════════════════════════════════════════╝\n';
-
-    return txt;
-}
-
-// ======================================================
-// FUNCIÓN: mostrarInformePDA (VERSIÓN CORREGIDA - TAMAÑO)
-// ======================================================
-
-function mostrarInformePDA(informe) {
-    const html = generarInformePDAHTML(informe);
-    const txt = generarInformePDATXT(informe);
-
-    const modalHtml = `
-        <div id="modalInformePDA" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100050; display: flex; justify-content: center; align-items: center; padding: 20px;">
-            <div style="background: white; border-radius: 16px; width: 95%; max-width: 1100px; height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-                <div style="padding: 15px 20px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-                    <div>
-                        <strong style="font-size: 18px;">📋 Informe PDA - ${informe.agente}</strong>
-                        <div style="font-size: 13px; opacity: 0.8; margin-top: 2px;">Ciclo #${informe.ciclo.numero} | Tipo: ${informe.clasificacion.tipo.toUpperCase()} | ${informe.evaluaciones.length} audios analizados</div>
-                    </div>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button onclick="copiarInformePDAHTML()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;">
-                            📋 Copiar HTML
-                        </button>
-                        <button onclick="copiarInformePDATXT()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;">
-                            📋 Copiar TXT
-                        </button>
-                        <button onclick="imprimirInformePDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;">
-                            🖨️ Imprimir
-                        </button>
-                        <button onclick="cerrarModalInformePDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 22px; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">✖</button>
-                    </div>
-                </div>
-                <div id="informePDAContent" style="padding: 0; overflow-y: auto; flex: 1; background: #f5f5f0;">
-                    <iframe id="informePDAIframe" style="width: 100%; height: 100%; border: none; min-height: 500px;"></iframe>
-                </div>
-                <div style="padding: 10px 20px; background: #f8f9fa; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
-                    <div style="font-size: 12px; color: #666;">
-                        📌 <strong>Total fallas:</strong> ${informe.resumen.totalFallas} | 
-                        <strong>Procesos:</strong> ${informe.resumen.resumenPorTipo.procesos?.total || 0} | 
-                        <strong>Habilidades:</strong> ${informe.resumen.resumenPorTipo.habilidades?.total || 0} | 
-                        <strong>Feedback:</strong> ${informe.resumen.resumenPorTipo.feedback?.total || 0}
-                    </div>
-                    <button onclick="cerrarModalInformePDA()" style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 13px;">Cerrar</button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    const existing = document.getElementById('modalInformePDA');
-    if (existing) existing.remove();
-
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-    const iframe = document.getElementById('informePDAIframe');
-    if (iframe) {
-        const iframeDoc = iframe.contentWindow.document;
-        iframeDoc.open();
-        iframeDoc.write(html);
-        iframeDoc.close();
-    }
-
-    window._informePDAHTML = html;
-    window._informePDATXT = txt;
-    window._informePDA = informe;
-
-    console.log('✅ Informe PDA mostrado correctamente');
-}
-
-// ======================================================
-// FUNCIÓN: actualizarEstadoPDAEnvio
-// ======================================================
-
-async function actualizarEstadoPDAEnvio(informe, nuevoEstado) {
-    try {
-        const db = getDB();
-        if (!db) return;
-
-        // Buscar si ya existe un PDA para este agente y ciclo
-        const { data: pdaExistente, error: findError } = await db
-            .from('pda_cabecera')
-            .select('id')
-            .eq('agente', informe.agente)
-            .eq('ciclo_basal_numero', informe.ciclo.numero)
-            .maybeSingle();
-
-        if (findError) {
-            console.warn('Error buscando PDA:', findError);
-            return;
-        }
-
-        let pdaId;
-        if (pdaExistente) {
-            pdaId = pdaExistente.id;
-            // Actualizar estado
-            await db
-                .from('pda_cabecera')
-                .update({
-                    estado: nuevoEstado,
-                    fecha_envio_operaciones: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', pdaId);
-        } else {
-            // Crear nuevo PDA si no existe
-            const nuevoPDA = {
-                agente: informe.agente,
-                ciclo_basal_numero: informe.ciclo.numero,
-                fecha_inicio_ciclo_basal: informe.ciclo.fechaInicio,
-                fecha_fin_ciclo_basal: informe.ciclo.fechaFin,
-                promedio_basal: informe.ciclo.promedio,
-                cuartil_basal: informe.ciclo.cuartil,
-                tipo_pda: informe.clasificacion.tipo,
-                estado: nuevoEstado,
-                evaluaciones_detalle: JSON.stringify(informe.evaluaciones),
-                audios_quiebre: JSON.stringify(informe.audiosQuiebre),
-                resumen_quiebres: JSON.stringify(informe.resumen),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            };
-
-            const { data: inserted, error: insertError } = await db
-                .from('pda_cabecera')
-                .insert(nuevoPDA)
-                .select();
-
-            if (insertError) throw insertError;
-            pdaId = inserted?.[0]?.id;
-        }
-
-        console.log(`✅ PDA #${pdaId} actualizado a estado: ${nuevoEstado}`);
-        return pdaId;
-
-    } catch (error) {
-        console.warn('⚠️ Error actualizando estado del PDA:', error);
-        return null;
-    }
-}
-
-
-
-// ======================================================
-// FUNCIÓN: generarYEnviarPDA
-// ======================================================
-
-async function generarYEnviarPDA(agente, cicloNumero) {
-    console.log(`🚀 Generando y enviando PDA para ${agente} - Ciclo #${cicloNumero}`);
-
-    try {
-        // 1. Generar el informe
-        const informe = await generarYMostrarInformePDA(agente, cicloNumero);
-
-        if (!informe) {
-            console.error('❌ No se pudo generar el informe');
-            return;
-        }
-
-        // 2. Preguntar si desea enviar a Operaciones
-        const enviar = confirm(
-            `📤 ¿Enviar este informe a Operaciones?\n\n` +
-            `👤 Agente: ${informe.agente}\n` +
-            `📊 Ciclo: #${informe.ciclo.numero}\n` +
-            `📋 Tipo: ${informe.clasificacion.tipo.toUpperCase()}\n` +
-            `📧 Destinatario: operaciones@empresa.com\n\n` +
-            `El informe se enviará por correo electrónico con el detalle completo.`
-        );
-
-        if (enviar) {
-            await enviarInformeAOperaciones(informe);
-        }
-
-        return informe;
-
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('❌ Error al generar y enviar PDA: ' + error.message);
-    }
-}
-// ======================================================
-// FUNCIÓN: registrarNotificacionGestor
-// ======================================================
-
-async function registrarNotificacionGestor(pdaId, observaciones = '') {
-    console.log(`📝 Registrando notificación al gestor para PDA #${pdaId}`);
-
-    const db = getDB();
-    if (!db) {
-        alert('❌ Base de datos no disponible');
-        return false;
-    }
-
-    try {
-        // Actualizar el estado del PDA
-        const { error } = await db
-            .from('pda_cabecera')
-            .update({
-                estado: 'gestor_notificado',
-                fecha_notificacion_gestor: new Date().toISOString().split('T')[0],
-                notificado_por: window.usuarioActual?.nombre_completo || window.usuarioActual?.usuario || 'Operaciones',
-                observaciones_notificacion: observaciones || 'Gestor notificado sobre su desempeño en Q4.',
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', pdaId);
-
-        if (error) throw error;
-
-        // Registrar en historial de cambios
-        await registrarHistorialPDA(pdaId, 'pendiente_operaciones', 'gestor_notificado', 'Gestor notificado por Operaciones');
-
-        alert(`✅ Notificación registrada correctamente\n\nPDA #${pdaId} ahora está en estado "gestor_notificado"`);
-        return true;
-
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('❌ Error al registrar notificación: ' + error.message);
-        return false;
-    }
-}
-
-// ======================================================
-// FUNCIÓN: enviarListaACapacitacion
-// ======================================================
-
-async function enviarListaACapacitacion(pdaIds) {
-    console.log(`📤 Enviando ${pdaIds.length} PDA(s) a Capacitación`);
-
-    const db = getDB();
-    if (!db) {
-        alert('❌ Base de datos no disponible');
-        return false;
-    }
-
-    try {
-        // Obtener los datos de los PDA
-        const { data: pdaList, error } = await db
-            .from('pda_cabecera')
-            .select('*')
-            .in('id', pdaIds);
-
-        if (error) throw error;
-
-        if (!pdaList || pdaList.length === 0) {
-            alert('⚠️ No se encontraron PDA para enviar');
-            return false;
-        }
-
-        // Generar la lista para Capacitación
-        let listaHtml = `
-            <h2>📋 LISTA DE GESTORES PARA CAPACITACIÓN</h2>
-            <p><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-ES')}</p>
-            <p><strong>Total gestores:</strong> ${pdaList.length}</p>
-            <hr>
-            <table border="1" cellpadding="8" style="border-collapse: collapse; width: 100%;">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Agente</th>
-                        <th>Ciclo</th>
-                        <th>Tipo PDA</th>
-                        <th>Items a trabajar</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-
-        for (let i = 0; i < pdaList.length; i++) {
-            const pda = pdaList[i];
-            // Obtener submotivos del PDA (desde el JSON almacenado o desde acciones)
-            const submotivos = pda.evaluaciones_detalle
-                ? JSON.parse(pda.evaluaciones_detalle)
-                : [];
-
-            const itemsResumen = submotivos.length > 0
-                ? submotivos.slice(0, 3).map(s => s.submotivo).join(', ') + (submotivos.length > 3 ? '...' : '')
-                : 'Pendiente';
-
-            listaHtml += `
-                <tr>
-                    <td>${i + 1}</td>
-                    <td><strong>${pda.agente}</strong></td>
-                    <td>#${pda.ciclo_basal_numero}</td>
-                    <td>${pda.tipo_pda?.toUpperCase() || 'PENDIENTE'}</td>
-                    <td>${itemsResumen}</td>
-                </tr>
-            `;
-        }
-
-        listaHtml += `
-                </tbody>
-            </table>
-            <hr>
-            <p style="color: #666; font-size: 12px;">Documento generado por Sistema MECA</p>
-        `;
-
-        // Mostrar la lista en un modal para revisión antes de enviar
-        const modalHtml = `
-            <div id="modalListaCapacitacion" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100060; display: flex; justify-content: center; align-items: center; padding: 20px;">
-                <div style="background: white; border-radius: 16px; width: 95%; max-width: 800px; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden;">
-                    <div style="padding: 15px 20px; background: linear-gradient(135deg, #fd7e14, #f39c12); color: white; display: flex; justify-content: space-between; align-items: center;">
-                        <strong style="font-size: 16px;">📋 Lista para Capacitación</strong>
-                        <button onclick="cerrarModalListaCapacitacion()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
-                    </div>
-                    <div style="padding: 20px; overflow-y: auto; flex: 1;">
-                        ${listaHtml}
-                    </div>
-                    <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0;">
-                        <button onclick="cerrarModalListaCapacitacion()" style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white;">Cerrar</button>
-                        <button onclick="confirmarEnvioCapacitacion(${JSON.stringify(pdaIds).replace(/"/g, "'")})" style="padding: 8px 20px; background: #fd7e14; border: none; border-radius: 8px; cursor: pointer; color: white;">
-                            📤 Enviar a Capacitación
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        const existing = document.getElementById('modalListaCapacitacion');
-        if (existing) existing.remove();
-
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-        // Guardar referencia de los IDs para la confirmación
-        window._pdaIdsEnviarCapacitacion = pdaIds;
-
-        return true;
-
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('❌ Error al generar lista: ' + error.message);
-        return false;
-    }
-}
-
-// ======================================================
-// FUNCIÓN: confirmarEnvioCapacitacion
-// ======================================================
-
-async function confirmarEnvioCapacitacion(pdaIds) {
-    console.log(`📤 Confirmando envío a Capacitación para ${pdaIds.length} PDA(s)`);
-
-    const db = getDB();
-    if (!db) {
-        alert('❌ Base de datos no disponible');
-        return;
-    }
-
-    try {
-        // Actualizar estado de los PDA
-        const idsArray = Array.isArray(pdaIds) ? pdaIds : [pdaIds];
-
-        for (const id of idsArray) {
-            await db
-                .from('pda_cabecera')
-                .update({
-                    estado: 'enviado_capacitacion',
-                    fecha_envio_capacitacion: new Date().toISOString().split('T')[0],
-                    enviado_por: window.usuarioActual?.nombre_completo || window.usuarioActual?.usuario || 'Operaciones',
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', id);
-
-            // Registrar en historial
-            await registrarHistorialPDA(id, 'gestor_notificado', 'enviado_capacitacion', 'Enviado a Capacitación');
-        }
-
-        alert(`✅ ${idsArray.length} PDA(s) enviados a Capacitación correctamente`);
-
-        cerrarModalListaCapacitacion();
-
-        // Recargar datos si es necesario
-        if (typeof cargarDatosPDA === 'function') {
-            await cargarDatosPDA();
-        }
-
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('❌ Error al enviar a Capacitación: ' + error.message);
-    }
-}
-
-// ======================================================
 // FUNCIÓN: cerrarModalListaCapacitacion
 // ======================================================
 
@@ -15039,86 +13440,6 @@ async function registrarHistorialPDA(pdaId, estadoAnterior, estadoNuevo, observa
         console.log(`📝 Historial registrado: ${estadoAnterior} → ${estadoNuevo} (PDA #${pdaId})`);
     } catch (error) {
         console.warn('⚠️ Error registrando historial:', error);
-    }
-}
-
-// ======================================================
-// FUNCIONES AUXILIARES PARA EL MODAL
-// ======================================================
-
-function cerrarModalInformePDA() {
-    const modal = document.getElementById('modalInformePDA');
-    if (modal) modal.remove();
-    window._informePDAHTML = null;
-    window._informePDATXT = null;
-    window._informePDA = null;
-}
-
-function copiarInformePDAHTML() {
-    if (!window._informePDAHTML) {
-        alert('⚠️ No hay informe para copiar');
-        return;
-    }
-    navigator.clipboard.writeText(window._informePDAHTML)
-        .then(() => alert('✅ Informe HTML copiado al portapapeles'))
-        .catch(() => alert('❌ Error al copiar'));
-}
-
-function copiarInformePDATXT() {
-    if (!window._informePDATXT) {
-        alert('⚠️ No hay informe para copiar');
-        return;
-    }
-    navigator.clipboard.writeText(window._informePDATXT)
-        .then(() => alert('✅ Informe TXT copiado al portapapeles'))
-        .catch(() => alert('❌ Error al copiar'));
-}
-
-function imprimirInformePDA() {
-    if (!window._informePDAHTML) {
-        alert('⚠️ No hay informe para imprimir');
-        return;
-    }
-    const ventana = window.open('', '_blank');
-    ventana.document.write(window._informePDAHTML);
-    ventana.document.close();
-    ventana.print();
-}
-
-// ======================================================
-// FUNCIÓN: generarYMostrarInformePDA
-// ======================================================
-
-async function generarYMostrarInformePDA(agente, cicloNumero) {
-    console.log(`📄 Generando informe PDA para ${agente} - Ciclo #${cicloNumero}`);
-
-    try {
-        // 1. Obtener ciclos del agente
-        const ciclos = await agruparEvaluacionesEnCiclos(agente);
-
-        // 2. Buscar el ciclo específico
-        const ciclo = ciclos.find(c => c.numero === cicloNumero && c.esCompleto);
-        if (!ciclo) {
-            alert(`❌ No se encontró el ciclo #${cicloNumero} para ${agente}`);
-            return;
-        }
-
-        if (ciclo.cuartil !== 'Q4') {
-            alert(`⚠️ El agente ${agente} no está en Q4 (${ciclo.cuartil} - ${ciclo.promedio}%). No requiere PDA.`);
-            return;
-        }
-
-        // 3. Generar estructura del informe
-        const informe = generarEstructuraInformePDA(agente, ciclo);
-
-        // 4. Mostrar el informe
-        mostrarInformePDA(informe);
-
-        return informe;
-
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('❌ Error al generar el informe: ' + error.message);
     }
 }
 
@@ -15662,24 +13983,105 @@ async function cargarPestanasDisponiblesGlobal() {
 // CARGAR PERMISOS DE PESTAÑAS (GLOBAL)
 // ======================================================
 async function cargarPermisosPestanasGlobal() {
-    const token = localStorage.getItem('meca_token');
 
-    try {
-        const response = await fetch('/api/rol-pestanas', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+    // ======================================================
+    // FUENTE ACTUAL:
+    // rolesGlobales ya contiene la información cargada
+    // desde el módulo de Roles.
+    //
+    // No consultar /api/rol-pestanas:
+    // ese GET pertenece al flujo legacy.
+    // ======================================================
 
-        if (response.ok) {
-            window.permisosPestanasGlobal = await response.json();
-            console.log(`✅ Cargados ${window.permisosPestanasGlobal.length} permisos de pestañas`);
-        } else {
-            throw new Error(`HTTP ${response.status}`);
+    const roles =
+        Array.isArray(
+            window.rolesGlobales
+        )
+            ? window.rolesGlobales
+            : Array.isArray(
+                rolesGlobales
+            )
+                ? rolesGlobales
+                : [];
+
+
+    const permisos =
+        [];
+
+
+    for (
+        const rol
+        of roles
+    ) {
+        const rolId =
+            Number(
+                rol?.id
+            );
+
+
+        const pestanas =
+            Array.isArray(
+                rol?.pestanas
+            )
+                ? rol.pestanas
+                : Array.isArray(
+                    rol?.permisos
+                )
+                    ? rol.permisos
+                    : Array.isArray(
+                        rol?.tabs
+                    )
+                        ? rol.tabs
+                        : [];
+
+
+        for (
+            const pestana
+            of pestanas
+        ) {
+
+            const codigo =
+                typeof pestana ===
+                    'string'
+                    ? pestana
+                    : (
+                        pestana?.codigo ??
+                        pestana?.pestana_codigo ??
+                        null
+                    );
+
+
+            if (
+                !rolId ||
+                !codigo
+            ) {
+                continue;
+            }
+
+
+            permisos.push({
+                rol_id:
+                    rolId,
+
+                pestana_codigo:
+                    String(
+                        codigo
+                    )
+            });
         }
-    } catch (error) {
-        console.error('Error cargando permisos:', error);
-        window.permisosPestanasGlobal = [];
     }
-    return window.permisosPestanasGlobal;
+
+
+    window.permisosPestanasGlobal =
+        permisos;
+
+
+    console.log(
+        `✅ Permisos de pestañas reconstruidos desde roles: ${permisos.length}`
+    );
+
+
+    return permisos;
 }
 // INICIALIZAR EVENTO DE CARGA DE AGENTES
 // ======================================================
@@ -15872,7 +14274,7 @@ function inicializarEventoAgentes() {
 
 // ========================================================================================
 // BLOQUE 1: CONEXIÓN BD, LOGIN, SESIÓN Y ACTUALIZACIONES (13 funciones)
-// ========================================================================================        
+// ========================================================================================
 
 // ===== 3. INICIO FUNCIÓN: Verificar sesión ==============================
 async function verificarSesion() {
@@ -16050,13 +14452,6 @@ async function cargarDatosInicialesSupervisor() {
             await cargarRankingAgentes();
         }
 
-        // Cargar reportes
-        if (typeof generarReportes === 'function') {
-            await generarReportes();
-        }
-
-        console.log('✅ Datos del supervisor cargados correctamente');
-
     } catch (error) {
         console.error('❌ Error cargando datos del supervisor:', error);
     }
@@ -16071,7 +14466,11 @@ async function cargarDatosInicialesSupervisor() {
 
 
 // ===== 4. INICIO FUNCIÓN: cargarDatosPDA ===============================
-async function cargarDatosPDA() {
+async function cargarDatosPDA(
+    {
+        cargarReportes = true
+    } = {}
+) {
     console.log('📋 Cargando PDA...');
 
     try {
@@ -16082,7 +14481,7 @@ async function cargarDatosPDA() {
         if (!db) {
             console.error('❌ Base de datos no disponible');
             window.datosPDA = [];
-            actualizarListasPDA();
+
             return;
         }
 
@@ -16094,7 +14493,7 @@ async function cargarDatosPDA() {
         if (error) {
             console.error('❌ Error consultando PDA:', error);
             window.datosPDA = [];
-            actualizarListasPDA();
+
             return;
         }
 
@@ -16111,19 +14510,74 @@ async function cargarDatosPDA() {
         // ======================================================
         // 🔴 OBTENER TODOS LOS REPORTES
         // ======================================================
-        const token = localStorage.getItem('meca_token');
-        let todosLosReportes = [];
-        try {
-            const reportesResponse = await fetch(`${API_URL_PYTHON}/api/reportes/listar`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const reportesData = await reportesResponse.json();
-            todosLosReportes = reportesData.archivos || [];
-            console.log(`📊 ${todosLosReportes.length} reportes disponibles`);
-        } catch (e) {
-            console.warn('⚠️ No se pudieron cargar reportes:', e.message);
-        }
+        let todosLosReportes =
+                [];
 
+
+            if (
+                cargarReportes ===
+                true
+            ) {
+                const token =
+                    localStorage.getItem(
+                        'meca_token'
+                    );
+
+
+                try {
+                    const reportesResponse =
+                        await fetch(
+                            `${API_URL_PYTHON}/api/reportes/listar`,
+                            {
+                                headers: {
+                                    Authorization:
+                                        `Bearer ${token}`
+                                }
+                            }
+                        );
+
+
+                    if (
+                        !reportesResponse.ok
+                    ) {
+                        throw new Error(
+                            `HTTP ${reportesResponse.status}`
+                        );
+                    }
+
+
+                    const reportesData =
+                        await reportesResponse.json();
+
+
+                    todosLosReportes =
+                        Array.isArray(
+                            reportesData?.archivos
+                        )
+                            ? reportesData.archivos
+                            : [];
+
+
+                    console.log(
+                        `📊 ${todosLosReportes.length} reportes disponibles`
+                    );
+
+
+                } catch (
+                    error
+                ) {
+                    console.warn(
+                        '⚠️ Reportes PDA no disponibles:',
+                        error.message
+                    );
+                }
+
+
+            } else {
+                console.log(
+                    'ℹ️ Carga de reportes PDA omitida para esta vista'
+                );
+            }
         // ======================================================
         // 🔴 CREAR MAPA DE REPORTES
         // ======================================================
@@ -16183,48 +14637,15 @@ async function cargarDatosPDA() {
             });
         }
 
-        // ======================================================
-        // 🔴 ACTUALIZAR LISTAS EN LA UI
-        // ======================================================
-        actualizarListasPDA();
+
 
     } catch (error) {
         console.error('❌ Error cargando PDA:', error);
         window.datosPDA = [];
-        actualizarListasPDA();
+
     }
 }
-// ===== FIN FUNCIÓN: cargarDatosPDA ======================================        
-
-function verReportePDA(rutaArchivo) {
-    if (!rutaArchivo) {
-        alert('⚠️ No hay reporte disponible para este PDA');
-        return;
-    }
-
-    // 🔴 EXTRAER SOLO EL NOMBRE DEL ARCHIVO
-    let nombreArchivo = rutaArchivo;
-
-    // Si es una ruta con \, extraer después de la última \
-    if (nombreArchivo.includes('\\')) {
-        nombreArchivo = nombreArchivo.split('\\').pop();
-    }
-    // Si es una ruta con /, extraer después de la última /
-    if (nombreArchivo.includes('/')) {
-        nombreArchivo = nombreArchivo.split('/').pop();
-    }
-
-    // Limpiar
-    nombreArchivo = nombreArchivo.trim();
-
-    console.log('📄 Abriendo reporte:', nombreArchivo);
-
-    // 🔴 USAR EL PUERTO 5000 (NO 8080)
-    const url = `${API_URL_PYTHON}/api/reportes/descargar/${encodeURIComponent(nombreArchivo)}`;
-    console.log('🔗 URL:', url);
-
-    window.open(url, '_blank');
-}
+// ===== FIN FUNCIÓN: cargarDatosPDA ======================================
 
 // ===== SISTEMA DE CACHÉ PARA EVALUACIONES ===============================
 let cacheEvaluaciones = {
@@ -16233,25 +14654,6 @@ let cacheEvaluaciones = {
     hash: null
 };
 const CACHE_DURACION = 5 * 60 * 1000; // 5 minutos
-
-function limpiarFiltroLiderRanking() {
-    console.log('🧹 Limpiando filtro de líder en ranking...');
-
-    // Resetear el select de líder a "todos"
-    const selectLider = document.getElementById('selectFiltroLiderRanking');
-    if (selectLider) {
-        selectLider.value = 'todos';
-    }
-
-    // Resetear variable global
-    liderFiltroRankingActual = 'todos';
-
-    // Aplicar los filtros actuales (sin líder)
-    aplicarFiltrosRankingCompletos();
-}
-
-
-
 
 
 let indicadoresEvolutivosExpandido = {
@@ -16454,10 +14856,10 @@ async function renderizarControlesPeriodo() {
         html = `
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%;">
                     <span style="font-size: 12px; color: #64748b; font-weight: 500;">Desde:</span>
-                    <input type="date" id="filtroFechaInicioReportes" value="${filtroDiaDesde || ''}" 
+                    <input type="date" id="filtroFechaInicioReportes" value="${filtroDiaDesde || ''}"
                         style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none;">
                     <span style="color: #94a3b8;">→</span>
-                    <input type="date" id="filtroFechaFinReportes" value="${filtroDiaHasta || ''}" 
+                    <input type="date" id="filtroFechaFinReportes" value="${filtroDiaHasta || ''}"
                         style="padding: 5px 10px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 12px; background: white; outline: none;">
                 </div>
             `;
@@ -17627,36 +16029,6 @@ function invalidarRankingCache() {
 }
 // ===== FIN FUNCIÓN: invalidarRankingCache ===============================
 
-// ===== 3. INICIO FUNCIÓN: cargarRankingAgentesCompleto =================
-async function cargarRankingAgentesCompleto() {
-    console.log('📊 Cargando ranking completo de agentes...');
-
-    if (!window.evaluacionesGlobales || window.evaluacionesGlobales.length === 0) {
-        await cargarEvaluacionesDesdePostgreSQL();
-    }
-
-    await cargarMesesDisponiblesRanking();
-
-    const evaluaciones = window.evaluacionesGlobales || [];
-    const rankingSinCuartiles = await construirRankingAgentes(evaluaciones);
-
-    // 🔴 🔴 🔴 SOLO AGREGA ESTA LÍNEA 🔴 🔴 🔴
-    window.rankingOriginalCompleto = calcularCuartilesGlobales(rankingSinCuartiles);
-    window.rankingCompletoGlobal = window.rankingOriginalCompleto;
-
-    console.log(`✅ Ranking completo cargado: ${window.rankingOriginalCompleto.length} agentes`);
-
-    await aplicarFiltroMesRanking();
-
-    const selectPeriodo = document.getElementById('filtroMesRanking');
-    if (selectPeriodo && !selectPeriodo._listenerAdded) {
-        selectPeriodo.addEventListener('change', () => aplicarFiltroMesRanking());
-        selectPeriodo._listenerAdded = true;
-    }
-}
-// ===== FIN FUNCIÓN: cargarRankingAgentesCompleto ========================
-
-
 
 async function cargarEvolucionCuartilesPorGestor() {
     console.log('📊 Cargando evolución de cuartiles por gestor...');
@@ -18056,8 +16428,8 @@ function generarTablaEvolucionCuartiles(container, matrizCuartiles, periodosLabe
             </div>
         </div>
         <div style="margin-top: 12px; padding: 8px 15px; background: #f8fafc; border-radius: 10px; font-size: 12px; color: #475569; border: 1px solid #e2e8f0;">
-            📊 Total gestores: <strong>${gestoresOrdenados.length}</strong> | 
-            🔴 En Q4 actual: <strong style="color: #d93025;">${totalQ4}</strong> | 
+            📊 Total gestores: <strong>${gestoresOrdenados.length}</strong> |
+            🔴 En Q4 actual: <strong style="color: #d93025;">${totalQ4}</strong> |
             📅 Períodos mostrados: <strong>${periodosLabels.length}</strong>
         </div>
     `;
@@ -18079,559 +16451,6 @@ function inicializarFiltrosEvolucionCuartiles() {
 }
 // ===== FIN FUNCIÓN: Tabla Evolución de Cuartiles por Gestor =============
 
-// ===== 5. INICIO FUNCIÓN: actualizarTablaRanking =======================
-async function actualizarTablaRanking(ranking) {
-    console.log('📊 actualizarTablaRanking - Iniciando...');
-
-    const tablaRanking = document.getElementById('tablaRanking');
-    if (!tablaRanking) {
-        console.error('❌ Tabla ranking no encontrada');
-        return;
-    }
-
-    if (!ranking || ranking.length === 0) {
-        tablaRanking.innerHTML = '<tbody><tr><td colspan="15" style="text-align: center; padding: 40px;">📊 No hay agentes para mostrar<\/td><\/tr><\/tbody>';
-        console.log('✅ Tabla ranking actualizada: sin agentes');
-        return;
-    }
-
-    // ======================================================
-    // 1. OBTENER LÍDERES DESDE POSTGRESQL
-    // ======================================================
-    const db = getDB();
-    let liderPorAgente = {};
-
-    if (db) {
-        try {
-            const { data: agentesConLider, error } = await db
-                .from('agentes')
-                .select('nombre, lider_2026');
-
-            if (!error && agentesConLider) {
-                agentesConLider.forEach(a => {
-                    liderPorAgente[a.nombre] = a.lider_2026 || 'Sin líder';
-                });
-            }
-        } catch (error) {
-            console.error('Error obteniendo líderes:', error);
-        }
-    }
-
-    // ======================================================
-    // 2. OBTENER TENDENCIAS POR AGENTE (basado en ciclos)
-    // ======================================================
-    const tendencias = {};
-
-    for (const agente of ranking) {
-        try {
-            const ciclos = await agruparEvaluacionesEnCiclos(agente.agente);
-            if (ciclos.length >= 2) {
-                const ultimoCiclo = ciclos[ciclos.length - 1];
-                const cicloAnterior = ciclos[ciclos.length - 2];
-                const diferencia = ultimoCiclo.promedio - cicloAnterior.promedio;
-
-                if (diferencia > 3) {
-                    tendencias[agente.agente] = {
-                        icono: '📈',
-                        color: '#28a745',
-                        texto: `+${diferencia.toFixed(1)}%`,
-                        tooltip: `Mejoró ${diferencia.toFixed(1)}% respecto al ciclo anterior`
-                    };
-                } else if (diferencia < -3) {
-                    tendencias[agente.agente] = {
-                        icono: '📉',
-                        color: '#d93025',
-                        texto: `${diferencia.toFixed(1)}%`,
-                        tooltip: `Empeoró ${Math.abs(diferencia).toFixed(1)}% respecto al ciclo anterior`
-                    };
-                } else {
-                    tendencias[agente.agente] = {
-                        icono: '➡️',
-                        color: '#6c757d',
-                        texto: 'Estable',
-                        tooltip: `Mantuvo el nivel (variación de ${Math.abs(diferencia).toFixed(1)}%)`
-                    };
-                }
-            } else if (ciclos.length === 1) {
-                tendencias[agente.agente] = {
-                    icono: '🆕',
-                    color: '#019DF4',
-                    texto: 'Primer ciclo',
-                    tooltip: 'Es el primer ciclo de evaluación del agente'
-                };
-            } else {
-                tendencias[agente.agente] = {
-                    icono: '-',
-                    color: '#6c757d',
-                    texto: 'Sin datos',
-                    tooltip: 'No hay suficientes datos para calcular tendencia'
-                };
-            }
-        } catch (error) {
-            console.warn(`Error obteniendo tendencia para ${agente.agente}:`, error);
-            tendencias[agente.agente] = {
-                icono: '❓',
-                color: '#6c757d',
-                texto: 'Error',
-                tooltip: 'No se pudo calcular la tendencia'
-            };
-        }
-    }
-
-    // ======================================================
-    // 3. GENERAR HTML DE LA TABLA
-    // ======================================================
-    let tbodyHtml = '';
-
-    for (let i = 0; i < ranking.length; i++) {
-        const r = ranking[i];
-
-        // Determinar color del promedio
-        let colorPromedio = 'var(--danger)';
-        if (r.promedio >= 97) colorPromedio = 'var(--ok)';
-        else if (r.promedio >= 90) colorPromedio = '#019DF4';
-        else if (r.promedio >= 85) colorPromedio = 'var(--warning)';
-
-        // Determinar color y texto del cuartil
-        let colorCuartil = 'var(--danger)';
-        let cuartilTexto = '';
-
-        if (r.cuartil === 'Q1') {
-            colorCuartil = 'var(--ok)';
-            cuartilTexto = 'Q1';
-        } else if (r.cuartil === 'Q2') {
-            colorCuartil = '#019DF4';
-            cuartilTexto = 'Q2';
-        } else if (r.cuartil === 'Q3') {
-            colorCuartil = 'var(--warning)';
-            cuartilTexto = 'Q3';
-        } else {
-            colorCuartil = 'var(--danger)';
-            cuartilTexto = 'Q4';
-        }
-
-        // Obtener información de PDA
-        const infoPDA = obtenerInfoPDA(r.agente, r.cuartil);
-        const lider = liderPorAgente[r.agente] || 'Sin líder';
-        const tendencia = tendencias[r.agente] || { icono: '-', color: '#6c757d', texto: '', tooltip: '' };
-
-        // Formatear última fecha
-        const ultimaFecha = mostrarFechaSinT(r.ultima) || '-';
-
-        tbodyHtml += `
-                <tr style="border-bottom: 1px solid var(--line);">
-                    <td style="padding: 10px 8px; text-align: center; font-weight: 600;">${i + 1}</td>
-                    <td style="padding: 10px 8px;">
-                        <strong>${escapeHtml(r.agente)}</strong>
-                    </td>
-                    <td style="padding: 10px 8px;">${escapeHtml(lider)}</td>
-                    <td style="padding: 10px 8px; font-weight: bold; color: ${colorPromedio}; text-align: center;">${r.promedio}%</td>
-                    <td style="padding: 10px 8px; text-align: center;">
-                        <span class="badge" style="background: ${colorCuartil};">${cuartilTexto}</span>
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center;">${r.count}</td>
-                    <td style="padding: 10px 8px; font-weight: bold; color: #019DF4; text-align: center;">${r.promedioENC}%</td>
-                    <td style="padding: 10px 8px; font-weight: bold; color: #7b1fa2; text-align: center;">${r.promedioECUF}%</td>
-                    <td style="padding: 10px 8px; font-weight: bold; color: #fd7e14; text-align: center;">${r.promedioECN}%</td>
-                    <td style="padding: 10px 8px; text-align: center;">
-                        <span style="color: var(--danger); font-weight: bold;">${r.bajos}</span>
-                    </td>                                    
-                    <td style="padding: 10px 8px; text-align: center;">
-                        ${r.cuartil === 'Q4' ? (infoPDA.total !== '-' ? infoPDA.total : '0') : '-'}
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center; font-size: 11px;">
-                        ${r.cuartil === 'Q4' ? (infoPDA.ultimaFecha !== '-' ? infoPDA.ultimaFecha : '-') : '-'}
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center; font-size: 11px;">
-                        ${ultimaFecha}
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center;">
-                        <span style="color: ${tendencia.color}; cursor: help;" title="${escapeHtml(tendencia.tooltip || '')}">
-                            ${tendencia.icono} ${tendencia.texto}
-                        </span>
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center;">
-                        <button onclick="verEvolucionCiclos('${escapeHtml(r.agente)}')" 
-                                style="background: var(--accent); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
-                            📊 Ciclos
-                        </button>
-                    </td>
-                </tr>
-            `;
-    }
-
-    // ======================================================
-    // 4. ACTUALIZAR LA TABLA EN EL DOM
-    // ======================================================
-    tablaRanking.innerHTML = `<tbody>${tbodyHtml}</tbody>`;
-
-    // Actualizar también el contador total de agentes (opcional)
-    const totalAgentesSpan = document.getElementById('totalAgentesRanking');
-    if (totalAgentesSpan) {
-        totalAgentesSpan.textContent = ranking.length;
-    }
-
-    console.log(`✅ Tabla ranking actualizada: ${ranking.length} agentes mostrados`);
-}
-// ===== FIN FUNCIÓN: actualizarTablaRanking ==============================
-
-
-
-// ===== 6. INICIO FUNCIÓN: actualizarTablaRankingConLider ===============
-async function actualizarTablaRankingConLider(ranking, liderFiltro, cuartilFiltro) {
-    const tablaRanking = document.getElementById('tablaRanking');
-    if (!tablaRanking) return;
-
-    if (!ranking || ranking.length === 0) {
-        tablaRanking.innerHTML = `<tr><td colspan="15" style="text-align: center; padding: 40px;">
-                📊 No hay gestores ${liderFiltro !== 'todos' ? `para el líder ${liderFiltro}` : ''} 
-                ${cuartilFiltro && cuartilFiltro !== 'todos' ? `en el cuartil ${cuartilFiltro}` : ''}
-            <\/td><\/tr>`;
-        return;
-    }
-
-    // Obtener líderes desde la base de datos
-    const db = getDB();
-    let liderPorAgente = {};
-
-    if (db) {
-        try {
-            const { data: agentesConLider, error } = await db
-                .from('agentes')
-                .select('nombre, lider_2026');
-
-            if (!error && agentesConLider) {
-                agentesConLider.forEach(a => {
-                    liderPorAgente[a.nombre] = a.lider_2026 || 'Sin líder';
-                });
-            }
-        } catch (error) {
-            console.error('Error obteniendo líderes:', error);
-        }
-    }
-
-    // Obtener tendencias
-    const tendencias = {};
-    for (const agente of ranking) {
-        try {
-            const ciclos = await agruparEvaluacionesEnCiclos(agente.agente);
-            if (ciclos.length >= 2) {
-                const ultimoCiclo = ciclos[ciclos.length - 1];
-                const cicloAnterior = ciclos[ciclos.length - 2];
-                const diferencia = ultimoCiclo.promedio - cicloAnterior.promedio;
-
-                if (diferencia > 3) {
-                    tendencias[agente.agente] = { icono: '📈', color: '#28a745', texto: `+${diferencia.toFixed(1)}%` };
-                } else if (diferencia < -3) {
-                    tendencias[agente.agente] = { icono: '📉', color: '#d93025', texto: `${diferencia.toFixed(1)}%` };
-                } else {
-                    tendencias[agente.agente] = { icono: '➡️', color: '#6c757d', texto: 'Estable' };
-                }
-            } else if (ciclos.length === 1) {
-                tendencias[agente.agente] = { icono: '🆕', color: '#019DF4', texto: 'Primer ciclo' };
-            } else {
-                tendencias[agente.agente] = { icono: '-', color: '#6c757d', texto: 'Sin datos' };
-            }
-        } catch (error) {
-            tendencias[agente.agente] = { icono: '❓', color: '#6c757d', texto: 'Error' };
-        }
-    }
-
-    let html = '';
-    for (let i = 0; i < ranking.length; i++) {
-        const r = ranking[i];
-
-        let colorPromedio = 'var(--danger)';
-        if (r.promedio >= 97) colorPromedio = 'var(--ok)';
-        else if (r.promedio >= 90) colorPromedio = '#019DF4';
-        else if (r.promedio >= 85) colorPromedio = 'var(--warning)';
-
-        let colorCuartil = 'var(--danger)';
-        let cuartilTexto = '';
-        if (r.cuartil === 'Q1') {
-            colorCuartil = 'var(--ok)';
-            cuartilTexto = 'Q1';
-        } else if (r.cuartil === 'Q2') {
-            colorCuartil = '#019DF4';
-            cuartilTexto = 'Q2';
-        } else if (r.cuartil === 'Q3') {
-            colorCuartil = 'var(--warning)';
-            cuartilTexto = 'Q3';
-        } else {
-            colorCuartil = 'var(--danger)';
-            cuartilTexto = 'Q4';
-        }
-
-        const infoPDA = obtenerInfoPDA(r.agente, r.cuartil);
-        const lider = liderPorAgente[r.agente] || 'Sin líder';
-        const tendencia = tendencias[r.agente] || { icono: '-', color: '#6c757d', texto: '' };
-        const ultimaFecha = mostrarFechaSinT(r.ultima) || '-';
-
-        html += `
-                <tr>
-                    <td style="padding: 10px 8px; text-align: center;">${i + 1}</td>
-                    <td style="padding: 10px 8px;"><strong>${escapeHtml(r.agente)}</strong></td>
-                    <td style="padding: 10px 8px;">${escapeHtml(lider)}</td>
-                    <td style="padding: 10px 8px; font-weight: bold; color: ${colorPromedio};">${r.promedio}%</td>
-                    <td style="padding: 10px 8px; text-align: center;">
-                        <span class="badge" style="background: ${colorCuartil};">${cuartilTexto}</span>
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center;">${r.count}</td>
-                    <td style="padding: 10px 8px; font-weight: bold; color: #019DF4;">${r.promedioENC}%</td>
-                    <td style="padding: 10px 8px; font-weight: bold; color: #7b1fa2;">${r.promedioECUF}%</td>
-                    <td style="padding: 10px 8px; font-weight: bold; color: #fd7e14;">${r.promedioECN}%</td>
-                    <td style="padding: 10px 8px; text-align: center;">${r.bajos}</td>
-                    <td style="padding: 10px 8px; text-align: center;">${r.cuartil === 'Q4' ? (infoPDA.total !== '-' ? infoPDA.total : '0') : '-'}</td>
-                    <td style="padding: 10px 8px; text-align: center;">${r.cuartil === 'Q4' ? (infoPDA.ultimaFecha !== '-' ? infoPDA.ultimaFecha : '-') : '-'}</td>
-                    <td style="padding: 10px 8px;">${ultimaFecha}</td>
-                    <td style="padding: 10px 8px; text-align: center;">
-                        <span style="color: ${tendencia.color};">${tendencia.icono} ${tendencia.texto}</span>
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center;">
-                        <button onclick="verEvolucionCiclos('${escapeHtml(r.agente)}')" 
-                                style="background: var(--accent); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
-                            📊 Ciclos
-                        </button>
-                    </td>
-                </tr>
-            `;
-    }
-
-    tablaRanking.innerHTML = html;
-    console.log(`✅ Tabla ranking con líder actualizada: ${ranking.length} agentes`);
-}
-// ===== FIN FUNCIÓN: actualizarTablaRankingConLider ======================
-
-
-// ===== 8. INICIO FUNCIÓN: actualizarTablaRankingConFiltro ==============⚠️ Redundante
-function actualizarTablaRankingConFiltro(ranking, cuartilActivo) {
-    const tablaRanking = document.getElementById('tablaRanking');
-    if (!tablaRanking) return;
-
-    if (ranking.length === 0) {
-        tablaRanking.innerHTML = `<tr><td colspan="13" style="text-align: center; padding: 40px;">
-                📊 No hay gestores en el cuartil ${cuartilActivo}
-            </td></tr>`;
-        return;
-    }
-
-    let html = '';
-    ranking.forEach((r, i) => {
-        let colorPromedio = 'var(--danger)';
-        if (r.promedio >= 97) colorPromedio = 'var(--ok)';
-        else if (r.promedio >= 90) colorPromedio = '#019DF4';
-        else if (r.promedio >= 85) colorPromedio = 'var(--warning)';
-
-        let colorCuartil = 'var(--danger)';
-        let cuartilTexto = '';
-        if (r.cuartil === 'Q1') {
-            colorCuartil = 'var(--ok)';
-            cuartilTexto = 'Q1';
-        } else if (r.cuartil === 'Q2') {
-            colorCuartil = '#019DF4';
-            cuartilTexto = 'Q2';
-        } else if (r.cuartil === 'Q3') {
-            colorCuartil = 'var(--warning)';
-            cuartilTexto = 'Q3';
-        } else {
-            colorCuartil = 'var(--danger)';
-            cuartilTexto = 'Q4';
-        }
-
-        const infoPDA = obtenerInfoPDA(r.agente, r.cuartil);
-
-        html += `
-                <tr>
-                    <td style="padding: 8px; text-align: center;">${i + 1}</td>
-                    <td style="padding: 8px;"><strong>${escapeHtml(r.agente)}</strong></td>
-                    <td style="padding: 8px; font-weight: bold; color: ${colorPromedio};">${r.promedio}%</td>
-                    <td style="padding: 8px;"><span class="badge" style="background: ${colorCuartil};">${cuartilTexto}</span></td>
-                    <td style="padding: 8px; text-align: center;">${r.count}</td>
-                    <td style="padding: 8px; font-weight: bold; color: #019DF4;">${r.promedioENC}%</td>
-                    <td style="padding: 8px; font-weight: bold; color: #7b1fa2;">${r.promedioECUF}%</td>
-                    <td style="padding: 8px; font-weight: bold; color: #fd7e14;">${r.promedioECN}%</td>
-                    <td style="padding: 8px; text-align: center;">${r.bajos}</td>                                    
-                    <td style="padding: 8px; text-align: center;">${r.cuartil === 'Q4' ? infoPDA.total : '-'}</td>
-                    <td style="padding: 8px;">${r.cuartil === 'Q4' ? (infoPDA.ultimaFecha || '-') : '-'}</td>
-                    <td style="padding: 8px;">${mostrarFechaSinT(r.ultima) || '-'}</td>
-                </tr>
-            `;
-    });
-
-    tablaRanking.innerHTML = html;
-}
-// ===== FIN FUNCIÓN: actualizarTablaRankingConFiltro =====================
-
-// ===== 9. INICIO FUNCIÓN: filtrarRankingPorCuartil =====================
-async function filtrarRankingPorCuartil(cuartil) {
-    console.log(`📊 Filtrando ranking por cuartil: ${cuartil}`);
-
-    cuartilActivoGlobal = cuartil;
-
-    actualizarEstiloBotonesCuartil(cuartil);
-
-    if (!rankingOriginalCompleto || rankingOriginalCompleto.length === 0) {
-        const evaluaciones = await API.getHistorial();
-        rankingOriginalCompleto = await construirRankingAgentes(evaluaciones);
-    }
-
-    let rankingFiltrado = [...rankingOriginalCompleto];
-
-    if (cuartil !== 'todos') {
-        rankingFiltrado = rankingFiltrado.filter(agente => agente.cuartil === cuartil);
-    }
-
-    if (liderFiltroRankingActual && liderFiltroRankingActual !== 'todos') {
-        rankingFiltrado = await filtrarRankingPorLiderInterno(rankingFiltrado, liderFiltroRankingActual);
-    }
-
-    await actualizarTablaRanking(rankingFiltrado);
-
-    const infoDiv = document.createElement('div');
-    infoDiv.textContent = `Mostrando ${rankingFiltrado.length} gestor(es) en ${cuartil === 'todos' ? 'todos los cuartiles' : cuartil}`;
-    infoDiv.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--accent); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1000; animation: fadeOut 2s ease forwards;';
-    document.body.appendChild(infoDiv);
-    setTimeout(() => infoDiv.remove(), 2000);
-}
-// ===== FIN FUNCIÓN: filtrarRankingPorCuartil ============================
-
-// ===== 10. INICIO FUNCIÓN: actualizarEstiloBotonesCuartil ===============
-function actualizarEstiloBotonesCuartil(activo) {
-    const botones = {
-        'todos': document.getElementById('btnFiltrarTodos'),
-        'Q1': document.getElementById('btnFiltrarQ1'),
-        'Q2': document.getElementById('btnFiltrarQ2'),
-        'Q3': document.getElementById('btnFiltrarQ3'),
-        'Q4': document.getElementById('btnFiltrarQ4')
-    };
-
-    // Estilos por defecto para cada botón
-    const estilosDefault = {
-        'todos': { background: '#6c757d', opacity: '0.7' },
-        'Q1': { background: '#1a7f37', opacity: '0.7' },
-        'Q2': { background: '#019DF4', opacity: '0.7' },
-        'Q3': { background: '#f39c12', opacity: '0.7' },
-        'Q4': { background: '#d93025', opacity: '0.7' }
-    };
-
-    const estilosActivo = {
-        'todos': { background: '#6c757d', opacity: '1', boxShadow: '0 0 0 2px #fff, 0 0 0 4px #6c757d' },
-        'Q1': { background: '#1a7f37', opacity: '1', boxShadow: '0 0 0 2px #fff, 0 0 0 4px #1a7f37' },
-        'Q2': { background: '#019DF4', opacity: '1', boxShadow: '0 0 0 2px #fff, 0 0 0 4px #019DF4' },
-        'Q3': { background: '#f39c12', opacity: '1', boxShadow: '0 0 0 2px #fff, 0 0 0 4px #f39c12' },
-        'Q4': { background: '#d93025', opacity: '1', boxShadow: '0 0 0 2px #fff, 0 0 0 4px #d93025' }
-    };
-
-    for (const [cuartilBtn, btn] of Object.entries(botones)) {
-        if (btn) {
-            const estilo = cuartilBtn === activo ? estilosActivo[cuartilBtn] : estilosDefault[cuartilBtn];
-            btn.style.background = estilo.background;
-            btn.style.opacity = estilo.opacity;
-            btn.style.boxShadow = estilo.boxShadow || 'none';
-            btn.style.transition = 'all 0.2s ease';
-        }
-    }
-}
-// ===== FIN FUNCIÓN: actualizarEstiloBotonesCuartil ======================
-
-// ===== 11. INICIO FUNCIÓN: filtrarRankingPorLider =======================
-async function filtrarRankingPorLider(lider) {
-    console.log(`📊 Filtrando ranking por líder: ${lider}`);
-
-    liderFiltroRankingActual = lider;
-
-    // Obtener ranking original si no existe
-    if (rankingOriginalCompleto.length === 0) {
-        const evaluaciones = window.evaluacionesGlobales || [];
-        if (evaluaciones.length === 0) {
-            console.warn('⚠️ No hay evaluaciones');
-            return;
-        }
-        rankingOriginalCompleto = await construirRankingAgentes(evaluaciones);
-    }
-
-    // Obtener líder de cada agente desde la base de datos
-    const db = getDB();
-    if (!db) return;
-
-    const { data: agentesConLider, error } = await db
-        .from('agentes')
-        .select('nombre, lider_2026');
-
-    if (error) {
-        console.error('Error obteniendo líderes:', error);
-        return;
-    }
-
-    // Crear mapa agente -> líder
-    const liderPorAgente = {};
-    agentesConLider.forEach(a => {
-        liderPorAgente[a.nombre] = a.lider_2026;
-    });
-
-    // Filtrar ranking por líder
-    let rankingFiltrado;
-    if (lider === 'todos') {
-        rankingFiltrado = [...rankingOriginalCompleto];
-    } else {
-        rankingFiltrado = rankingOriginalCompleto.filter(agente => {
-            const liderAgente = liderPorAgente[agente.agente];
-            return liderAgente === lider;
-        });
-    }
-
-    // Aplicar también filtro de cuartil si está activo
-    if (cuartilActivoGlobal && cuartilActivoGlobal !== 'todos') {
-        rankingFiltrado = rankingFiltrado.filter(agente => agente.cuartil === cuartilActivoGlobal);
-    }
-
-    // Actualizar la tabla
-    actualizarTablaRankingConLider(rankingFiltrado, lider, cuartilActivoGlobal);
-
-    // Actualizar estilo del select
-    const select = document.getElementById('selectFiltroLiderRanking');
-    if (select) select.value = lider;
-
-    // Mostrar mensaje temporal
-    const totalAgentes = rankingFiltrado.length;
-    const mensaje = lider === 'todos'
-        ? `Mostrando todos los ${totalAgentes} gestores`
-        : `Mostrando ${totalAgentes} gestores del líder ${lider}`;
-
-    const infoDiv = document.createElement('div');
-    infoDiv.textContent = mensaje;
-    infoDiv.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--accent); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1000; animation: fadeOut 2s ease forwards;';
-    document.body.appendChild(infoDiv);
-    setTimeout(() => infoDiv.remove(), 2000);
-}
-// ===== FIN FUNCIÓN: filtrarRankingPorLider ==============================
-
-// ===== 12. INICIO FUNCIÓN: filtrarRankingPorLiderInterno ================
-async function filtrarRankingPorLiderInterno(ranking, lider) {
-    if (lider === 'todos') return ranking;
-
-    const db = getDB();
-    if (!db) return ranking;
-
-    try {
-        const { data: agentesConLider, error } = await db
-            .from('agentes')
-            .select('nombre, lider_2026');
-
-        if (error) throw error;
-
-        const liderPorAgente = {};
-        agentesConLider.forEach(a => {
-            liderPorAgente[a.nombre] = a.lider_2026;
-        });
-
-        return ranking.filter(agente => liderPorAgente[agente.agente] === lider);
-
-    } catch (error) {
-        console.error('Error filtrando por líder:', error);
-        return ranking;
-    }
-}
 
 async function obtenerResumenAgrupado(campoAgrupacion) {
     console.log(`📊 Agrupando por: ${campoAgrupacion}`);
@@ -18836,41 +16655,8 @@ async function filtrarPor(campo, valor) {
     }
 }
 
-// ===== 17. INICIO FUNCIÓN: cargarLideresEnSelectRanking =================
+
 let liderFiltroRankingActual = 'todos';
-// Guardar ranking original sin filtrar
-// DESPUÉS (usando API)
-async function cargarLideresEnSelectRanking() {
-    console.log('🔄 cargarLideresEnSelectRanking - INICIANDO...');
-
-    const select = document.getElementById('selectFiltroLiderRanking');
-    if (!select) {
-        console.error('❌ Select selectFiltroLiderRanking no encontrado');
-        return;
-    }
-
-    try {
-        const lideres = await API.getLideres();
-
-        const valorActual = select.value;
-        select.innerHTML = '<option value="todos">👥 Todos los líderes</option>';
-
-        if (lideres.length === 0) {
-            select.innerHTML += '<option disabled>⚠️ No hay líderes con evaluaciones</option>';
-        } else {
-            lideres.forEach(lider => {
-                select.innerHTML += `<option value="${escapeHtml(lider)}" ${valorActual === lider ? 'selected' : ''}>👤 ${escapeHtml(lider)}</option>`;
-            });
-        }
-
-        console.log(`✅ Select actualizado: ${lideres.length} líderes`);
-
-    } catch (error) {
-        console.error('❌ Error cargando líderes:', error);
-        select.innerHTML = '<option value="todos">👥 Todos los líderes</option><option disabled>❌ Error</option>';
-    }
-}
-// ===== FIN FUNCIÓN: cargarLideresEnSelectRanking ========================
 
 // ===== 18. INICIO FUNCIÓN: actualizarSelectLideres ======================
 async function actualizarSelectLideres(lideresDesdeTabla) {
@@ -19256,60 +17042,6 @@ function invalidarCacheCiclos() {
 }
 // ===== FIN FUNCIÓN: invalidarCacheCiclos ================================
 
-// ===== 23. INICIO FUNCIÓN: obtenerEstadoPDAporUltimoCiclo ===============
-async function obtenerEstadoPDAporUltimoCiclo(agente) {
-    // Obtener ciclos del agente
-    const ciclos = await agruparEvaluacionesEnCiclos(agente);
-
-    if (ciclos.length === 0) {
-        return {
-            estado: '<span style="color: var(--muted);">-</span>',
-            requierePDA: false,
-            cuartilUltimoCiclo: null
-        };
-    }
-
-    const ultimoCiclo = ciclos[ciclos.length - 1];
-    const esQ4 = ultimoCiclo.cuartil === 'Q4';
-
-    // Verificar si tiene PDA activo
-    const tienePDAactivo = (window.datosPDA || []).some(pda =>
-        pda.agente === agente &&
-        ['pendiente', 'notificado', 'en_gestion', 'en_seguimiento'].includes(pda.estado)
-    );
-
-    let estado = '';
-    let requierePDA = false;
-
-    if (esQ4 && !tienePDAactivo) {
-        estado = '<span class="badge" style="background: var(--danger);">🔴 Requiere PDA</span>';
-        requierePDA = true;
-    } else if (esQ4 && tienePDAactivo) {
-        estado = '<span class="badge" style="background: var(--warning);">⏳ PDA en curso</span>';
-        requierePDA = false;
-    } else if (!esQ4) {
-        // Buscar PDA completado recientemente
-        const pdaCompletado = (window.datosPDA || []).find(pda =>
-            pda.agente === agente && pda.estado === 'corregido'
-        );
-        if (pdaCompletado) {
-            estado = '<span class="badge" style="background: var(--ok);">✅ Corregido</span>';
-        } else {
-            estado = '<span style="color: var(--muted);">-</span>';
-        }
-        requierePDA = false;
-    }
-
-    return {
-        estado: estado,
-        requierePDA: requierePDA,
-        cuartilUltimoCiclo: ultimoCiclo.cuartil,
-        promedioUltimoCiclo: ultimoCiclo.promedio
-    };
-}
-// ===== FIN FUNCIÓN: obtenerEstadoPDAporUltimoCiclo ======================
-
-// ===== 24. INICIO FUNCIÓN: verEvolucionCiclos ===========================
 // ===== FUNCIÓN CORREGIDA: verEvolucionCiclos =====
 async function verEvolucionCiclos(agente) {
     console.log(`📊 Mostrando evolución de ciclos para: ${agente}`);
@@ -19698,7 +17430,7 @@ function toggleDetalleEvaluacion(rowId) {
         icon?.classList.remove('expanded');
     }
 }
-// ===== FIN FUNCIÓN: toggleDetalleEvaluacion =============================            
+// ===== FIN FUNCIÓN: toggleDetalleEvaluacion =============================
 
 // ===== 36. INICIO FUNCIÓN: generarDetalleItemsHTML =====================
 function generarDetalleItemsHTML(detalles) {
@@ -19987,7 +17719,7 @@ function actualizarTablaHistorialFiltrada() {
         else notaColor = 'var(--danger)';
 
         html += `<tr>
-                <td style="padding: 8px; text-align: center;">${index + 1}</td>                
+                <td style="padding: 8px; text-align: center;">${index + 1}</td>
                 <td style="padding: 8px;">${evalu.fechaOriginal || evalu.fecha || ''}</td>
                 <td style="padding: 8px;">${escapeHtml(evalu.agente || '')}</td>
                 <td style="padding: 8px;">${escapeHtml(evalu.evaluador || '')}</td>
@@ -20299,39 +18031,6 @@ function mostrarTimeline(agente) {
 }
 // ===== FIN FUNCIÓN: mostrarTimeline ====================================
 
-// ===== 46. INICIO FUNCIÓN: generarPDA ==================================
-async function generarPDA(agente) {
-    console.log('🚀 generarPDA llamado para:', agente);
-
-    if (!agente) {
-        alert('⚠️ No se especificó el agente');
-        return;
-    }
-
-    try {
-        // 🔴 CAMBIO: Usar API en lugar de PostgreSQL directo
-        const resultado = await API.generarPDA(agente);
-
-        if (resultado.success) {
-            alert(`✅ PDA generado para ${agente}\n\n📌 Ítems: ${resultado.cantidadItems || 0} áreas de mejora`);
-
-            // Recargar datos de PDA
-            await cargarDatosPDA();
-
-            // Preguntar si quiere ir a gestión
-            if (confirm('¿Desea ir a la pestaña de Gestión PDA para completar los detalles?')) {
-                showTab('gestionPDA', null);
-            }
-        } else {
-            alert(`❌ Error al generar PDA: ${resultado.error || 'Error desconocido'}`);
-        }
-
-    } catch (error) {
-        console.error('Error generando PDA:', error);
-        alert('❌ Error al generar PDA: ' + error.message);
-    }
-}
-// ===== FIN FUNCIÓN: generarPDA =========================================
 
 // ======================================================
 // BUSCADOR EN RANKING DE AGENTES
@@ -20340,151 +18039,6 @@ async function generarPDA(agente) {
 // Variable para almacenar el ranking original (sin filtrar por búsqueda)
 let rankingOriginalParaBusqueda = [];
 
-// Función para filtrar el ranking por nombre de agente
-function filtrarRankingPorBusqueda() {
-    const busqueda = document.getElementById('buscadorAgenteRanking')?.value.toLowerCase().trim();
-
-    if (!busqueda) {
-        // Restaurar el ranking según los filtros activos
-        if (typeof aplicarFiltrosRankingCompletos === 'function') {
-            aplicarFiltrosRankingCompletos();
-        } else {
-            // Fallback: restaurar ranking original
-            actualizarTablaRanking(rankingOriginalCompleto || []);
-        }
-        return;
-    }
-
-    // Obtener el ranking actual (el que está visible o el original)
-    const rankingActual = window.rankingActualVisible || rankingOriginalCompleto || [];
-
-    const rankingFiltrado = rankingActual.filter(agente =>
-        agente.agente.toLowerCase().includes(busqueda)
-    );
-
-    // Actualizar tabla directamente
-    actualizarTablaRanking(rankingFiltrado);
-
-    const infoDiv = document.createElement('div');
-    infoDiv.textContent = `🔍 Búsqueda: "${busqueda}" - ${rankingFiltrado.length} gestor(es) encontrado(s)`;
-    infoDiv.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--accent); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1000; animation: fadeOut 2s ease forwards;';
-    document.body.appendChild(infoDiv);
-    setTimeout(() => infoDiv.remove(), 2000);
-}
-
-// Función para limpiar el buscador
-function limpiarBuscadorRanking() {
-    const inputBusqueda = document.getElementById('buscadorAgenteRanking');
-    if (inputBusqueda) {
-        inputBusqueda.value = '';
-    }
-    // 🔴 Restaurar usando aplicarFiltrosRankingCompletos
-    aplicarFiltrosRankingCompletos();
-}
-
-async function cargarMesesParaSelectorQ4() {
-    const select = document.getElementById('selectorMesQ4');
-    if (!select) return;
-
-    try {
-        const evaluaciones = await API.getHistorial();
-        const mesesSet = new Set();
-
-        for (const e of evaluaciones) {
-            if (e.fecha_formateada) {
-                let fechaStr = e.fecha_formateada;
-                if (fechaStr.includes(' ')) {
-                    fechaStr = fechaStr.split(' ')[0];
-                }
-                const partes = fechaStr.split('/');
-                if (partes.length === 3) {
-                    const anio = partes[2];
-                    const mes = partes[1];
-                    if (anio && anio.match(/^\d{4}$/) && mes && mes.match(/^\d{1,2}$/) && parseInt(mes) >= 1 && parseInt(mes) <= 12) {
-                        mesesSet.add(`${anio}-${mes.padStart(2, '0')}`);
-                    }
-                }
-            }
-        }
-
-        const meses = Array.from(mesesSet).sort();
-        const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-
-        // Guardar el valor actual
-        const valorActual = select.value;
-
-        select.innerHTML = '<option value="">-- Seleccionar mes --</option>';
-        for (const mes of meses) {
-            const [anio, mesNum] = mes.split('-');
-            const nombreMes = mesesNombres[parseInt(mesNum) - 1];
-            select.innerHTML += `<option value="${mes}">${nombreMes} ${anio}</option>`;
-        }
-
-        console.log(`✅ ${meses.length} meses cargados:`, meses);
-
-        // ✅ FORZAR EVENTO: Eliminar listeners anteriores y agregar uno nuevo
-        const nuevoSelect = select.cloneNode(true);
-        select.parentNode.replaceChild(nuevoSelect, select);
-
-        // ✅ Event listener que SIEMPRE carga los datos
-        nuevoSelect.addEventListener('change', function () {
-            console.log('📅 Mes cambiado a:', this.value);
-            cargarAgentesQ4PorMes();
-        });
-
-        // ✅ Seleccionar mes por defecto
-        if (meses.includes('2026-06')) {
-            nuevoSelect.value = '2026-06';
-        } else if (meses.length > 0) {
-            nuevoSelect.value = meses[meses.length - 1];
-        } else if (valorActual && meses.includes(valorActual)) {
-            nuevoSelect.value = valorActual;
-        }
-
-        // ✅ SIEMPRE cargar los datos al inicializar
-        if (typeof cargarAgentesQ4PorMes === 'function') {
-            console.log('🔄 Cargando agentes Q4 iniciales...');
-            await cargarAgentesQ4PorMes();
-        }
-
-    } catch (error) {
-        console.error('Error cargando meses:', error);
-    }
-}
-
-
-
-// Función auxiliar para aplicar todos los filtros (cuartil, líder, mes)
-async function aplicarFiltrosRankingCompletos() {
-    //let ranking = rankingOriginalCompleto || [];
-
-    // Aplicar filtro de mes
-    if (filtroMesRankingActual && filtroMesRankingActual !== 'todos') {
-        const evaluaciones = await API.getHistorial();
-        const evaluacionesFiltradas = filtrarEvaluacionesPorMes(evaluaciones, filtroMesRankingActual);
-        ranking = await construirRankingAgentes(evaluacionesFiltradas);
-    }
-
-    // Aplicar filtro de cuartil
-    if (cuartilActivoGlobal && cuartilActivoGlobal !== 'todos') {
-        ranking = ranking.filter(a => a.cuartil === cuartilActivoGlobal);
-    }
-
-    // Aplicar filtro de líder
-    if (liderFiltroRankingActual && liderFiltroRankingActual !== 'todos') {
-        ranking = await filtrarRankingPorLiderInterno(ranking, liderFiltroRankingActual);
-    }
-
-    // Guardar ranking actual visible
-    window.rankingActualVisible = ranking;
-
-    // 🔴 Usar actualizarTablaRanking directamente
-    await actualizarTablaRanking(ranking);
-}
-
-
-
-// =============================CIERRE BLOQUE 4==========================================
 
 // ======================================================================================
 // BLOQUE 5: PESTAÑA "PDA" (Plan de Desarrollo y Acción) (26 funciones)
@@ -20547,45 +18101,6 @@ async function llenarSelectAgentes() {
 }
 // ===== FIN FUNCIÓN: llenarSelectAgentes ================================
 
-// ===== 2. INICIO FUNCIÓN: actualizarEstadisticasPDA ==================
-function actualizarEstadisticasPDA() {
-    console.log('📊 Actualizando estadísticas PDA...');
-    const mesActual = new Date().getMonth();
-    const anioActual = new Date().getFullYear();
-
-    // PDA completados este mes (no pendientes)
-    const pdaEsteMes = datosPDA.filter(p => {
-        if (!p.fechaAplicacion || p.estado === 'pendiente') return false;
-        const fecha = new Date(p.fechaAplicacion);
-        return fecha.getMonth() === mesActual && fecha.getFullYear() === anioActual;
-    }).length;
-
-    const statsPDAEsteMes = document.getElementById('statsPDAEsteMes');
-    if (statsPDAEsteMes) statsPDAEsteMes.textContent = pdaEsteMes;
-
-    // Agentes con 2+ PDA en el mes
-    const conteoPorAgente = {};
-    datosPDA.forEach(p => {
-        if (!p.fechaAplicacion || p.estado === 'pendiente') return;
-        const fecha = new Date(p.fechaAplicacion);
-        if (fecha.getMonth() === mesActual && fecha.getFullYear() === anioActual) {
-            conteoPorAgente[p.agente] = (conteoPorAgente[p.agente] || 0) + 1;
-        }
-    });
-
-    const agentesEscalar = Object.values(conteoPorAgente).filter(c => c >= 2).length;
-    const statsAgentesEscalar = document.getElementById('statsAgentesEscalar');
-    if (statsAgentesEscalar) statsAgentesEscalar.textContent = agentesEscalar;
-
-    // Tasa de eficacia (corregidos / total completados)
-    const totalFinalizados = datosPDA.filter(p => p.estado !== 'pendiente').length;
-    const corregidos = datosPDA.filter(p => p.estado === 'corregido').length;
-    const eficacia = totalFinalizados > 0 ? ((corregidos / totalFinalizados) * 100).toFixed(1) : 0;
-    const statsEficacia = document.getElementById('statsEficacia');
-    if (statsEficacia) statsEficacia.textContent = eficacia + '%';
-}
-// ===== FIN FUNCIÓN: actualizarEstadisticasPDA ==========================
-
 // ======================================================
 // FUNCIÓN AUXILIAR: formatearFechaPeru
 // ======================================================
@@ -20639,1251 +18154,7 @@ function formatearFechaPeru(fechaIso) {
         return fechaIso || 'N/A';
     }
 }
-// ===== 3. INICIO FUNCIÓN: actualizarListasPDA ========================
 
-function actualizarListasPDA() {
-    console.log('📋 Actualizando listas PDA, total:', window.datosPDA?.length || 0);
-
-    // 🔴 NUEVA CLASIFICACIÓN POR ESTADOS
-    const pendientesOperaciones = (window.datosPDA || []).filter(p =>
-        p.estado === 'pendiente_operaciones' || p.estado === 'pendiente'
-    );
-
-    const gestorNotificado = (window.datosPDA || []).filter(p =>
-        p.estado === 'gestor_notificado' || p.estado === 'notificado'
-    );
-
-    const feedbackRegistrado = (window.datosPDA || []).filter(p =>
-        p.estado === 'feedback_registrado'
-    );
-
-    const enviadoCapacitacion = (window.datosPDA || []).filter(p =>
-        p.estado === 'enviado_capacitacion'
-    );
-
-    const enCapacitacion = (window.datosPDA || []).filter(p =>
-        p.estado === 'en_capacitacion' || p.estado === 'en_gestion'
-    );
-
-    const enSeguimiento = (window.datosPDA || []).filter(p =>
-        p.estado === 'en_seguimiento' || p.estado === 'en_seguimiento_capacitacion'
-    );
-
-    const requiereCapacitacion = (window.datosPDA || []).filter(p =>
-        p.estado === 'requiere_capacitacion' || p.estado === 'listo_para_seguimiento'
-    );
-
-    const completados = (window.datosPDA || []).filter(p =>
-        p.estado === 'completado' || p.estado === 'escalado' || p.estado === 'reiterativo'
-    );
-
-    const capacitacionItems = [...enviadoCapacitacion, ...enCapacitacion];
-
-    // 🔴 ACTUALIZAR CONTADORES
-    const totalPendientes = document.getElementById('totalPendientes');
-    const totalSeguimiento = document.getElementById('totalSeguimiento');
-    const totalCompletados = document.getElementById('totalCompletados');
-    const totalPendientesBadge = document.getElementById('totalPendientesBadge');
-    const totalSeguimientoBadge = document.getElementById('totalSeguimientoBadge');
-    const totalCapacitacion = document.getElementById('totalCapacitacion');
-
-    if (totalPendientes) totalPendientes.textContent = pendientesOperaciones.length + gestorNotificado.length;
-    if (totalSeguimiento) totalSeguimiento.textContent = enSeguimiento.length + requiereCapacitacion.length;
-    if (totalCompletados) totalCompletados.textContent = completados.length;
-    if (totalPendientesBadge) totalPendientesBadge.textContent = pendientesOperaciones.length + gestorNotificado.length;
-    if (totalSeguimientoBadge) totalSeguimientoBadge.textContent = enSeguimiento.length + requiereCapacitacion.length;
-    if (totalCapacitacion) totalCapacitacion.textContent = capacitacionItems.length;
-
-    // ======================================================
-    // SECCIÓN: PDA PENDIENTES
-    // ======================================================
-    const containerPendientes = document.getElementById('listaPendientes');
-    if (containerPendientes) {
-        const todosPendientes = [...pendientesOperaciones, ...gestorNotificado];
-        if (todosPendientes.length === 0) {
-            containerPendientes.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">✅ No hay PDA pendientes</div>';
-        } else {
-            let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
-            for (const pda of todosPendientes) {
-                const estadoTexto = obtenerTextoEstadoPDA(pda.estado);
-                const estadoColor = obtenerColorEstadoPDA(pda.estado);
-                const avance = pda.totalAcciones > 0 ? Math.round((pda.accionesCompletadas / pda.totalAcciones) * 100) : 0;
-
-                const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
-                const fechaInicio = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
-                const fechaFin = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
-
-                html += `
-                    <div class="card" style="padding: 15px; border-left: 5px solid ${estadoColor};">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-                            <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                    <strong style="font-size: 16px;">⚠️ ${escapeHtml(pda.agente)}</strong>
-                                    <span class="badge" style="background: ${estadoColor};">${estadoTexto}</span>
-                                    <span style="font-size: 11px; color: var(--muted);">ID: ${pda.id}</span>
-                                </div>
-                                <div style="font-size: 12px; color: var(--muted); margin-top: 5px;">
-                                    📅 Detección: ${fechaDeteccion} | Ciclo basal: ${fechaInicio} al ${fechaFin}
-                                </div>
-                                <div style="margin-top: 8px;">
-                                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                        <span style="font-size: 12px;">📋 Progreso:</span>
-                                        <div style="flex: 1; max-width: 200px; background: #e9ecef; border-radius: 10px; height: 8px;">
-                                            <div style="width: ${avance}%; height: 100%; background: ${estadoColor}; border-radius: 10px;"></div>
-                                        </div>
-                                        <span style="font-size: 11px;">${pda.accionesCompletadas}/${pda.totalAcciones} acciones</span>
-                                    </div>
-                                </div>
-                                ${pda.gescot_reunion ? `<div style="font-size: 11px; color: var(--accent); margin-top: 4px;">🔑 GESCOT Reunión: ${escapeHtml(pda.gescot_reunion)}</div>` : ''}
-                                ${pda.gescot_capacitacion ? `<div style="font-size: 11px; color: var(--ok); margin-top: 4px;">🔑 GESCOT Capacitación: ${escapeHtml(pda.gescot_capacitacion)}</div>` : ''}
-                            </div>
-                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                ${pda.ruta_archivo ? `
-                                <button onclick="verReportePDA('${escapeHtml(pda.ruta_archivo)}')" 
-                                        style="background: #019DF4; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                                    📄 Ver Reporte
-                                </button>
-                                ` : ''}
-                                <button onclick="abrirGestionPDA(${pda.id})" 
-                                        style="background: var(--accent); padding: 8px 20px; font-size: 13px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                                    ${pda.estado === 'pendiente_operaciones' || pda.estado === 'pendiente' ? '📋 Iniciar gestión' :
-                        pda.estado === 'gestor_notificado' || pda.estado === 'notificado' ? '✏️ Completar acciones' :
-                            '📝 Continuar'}
-                                </button>
-                                <button onclick="verHistorialPDA(${pda.id})" 
-                                        style="background: #6c757d; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                                    📋 Historial
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-            html += '</div>';
-            containerPendientes.innerHTML = html;
-        }
-    }
-
-    // ======================================================
-    // SECCIÓN: PDA EN CAPACITACIÓN (CORREGIDA)
-    // ======================================================
-    const containerCapacitacion = document.getElementById('listaCapacitacion');
-    if (containerCapacitacion) {
-        // 🔴 CLASIFICAR CORRECTAMENTE
-        const enviadoCapacitacion = (window.datosPDA || []).filter(p =>
-            p.estado === 'enviado_capacitacion'
-        );
-
-        const enCapacitacion = (window.datosPDA || []).filter(p =>
-            p.estado === 'en_capacitacion' || p.estado === 'en_gestion'
-        );
-
-        const capacitacionItems = [...enviadoCapacitacion, ...enCapacitacion];
-
-        console.log(`📚 PDA en capacitación (renderizado): ${capacitacionItems.length}`);
-        if (capacitacionItems.length > 0) {
-            capacitacionItems.forEach(p => {
-                console.log(`   ID: ${p.id} | Agente: ${p.agente} | Estado: ${p.estado}`);
-            });
-        }
-
-        // 🔴 ACTUALIZAR BADGE
-        const totalCapacitacion = document.getElementById('totalCapacitacion');
-        if (totalCapacitacion) {
-            totalCapacitacion.textContent = capacitacionItems.length;
-        }
-
-        if (capacitacionItems.length === 0) {
-            containerCapacitacion.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📚 No hay PDA en proceso de capacitación</div>';
-        } else {
-            let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
-            for (const pda of capacitacionItems) {
-                const estadoTexto = obtenerTextoEstadoPDA(pda.estado);
-                const estadoColor = obtenerColorEstadoPDA(pda.estado);
-                const fechaInicio = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
-                const fechaFin = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
-                const promedio = parseFloat(pda.promedio_basal || 0).toFixed(1);
-
-                const accionesPDA = pda.acciones || [];
-                const completadas = accionesPDA.filter(a => a.completado).length;
-                const totalAcciones = accionesPDA.length;
-                const avance = totalAcciones > 0 ? Math.round((completadas / totalAcciones) * 100) : 0;
-
-                let subtexto = '';
-                let botonAccion = '';
-
-                if (pda.estado === 'enviado_capacitacion') {
-                    subtexto = '📤 Pendiente de iniciar capacitación';
-                    botonAccion = `
-                    <button onclick="abrirGestionPDA(${pda.id})" 
-                            style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                        📚 Iniciar Capacitación
-                    </button>
-                `;
-                } else if (pda.estado === 'en_capacitacion' || pda.estado === 'en_gestion') {
-                    subtexto = '🔄 Capacitación en curso';
-                    botonAccion = `
-                    <button onclick="abrirGestionPDA(${pda.id})" 
-                            style="background: var(--warning); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                        📝 Continuar Capacitación
-                    </button>
-                `;
-                }
-
-                html += `
-                <div class="card" style="padding: 15px; border-left: 5px solid ${estadoColor};">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-                        <div style="flex: 1;">
-                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                <strong style="font-size: 16px;">📚 ${escapeHtml(pda.agente)}</strong>
-                                <span class="badge" style="background: ${estadoColor};">${estadoTexto}</span>
-                                <span style="font-size: 11px; color: var(--muted);">ID: ${pda.id}</span>
-                                <span style="font-size: 11px; color: ${estadoColor};">${subtexto}</span>
-                            </div>
-                            <div style="font-size: 12px; color: var(--muted); margin-top: 5px;">
-                                📅 Ciclo basal: ${fechaInicio} al ${fechaFin}
-                            </div>
-                            <div style="font-size: 12px; color: var(--muted);">
-                                📈 Promedio basal: ${promedio}% | Cuartil: ${pda.cuartil_basal || 'Q4'}
-                            </div>
-                            <div style="margin-top: 8px;">
-                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                    <span style="font-size: 12px;">📋 Progreso capacitación:</span>
-                                    <div style="flex: 1; max-width: 200px; background: #e9ecef; border-radius: 10px; height: 8px;">
-                                        <div style="width: ${avance}%; height: 100%; background: ${estadoColor}; border-radius: 10px;"></div>
-                                    </div>
-                                    <span style="font-size: 11px;">${completadas}/${totalAcciones} acciones</span>
-                                </div>
-                            </div>
-                            ${pda.gescot_capacitacion ? `<div style="font-size: 11px; color: var(--ok); margin-top: 4px;">🔑 GESCOT Capacitación: ${escapeHtml(pda.gescot_capacitacion)}</div>` : ''}
-                            ${pda.fecha_envio_capacitacion ? `<div style="font-size: 11px; color: var(--muted); margin-top: 4px;">📤 Enviado: ${formatearFechaPeru(pda.fecha_envio_capacitacion)}</div>` : ''}
-                        </div>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            ${botonAccion}
-                            
-                            <!-- ✅ NUEVO: Botón Ver Reporte -->
-                            ${pda.ruta_archivo ? `
-                            <button onclick="verReportePDA('${escapeHtml(pda.ruta_archivo)}')" 
-                                    style="background: #019DF4; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                                📄 Ver Reporte
-                            </button>
-                            ` : ''}
-                            
-                            <button onclick="verHistorialPDA(${pda.id})" 
-                                    style="background: #6c757d; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                                📋 Historial
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            }
-            html += '</div>';
-            containerCapacitacion.innerHTML = html;
-        }
-    }
-
-    // ======================================================
-    // SECCIÓN: PDA EN SEGUIMIENTO
-    // ======================================================
-    const containerSeguimiento = document.getElementById('listaSeguimiento');
-    if (containerSeguimiento) {
-        const seguimientoItems = [...enSeguimiento, ...requiereCapacitacion];
-        if (seguimientoItems.length === 0) {
-            containerSeguimiento.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay PDA en seguimiento</div>';
-        } else {
-            let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
-            for (const pda of seguimientoItems) {
-                const estadoTexto = obtenerTextoEstadoPDA(pda.estado);
-                const estadoColor = obtenerColorEstadoPDA(pda.estado);
-                const fechaInicio = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
-                const fechaFin = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
-                const promedio = parseFloat(pda.promedio_basal || 0).toFixed(1);
-                const cuartil = pda.cuartil_basal || 'Q4';
-
-                html += `
-                    <div class="card" style="padding: 15px; border-left: 5px solid ${estadoColor};">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                            <div>
-                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                    <strong>📊 ${escapeHtml(pda.agente)}</strong>
-                                    <span class="badge" style="background: ${estadoColor};">${estadoTexto}</span>
-                                </div>
-                                <div style="font-size: 12px; color: var(--muted); margin-top: 3px;">
-                                    📅 Ciclo basal: ${fechaInicio} al ${fechaFin}
-                                </div>
-                                <div style="font-size: 12px; color: var(--muted);">
-                                    📈 Promedio basal: ${promedio}% | Cuartil: ${cuartil}
-                                </div>
-                                ${pda.gescot_reunion ? `<div style="font-size: 11px; color: var(--accent); margin-top: 4px;">🔑 GESCOT Reunión: ${escapeHtml(pda.gescot_reunion)}</div>` : ''}
-                                ${pda.gescot_capacitacion ? `<div style="font-size: 11px; color: var(--ok); margin-top: 4px;">🔑 GESCOT Capacitación: ${escapeHtml(pda.gescot_capacitacion)}</div>` : ''}
-                            </div>
-                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                <button onclick="verEvaluacionMejora(${pda.id})" 
-                                        style="background: #f39c12; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                                    📈 Ver evaluación de mejora
-                                </button>
-                                <button onclick="verHistorialPDA(${pda.id})" 
-                                        style="background: #6c757d; padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                                    📋 Historial
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-            html += '</div>';
-            containerSeguimiento.innerHTML = html;
-        }
-    }
-
-    // ======================================================
-    // SECCIÓN: HISTORIAL (Completados) - VERSIÓN TABLA CON MEJORA
-    // ======================================================
-    const containerHistorial = document.getElementById('listaHistorial');
-    if (containerHistorial) {
-        if (completados.length === 0) {
-            containerHistorial.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📭 No hay PDA en el historial</div>';
-        } else {
-            const historialOrdenado = [...completados].sort((a, b) => {
-                const fechaA = new Date(a.fecha_deteccion || a.created_at || 0);
-                const fechaB = new Date(b.fecha_deteccion || b.created_at || 0);
-                return fechaB - fechaA;
-            });
-
-            let html = `
-                <div style="overflow-x: auto; margin-top: 10px; border: 1px solid #e0e0e0; border-radius: 12px;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 950px;">
-                        <thead>
-                            <tr style="background: linear-gradient(135deg, #f8f9fa, #e9ecef); border-bottom: 2px solid #dee2e6;">
-                                <th style="padding: 12px 10px; text-align: left; white-space: nowrap;">#</th>
-                                <th style="padding: 12px 10px; text-align: left; white-space: nowrap;">👤 Agente</th>
-                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📊 Basal</th>
-                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📈 Seguimiento</th>
-                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📊 Mejora</th>
-                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📋 Cuartil Final</th>
-                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">✅ Acciones</th>
-                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📊 Resultado</th>
-                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📅 Cierre</th>
-                                <th style="padding: 12px 10px; text-align: center; white-space: nowrap;">📋</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
-
-            for (let i = 0; i < historialOrdenado.length; i++) {
-                const pda = historialOrdenado[i];
-                const rowBg = i % 2 === 0 ? '#ffffff' : '#f8f9fa';
-
-                const accionesPDA = pda.acciones || [];
-                const completadas = accionesPDA.filter(a => a.completado).length;
-                const totalAcciones = accionesPDA.length;
-
-                let promedioSeguimiento = null;
-                let mejora = null;
-                let mejoraPorcentaje = null;
-                let mejoraColor = '#6c757d';
-                let mejoraIcono = '➡️';
-
-                const promedioBasal = parseFloat(pda.promedio_basal || 0);
-
-                if (pda.promedio_seguimiento !== null && pda.promedio_seguimiento !== undefined) {
-                    promedioSeguimiento = parseFloat(pda.promedio_seguimiento);
-                }
-
-                if (promedioSeguimiento !== null && promedioSeguimiento > 0 && promedioBasal > 0) {
-                    mejora = promedioSeguimiento - promedioBasal;
-                    mejoraPorcentaje = (mejora / promedioBasal) * 100;
-
-                    if (mejora > 0.5) {
-                        mejoraColor = '#28a745';
-                        mejoraIcono = '📈';
-                    } else if (mejora < -0.5) {
-                        mejoraColor = '#d93025';
-                        mejoraIcono = '📉';
-                    } else {
-                        mejoraColor = '#6c757d';
-                        mejoraIcono = '➡️';
-                    }
-                } else {
-                    if (pda.estado === 'completado') {
-                        mejoraColor = '#28a745';
-                        mejoraIcono = '✅';
-                    } else if (pda.estado === 'escalado') {
-                        mejoraColor = '#d93025';
-                        mejoraIcono = '❌';
-                    }
-                }
-
-                let cuartilFinal = pda.cuartil_seguimiento || pda.cuartil_basal || 'Q4';
-                let cuartilColor = '#6c757d';
-                let cuartilIcono = '📊';
-                if (cuartilFinal === 'Q1') { cuartilColor = '#28a745'; cuartilIcono = '🏆'; }
-                else if (cuartilFinal === 'Q2') { cuartilColor = '#019DF4'; cuartilIcono = '📈'; }
-                else if (cuartilFinal === 'Q3') { cuartilColor = '#f39c12'; cuartilIcono = '⚠️'; }
-                else { cuartilColor = '#d93025'; cuartilIcono = '🔴'; }
-
-                let estadoFinal = '';
-                let estadoColor = '';
-                if (pda.estado === 'completado') {
-                    estadoFinal = '✅ Exitoso';
-                    estadoColor = '#28a745';
-                } else if (pda.estado === 'escalado') {
-                    estadoFinal = '🚨 Escalado';
-                    estadoColor = '#d93025';
-                } else {
-                    estadoFinal = pda.estado || 'Desconocido';
-                    estadoColor = '#6c757d';
-                }
-
-                let mejoraDisplay = '-';
-                if (mejora !== null) {
-                    const signo = mejora > 0 ? '+' : '';
-                    mejoraDisplay = `${signo}${mejora.toFixed(1)}%`;
-                    if (mejoraPorcentaje !== null) {
-                        mejoraDisplay += ` (${signo}${mejoraPorcentaje.toFixed(1)}%)`;
-                    }
-                } else if (pda.estado === 'completado' && promedioSeguimiento === null) {
-                    mejoraDisplay = '✅ Mejoró';
-                } else if (pda.estado === 'escalado' && promedioSeguimiento === null) {
-                    mejoraDisplay = '❌ Sin mejora';
-                }
-
-                const fechaCierre = formatearFechaPeru(pda.updated_at || pda.created_at);
-                const promedioSegDisplay = (promedioSeguimiento !== null && promedioSeguimiento > 0) ? `${promedioSeguimiento.toFixed(1)}%` : 'N/A';
-                const gescotMostrar = pda.gescot_capacitacion || pda.gescot_reunion || '-';
-
-                html += `
-                    <tr style="border-bottom: 1px solid #e0e0e0; background: ${rowBg};">
-                        <td style="padding: 10px 10px; text-align: center; font-weight: bold; color: #6c757d; white-space: nowrap;">${i + 1}</td>
-                        <td style="padding: 10px 10px; font-weight: 600; white-space: nowrap;">
-                            ${escapeHtml(pda.agente)}
-                            <div style="font-size: 10px; color: #6c757d;">Ciclo #${pda.ciclo_basal_numero || 'N/A'}</div>
-                            ${gescotMostrar !== '-' ? `<div style="font-size: 10px; color: #7b1fa2;">🔑 ${gescotMostrar}</div>` : ''}
-                        </td>
-                        <td style="padding: 10px 10px; text-align: center; font-weight: bold; color: #d93025; white-space: nowrap;">
-                            ${promedioBasal.toFixed(1)}%
-                        </td>
-                        <td style="padding: 10px 10px; text-align: center; font-weight: bold; color: ${promedioSeguimiento !== null && promedioSeguimiento > 0 ? (promedioSeguimiento >= 85 ? '#28a745' : '#d93025') : '#6c757d'}; white-space: nowrap;">
-                            ${promedioSegDisplay}
-                        </td>
-                        <td style="padding: 10px 10px; text-align: center; font-weight: bold; color: ${mejoraColor}; white-space: nowrap;">
-                            <span title="Mejora porcentual">${mejoraDisplay}</span>
-                        </td>
-                        <td style="padding: 10px 10px; text-align: center; white-space: nowrap;">
-                            <span style="background: ${cuartilColor}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; white-space: nowrap;">
-                                ${cuartilIcono} ${cuartilFinal}
-                            </span>
-                            ${pda.cuartil_seguimiento ? `<div style="font-size: 9px; color: #6c757d;">(seguimiento)</div>` : ''}
-                        </td>
-                        <td style="padding: 10px 10px; text-align: center; font-size: 13px; white-space: nowrap;">
-                            <span style="color: ${completadas === totalAcciones ? '#28a745' : '#f39c12'}; font-weight: bold;">
-                                ${completadas}/${totalAcciones}
-                            </span>
-                            ${totalAcciones > 0 ? `<div style="font-size: 10px; color: #6c757d;">${Math.round((completadas / totalAcciones) * 100)}%</div>` : ''}
-                        </td>
-                        <td style="padding: 10px 10px; text-align: center; white-space: nowrap;">
-                            <span style="background: ${estadoColor}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap;">
-                                ${estadoFinal}
-                            </span>
-                        </td>
-                        <td style="padding: 10px 10px; text-align: center; font-size: 12px; white-space: nowrap;">
-                            ${fechaCierre}
-                        </td>
-                        <td style="padding: 10px 10px; text-align: center; white-space: nowrap;">
-                            <button onclick="verHistorialPDA(${pda.id})" 
-                                    style="background: #6c757d; padding: 6px 12px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white; white-space: nowrap;">
-                                📋
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }
-
-            const totalCompletadosCount = historialOrdenado.filter(p => p.estado === 'completado').length;
-            const totalEscalados = historialOrdenado.filter(p => p.estado === 'escalado').length;
-            const totalAccionesCompletadas = historialOrdenado.reduce((sum, p) => {
-                const acc = p.acciones || [];
-                return sum + acc.filter(a => a.completado).length;
-            }, 0);
-            const totalAccionesTotales = historialOrdenado.reduce((sum, p) => {
-                const acc = p.acciones || [];
-                return sum + acc.length;
-            }, 0);
-            const porcentajeExitoso = historialOrdenado.length > 0 ? Math.round((totalCompletadosCount / historialOrdenado.length) * 100) : 0;
-            const porcentajeAcciones = totalAccionesTotales > 0 ? Math.round((totalAccionesCompletadas / totalAccionesTotales) * 100) : 0;
-
-            html += `
-                        </tbody>
-                        <tfoot>
-                            <tr style="background: #f0f7ff; font-weight: bold; border-top: 2px solid #dee2e6;">
-                                <td colspan="10" style="padding: 12px 10px; text-align: center; font-size: 13px; color: #019DF4;">
-                                    📊 Total PDA: <strong>${historialOrdenado.length}</strong>
-                                    | ✅ Exitosos: <strong style="color: #28a745;">${totalCompletadosCount} (${porcentajeExitoso}%)</strong>
-                                    ${totalEscalados > 0 ? `| 🚨 Escalados: <strong style="color: #d93025;">${totalEscalados}</strong>` : ''}
-                                    | 📋 Acciones: <strong>${totalAccionesCompletadas}/${totalAccionesTotales}</strong> (${porcentajeAcciones}% completadas)
-                                </td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-                <div style="margin-top: 8px; font-size: 11px; color: #6c757d; text-align: right; display: flex; justify-content: space-between; flex-wrap: wrap;">
-                    <span>💡 ${historialOrdenado.length} registros | Mostrando todos los PDA del historial</span>
-                    <span>📌 La mejora se calcula comparando el promedio basal con el ciclo de seguimiento</span>
-                </div>
-            `;
-
-            containerHistorial.innerHTML = html;
-        }
-    }
-}
-// ===== FIN FUNCIÓN: actualizarListasPDA ================================
-
-async function verEvaluacionMejora(pdaId) {
-    console.log(`📈 Ver evaluación de mejora para PDA ID: ${pdaId}`);
-
-    try {
-        const db = getDB();
-        if (!db) {
-            alert('❌ Base de datos no disponible');
-            return;
-        }
-
-        // ======================================================
-        // 1. OBTENER DATOS DEL PDA
-        // ======================================================
-        const { data: pda, error: pdaError } = await db
-            .from('pda_cabecera')
-            .select('*')
-            .eq('id', pdaId)
-            .single();
-
-        if (pdaError) throw pdaError;
-        if (!pda) {
-            alert('❌ PDA no encontrado');
-            return;
-        }
-
-        // ======================================================
-        // 2. OBTENER CICLO BASAL (GUARDADO EN BD)
-        // ======================================================
-        const { data: cicloBasal, error: cicloError } = await db
-            .from('pda_ciclos_evaluacion')
-            .select('*')
-            .eq('pda_origen_id', pdaId)
-            .eq('tipo_ciclo', 'basal')
-            .maybeSingle();
-
-        if (cicloError) throw cicloError;
-
-        // ======================================================
-        // 3. OBTENER ACCIONES
-        // ======================================================
-        const { data: acciones, error: accError } = await db
-            .from('pda_acciones')
-            .select('*')
-            .eq('pda_id', pdaId);
-
-        if (accError) throw accError;
-
-        // ======================================================
-        // 4. DECLARAR VARIABLES
-        // ======================================================
-        let esPostCapacitacion = pda.estado === 'en_seguimiento_capacitacion';
-        let fechaBasal = null;
-        let fechaBasalNormalizada = null;
-        let mesBasal = null;
-        let anioBasal = null;
-        let evaluacionesMismoMes = [];
-        let nuevoCiclo = [];
-        let promedioCalculado = 0;
-        let promedioSeguimiento = 0;
-
-        // ======================================================
-        // 5. FUNCIÓN AUXILIAR: Normalizar fecha para comparación
-        // ======================================================
-        function normalizarFechaParaComparacion(fechaStr) {
-            if (!fechaStr) return null;
-
-            try {
-                if (fechaStr instanceof Date) {
-                    const anio = fechaStr.getFullYear();
-                    const mes = String(fechaStr.getMonth() + 1).padStart(2, '0');
-                    const dia = String(fechaStr.getDate()).padStart(2, '0');
-                    return `${anio}${mes}${dia}`;
-                }
-
-                if (typeof fechaStr === 'string') {
-                    let dia, mes, anio;
-
-                    if (fechaStr.includes('T')) {
-                        const fechaLimpia = fechaStr.split('T')[0];
-                        const partes = fechaLimpia.split('-');
-                        if (partes.length === 3) {
-                            anio = partes[0];
-                            mes = partes[1];
-                            dia = partes[2];
-                            return `${anio}${mes}${dia}`;
-                        }
-                    }
-
-                    if (fechaStr.includes('/')) {
-                        const partes = fechaStr.split('/');
-                        if (partes.length === 3) {
-                            dia = partes[0].padStart(2, '0');
-                            mes = partes[1].padStart(2, '0');
-                            anio = partes[2];
-                            return `${anio}${mes}${dia}`;
-                        }
-                    }
-
-                    if (fechaStr.includes('-') && !fechaStr.includes('T')) {
-                        const partes = fechaStr.split('-');
-                        if (partes.length === 3) {
-                            anio = partes[0];
-                            mes = partes[1];
-                            dia = partes[2];
-                            return `${anio}${mes}${dia}`;
-                        }
-                    }
-                }
-
-                return null;
-            } catch (e) {
-                console.warn('Error normalizando fecha:', fechaStr, e);
-                return null;
-            }
-        }
-
-        // ======================================================
-        // 6. 🔴 CORREGIDO: USAR EL CICLO BASAL DE LA BD
-        // ======================================================
-
-        // 6a. Obtener el mes y año del ciclo basal desde la BD
-        if (cicloBasal && cicloBasal.fecha_fin) {
-            try {
-                const fechaFinStr = normalizarFechaParaComparacion(cicloBasal.fecha_fin);
-                if (fechaFinStr) {
-                    anioBasal = parseInt(fechaFinStr.substring(0, 4));
-                    mesBasal = parseInt(fechaFinStr.substring(4, 6));
-
-                    const fecha = new Date(cicloBasal.fecha_fin);
-                    fecha.setDate(fecha.getDate() + 1);
-                    fechaBasalNormalizada = normalizarFechaParaComparacion(fecha);
-                    fechaBasal = fecha;
-
-                    console.log(`📅 Mes basal (desde BD): ${mesBasal}/${anioBasal}`);
-                    console.log(`📅 Fecha límite: ${fechaBasalNormalizada}`);
-                }
-            } catch (e) {
-                console.warn('Error parseando fecha:', e);
-            }
-        }
-
-        // 6b. Fallback: usar fecha_fin_ciclo_basal de pda_cabecera
-        if (!fechaBasalNormalizada && pda.fecha_fin_ciclo_basal) {
-            try {
-                const fecha = new Date(pda.fecha_fin_ciclo_basal);
-                fecha.setDate(fecha.getDate() + 1);
-                fechaBasalNormalizada = normalizarFechaParaComparacion(fecha);
-                fechaBasal = fecha;
-
-                // Extraer mes/año
-                const fechaStr = normalizarFechaParaComparacion(pda.fecha_fin_ciclo_basal);
-                if (fechaStr) {
-                    anioBasal = parseInt(fechaStr.substring(0, 4));
-                    mesBasal = parseInt(fechaStr.substring(4, 6));
-                }
-                console.log('📅 Fecha límite (fallback - pda):', fechaBasalNormalizada);
-            } catch (e) {
-                console.warn('Error parseando fecha de pda:', e);
-            }
-        }
-
-        // 6c. Si no hay fecha, mostrar error
-        if (!fechaBasalNormalizada) {
-            alert('❌ No se pudo determinar la fecha del ciclo basal para evaluar la mejora.');
-            return;
-        }
-
-        // ======================================================
-        // 7. OBTENER EVALUACIONES DEL AGENTE
-        // ======================================================
-        const { data: todasEvaluaciones, error: evalError } = await db
-            .from('evaluaciones')
-            .select('*')
-            .eq('agente', pda.agente);
-
-        if (evalError) throw evalError;
-
-        // ======================================================
-        // 8. 🔴 CORREGIDO: FILTRAR EVALUACIONES DEL MISMO MES Y POSTERIORES
-        // ======================================================
-        evaluacionesMismoMes = (todasEvaluaciones || []).filter(e => {
-            if (!e.fecha) return false;
-
-            try {
-                const fechaEvalNormalizada = normalizarFechaParaComparacion(e.fecha);
-                if (!fechaEvalNormalizada) return false;
-
-                const anioEval = parseInt(fechaEvalNormalizada.substring(0, 4));
-                const mesEval = parseInt(fechaEvalNormalizada.substring(4, 6));
-
-                // 🔴 CLAVE: Filtrar por el MISMO mes del ciclo basal
-                const mismoMes = (mesEval === mesBasal && anioEval === anioBasal);
-                const esPosterior = fechaEvalNormalizada >= fechaBasalNormalizada;
-
-                return mismoMes && esPosterior;
-            } catch (err) {
-                return false;
-            }
-        });
-
-        console.log(`📊 Evaluaciones en el mismo mes (${mesBasal}/${anioBasal}): ${evaluacionesMismoMes.length}`);
-
-        // ======================================================
-        // 9. VERIFICAR SI HAY SUFICIENTES EVALUACIONES
-        // ======================================================
-        if (evaluacionesMismoMes.length < 5) {
-            const mensaje = `📊 EVALUACIÓN DE MEJORA - PDA #${pda.id}\n\n` +
-                `📌 Agente: ${pda.agente}\n` +
-                `📊 Estado: ${esPostCapacitacion ? 'En Seguimiento Post-Capacitación' : 'En Seguimiento'}\n\n` +
-                `⏳ Evaluaciones en el mismo mes (${mesBasal}/${anioBasal}): ${evaluacionesMismoMes.length} de 5 necesarias\n` +
-                `📊 Para evaluar la mejora, el agente debe completar 5 evaluaciones en el MISMO MES\n\n` +
-                `📈 Promedio basal: ${pda.promedio_basal || 0}%\n` +
-                `📅 Mes basal: ${mesBasal}/${anioBasal}\n` +
-                `📅 Fecha límite: ${fechaBasalNormalizada}\n\n` +
-                `📌 El agente debe completar ${5 - evaluacionesMismoMes.length} evaluación(es) más\n` +
-                `   en el mismo mes para evaluar la mejora.\n\n` +
-                `📌 Si el agente cae en Q4 en otro mes, se generará un NUEVO PDA independiente.`;
-
-            alert(mensaje);
-            return;
-        }
-
-        // ======================================================
-        // 10. ORDENAR EVALUACIONES POR FECHA
-        // ======================================================
-        evaluacionesMismoMes.sort((a, b) => {
-            const fechaA = normalizarFechaParaComparacion(a.fecha);
-            const fechaB = normalizarFechaParaComparacion(b.fecha);
-            return (fechaA || '').localeCompare(fechaB || '');
-        });
-
-        // ======================================================
-        // 11. OBTENER LOS CICLOS: BASAL Y NUEVO
-        // ======================================================
-
-        // 🔴 CORREGIDO: El ciclo basal son las PRIMERAS 5 evaluaciones del mes
-        // (que deberían coincidir con el ciclo basal original)
-        const evaluacionesBasal = evaluacionesMismoMes.slice(0, 5);
-
-        // 🔴 El nuevo ciclo son las ÚLTIMAS 5 evaluaciones del mes
-        const nuevoCicloArray = evaluacionesMismoMes.slice(-5);
-
-        console.log(`📊 Evaluaciones del ciclo BASAL (primeras 5):`);
-        evaluacionesBasal.forEach(e => {
-            console.log(`   📅 ${e.fecha} | Nota: ${e.nota_final || e.notaFinal || 0}%`);
-        });
-
-        console.log(`📊 Evaluaciones del NUEVO ciclo (últimas 5):`);
-        nuevoCicloArray.forEach(e => {
-            console.log(`   📅 ${e.fecha} | Nota: ${e.nota_final || e.notaFinal || 0}%`);
-        });
-
-        // ======================================================
-        // 12. CALCULAR PROMEDIOS DEL NUEVO CICLO
-        // ======================================================
-        const sumaNuevoCiclo = nuevoCicloArray.reduce((acc, e) => {
-            const nota = parseFloat(e.nota_final || e.notaFinal || 0);
-            return acc + (isNaN(nota) ? 0 : nota);
-        }, 0);
-        promedioCalculado = nuevoCicloArray.length > 0 ? sumaNuevoCiclo / nuevoCicloArray.length : 0;
-
-        console.log(`📈 Promedio nuevo ciclo: ${promedioCalculado.toFixed(1)}%`);
-
-        // Asignar a la variable que se usará en el modal
-        promedioSeguimiento = promedioCalculado;
-
-        // ======================================================
-        // 13. CALCULAR PROMEDIOS BASALES (DESDE CICLO BASAL)
-        // ======================================================
-        const toNumber = (val) => {
-            const num = parseFloat(val);
-            return isNaN(num) ? 0 : num;
-        };
-
-        const promedioBasal = toNumber(pda.promedio_basal);
-        const cuartilBasal = pda.cuartil_basal || 'Q4';
-
-        // ======================================================
-        // 14. CALCULAR PROMEDIOS BASALES POR FRENTE (DESDE EL CICLO BASAL)
-        // ======================================================
-        let basalENC = 0;
-        let basalECUF = 0;
-        let basalECN = 0;
-        let countENC = 0;
-        let countECUF = 0;
-        let countECN = 0;
-
-        for (const ev of evaluacionesBasal) {
-            const totalENC = toNumber(ev.total_enc || ev.totalENC || 0);
-            const totalECUF = toNumber(ev.total_ecuf || ev.totalECUF || 0);
-            const totalECN = toNumber(ev.total_ecn || ev.totalECN || 0);
-
-            console.log(`   Procesando basal: ${ev.fecha} → ENC: ${totalENC}, ECUF: ${totalECUF}, ECN: ${totalECN}`);
-
-            if (totalENC > 0) {
-                basalENC += totalENC;
-                countENC++;
-            }
-            if (totalECUF > 0) {
-                basalECUF += totalECUF;
-                countECUF++;
-            }
-            if (totalECN > 0) {
-                basalECN += totalECN;
-                countECN++;
-            }
-        }
-
-        // Calcular promedios basales
-        if (countENC > 0) {
-            basalENC = basalENC / countENC;
-        } else {
-            basalENC = 30 * (promedioBasal / 100);
-            console.warn('⚠️ Usando valores fallback para basal ENC');
-        }
-
-        if (countECUF > 0) {
-            basalECUF = basalECUF / countECUF;
-        } else {
-            basalECUF = 30 * (promedioBasal / 100);
-            console.warn('⚠️ Usando valores fallback para basal ECUF');
-        }
-
-        if (countECN > 0) {
-            basalECN = basalECN / countECN;
-        } else {
-            basalECN = 40 * (promedioBasal / 100);
-            console.warn('⚠️ Usando valores fallback para basal ECN');
-        }
-
-        console.log(`📊 Promedios Basales: ENC=${basalENC.toFixed(1)}%, ECUF=${basalECUF.toFixed(1)}%, ECN=${basalECN.toFixed(1)}%`);
-
-        // ======================================================
-        // 15. CALCULAR PROMEDIOS DEL NUEVO CICLO POR FRENTE
-        // ======================================================
-        let sumENC = 0;
-        let sumECUF = 0;
-        let sumECN = 0;
-        let countENCNuevo = 0;
-        let countECUFNuevo = 0;
-        let countECNNuevo = 0;
-
-        for (const ev of nuevoCicloArray) {
-            const totalENC = toNumber(ev.total_enc || ev.totalENC || 0);
-            const totalECUF = toNumber(ev.total_ecuf || ev.totalECUF || 0);
-            const totalECN = toNumber(ev.total_ecn || ev.totalECN || 0);
-
-            if (totalENC > 0) {
-                sumENC += totalENC;
-                countENCNuevo++;
-            }
-            if (totalECUF > 0) {
-                sumECUF += totalECUF;
-                countECUFNuevo++;
-            }
-            if (totalECN > 0) {
-                sumECN += totalECN;
-                countECNNuevo++;
-            }
-        }
-
-        const promedioENC = countENCNuevo > 0 ? (sumENC / countENCNuevo) : 0;
-        const promedioECUF = countECUFNuevo > 0 ? (sumECUF / countECUFNuevo) : 0;
-        const promedioECN = countECNNuevo > 0 ? (sumECN / countECNNuevo) : 0;
-
-        // Mejora por frente
-        const mejoraENC = promedioENC - basalENC;
-        const mejoraECUF = promedioECUF - basalECUF;
-        const mejoraECN = promedioECN - basalECN;
-
-        console.log(`📊 Promedios Nuevo Ciclo: ENC=${promedioENC.toFixed(1)}%, ECUF=${promedioECUF.toFixed(1)}%, ECN=${promedioECN.toFixed(1)}%`);
-        console.log(`📊 Mejora: ENC=${mejoraENC.toFixed(1)}%, ECUF=${mejoraECUF.toFixed(1)}%, ECN=${mejoraECN.toFixed(1)}%`);
-
-        // ======================================================
-        // 16. OBTENER CUARTIL DE SEGUIMIENTO
-        // ======================================================
-        const criterios = await obtenerCriteriosCuartiles(false);
-        let cuartilSeguimiento = 'Q4';
-        let cuartilSeguimientoNombre = 'Riesgo';
-        let cuartilSeguimientoColor = '#d93025';
-        let cuartilSeguimientoIcono = '🔴';
-
-        if (criterios && criterios.length > 0) {
-            for (const c of criterios) {
-                if (promedioSeguimiento >= c.limite_inferior && promedioSeguimiento <= c.limite_superior) {
-                    cuartilSeguimiento = c.cuartil;
-                    cuartilSeguimientoNombre = c.nombre || cuartilSeguimiento;
-                    cuartilSeguimientoColor = c.color_hex || '#6c757d';
-                    cuartilSeguimientoIcono = c.icono || '📊';
-                    break;
-                }
-            }
-        }
-
-        // ======================================================
-        // 17. EVALUAR MEJORA
-        // ======================================================
-        const mejoraTotal = promedioSeguimiento - promedioBasal;
-        const salioDeQ4 = cuartilSeguimiento !== 'Q4';
-
-        // ======================================================
-        // 18. CLASIFICAR RESULTADO
-        // ======================================================
-        let resultado = {
-            tipo: '',
-            mensaje: '',
-            color: '',
-            icono: '',
-            accion: ''
-        };
-
-        if (salioDeQ4) {
-            resultado.tipo = 'exitoso';
-            resultado.mensaje = '✅ El gestor logró salir de Q4 exitosamente.';
-            resultado.color = '#28a745';
-            resultado.icono = '🏆';
-            resultado.accion = 'Cerrar PDA automáticamente';
-        } else {
-            if (esPostCapacitacion) {
-                resultado.tipo = 'reiterativo';
-                resultado.mensaje = '🔴 El gestor persiste en Q4 después de capacitación. Caso reiterativo.';
-                resultado.color = '#d93025';
-                resultado.icono = '🔄';
-                resultado.accion = 'Marcar como Reiterativo';
-            } else {
-                resultado.tipo = 'requiere_capacitacion';
-                resultado.mensaje = '📋 El gestor sigue en Q4. Requiere capacitación formal.';
-                resultado.color = '#f39c12';
-                resultado.icono = '📋';
-                resultado.accion = 'Enviar a Capacitación';
-            }
-        }
-
-        // ======================================================
-        // 19. GENERAR HTML DEL MODAL
-        // ======================================================
-
-        // 🔴 FORZAR QUE LAS VARIABLES TENGAN VALORES CORRECTOS
-        const basalENC_final = basalENC || 0;
-        const basalECUF_final = basalECUF || 0;
-        const basalECN_final = basalECN || 0;
-        const promedioENC_final = promedioENC || 0;
-        const promedioECUF_final = promedioECUF || 0;
-        const promedioECN_final = promedioECN || 0;
-        const mejoraENC_final = mejoraENC || 0;
-        const mejoraECUF_final = mejoraECUF || 0;
-        const mejoraECN_final = mejoraECN || 0;
-
-        console.log('🔴 VALORES PARA EL MODAL:');
-        console.log(`   basalENC: ${basalENC_final.toFixed(1)}%`);
-        console.log(`   promedioENC: ${promedioENC_final.toFixed(1)}%`);
-        console.log(`   mejoraENC: ${mejoraENC_final.toFixed(1)}%`);
-        console.log(`   basalECUF: ${basalECUF_final.toFixed(1)}%`);
-        console.log(`   promedioECUF: ${promedioECUF_final.toFixed(1)}%`);
-        console.log(`   mejoraECUF: ${mejoraECUF_final.toFixed(1)}%`);
-        console.log(`   basalECN: ${basalECN_final.toFixed(1)}%`);
-        console.log(`   promedioECN: ${promedioECN_final.toFixed(1)}%`);
-        console.log(`   mejoraECN: ${mejoraECN_final.toFixed(1)}%`);
-
-        const modalHTML = `
-<div id="modalEvaluacionMejora" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100060; display: flex; justify-content: center; align-items: center; padding: 20px;">
-    <div style="background: white; border-radius: 16px; width: 95%; max-width: 750px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-        
-        <!-- HEADER -->
-        <div style="padding: 18px 24px; background: linear-gradient(135deg, #019DF4, #00B4F0); color: white; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
-            <div>
-                <strong style="font-size: 18px;">📈 Evaluación de Mejora</strong>
-                <div style="font-size: 13px; opacity: 0.9; margin-top: 2px;">
-                    PDA #${pda.id} - ${escapeHtml(pda.agente)}
-                </div>
-            </div>
-            <button onclick="cerrarModalEvaluacionMejora()" style="background: rgba(255,255,255,0.15); border: none; color: white; font-size: 22px; cursor: pointer; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">✖</button>
-        </div>
-        
-        <!-- BODY -->
-        <div style="padding: 24px; overflow-y: auto; flex: 1; background: #f8fafc;">
-            
-            <!-- 1. COMPARATIVA DE PROMEDIOS -->
-            <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e0e0;">
-                <h4 style="margin: 0 0 15px 0; color: #333;">📊 Comparativa de Desempeño</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div style="background: #fff5f5; padding: 15px; border-radius: 10px; border-left: 4px solid #d93025;">
-                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px;">Ciclo Basal (Q4)</div>
-                        <div style="font-size: 28px; font-weight: bold; color: #d93025; margin: 8px 0;">${promedioBasal.toFixed(1)}%</div>
-                        <div style="font-size: 13px; color: #6c757d;">Cuartil: ${cuartilBasal}</div>
-                        <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">
-                            📅 ${formatearFechaPeru(cicloBasal?.fecha_inicio || pda.fecha_inicio_ciclo_basal)} → ${formatearFechaPeru(cicloBasal?.fecha_fin || pda.fecha_fin_ciclo_basal)}
-                        </div>
-                        <div style="font-size: 12px; color: #6c757d;">📞 ${cicloBasal?.total_evaluaciones || 0} evaluaciones</div>
-                        <div style="font-size: 11px; color: #6c757d; margin-top: 4px;">📌 Mes: ${mesBasal}/${anioBasal}</div>
-                    </div>
-                    <div style="background: ${salioDeQ4 ? '#f0fff4' : '#fff8f0'}; padding: 15px; border-radius: 10px; border-left: 4px solid ${salioDeQ4 ? '#28a745' : '#f39c12'};">
-                        <div style="font-size: 11px; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px;">Nuevo Ciclo (Mismo Mes)</div>
-                        <div style="font-size: 28px; font-weight: bold; color: ${salioDeQ4 ? '#28a745' : '#f39c12'}; margin: 8px 0;">${promedioSeguimiento.toFixed(1)}%</div>
-                        <div style="font-size: 13px; color: #6c757d;">Cuartil: ${cuartilSeguimiento}</div>
-                        <div style="font-size: 12px; color: #6c757d; margin-top: 4px;">
-                            📅 ${nuevoCicloArray.length > 0 ? formatearFechaPeru(nuevoCicloArray[0]?.fecha) : 'N/A'}
-                        </div>
-                        <div style="font-size: 12px; color: #6c757d;">📞 ${nuevoCicloArray.length} evaluaciones</div>
-                        ${esPostCapacitacion ? `<div style="font-size: 11px; color: #7b1fa2; margin-top: 4px;">📌 Evaluación POST-CAPACITACIÓN</div>` : ''}
-                        <div style="font-size: 11px; color: #6c757d; margin-top: 4px;">📌 Mismo mes: ${mesBasal}/${anioBasal}</div>
-                    </div>
-                </div>
-                
-                <!-- Barra de progreso de mejora -->
-                <div style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <span style="font-size: 13px; font-weight: 600;">📈 Evolución</span>
-                        <span style="font-size: 14px; font-weight: bold; color: ${mejoraTotal > 0 ? '#28a745' : '#d93025'};">
-                            ${mejoraTotal > 0 ? '+' : ''}${mejoraTotal.toFixed(1)}%
-                        </span>
-                    </div>
-                    <div style="background: #e9ecef; border-radius: 10px; height: 8px; overflow: hidden;">
-                        <div style="width: ${Math.min(Math.max((promedioSeguimiento / 100) * 100, 0), 100)}%; height: 100%; background: ${salioDeQ4 ? 'linear-gradient(90deg, #28a745, #20c997)' : 'linear-gradient(90deg, #f39c12, #e67e22)'}; border-radius: 10px; transition: width 0.5s;"></div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: #6c757d; margin-top: 4px;">
-                        <span>0%</span>
-                        <span>💡 ${salioDeQ4 ? '✅ Salió de Q4' : '⚠️ Persiste en Q4'}</span>
-                        <span>100%</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 2. DESGLOSE POR FRENTE -->
-            <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e0e0;">
-                <h4 style="margin: 0 0 15px 0; color: #333;">📋 Desglose por Frente de Impacto</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                    
-                    <!-- ENC -->
-                    <div style="text-align: center; padding: 12px; background: #f0f7ff; border-radius: 10px;">
-                        <div style="font-size: 20px;">🎯</div>
-                        <div style="font-size: 12px; color: #6c757d;">ENC (Cliente)</div>
-                        <div style="font-size: 18px; font-weight: bold; color: ${mejoraENC_final > 0 ? '#28a745' : '#d93025'};">
-                            ${promedioENC_final.toFixed(1)}%
-                        </div>
-                        <div style="font-size: 11px; color: ${mejoraENC_final > 0 ? '#28a745' : '#d93025'};">
-                            ${mejoraENC_final > 0 ? '▲' : '▼'} ${Math.abs(mejoraENC_final).toFixed(1)}%
-                        </div>
-                        <div style="font-size: 10px; color: #6c757d;">Basal: ${basalENC_final.toFixed(1)}%</div>
-                    </div>
-                    
-                    <!-- ECUF -->
-                    <div style="text-align: center; padding: 12px; background: #f3e5f5; border-radius: 10px;">
-                        <div style="font-size: 20px;">⚠️</div>
-                        <div style="font-size: 12px; color: #6c757d;">ECUF (Negocio)</div>
-                        <div style="font-size: 18px; font-weight: bold; color: ${mejoraECUF_final > 0 ? '#28a745' : '#d93025'};">
-                            ${promedioECUF_final.toFixed(1)}%
-                        </div>
-                        <div style="font-size: 11px; color: ${mejoraECUF_final > 0 ? '#28a745' : '#d93025'};">
-                            ${mejoraECUF_final > 0 ? '▲' : '▼'} ${Math.abs(mejoraECUF_final).toFixed(1)}%
-                        </div>
-                        <div style="font-size: 10px; color: #6c757d;">Basal: ${basalECUF_final.toFixed(1)}%</div>
-                    </div>
-                    
-                    <!-- ECN -->
-                    <div style="text-align: center; padding: 12px; background: #fff8e0; border-radius: 10px;">
-                        <div style="font-size: 20px;">💰</div>
-                        <div style="font-size: 12px; color: #6c757d;">ECN (Proceso)</div>
-                        <div style="font-size: 18px; font-weight: bold; color: ${mejoraECN_final > 0 ? '#28a745' : '#d93025'};">
-                            ${promedioECN_final.toFixed(1)}%
-                        </div>
-                        <div style="font-size: 11px; color: ${mejoraECN_final > 0 ? '#28a745' : '#d93025'};">
-                            ${mejoraECN_final > 0 ? '▲' : '▼'} ${Math.abs(mejoraECN_final).toFixed(1)}%
-                        </div>
-                        <div style="font-size: 10px; color: #6c757d;">Basal: ${basalECN_final.toFixed(1)}%</div>
-                    </div>
-                    
-                </div>
-            </div>
-            
-            <!-- 3. ACCIONES PENDIENTES -->
-            <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e0e0;">
-                <h4 style="margin: 0 0 15px 0; color: #333;">📋 Acciones Pendientes por Completar</h4>
-                ${acciones && acciones.length > 0 ? (() => {
-                const pendientes = acciones.filter(a => !a.completado);
-
-                if (pendientes.length === 0) {
-                    return '<div style="color: #28a745; font-size: 14px;">✅ Todas las acciones han sido completadas.</div>';
-                }
-
-                const agrupado = {};
-                pendientes.forEach(a => {
-                    const key = a.submotivo || 'Sin submotivo';
-                    if (!agrupado[key]) {
-                        agrupado[key] = {
-                            submotivo: key,
-                            tipo: a.tipo_accion || 'proceso',
-                            count: 0,
-                            atributo: a.atributo || ''
-                        };
-                    }
-                    agrupado[key].count++;
-                });
-
-                const ordenTipo = { 'proceso': 0, 'habilidades': 1, 'feedback': 2 };
-                const agrupadoArray = Object.values(agrupado).sort((a, b) => {
-                    if (ordenTipo[a.tipo] !== ordenTipo[b.tipo]) {
-                        return ordenTipo[a.tipo] - ordenTipo[b.tipo];
-                    }
-                    return b.count - a.count;
-                });
-
-                const getIcono = (tipo) => {
-                    if (tipo === 'proceso') return '📚';
-                    if (tipo === 'habilidades') return '🎯';
-                    if (tipo === 'feedback') return '💬';
-                    return '📌';
-                };
-
-                const getTipoNombre = (tipo) => {
-                    if (tipo === 'proceso') return 'Procesos (ECN)';
-                    if (tipo === 'habilidades') return 'Habilidades Blandas (ENC)';
-                    if (tipo === 'feedback') return 'Feedback (ECUF)';
-                    return 'Otros';
-                };
-
-                const getTipoColor = (tipo) => {
-                    if (tipo === 'proceso') return '#fd7e14';
-                    if (tipo === 'habilidades') return '#7b1fa2';
-                    if (tipo === 'feedback') return '#019DF4';
-                    return '#6c757d';
-                };
-
-                let html = '';
-                let currentTipo = '';
-
-                agrupadoArray.forEach(item => {
-                    const tipo = item.tipo;
-
-                    if (tipo !== currentTipo) {
-                        if (currentTipo !== '') {
-                            html += '</div>';
-                        }
-                        currentTipo = tipo;
-                        const tipoNombre = getTipoNombre(tipo);
-                        const tipoColor = getTipoColor(tipo);
-                        const icono = getIcono(tipo);
-                        html += `
-                                <div style="margin-top: 12px; border-left: 4px solid ${tipoColor}; padding-left: 12px;">
-                                    <div style="font-weight: 600; color: ${tipoColor}; margin-bottom: 8px; font-size: 14px;">
-                                        ${icono} ${tipoNombre}
-                                    </div>
-                                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                            `;
-                    }
-
-                    const icono = getIcono(tipo);
-                    const count = item.count;
-                    const countLabel = count > 1 ? `(${count} ocurrencias)` : '';
-
-                    html += `
-                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; background: #f8f9fa; border-radius: 6px;">
-                                <span style="font-size: 13px;">
-                                    ${icono} ${escapeHtml(item.submotivo)}
-                                </span>
-                                <span style="font-size: 11px; color: #f39c12; font-weight: 500;">
-                                    ${countLabel}
-                                </span>
-                            </div>
-                        `;
-                });
-
-                if (currentTipo !== '') {
-                    html += '</div></div>';
-                }
-
-                const totalPendientes = pendientes.length;
-                const submotivosUnicos = agrupadoArray.length;
-
-                html += `
-                        <div style="margin-top: 15px; padding: 10px; background: #fff8e0; border-radius: 8px; font-size: 12px; color: #6c757d;">
-                            📊 Resumen: <strong>${submotivosUnicos}</strong> submotivos únicos pendientes (${totalPendientes} ocurrencias totales)
-                            <span style="margin-left: 15px;">💡 Los submotivos se agrupan por tipo y frecuencia.</span>
-                        </div>
-                    `;
-
-                return html;
-            })() : '<div style="color: #6c757d; font-size: 13px;">No hay acciones registradas</div>'}
-            </div>
-            
-            <!-- 4. TRAZABILIDAD GESCOT -->
-            <div style="background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; border: 1px solid #e0e0e0;">
-                <h4 style="margin: 0 0 15px 0; color: #333;">🔑 Trazabilidad GESCOT</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div style="padding: 8px 12px; background: #f8f9fa; border-radius: 8px;">
-                        <div style="font-size: 11px; color: #6c757d;">📨 Reunión 1:1</div>
-                        <div style="font-size: 13px; font-weight: bold; color: #7b1fa2;">${pda.gescot_reunion || 'No registrado'}</div>
-                        <div style="font-size: 11px; color: #6c757d;">${formatearFechaPeru(pda.fecha_notificacion_gestor)}</div>
-                    </div>
-                    <div style="padding: 8px 12px; background: #f8f9fa; border-radius: 8px;">
-                        <div style="font-size: 11px; color: #6c757d;">📚 Capacitación</div>
-                        <div style="font-size: 13px; font-weight: bold; color: #7b1fa2;">${pda.gescot_capacitacion || 'No registrado'}</div>
-                        <div style="font-size: 11px; color: #6c757d;">${formatearFechaPeru(pda.fecha_capacitacion)}</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 5. RESULTADO Y ACCIÓN -->
-            <div style="background: ${resultado.color}15; border-radius: 12px; padding: 20px; border: 2px solid ${resultado.color};">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 32px;">${resultado.icono}</span>
-                    <div>
-                        <div style="font-size: 18px; font-weight: bold; color: ${resultado.color};">${resultado.tipo.toUpperCase()}</div>
-                        <div style="font-size: 14px; color: #333; margin-top: 4px;">${resultado.mensaje}</div>
-                        <div style="font-size: 13px; color: #6c757d; margin-top: 4px;">
-                            📌 Próximo paso: <strong>${resultado.accion}</strong>
-                        </div>
-                        ${esPostCapacitacion ? `<div style="font-size: 11px; color: #7b1fa2; margin-top: 4px;">🔵 Esta evaluación corresponde al CICLO POST-CAPACITACIÓN</div>` : ''}
-                    </div>
-                </div>
-            </div>
-            
-        </div>
-        
-        <!-- FOOTER -->
-        <div style="padding: 16px 24px; background: white; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
-            ${resultado.tipo === 'exitoso' ? `
-                <button onclick="cerrarPDAExitoso(${pda.id})" style="padding: 10px 24px; background: #28a745; border: none; border-radius: 10px; cursor: pointer; color: white; font-size: 14px; font-weight: 600;">
-                    🏆 Cerrar PDA (Mejora Exitosa)
-                </button>
-            ` : resultado.tipo === 'requiere_capacitacion' ? `
-                <button onclick="enviarACapacitacion(${pda.id})" style="padding: 10px 24px; background: #f39c12; border: none; border-radius: 10px; cursor: pointer; color: white; font-size: 14px; font-weight: 600;">
-                    📤 Enviar a Capacitación
-                </button>
-            ` : resultado.tipo === 'reiterativo' ? `
-                <button onclick="marcarComoReiterativo(${pda.id})" style="padding: 10px 24px; background: #d93025; border: none; border-radius: 10px; cursor: pointer; color: white; font-size: 14px; font-weight: 600;">
-                    🔄 Marcar como Reiterativo
-                </button>
-            ` : ''}
-            <button onclick="cerrarModalEvaluacionMejora()" style="padding: 10px 24px; background: #6c757d; border: none; border-radius: 10px; cursor: pointer; color: white; font-size: 14px; font-weight: 500;">Cerrar</button>
-        </div>
-    </div>
-</div>
-`;
-
-        const existing = document.getElementById('modalEvaluacionMejora');
-        if (existing) existing.remove();
-
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    } catch (error) {
-        console.error('❌ Error en verEvaluacionMejora:', error);
-        alert('❌ Error al cargar la evaluación de mejora: ' + error.message);
-    }
-}
 
 // ======================================================
 // FUNCIONES AUXILIARES PARA EL MODAL
@@ -22166,32 +18437,6 @@ function obtenerTextoEstadoPDA(estado) {
 }
 // ===== FIN FUNCIÓN: obtenerTextoEstadoPDA ==============================
 
-// ===== 4. INICIO FUNCIÓN: obtenerColorEstadoPDA ======================
-function obtenerColorEstadoPDA(estado) {
-    const colores = {
-        // Estados existentes
-        'pendiente': 'var(--warning)',
-        'notificado': 'var(--accent)',
-        'en_gestion': '#7b1fa2',
-        'en_seguimiento': '#f39c12',
-        'listo_para_seguimiento': '#28a745',
-        'completado': 'var(--ok)',
-        'escalado': 'var(--danger)',
-
-        // 🔴 NUEVOS ESTADOS
-        'pendiente_operaciones': '#f39c12',      // Naranja
-        'gestor_notificado': '#019DF4',          // Azul
-        'feedback_registrado': '#7b1fa2',        // Morado
-        'enviado_capacitacion': '#7b1fa2',       // Morado
-        'en_capacitacion': '#fd7e14',            // Naranja
-        'en_seguimiento_capacitacion': '#019DF4',// Azul
-        'requiere_capacitacion': '#fd7e14',      // Naranja
-        'reiterativo': '#d93025'                 // Rojo
-    };
-    return colores[estado] || 'var(--muted)';
-}
-// ===== FIN FUNCIÓN: obtenerColorEstadoPDA ==============================
-
 // ===== 5. INICIO FUNCIÓN: obtenerInfoPDA =============================
 function obtenerInfoPDA(agente, cuartil) {
     //Si el agente NO está en Q4, retornar TODO vacío
@@ -22281,1638 +18526,6 @@ function obtenerInfoPDA(agente, cuartil) {
 }
 // ===== FIN FUNCIÓN: obtenerInfoPDA =====================================
 
-function renderizarModalPendiente(pda) {
-    const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
-    const promedioBasal = pda.promedio_basal || 'Pendiente';
-    const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
-    const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
-    const totalAcciones = pda.acciones?.length || 0;
-
-    return `
-            <div class="modal-gestion-content">
-                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #f39c12, #e67e22);">
-                    <strong>📋 Notificar al Gestor - ${escapeHtml(pda.agente)}</strong>
-                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
-                </div>
-                <div class="modal-gestion-body">
-                    <div style="background: #fff8e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f39c12;">
-                        <strong>📌 PASO 1 DE 2:</strong> Registrar la reunión 1:1 con el gestor para notificarle su desempeño en Q4.
-                        <br><small style="color: var(--muted);">Luego de este paso, deberá registrar el feedback con código GESCOT.</small>
-                    </div>
-
-                    <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div><strong>👤 Gestor:</strong></div>
-                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
-                            <div><strong>📅 Fecha detección:</strong></div>
-                            <div>${fechaDeteccion}</div>
-                            <div><strong>📊 Ciclo basal:</strong></div>
-                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
-                            <div><strong>📊 Cuartil basal:</strong></div>
-                            <div>Q4</div>
-                            <div><strong>📈 Promedio ciclo basal:</strong></div>
-                            <div>${promedioBasal}%</div>
-                            <div><strong>📋 Acciones requeridas:</strong></div>
-                            <div>${totalAcciones}</div>
-                        </div>
-                    </div>
-                    
-                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
-                        <h4>📝 Registrar Notificación</h4>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">📅 Fecha de Notificación *</label>
-                            <input type="date" id="fechaNotificacion" value="${new Date().toISOString().split('T')[0]}" required 
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">👤 Supervisor que notificó *</label>
-                            <input type="text" id="supervisorNotifico" value="${window.usuarioActual?.nombre_completo || ''}" required 
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">📝 Observaciones (opcional)</label>
-                            <textarea id="observacionesNotificacion" rows="2" 
-                                    placeholder="Comentarios sobre la reunión con el gestor..."
-                                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line);"></textarea>
-                        </div>
-                        
-                        <div style="margin-top: 15px; background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #019DF4;">
-                            💡 <strong>Nota:</strong> Al marcar como notificado, el PDA pasará a estado <strong>"Notificado"</strong>.
-                            Luego deberá registrar el feedback con código GESCOT.
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-gestion-footer">
-                    <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cancelar</button>
-                    <button onclick="marcarComoNotificado(${pda.id})" 
-                            style="background: var(--accent); padding: 10px 20px;">
-                        📨 Marcar como Notificado
-                    </button>
-                </div>
-            </div>
-        `;
-}
-
-// ===== 6. INICIO FUNCIÓN: abrirGestionPDA ============================
-async function abrirGestionPDA(pdaId) {
-    console.log(`📋 Abriendo gestión de PDA ID: ${pdaId}`);
-
-    try {
-        const pdaCompleto = await API.getPDADetalle(pdaId);
-
-        if (!pdaCompleto) {
-            throw new Error('No se encontró el PDA');
-        }
-
-        // Seleccionar el modal según el estado
-        let modalHTML = '';
-
-        switch (pdaCompleto.estado) {
-            // 🔴 ESTADOS EXISTENTES (con funcionalidades actualizadas)
-            case 'pendiente':
-                modalHTML = renderizarModalPendiente(pdaCompleto);
-                break;
-            case 'notificado':
-                modalHTML = renderizarModalNotificado(pdaCompleto);
-                break;
-            case 'en_gestion':
-                modalHTML = renderizarModalEnGestion(pdaCompleto);
-                break;
-            case 'en_seguimiento':
-                modalHTML = renderizarModalEnSeguimiento(pdaCompleto);
-                break;
-
-            // 🔴 NUEVOS ESTADOS (para el flujo extendido)
-            case 'requiere_capacitacion':
-                modalHTML = renderizarModalRequiereCapacitacion(pdaCompleto);
-                break;
-            case 'reiterativo':
-                modalHTML = renderizarModalReiterativo(pdaCompleto);
-                break;
-            case 'completado':
-            case 'escalado':
-                modalHTML = renderizarModalDetallePDA(pdaCompleto);
-                break;
-
-            default:
-                modalHTML = renderizarModalEnGestion(pdaCompleto);
-        }
-
-        // Crear y mostrar modal (el resto se mantiene igual)
-        const modalExistente = document.getElementById('modalGestionPDA');
-        if (modalExistente) modalExistente.remove();
-
-        const nuevoModal = document.createElement('div');
-        nuevoModal.id = 'modalGestionPDA';
-        nuevoModal.className = 'modal-gestion-pda';
-        nuevoModal.innerHTML = modalHTML;
-        document.body.appendChild(nuevoModal);
-
-        window.pdaActualGestion = { id: pdaId, cabecera: pdaCompleto };
-
-        setTimeout(() => {
-            if (typeof inicializarSelectoresMultiples === 'function') {
-                inicializarSelectoresMultiples();
-            }
-        }, 100);
-
-    } catch (error) {
-        console.error('Error abriendo gestión PDA:', error);
-        alert('❌ Error al cargar el PDA: ' + error.message);
-    }
-}
-// ===== FIN FUNCIÓN: abrirGestionPDA ====================================
-
-
-// ===== 7. INICIO FUNCIÓN: renderizarModalPendiente ===================
-
-// ===== FIN FUNCIÓN: renderizarModalPendiente ===========================
-
-
-function renderizarModalFeedback(pda) {
-    const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
-    const promedioBasal = pda.promedio_basal || 'Pendiente';
-    const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
-    const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
-    const totalAcciones = pda.acciones?.length || 0;
-    const fechaNotificacion = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : 'No registrada';
-    const notificadoPor = pda.notificado_por || 'No registrado';
-
-    return `
-            <div class="modal-gestion-content">
-                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #7b1fa2, #9c27b0);">
-                    <strong>💬 Registrar Feedback - ${escapeHtml(pda.agente)}</strong>
-                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
-                </div>
-                <div class="modal-gestion-body">
-                    <div style="background: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #28a745;">
-                        <strong>✅ Gestor notificado el:</strong> ${fechaNotificacion}
-                        <br><strong>👤 Notificado por:</strong> ${notificadoPor}
-                    </div>
-
-                    <div style="background: #fff8e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f39c12;">
-                        <strong>📌 PASO 2 DE 2:</strong> Registrar el feedback proporcionado al gestor con código GESCOT.
-                        <br><small style="color: var(--muted);">El código GESCOT es obligatorio para la trazabilidad.</small>
-                    </div>
-
-                    <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div><strong>👤 Gestor:</strong></div>
-                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
-                            <div><strong>📅 Fecha detección:</strong></div>
-                            <div>${fechaDeteccion}</div>
-                            <div><strong>📊 Ciclo basal:</strong></div>
-                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
-                            <div><strong>📊 Cuartil basal:</strong></div>
-                            <div>Q4</div>
-                            <div><strong>📈 Promedio ciclo basal:</strong></div>
-                            <div>${promedioBasal}%</div>
-                            <div><strong>📋 Acciones requeridas:</strong></div>
-                            <div>${totalAcciones}</div>
-                        </div>
-                    </div>
-                    
-                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
-                        <h4>📝 Registrar Feedback (GESCOT)</h4>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">🔑 Código GESCOT *</label>
-                            <input type="text" id="gescotFeedback" 
-                                placeholder="Ej: GESCOT-2026-07-1234"
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                            <small style="color: var(--danger);">⚠️ Obligatorio para registrar el feedback</small>
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">📅 Fecha del Feedback *</label>
-                            <input type="date" id="fechaFeedback" value="${new Date().toISOString().split('T')[0]}" required 
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">👤 Supervisor que realizó el feedback *</label>
-                            <input type="text" id="supervisorFeedback" 
-                                value="${window.usuarioActual?.nombre_completo || ''}" required 
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">📝 Observaciones del Feedback (opcional)</label>
-                            <textarea id="observacionesFeedback" rows="3" 
-                                    placeholder="Detalles del feedback proporcionado al gestor..."
-                                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line);"></textarea>
-                        </div>
-                        
-                        <div style="margin-top: 15px; background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #019DF4;">
-                            💡 <strong>Nota:</strong> Al registrar el feedback con GESCOT, el PDA pasará automáticamente a 
-                            <strong>estado "En Seguimiento"</strong> y el sistema evaluará la mejora en el próximo ciclo.
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-gestion-footer">
-                    <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cancelar</button>
-                    <button onclick="registrarFeedbackYEnviarSeguimiento(${pda.id})" 
-                            style="background: var(--ok); padding: 10px 20px;">
-                        💾 Registrar Feedback y Enviar a Seguimiento
-                    </button>
-                </div>
-            </div>
-        `;
-}
-
-async function registrarFeedbackYEnviarSeguimiento(pdaId) {
-    const gescot = document.getElementById('gescotFeedback').value.trim();
-    const fecha = document.getElementById('fechaFeedback').value;
-    const supervisor = document.getElementById('supervisorFeedback').value.trim();
-    const observaciones = document.getElementById('observacionesFeedback').value.trim();
-
-    if (!gescot) {
-        alert('⚠️ El código GESCOT es obligatorio para registrar el feedback');
-        document.getElementById('gescotFeedback').focus();
-        return;
-    }
-
-    if (!fecha || !supervisor) {
-        alert('⚠️ Complete todos los campos obligatorios');
-        return;
-    }
-
-    try {
-        const db = getDB();
-        if (!db) {
-            alert('❌ Base de datos no disponible');
-            return;
-        }
-
-        const { error } = await db
-            .from('pda_cabecera')
-            .update({
-                estado: 'en_seguimiento',
-                gescot_reunion: gescot,
-                fecha_feedback: fecha,
-                feedback_por: supervisor,
-                observaciones_feedback: observaciones,
-                fecha_inicio_seguimiento: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', pdaId);
-
-        if (error) throw error;
-
-        // 🔴 REGISTRAR EVENTO CON EL SUPERVISOR
-        await registrarEventoPDA(pdaId, 'feedback_registrado', {
-            gescot: gescot,
-            fecha_feedback: fecha,
-            supervisor: supervisor,
-            observaciones: observaciones
-        }, supervisor);  // ← PASAR EL SUPERVISOR COMO PERSONA
-
-        alert(`✅ Feedback registrado correctamente\n\n🔑 GESCOT: ${gescot}\n👤 Supervisor: ${supervisor}`);
-
-        cerrarModalGestionPDA();
-        await cargarDatosPDA();
-
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error al registrar feedback: ' + error.message);
-    }
-}
-
-
-
-async function registrarCapacitacionYEnviarSeguimiento(pdaId) {
-    const gescot = document.getElementById('gescotCapacitacion').value.trim();
-    const fecha = document.getElementById('fechaCapacitacion').value;
-    const capacitador = document.getElementById('capacitador').value.trim();
-    const observaciones = document.getElementById('observacionesCapacitacion').value.trim();
-
-    // 🔴 VALIDAR GESCOT - OBLIGATORIO
-    if (!gescot) {
-        alert('⚠️ El código GESCOT es obligatorio para registrar la capacitación');
-        document.getElementById('gescotCapacitacion').focus();
-        return;
-    }
-
-    if (!fecha || !capacitador) {
-        alert('⚠️ Complete todos los campos obligatorios');
-        return;
-    }
-
-    // Obtener items seleccionados
-    const itemsSeleccionados = document.querySelectorAll('.item-capacitacion:checked');
-    if (itemsSeleccionados.length === 0) {
-        alert('⚠️ Seleccione al menos un item a capacitar');
-        return;
-    }
-
-    try {
-        const db = getDB();
-        if (!db) {
-            alert('❌ Base de datos no disponible');
-            return;
-        }
-
-        const itemIds = Array.from(itemsSeleccionados).map(cb => parseInt(cb.dataset.id));
-
-        // 1. Marcar items como completados
-        for (const id of itemIds) {
-            const { error } = await db
-                .from('pda_acciones')
-                .update({
-                    completado: true,
-                    codigo_gescot: gescot,
-                    fecha_completado: fecha,
-                    completado_por: capacitador,
-                    observaciones: observaciones,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', id);
-
-            if (error) throw error;
-        }
-
-        // 2. Actualizar PDA cabecera a 'en_seguimiento_capacitacion'
-        const { error } = await db
-            .from('pda_cabecera')
-            .update({
-                estado: 'en_seguimiento_capacitacion',
-                gescot_capacitacion: gescot,
-                fecha_capacitacion: fecha,
-                capacitador: capacitador,
-                observaciones_capacitacion: observaciones,
-                fecha_inicio_seguimiento_capacitacion: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', pdaId);
-
-        if (error) throw error;
-
-        // 3. Registrar en historial
-        await registrarHistorialPDA(pdaId, 'en_capacitacion', 'en_seguimiento_capacitacion',
-            `Capacitación registrada - GESCOT: ${gescot} - ${itemsSeleccionados.length} items`);
-
-        alert(`✅ Capacitación registrada correctamente\n\n🔑 GESCOT: ${gescot}\n📅 Fecha: ${fecha}\n📊 Items: ${itemsSeleccionados.length}\n📊 Estado: Seguimiento Post-Capacitación`);
-
-        cerrarModalGestionPDA();
-        await cargarDatosPDA();
-
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error al registrar capacitación: ' + error.message);
-    }
-}
-
-function renderizarModalRequiereCapacitacion(pda) {
-    const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
-    const promedioBasal = pda.promedio_basal || 'Pendiente';
-    const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
-    const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
-    const fechaNotificacion = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : 'No registrada';
-    const notificadoPor = pda.notificado_por || 'No registrado';
-    const gescotReunion = pda.gescot_reunion || 'No registrado';
-
-    // Contar acciones pendientes
-    const accionesPendientes = (pda.acciones || []).filter(a => !a.completado);
-    const totalPendientes = accionesPendientes.length;
-
-    return `
-            <div class="modal-gestion-content">
-                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #fd7e14, #e67e22);">
-                    <strong>📋 Requiere Capacitación - ${escapeHtml(pda.agente)}</strong>
-                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
-                </div>
-                <div class="modal-gestion-body">
-                    <div style="background: #fff3e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #fd7e14;">
-                        <strong>📌 EVALUACIÓN DE MEJORA:</strong> El gestor NO logró salir de Q4 en el ciclo de seguimiento.
-                        <br><small style="color: var(--muted);">Requiere capacitación formal antes de un nuevo intento.</small>
-                    </div>
-
-                    <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div><strong>👤 Gestor:</strong></div>
-                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
-                            <div><strong>📅 Fecha detección:</strong></div>
-                            <div>${fechaDeteccion}</div>
-                            <div><strong>📊 Ciclo basal:</strong></div>
-                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
-                            <div><strong>📊 Cuartil basal:</strong></div>
-                            <div>Q4</div>
-                            <div><strong>📈 Promedio basal:</strong></div>
-                            <div>${promedioBasal}%</div>
-                            <div><strong>📅 Notificado:</strong></div>
-                            <div>${fechaNotificacion}</div>
-                            <div><strong>👤 Notificado por:</strong></div>
-                            <div>${notificadoPor}</div>
-                            <div><strong>🔑 GESCOT Reunión:</strong></div>
-                            <div><strong style="color: #7b1fa2;">${gescotReunion}</strong></div>
-                            <div><strong>📋 Acciones pendientes:</strong></div>
-                            <div><strong style="color: #d93025;">${totalPendientes}</strong></div>
-                        </div>
-                    </div>
-                    
-                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
-                        <h4>📌 Resumen de Items Pendientes</h4>
-                        ${totalPendientes > 0 ? `
-                            <ul style="margin-top: 10px; padding-left: 20px;">
-                                ${accionesPendientes.map(a => `
-                                    <li style="margin-bottom: 5px;">
-                                        ❌ ${escapeHtml(a.submotivo)} 
-                                        <span style="font-size: 11px; color: var(--muted);">(${a.tipo_accion})</span>
-                                    </li>
-                                `).join('')}
-                            </ul>
-                        ` : `
-                            <div style="color: var(--ok); margin-top: 10px;">✅ No hay items pendientes</div>
-                        `}
-                        
-                        <div style="margin-top: 20px; background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #019DF4;">
-                            💡 <strong>Próximo paso:</strong> Enviar este PDA a Capacitación para que ejecuten la formación necesaria.
-                            <br><small>Use el botón "📤 Enviar a Capacitación" para continuar con el flujo.</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-gestion-footer">
-                    <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cancelar</button>
-                    <button onclick="enviarACapacitacion(${pda.id})" 
-                            style="background: var(--accent); padding: 10px 20px;">
-                        📤 Enviar a Capacitación
-                    </button>
-                </div>
-            </div>
-        `;
-}
-
-async function enviarACapacitacion(pdaId) {
-    if (!confirm(`⚠️ ¿Enviar este PDA a Capacitación?\n\nEl PDA pasará a estado "Enviado a Capacitación".`)) {
-        return;
-    }
-
-    try {
-        const db = getDB();
-        if (!db) {
-            alert('❌ Base de datos no disponible');
-            return;
-        }
-
-        const { data: pda, error: fetchError } = await db
-            .from('pda_cabecera')
-            .select('*')
-            .eq('id', pdaId)
-            .single();
-
-        if (fetchError) throw fetchError;
-
-        // 🔴 OBTENER QUIÉN ESTÁ REALIZANDO LA ACCIÓN
-        const persona = window.usuarioActual?.nombre_completo ||
-            window.usuarioActual?.usuario ||
-            prompt('Ingrese su nombre para registrar el envío a Capacitación:') ||
-            'Operaciones';
-
-        await db
-            .from('pda_cabecera')
-            .update({
-                estado: 'enviado_capacitacion',
-                fecha_envio_capacitacion: new Date().toISOString().split('T')[0],
-                enviado_por: persona,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', pdaId);
-
-        // 🔴 REGISTRAR EVENTO CON LA PERSONA
-        await registrarEventoPDA(pdaId, 'enviado_capacitacion', {
-            fecha_envio: new Date().toISOString().split('T')[0],
-            enviado_por: persona
-        }, persona);
-
-        alert(`✅ PDA enviado a Capacitación correctamente\n\n👤 Enviado por: ${persona}`);
-
-        cerrarModalGestionPDA();
-        await cargarDatosPDA();
-
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error al enviar a Capacitación: ' + error.message);
-    }
-}
-
-function renderizarModalReiterativo(pda) {
-    const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
-    const promedioBasal = pda.promedio_basal || 'Pendiente';
-    const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
-    const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
-    const fechaNotificacion = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : 'No registrada';
-    const notificadoPor = pda.notificado_por || 'No registrado';
-    const gescotReunion = pda.gescot_reunion || 'No registrado';
-    const gescotCapacitacion = pda.gescot_capacitacion || 'No registrado';
-    const fechaCapacitacion = pda.fecha_capacitacion ? formatearFechaPeru(pda.fecha_capacitacion) : 'No registrada';
-    const capacitador = pda.capacitador || 'No registrado';
-
-    return `
-            <div class="modal-gestion-content">
-                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #d93025, #b71c1c);">
-                    <strong>🔄 Reiterativo - ${escapeHtml(pda.agente)}</strong>
-                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
-                </div>
-                <div class="modal-gestion-body">
-                    <div style="background: #ffebee; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #d93025;">
-                        <strong>🚨 CASO REITERATIVO:</strong> El gestor NO logró salir de Q4 después de la capacitación formal.
-                        <br><small style="color: var(--danger);">Requiere escalamiento a Gerencia para evaluación de continuidad.</small>
-                    </div>
-
-                    <!-- Historial completo del PDA -->
-                    <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div><strong>👤 Gestor:</strong></div>
-                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
-                            <div><strong>📅 Fecha detección:</strong></div>
-                            <div>${fechaDeteccion}</div>
-                            <div><strong>📊 Ciclo basal:</strong></div>
-                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
-                            <div><strong>📈 Promedio basal:</strong></div>
-                            <div>${promedioBasal}%</div>
-                            <div><strong>📅 Notificación:</strong></div>
-                            <div>${fechaNotificacion}</div>
-                            <div><strong>👤 Notificado por:</strong></div>
-                            <div>${notificadoPor}</div>
-                            <div><strong>🔑 GESCOT Reunión:</strong></div>
-                            <div><strong style="color: #7b1fa2;">${gescotReunion}</strong></div>
-                            <div><strong>📅 Capacitación:</strong></div>
-                            <div>${fechaCapacitacion}</div>
-                            <div><strong>👤 Capacitador:</strong></div>
-                            <div>${capacitador}</div>
-                            <div><strong>🔑 GESCOT Capacitación:</strong></div>
-                            <div><strong style="color: #7b1fa2;">${gescotCapacitacion}</strong></div>
-                        </div>
-                    </div>
-                    
-                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
-                        <h4>📌 Resumen de Acciones Realizadas</h4>
-                        <ul style="margin-top: 10px; padding-left: 20px;">
-                            <li>✅ Reunión 1:1 con gestor (${fechaNotificacion})</li>
-                            <li>✅ Feedback registrado con GESCOT: ${gescotReunion}</li>
-                            <li>✅ Capacitación formal (${fechaCapacitacion})</li>
-                            <li>✅ GESCOT Capacitación: ${gescotCapacitacion}</li>
-                            <li style="color: #d93025; font-weight: bold;">❌ El gestor PERSISTE en Q4</li>
-                        </ul>
-                        
-                        <div style="margin-top: 20px; background: #ffebee; padding: 12px; border-radius: 8px; border-left: 4px solid #d93025;">
-                            <strong>🚨 ACCIÓN REQUERIDA:</strong>
-                            <br>Este caso debe ser <strong>ESCALADO A GERENCIA</strong> para evaluación de continuidad.
-                            <br><small>El reporte de reiterativos mensual incluirá este caso automáticamente.</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-gestion-footer">
-                    <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cerrar</button>
-                    <button onclick="marcarComoReiterativo(${pda.id})" 
-                            style="background: #d93025; padding: 10px 20px;">
-                        🚨 Marcar como Escalado a Gerencia
-                    </button>
-                </div>
-            </div>
-        `;
-}
-
-async function marcarComoReiterativo(pdaId) {
-    // 🔴 SOLICITAR NOMBRE DE QUIÉN ESCALA
-    const nombreEscala = prompt('Ingrese su nombre completo para escalar este caso a Gerencia:');
-    if (!nombreEscala || nombreEscala.trim() === '') {
-        alert('⚠️ Debe ingresar su nombre para escalar el caso');
-        return;
-    }
-
-    if (!confirm(`🚨 ¿Marcar este PDA como REITERATIVO y escalar a Gerencia?\n\n👤 Escalado por: ${nombreEscala.trim()}\n\nEsta acción no se puede deshacer.`)) {
-        return;
-    }
-
-    try {
-        const db = getDB();
-        if (!db) {
-            alert('❌ Base de datos no disponible');
-            return;
-        }
-
-        const { data: pda, error: fetchError } = await db
-            .from('pda_cabecera')
-            .select('*')
-            .eq('id', pdaId)
-            .single();
-
-        if (fetchError) throw fetchError;
-
-        const persona = nombreEscala.trim();
-
-        await db
-            .from('pda_cabecera')
-            .update({
-                estado: 'escalado',
-                fecha_escalamiento: new Date().toISOString().split('T')[0],
-                escalado_por: persona,
-                observaciones_escalamiento: 'Caso reiterativo - Persiste en Q4 después de capacitación formal',
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', pdaId);
-
-        // 🔴 REGISTRAR EVENTO CON LA PERSONA QUE ESCALA
-        await registrarEventoPDA(pdaId, 'marcado_reiterativo', {
-            escalado_por: persona,
-            motivo: 'Persiste en Q4 después de capacitación formal'
-        }, persona);
-
-        alert(`🚨 PDA escalado a Gerencia correctamente\n\n👤 Escalado por: ${persona}`);
-
-        cerrarModalGestionPDA();
-        await cargarDatosPDA();
-
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error al escalar el PDA: ' + error.message);
-    }
-}
-
-// ======================================================
-// VER HISTORIAL COMPLETO DEL PDA
-// ======================================================
-async function verHistorialPDA(pdaId) {
-    try {
-        const db = getDB();
-        if (!db) {
-            alert('❌ Base de datos no disponible');
-            return;
-        }
-
-        const { data: pda, error } = await db
-            .from('pda_cabecera')
-            .select('agente, historial_estados, estado, created_at, cuartil_basal, promedio_basal')
-            .eq('id', pdaId)
-            .single();
-
-        if (error) throw error;
-
-        let historial = [];
-        try {
-            historial = pda.historial_estados || [];
-            if (typeof historial === 'string') {
-                historial = JSON.parse(historial);
-            }
-            if (!Array.isArray(historial)) {
-                historial = [];
-            }
-        } catch (e) {
-            historial = [];
-        }
-
-        if (historial.length === 0) {
-            alert(`📋 PDA #${pdaId} - ${pda.agente}\n\nNo hay eventos registrados en el historial.`);
-            return;
-        }
-
-        // Construir mensaje
-        let mensaje = `📋 HISTORIAL COMPLETO - PDA #${pdaId}\n`;
-        mensaje += `👤 Agente: ${pda.agente}\n`;
-        mensaje += `📊 Estado actual: ${obtenerTextoEstadoPDA(pda.estado)}\n`;
-        mensaje += `📅 Creado: ${formatearFechaPeru(pda.created_at)}\n`;
-        mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-
-        // Mostrar eventos en orden cronológico
-        const eventosOrdenados = [...historial].sort((a, b) =>
-            new Date(a.fecha) - new Date(b.fecha)
-        );
-
-        for (let i = 0; i < eventosOrdenados.length; i++) {
-            const ev = eventosOrdenados[i];
-            const icono = obtenerIconoEvento(ev.evento);
-            const eventoNombre = ev.evento.toUpperCase().replace(/_/g, ' ');
-
-            // 🔴 Obtener la persona que realizó la acción (usuario del evento)
-            const persona = ev.usuario || 'Sistema';
-
-            mensaje += `${icono} ${eventoNombre}\n`;
-            mensaje += `   📅 ${ev.fecha_display || formatearFechaPeru(ev.fecha)}\n`;
-            mensaje += `   👤 ${persona}\n`;
-
-            // Mostrar detalles según el evento (sin repetir la persona)
-            if (ev.detalle) {
-                const d = ev.detalle;
-
-                // Evento: GENERADO
-                if (ev.evento === 'generado') {
-                    mensaje += `   📊 Ciclo #${d.ciclo || 'N/A'}\n`;
-                    mensaje += `   📈 Promedio: ${d.promedio || 'N/A'}%\n`;
-                    mensaje += `   📋 Cuartil: ${d.cuartil || 'N/A'}\n`;
-                    mensaje += `   📞 Evaluaciones: ${d.total_evaluaciones || 'N/A'}\n`;
-                }
-
-                // Evento: NOTIFICADO
-                if (ev.evento === 'notificado') {
-                    mensaje += `   📅 Fecha notificación: ${d.fecha_notificacion || 'N/A'}\n`;
-                    // 🔴 NO mostrar supervisor porque ya está en la línea 👤
-                    // Solo mostrar observaciones si existen
-                    if (d.observaciones) {
-                        mensaje += `   📝 ${d.observaciones}\n`;
-                    }
-                }
-
-                // Evento: FEEDBACK_REGISTRADO
-                if (ev.evento === 'feedback_registrado') {
-                    mensaje += `   🔑 GESCOT: ${d.gescot || 'N/A'}\n`;
-                    mensaje += `   📅 Fecha: ${d.fecha_feedback || 'N/A'}\n`;
-                    // 🔴 NO mostrar supervisor porque ya está en la línea 👤
-                    if (d.observaciones) {
-                        mensaje += `   📝 ${d.observaciones}\n`;
-                    }
-                }
-
-                // Evento: ENVIADO_CAPACITACION
-                if (ev.evento === 'enviado_capacitacion') {
-                    mensaje += `   📅 Fecha envío: ${d.fecha_envio || 'N/A'}\n`;
-                    // 🔴 NO mostrar enviado_por porque ya está en la línea 👤
-                }
-
-                // Evento: CAPACITACION_REGISTRADA
-                if (ev.evento === 'capacitacion_registrada') {
-                    mensaje += `   🔑 GESCOT: ${d.gescot || 'N/A'}\n`;
-                    mensaje += `   📅 Fecha: ${d.fecha_capacitacion || 'N/A'}\n`;
-                    mensaje += `   📋 Items completados: ${d.items_completados || 0}\n`;
-                    // 🔴 NO mostrar capacitador porque ya está en la línea 👤
-                    if (d.observaciones) {
-                        mensaje += `   📝 ${d.observaciones}\n`;
-                    }
-                }
-
-                // Evento: CERRADO_EXITOSO
-                if (ev.evento === 'cerrado_exitoso') {
-                    mensaje += `   📊 Cuartil seguimiento: ${d.cuartil_seguimiento || 'N/A'}\n`;
-                    mensaje += `   📈 Promedio seguimiento: ${d.promedio_seguimiento ? d.promedio_seguimiento.toFixed(1) : 'N/A'}%\n`;
-                    // 🔴 NO mostrar cerrado_por porque ya está en la línea 👤
-                }
-
-                // Evento: MARCADO_REITERATIVO
-                if (ev.evento === 'marcado_reiterativo') {
-                    mensaje += `   📌 ${d.motivo || 'Persiste en Q4'}\n`;
-                    // 🔴 NO mostrar escalado_por porque ya está en la línea 👤
-                }
-            }
-
-            mensaje += `\n`;
-        }
-
-        mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-        mensaje += `📌 Total eventos: ${eventosOrdenados.length}`;
-
-        alert(mensaje);
-
-    } catch (error) {
-        console.error('Error en verHistorialPDA:', error);
-        alert('❌ Error al cargar el historial: ' + error.message);
-    }
-}
-
-// ======================================================
-// OBTENER ICONO SEGÚN EVENTO
-// ======================================================
-function obtenerIconoEvento(evento) {
-    const iconos = {
-        'generado': '🟢',
-        'notificado': '📨',
-        'feedback_registrado': '💬',
-        'enviado_capacitacion': '📤',
-        'capacitacion_registrada': '📚',
-        'cerrado_exitoso': '🏆',
-        'marcado_reiterativo': '🔄',
-        'escalado': '🚨'
-    };
-    return iconos[evento] || '📌';
-}
-
-// ===== 8. INICIO FUNCIÓN: renderizarModalNotificado ==================
-function renderizarModalNotificado(pda) {
-    // Esta función ahora es el PASO 2: Feedback con GESCOT
-    // Pero mantiene el nombre original para compatibilidad con el switch
-
-    const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
-    const promedioBasal = pda.promedio_basal || 'Pendiente';
-    const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
-    const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
-    const totalAcciones = pda.acciones?.length || 0;
-    const fechaNotificacion = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : 'No registrada';
-    const notificadoPor = pda.notificado_por || 'No registrado';
-
-    return `
-            <div class="modal-gestion-content">
-                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #7b1fa2, #9c27b0);">
-                    <strong>💬 Registrar Feedback - ${escapeHtml(pda.agente)}</strong>
-                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
-                </div>
-                <div class="modal-gestion-body">
-                    <div style="background: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #28a745;">
-                        <strong>✅ Gestor notificado el:</strong> ${fechaNotificacion}
-                        <br><strong>👤 Notificado por:</strong> ${notificadoPor}
-                    </div>
-
-                    <div style="background: #fff8e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f39c12;">
-                        <strong>📌 PASO 2 DE 2:</strong> Registrar el feedback proporcionado al gestor con código GESCOT.
-                        <br><small style="color: var(--muted);">El código GESCOT es obligatorio para la trazabilidad.</small>
-                    </div>
-
-                    <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div><strong>👤 Gestor:</strong></div>
-                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
-                            <div><strong>📅 Fecha detección:</strong></div>
-                            <div>${fechaDeteccion}</div>
-                            <div><strong>📊 Ciclo basal:</strong></div>
-                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
-                            <div><strong>📊 Cuartil basal:</strong></div>
-                            <div>Q4</div>
-                            <div><strong>📈 Promedio ciclo basal:</strong></div>
-                            <div>${promedioBasal}%</div>
-                            <div><strong>📋 Acciones requeridas:</strong></div>
-                            <div>${totalAcciones}</div>
-                        </div>
-                    </div>
-                    
-                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
-                        <h4>📝 Registrar Feedback (GESCOT)</h4>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">🔑 Código GESCOT *</label>
-                            <input type="text" id="gescotFeedback" 
-                                placeholder="Ej: GESCOT-2026-07-1234"
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                            <small style="color: var(--danger);">⚠️ Obligatorio para registrar el feedback</small>
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">📅 Fecha del Feedback *</label>
-                            <input type="date" id="fechaFeedback" value="${new Date().toISOString().split('T')[0]}" required 
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">👤 Supervisor que realizó el feedback *</label>
-                            <input type="text" id="supervisorFeedback" 
-                                value="${window.usuarioActual?.nombre_completo || ''}" required 
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">📝 Observaciones del Feedback (opcional)</label>
-                            <textarea id="observacionesFeedback" rows="3" 
-                                    placeholder="Detalles del feedback proporcionado al gestor..."
-                                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line);"></textarea>
-                        </div>
-                        
-                        <div style="margin-top: 15px; background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #019DF4;">
-                            💡 <strong>Nota:</strong> Al registrar el feedback con GESCOT, el PDA pasará automáticamente a 
-                            <strong>estado "En Seguimiento"</strong> y el sistema evaluará la mejora en el próximo ciclo.
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-gestion-footer">
-                    <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cancelar</button>
-                    <button onclick="registrarFeedbackYEnviarSeguimiento(${pda.id})" 
-                            style="background: var(--ok); padding: 10px 20px;">
-                        💾 Registrar Feedback y Enviar a Seguimiento
-                    </button>
-                </div>
-            </div>
-        `;
-}
-// ===== FIN FUNCIÓN: renderizarModalNotificado ==========================
-
-// ===== 9. INICIO FUNCIÓN: renderizarModalEnGestion ===================
-function renderizarModalEnGestion(pda) {
-    // Esta función ahora es el modal de Capacitación
-    // Pero mantiene el nombre original para compatibilidad
-
-    const fechaDeteccion = formatearFechaPeru(pda.fecha_deteccion);
-    const promedioBasal = pda.promedio_basal || 'Pendiente';
-    const fechaInicioCiclo = formatearFechaPeru(pda.fecha_inicio_ciclo_basal);
-    const fechaFinCiclo = formatearFechaPeru(pda.fecha_fin_ciclo_basal);
-    const fechaNotificacion = pda.fecha_notificacion_gestor ? formatearFechaPeru(pda.fecha_notificacion_gestor) : 'No registrada';
-    const notificadoPor = pda.notificado_por || 'No registrado';
-    const gescotReunion = pda.gescot_reunion || 'No registrado';
-
-    // Filtrar acciones pendientes
-    const accionesPendientes = (pda.acciones || []).filter(a => !a.completado);
-    const totalPendientes = accionesPendientes.length;
-
-    // Agrupar por tipo
-    const accionesPorTipo = {
-        procesos: accionesPendientes.filter(a => a.tipo_accion === 'proceso'),
-        habilidades: accionesPendientes.filter(a => a.tipo_accion === 'habilidades'),
-        feedback: accionesPendientes.filter(a => a.tipo_accion === 'feedback')
-    };
-
-    return `
-            <div class="modal-gestion-content">
-                <div class="modal-gestion-header" style="background: linear-gradient(135deg, #fd7e14, #f39c12);">
-                    <strong>📚 Registrar Capacitación - ${escapeHtml(pda.agente)}</strong>
-                    <button onclick="cerrarModalGestionPDA()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 20px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">✖</button>
-                </div>
-                <div class="modal-gestion-body">
-                    <div style="background: #fff8e0; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #f39c12;">
-                        <strong>📌 CAPACITACIÓN FORMAL:</strong> Registrar la capacitación realizada al gestor.
-                        <br><small style="color: var(--muted);">El código GESCOT es obligatorio para la trazabilidad.</small>
-                    </div>
-
-                    <div style="background: #e8f5e9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #28a745;">
-                        <strong>✅ Gestor notificado el:</strong> ${fechaNotificacion}
-                        <br><strong>👤 Notificado por:</strong> ${notificadoPor}
-                        <br><strong>🔑 GESCOT Reunión:</strong> ${gescotReunion}
-                    </div>
-
-                    <div class="info-box" style="background: #f0f7ff; padding: 12px; border-radius: 10px; margin-bottom: 20px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div><strong>👤 Gestor:</strong></div>
-                            <div><strong>${escapeHtml(pda.agente)}</strong></div>
-                            <div><strong>📅 Fecha detección:</strong></div>
-                            <div>${fechaDeteccion}</div>
-                            <div><strong>📊 Ciclo basal:</strong></div>
-                            <div>${fechaInicioCiclo} → ${fechaFinCiclo}</div>
-                            <div><strong>📊 Cuartil basal:</strong></div>
-                            <div>Q4</div>
-                            <div><strong>📈 Promedio ciclo basal:</strong></div>
-                            <div>${promedioBasal}%</div>
-                            <div><strong>📋 Acciones pendientes:</strong></div>
-                            <div><strong style="color: #d93025;">${totalPendientes}</strong></div>
-                        </div>
-                    </div>
-                    
-                    <div style="border-top: 1px solid #e0e0e0; padding-top: 20px;">
-                        <h4>📝 Registrar Capacitación</h4>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">🔑 Código GESCOT de Capacitación *</label>
-                            <input type="text" id="gescotCapacitacion" 
-                                placeholder="Ej: GESCOT-2026-07-5678"
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                            <small style="color: var(--danger);">⚠️ Obligatorio para registrar la capacitación</small>
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">📅 Fecha de Capacitación *</label>
-                            <input type="date" id="fechaCapacitacion" value="${new Date().toISOString().split('T')[0]}" required 
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">👤 Capacitador *</label>
-                            <input type="text" id="capacitador" 
-                                value="${window.usuarioActual?.nombre_completo || ''}" required 
-                                style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
-                        </div>
-                        
-                        <!-- Items agrupados por tipo -->
-                        <div style="margin-top: 20px;">
-                            <h5>📋 Items a Capacitar</h5>
-                            
-                            ${accionesPorTipo.procesos.length > 0 ? `
-                                <div style="margin-top: 10px; border-left: 4px solid #fd7e14; padding-left: 15px;">
-                                    <strong style="color: #fd7e14;">📚 Procesos (ECN)</strong>
-                                    ${accionesPorTipo.procesos.map(a => `
-                                        <label style="display: block; margin-top: 5px;">
-                                            <input type="checkbox" class="item-capacitacion" data-id="${a.id}" checked>
-                                            ${escapeHtml(a.submotivo)}
-                                        </label>
-                                    `).join('')}
-                                </div>
-                            ` : ''}
-                            
-                            ${accionesPorTipo.habilidades.length > 0 ? `
-                                <div style="margin-top: 10px; border-left: 4px solid #7b1fa2; padding-left: 15px;">
-                                    <strong style="color: #7b1fa2;">🎯 Habilidades Blandas (ENC)</strong>
-                                    ${accionesPorTipo.habilidades.map(a => `
-                                        <label style="display: block; margin-top: 5px;">
-                                            <input type="checkbox" class="item-capacitacion" data-id="${a.id}" checked>
-                                            ${escapeHtml(a.submotivo)}
-                                        </label>
-                                    `).join('')}
-                                </div>
-                            ` : ''}
-                            
-                            ${accionesPorTipo.feedback.length > 0 ? `
-                                <div style="margin-top: 10px; border-left: 4px solid #019DF4; padding-left: 15px;">
-                                    <strong style="color: #019DF4;">💬 Feedback (ENC/ECUF)</strong>
-                                    ${accionesPorTipo.feedback.map(a => `
-                                        <label style="display: block; margin-top: 5px;">
-                                            <input type="checkbox" class="item-capacitacion" data-id="${a.id}" checked>
-                                            ${escapeHtml(a.submotivo)}
-                                        </label>
-                                    `).join('')}
-                                </div>
-                            ` : ''}
-                            
-                            ${totalPendientes === 0 ? `
-                                <div style="margin-top: 10px; color: var(--ok);">
-                                    ✅ No hay acciones pendientes de capacitación.
-                                </div>
-                            ` : ''}
-                        </div>
-                        
-                        <div style="margin-top: 10px;">
-                            <label style="font-size: 12px; font-weight: 600;">📝 Observaciones (opcional)</label>
-                            <textarea id="observacionesCapacitacion" rows="3" 
-                                    placeholder="Detalles de la capacitación realizada..."
-                                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--line);"></textarea>
-                        </div>
-                        
-                        <div style="margin-top: 15px; background: #e3f2fd; padding: 12px; border-radius: 8px; border-left: 4px solid #019DF4;">
-                            💡 <strong>Nota:</strong> Al registrar la capacitación con GESCOT, el PDA pasará a 
-                            <strong>estado "En Seguimiento"</strong> y el sistema evaluará la mejora en el próximo ciclo.
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-gestion-footer">
-                    <button onclick="cerrarModalGestionPDA()" class="secondary" style="padding: 10px 20px;">Cancelar</button>
-                    <button onclick="guardarGestionCapacitacion(${pda.id})" 
-                            style="background: var(--ok); padding: 10px 20px;">
-                        💾 Registrar Capacitación y Enviar a Seguimiento
-                    </button>
-                </div>
-            </div>
-        `;
-}
-// ===== FIN FUNCIÓN: renderizarModalEnGestion ===========================
-
-async function guardarGestionCapacitacion(pdaId) {
-    const gescot = document.getElementById('gescotCapacitacion').value.trim();
-    const fecha = document.getElementById('fechaCapacitacion').value;
-    const capacitador = document.getElementById('capacitador').value.trim();
-    const observaciones = document.getElementById('observacionesCapacitacion').value.trim();
-
-    if (!gescot) {
-        alert('⚠️ El código GESCOT es obligatorio para registrar la capacitación');
-        document.getElementById('gescotCapacitacion').focus();
-        return;
-    }
-
-    if (!fecha || !capacitador) {
-        alert('⚠️ Complete todos los campos obligatorios');
-        return;
-    }
-
-    const itemsSeleccionados = document.querySelectorAll('.item-capacitacion:checked');
-    if (itemsSeleccionados.length === 0) {
-        alert('⚠️ Seleccione al menos un item a capacitar');
-        return;
-    }
-
-    try {
-        const db = getDB();
-        if (!db) {
-            alert('❌ Base de datos no disponible');
-            return;
-        }
-
-        const itemIds = Array.from(itemsSeleccionados).map(cb => parseInt(cb.dataset.id));
-
-        for (const id of itemIds) {
-            await db
-                .from('pda_acciones')
-                .update({
-                    completado: true,
-                    codigo_gescot: gescot,
-                    fecha_completado: fecha,
-                    completado_por: capacitador,
-                    observaciones: observaciones,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', id);
-        }
-
-        await db
-            .from('pda_cabecera')
-            .update({
-                estado: 'en_seguimiento_capacitacion',
-                gescot_capacitacion: gescot,
-                fecha_capacitacion: fecha,
-                capacitador: capacitador,
-                observaciones_capacitacion: observaciones,
-                fecha_inicio_seguimiento_capacitacion: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', pdaId);
-
-        // 🔴 REGISTRAR EVENTO CON EL CAPACITADOR
-        await registrarEventoPDA(pdaId, 'capacitacion_registrada', {
-            gescot: gescot,
-            fecha_capacitacion: fecha,
-            capacitador: capacitador,
-            items_completados: itemsSeleccionados.length,
-            observaciones: observaciones
-        }, capacitador);  // ← PASAR EL CAPACITADOR COMO PERSONA
-
-        alert(`✅ Capacitación registrada correctamente\n\n🔑 GESCOT: ${gescot}\n👤 Capacitador: ${capacitador}`);
-
-        cerrarModalGestionPDA();
-        await cargarDatosPDA();
-
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error al registrar capacitación: ' + error.message);
-    }
-}
-
-// ===== 10. INICIO FUNCIÓN: renderizarModalEnSeguimiento ===============
-function renderizarModalEnSeguimiento(pda) {
-    return `
-            <div class="modal-gestion-content">
-                <div class="modal-gestion-header">
-                    <strong>📊 Seguimiento de mejora - ${escapeHtml(pda.agente)}</strong>
-                    <button onclick="cerrarModalGestionPDA()">✖</button>
-                </div>
-                <div class="modal-gestion-body">
-                    <div class="info-box">
-                        <p><strong>📅 Ciclo basal:</strong> ${pda.fechaInicioCicloBasal || 'N/A'} al ${pda.fechaFinCicloBasal || 'N/A'}</p>
-                        <p><strong>📊 Cuartil basal:</strong> Q4 | <strong>Promedio:</strong> ${pda.promedioBasal || 'N/A'}%</p>
-                        <p><strong>📅 Fecha fin gestión:</strong> ${pda.fechaFinGestion || 'N/A'}</p>
-                    </div>
-                    
-                    <div class="warning-box" style="margin-top: 15px;">
-                        ⏳ Este PDA está en período de seguimiento.<br>
-                        El sistema evaluará automáticamente la mejora cuando el gestor complete nuevas evaluaciones.
-                    </div>
-                    
-                    <button onclick="verEvaluacionPreliminar(${pda.id})" style="margin-top: 15px; width: 100%;">
-                        📈 Ver evaluaciones recientes del gestor
-                    </button>
-                </div>
-                <div class="modal-gestion-footer">
-                    <button onclick="cerrarModalGestionPDA()" class="secondary">Cerrar</button>
-                </div>
-            </div>
-        `;
-}
-// ===== FIN FUNCIÓN: renderizarModalEnSeguimiento =======================
-
-// ===== 11. INICIO FUNCIÓN: inicializarSelectoresMultiples =============            
-function inicializarSelectoresMultiples() {
-    const tipos = ['feedback', 'proceso', 'habilidades'];
-
-    for (const tipo of tipos) {
-        const btnSelectAll = document.querySelector(`.btn-select-all[data-tipo="${tipo}"]`);
-        if (!btnSelectAll) continue;
-
-        // Remover event listener anterior si existe
-        const nuevoBtn = btnSelectAll.cloneNode(true);
-        btnSelectAll.parentNode.replaceChild(nuevoBtn, btnSelectAll);
-
-        nuevoBtn.addEventListener('click', function () {
-            const checkboxes = document.querySelectorAll(`.check-submotivo-${tipo}`);
-            const todosSeleccionados = Array.from(checkboxes).every(cb => cb.checked);
-
-            checkboxes.forEach(cb => {
-                cb.checked = !todosSeleccionados;
-            });
-
-            // Actualizar texto del botón
-            const nuevosTodosSeleccionados = Array.from(checkboxes).every(cb => cb.checked);
-            this.innerHTML = nuevosTodosSeleccionados ? '⬜ Deseleccionar todos' : '☑️ Seleccionar todos';
-        });
-    }
-}
-// ===== FIN FUNCIÓN: inicializarSelectoresMultiples =====================
-
-// ===== 12. INICIO FUNCIÓN: guardarGestionAgrupada =====================
-async function guardarGestionAgrupada(pdaId) {
-    console.log('💾 Guardando gestión agrupada para PDA:', pdaId);
-
-    const db = getDB();
-    if (!db) {
-        alert('❌ Base de datos no disponible');
-        return;
-    }
-
-    // Obtener valores del formulario
-    const fechaInicioGestion = document.getElementById('fechaInicioGestion')?.value;
-    const supervisorGestion = document.getElementById('supervisorGestion')?.value.trim();
-
-    // Validaciones generales
-    if (!fechaInicioGestion) {
-        alert('⚠️ Complete la fecha de inicio de gestión');
-        return;
-    }
-    if (!supervisorGestion) {
-        alert('⚠️ Complete el supervisor que gestiona');
-        return;
-    }
-
-    // Recolectar datos por tipo
-    const tipos = ['feedback', 'proceso', 'habilidades'];
-    const datosPorTipo = {};
-    let hayItemsSeleccionados = false;
-    let errores = [];
-
-    for (const tipo of tipos) {
-        const config = MAPEO_ACCIONES_PDA[tipo];
-        const checkboxes = document.querySelectorAll(`.check-submotivo-${tipo}:checked`);
-        const submotivosSeleccionados = Array.from(checkboxes).map(cb => cb.value);
-
-        datosPorTipo[tipo] = {
-            submotivos: submotivosSeleccionados,
-            tieneItems: submotivosSeleccionados.length > 0
-        };
-
-        if (submotivosSeleccionados.length > 0) {
-            hayItemsSeleccionados = true;
-        }
-
-        // Validar código GESCOT para tipos que lo requieren
-        if (config.requiereCodigo && submotivosSeleccionados.length > 0) {
-            const codigoInput = document.getElementById(`codigo_${tipo}`);
-            const codigo = codigoInput?.value.trim();
-
-            if (!codigo) {
-                errores.push(`⚠️ El código GESCOT para ${config.nombre} es obligatorio`);
-                const errorSpan = document.getElementById(`codigo_${tipo}-error`);
-                if (errorSpan) errorSpan.style.display = 'block';
-            } else {
-                datosPorTipo[tipo].codigo = codigo;
-            }
-        }
-
-        // Para feedback, guardar observaciones
-        if (tipo === 'feedback' && submotivosSeleccionados.length > 0) {
-            const observaciones = document.getElementById(`observaciones_${tipo}`)?.value.trim();
-            datosPorTipo[tipo].observaciones = observaciones || 'Sin observaciones adicionales';
-        }
-    }
-
-    // Validar que haya al menos un item seleccionado
-    if (!hayItemsSeleccionados) {
-        alert('⚠️ Debe seleccionar al menos un item de mejora para gestionar');
-        return;
-    }
-
-    // Mostrar errores si hay
-    if (errores.length > 0) {
-        alert(errores.join('\n'));
-        return;
-    }
-
-    // Mostrar loading en el botón
-    const btnGuardar = document.getElementById('btnGuardarGestionAgrupada');
-    const textoOriginal = btnGuardar?.innerHTML;
-    if (btnGuardar) {
-        btnGuardar.innerHTML = '⏳ Guardando...';
-        btnGuardar.disabled = true;
-    }
-
-    try {
-        // 1. Actualizar la cabecera del PDA (estado, fechas, supervisor)
-        const { error: updateError } = await db
-            .from('pda_cabecera')
-            .update({
-                estado: 'en_gestion',
-                fecha_inicio_gestion: fechaInicioGestion,
-                supervisor_gestion: supervisorGestion,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', pdaId);
-
-        if (updateError) throw updateError;
-
-        // 2. Para cada tipo, actualizar las acciones correspondientes
-        const todasAccionesActualizadas = [];
-
-        for (const tipo of tipos) {
-            const data = datosPorTipo[tipo];
-            if (!data.tieneItems) continue;
-
-            // Para cada submotivo seleccionado, actualizar la acción correspondiente
-            for (const submotivo of data.submotivos) {
-                // Buscar la acción por submotivo y tipo
-                const { data: accionesExistentes, error: findError } = await db
-                    .from('pda_acciones')
-                    .select('id')
-                    .eq('pda_id', pdaId)
-                    .eq('submotivo', submotivo)
-                    .eq('tipo_accion', tipo)
-                    .maybeSingle();
-
-                if (findError) {
-                    console.warn(`Error buscando acción para ${submotivo}:`, findError);
-                    continue;
-                }
-
-                if (accionesExistentes) {
-                    // Actualizar acción existente
-                    const updateData = {
-                        completado: true,
-                        fecha_completado: new Date().toISOString().split('T')[0],
-                        completado_por: supervisorGestion,
-                        updated_at: new Date().toISOString()
-                    };
-
-                    // Agregar código GESCOT si aplica
-                    if (data.codigo) {
-                        updateData.codigo_gescot = data.codigo;
-                    }
-
-                    // Agregar observaciones si es feedback
-                    if (tipo === 'feedback' && data.observaciones) {
-                        updateData.observaciones = data.observaciones;
-                    }
-
-                    const { error: updateAccError } = await db
-                        .from('pda_acciones')
-                        .update(updateData)
-                        .eq('id', accionesExistentes.id);
-
-                    if (updateAccError) throw updateAccError;
-                    todasAccionesActualizadas.push(accionesExistentes.id);
-                }
-            }
-        }
-
-        console.log(`✅ Actualizadas ${todasAccionesActualizadas.length} acciones`);
-
-        // 3. Recargar datos y cerrar/refrescar modal
-        await cargarDatosPDA();
-
-        alert('✅ Gestión guardada correctamente\n\nEl PDA ha pasado a estado "En gestión".');
-
-        // Cerrar modal y abrir nuevamente para mostrar el nuevo estado
-        cerrarModalGestionPDA();
-        await abrirGestionPDA(pdaId);
-
-    } catch (error) {
-        console.error('Error guardando gestión agrupada:', error);
-        alert('❌ Error al guardar: ' + error.message);
-    } finally {
-        if (btnGuardar) {
-            btnGuardar.innerHTML = textoOriginal;
-            btnGuardar.disabled = false;
-        }
-    }
-}
-// ===== FIN FUNCIÓN: guardarGestionAgrupada =============================
-
-// ===== 13. INICIO FUNCIÓN: marcarComoNotificado =======================
-async function marcarComoNotificado(pdaId) {
-    const fecha = document.getElementById('fechaNotificacion').value;
-    const supervisor = document.getElementById('supervisorNotifico').value.trim();
-    const observaciones = document.getElementById('observacionesNotificacion').value.trim();
-
-    if (!fecha || !supervisor) {
-        alert('⚠️ Complete todos los campos obligatorios');
-        return;
-    }
-
-    try {
-        const db = getDB();
-        if (!db) {
-            alert('❌ Base de datos no disponible');
-            return;
-        }
-
-        // Actualizar estado a 'notificado'
-        const { error } = await db
-            .from('pda_cabecera')
-            .update({
-                estado: 'notificado',
-                fecha_notificacion_gestor: fecha,
-                notificado_por: supervisor,
-                observaciones_notificacion: observaciones,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', pdaId);
-
-        if (error) throw error;
-
-        // 🔴 REGISTRAR EVENTO CON EL SUPERVISOR (persona real)
-        await registrarEventoPDA(pdaId, 'notificado', {
-            fecha_notificacion: fecha,
-            supervisor: supervisor,
-            observaciones: observaciones
-        }, supervisor);  // ← PASAR EL SUPERVISOR COMO PERSONA
-
-        alert(`✅ Notificación registrada correctamente\n\n📅 Fecha: ${fecha}\n👤 Supervisor: ${supervisor}`);
-
-        cerrarModalGestionPDA();
-
-        const pdaCompleto = await API.getPDADetalle(pdaId);
-        if (pdaCompleto) {
-            const modalHTML = renderizarModalNotificado(pdaCompleto);
-            const nuevoModal = document.createElement('div');
-            nuevoModal.id = 'modalGestionPDA';
-            nuevoModal.className = 'modal-gestion-pda';
-            nuevoModal.innerHTML = modalHTML;
-            document.body.appendChild(nuevoModal);
-            window.pdaActualGestion = { id: pdaId, cabecera: pdaCompleto };
-        }
-
-        await cargarDatosPDA();
-
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error al registrar notificación: ' + error.message);
-    }
-}
-// ===== FIN FUNCIÓN: marcarComoNotificado ===============================
-
-// ===== 14. INICIO FUNCIÓN: guardarYcontinuarGestion ===================⚠️ Redundante (similar a guardarGestionAgrupada)
-async function guardarYcontinuarGestion(pdaId) {
-    const fechaInicioGestion = document.getElementById('fechaInicioGestion')?.value;
-    const supervisorGestion = document.getElementById('supervisorGestion')?.value;
-
-    if (!fechaInicioGestion || !supervisorGestion) {
-        alert('⚠️ Complete los campos de gestión');
-        return;
-    }
-
-    const db = getDB();
-    const { error } = await db
-        .from('pda_cabecera')
-        .update({
-            estado: 'en_gestion',
-            fecha_inicio_gestion: fechaInicioGestion,
-            supervisor_gestion: supervisorGestion,
-            updated_at: new Date().toISOString()
-        })
-        .eq('id', pdaId);
-
-    if (error) {
-        alert('❌ Error: ' + error.message);
-        return;
-    }
-
-    // Recargar el modal en el nuevo estado
-    cerrarModalGestionPDA();
-    abrirGestionPDA(pdaId);
-}
-// ===== FIN FUNCIÓN: guardarYcontinuarGestion ===========================
-
-// ===== 15. INICIO FUNCIÓN: completarAccionPDA =========================
-async function completarAccionPDA(accionId) {
-    console.log(`🔧 Completando acción ID: ${accionId}`);
-
-    const db = getDB();
-    if (!db) {
-        alert('❌ Base de datos no disponible');
-        return;
-    }
-
-    // Obtener los valores del formulario
-    const codigoInput = document.getElementById(`codigo-${accionId}`);
-    const obsInput = document.getElementById(`obs-${accionId}`);
-
-    // Determinar si requiere código (por la presencia del input)
-    const requiereCodigo = !!codigoInput;
-    const codigoGescot = codigoInput ? codigoInput.value.trim() : null;
-    const observaciones = obsInput ? obsInput.value.trim() : null;
-
-    // Validar código GESCOT si es requerido
-    if (requiereCodigo && (!codigoGescot || codigoGescot === '')) {
-        alert('⚠️ Esta acción requiere un código GESCOT. Por favor ingréselo antes de marcar como completada.');
-        return;
-    }
-
-    // Validar observaciones si es feedback
-    if (!requiereCodigo && (!observaciones || observaciones === '')) {
-        if (!confirm('⚠️ No ha ingresado observaciones. ¿Desea continuar de todas formas?')) {
-            return;
-        }
-    }
-
-    const usuarioActual = window.usuarioActual?.nombre_completo || window.usuarioActual?.usuario || 'Supervisor';
-
-    try {
-        const { error } = await db
-            .from('pda_acciones')
-            .update({
-                completado: true,
-                codigo_gescot: codigoGescot,
-                observaciones: observaciones,
-                fecha_completado: new Date().toISOString().split('T')[0],
-                completado_por: usuarioActual,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', accionId);
-
-        if (error) throw error;
-
-        // Mostrar mensaje de éxito
-        const tipoAccion = requiereCodigo ? 'capacitación' : 'feedback';
-        alert(`✅ Acción de ${tipoAccion} completada correctamente`);
-
-        // Recargar el modal para reflejar el cambio
-        const pdaId = window.pdaActualGestion?.id;
-        if (pdaId) {
-            cerrarModalGestionPDA();
-            await abrirGestionPDA(pdaId);
-        }
-
-        // Recargar listas de PDA
-        await cargarDatosPDA();
-
-    } catch (error) {
-        console.error('Error completando acción:', error);
-        alert('❌ Error al completar la acción: ' + error.message);
-    }
-}
-// ===== FIN FUNCIÓN: completarAccionPDA =================================
-
-// ===== 16. INICIO FUNCIÓN: iniciarSeguimientoPDA ======================
-async function iniciarSeguimientoPDA(pdaId) {
-    const db = getDB();
-    if (!db) return;
-
-    const fechaFinGestion = new Date().toISOString().split('T')[0];
-
-    try {
-        const { error } = await db
-            .from('pda_cabecera')
-            .update({
-                estado: 'en_seguimiento',
-                fecha_fin_gestion: fechaFinGestion,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', pdaId);
-
-        if (error) throw error;
-
-        alert('✅ PDA marcado como "En seguimiento". El sistema evaluará la mejora en las próximas evaluaciones del gestor.');
-
-        await cargarDatosPDA();
-        cerrarModalGestionPDA();
-
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error: ' + error.message);
-    }
-}
-// ===== FIN FUNCIÓN: iniciarSeguimientoPDA ==============================
-
-// ===== 17. INICIO FUNCIÓN: renderizarChecklistAcciones ================
-function renderizarChecklistAcciones(acciones) {
-    if (!acciones || acciones.length === 0) {
-        return '<div style="text-align: center; padding: 20px; color: var(--muted);">✅ No hay acciones pendientes</div>';
-    }
-
-    let html = '<div style="display: flex; flex-direction: column; gap: 15px;">';
-
-    for (const acc of acciones) {
-        const tipoIcono = acc.tipo_accion === 'feedback' ? '💬' : (acc.tipo_accion === 'capacitacion_proceso' ? '📚' : '🎯');
-        const tipoTexto = acc.tipo_accion === 'feedback' ? 'Feedback' : (acc.tipo_accion === 'capacitacion_proceso' ? 'Capacitación Proceso' : 'Capacitación Habilidades');
-        const tipoColor = acc.tipo_accion === 'feedback' ? 'var(--accent)' : (acc.tipo_accion === 'capacitacion_proceso' ? '#7b1fa2' : '#fd7e14');
-        const requiereCodigo = acc.requiere_codigo;
-
-        html += `
-                <div id="accion-${acc.id}" style="background: #f8f9fa; border-radius: 10px; padding: 12px; border-left: 4px solid ${tipoColor};">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-                        <div style="flex: 1;">
-                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                <span style="font-size: 16px;">${tipoIcono}</span>
-                                <strong>${escapeHtml(acc.submotivo)}</strong>
-                                <span class="badge" style="background: ${tipoColor};">${tipoTexto}</span>
-                            </div>
-                            <div style="font-size: 12px; color: var(--muted); margin-top: 5px;">
-                                📁 ${escapeHtml(acc.atributo || 'Sin atributo')}
-                            </div>
-                            <div style="margin-top: 12px;">
-                                ${requiereCodigo ? `
-                                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                        <label style="font-size: 12px; margin: 0; font-weight: 600;">🔑 Código GESCOT *:</label>
-                                        <input type="text" id="codigo-${acc.id}" 
-                                            placeholder="Ej: GESCOT-2024-00123"
-                                            style="flex: 1; min-width: 200px; padding: 8px 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--line);">
-                                        <small style="color: var(--danger);">Obligatorio</small>
-                                    </div>
-                                ` : `
-                                    <div>
-                                        <label style="font-size: 12px; font-weight: 600;">📝 Observaciones / Feedback:</label>
-                                        <textarea id="obs-${acc.id}" rows="2" 
-                                            placeholder="Describa el feedback proporcionado al gestor..."
-                                            style="width: 100%; padding: 8px 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--line); margin-top: 5px;"></textarea>
-                                    </div>
-                                `}
-                            </div>
-                        </div>
-                        <div>
-                            <button onclick="completarAccionPDA(${acc.id})" 
-                                    style="background: var(--ok); padding: 8px 16px; font-size: 12px; border-radius: 6px; border: none; cursor: pointer;">
-                                ✓ Marcar como completada
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-    }
-
-    html += '</div>';
-    return html;
-}
-// ===== FIN FUNCIÓN: renderizarChecklistAcciones ========================
-
-// ======================================================
-// NUEVA FUNCIÓN: verificarInformeGenerado
-// ======================================================
 async function verificarInformeGenerado(anio, mes, agente, cicloNumero) {
     try {
         const db = getDB();
@@ -24290,7 +18903,7 @@ async function generarPDAConDocumento(agente, numeroCiclo = null) {
         // PASO 14: GUARDAR EN BASE DE DATOS VIA API
         // ======================================================
         console.log('💾 Guardando PDA completo en base de datos via API...');
-        const guardado = await guardarPDAEnBaseDeDatos(informe, documentoHTML);
+        const guardado = await guardarPDAEnBaseDeDatos(informe);
 
         if (!guardado) {
             throw new Error('No se pudo guardar el PDA en la base de datos');
@@ -24372,122 +18985,6 @@ async function verificarReporteExistente(agente, ciclo, mes, anio) {
     }
 }
 
-// ======================================================
-// FUNCIÓN MODIFICADA: guardarPDAEnBaseDeDatos (vía API)
-// ======================================================
-async function guardarPDAEnBaseDeDatos(informe, htmlContent) {
-    console.log(`💾 Guardando PDA completo para ${informe.agente}`);
-
-    const db = getDB();
-    if (!db) {
-        alert('❌ Base de datos no disponible');
-        return false;
-    }
-
-    try {
-        // ======================================================
-        // 1. GENERAR ID PARA PDA_CABECERA
-        // ======================================================
-
-        const { data: maxIdData } = await db
-            .from('pda_cabecera')
-            .select('id')
-            .order('id', { ascending: false })
-            .limit(1);
-
-        let nuevoId = 1;
-        if (maxIdData && maxIdData.length > 0 && maxIdData[0].id !== null && maxIdData[0].id !== undefined) {
-            nuevoId = Number(maxIdData[0].id) + 1;
-            console.log(`   ID máximo cabecera: ${maxIdData[0].id}, nuevo: ${nuevoId}`);
-        } else {
-            console.log('   📭 Tabla pda_cabecera vacía, empezando desde ID: 1');
-        }
-
-        // ======================================================
-        // 2. INSERTAR EN PDA_CABECERA CON CAMPAÑA
-        // ======================================================
-
-        const pdaData = {
-            id: nuevoId,
-            agente: informe.agente,
-            // 🔴 NUEVO: Guardar campañas
-            campana: informe.campanaPrincipal || 'Sin campaña',
-            campanas: informe.campanas && informe.campanas.length > 0
-                ? JSON.stringify(informe.campanas)
-                : null,
-            fecha_deteccion: new Date().toISOString().split('T')[0],
-            fecha_inicio_ciclo_basal: informe.ciclo.fechaInicio !== 'N/A' ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaInicio) : null,
-            fecha_fin_ciclo_basal: informe.ciclo.fechaFin !== 'N/A' ? convertirFechaDDMMYYYYaISO(informe.ciclo.fechaFin) : null,
-            ciclo_basal_numero: informe.ciclo.numero,
-            promedio_basal: parseFloat(informe.ciclo.promedio),
-            cuartil_basal: informe.ciclo.cuartil,
-            estado: 'pendiente',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        };
-
-        console.log('📤 Insertando en pda_cabecera...');
-        console.log('   ID:', pdaData.id, '| Agente:', pdaData.agente, '| Ciclo:', pdaData.ciclo_basal_numero);
-        console.log('   📌 Campaña:', pdaData.campana);
-
-        const { error: cabeceraError } = await db
-            .from('pda_cabecera')
-            .insert(pdaData);
-
-        if (cabeceraError) {
-            console.error('❌ Error en pda_cabecera:', cabeceraError);
-            throw cabeceraError;
-        }
-
-        const pdaId = nuevoId;
-        console.log(`✅ PDA_CABECERA: #${pdaId}`);
-
-        // ======================================================
-        // 3. GUARDAR ACCIONES EN PDA_ACCIONES
-        // ======================================================
-        const todasLasFallas = [];
-        for (const ev of informe.evaluaciones) {
-            for (const falla of ev.fallas) {
-                todasLasFallas.push(falla);
-            }
-        }
-        await crearAccionesPDADesdeMatriz(pdaId, todasLasFallas);
-
-        // ======================================================
-        // 4. GUARDAR CICLO BASAL EN PDA_CICLOS_EVALUACION
-        // ======================================================
-        await guardarCicloBasalPDA(pdaId, informe);
-
-        // ======================================================
-        // 5. GUARDAR DOCUMENTO EN PDA_DOCUMENTOS
-        // ======================================================
-        await guardarDocumentoPDA(pdaId, informe, htmlContent);
-
-        // ======================================================
-        // 6. RESUMEN FINAL
-        // ======================================================
-
-        console.log('\n📊 === RESUMEN DE INSERCIÓN ===');
-        console.log(`✅ pda_cabecera: ID ${pdaId} | Campaña: ${pdaData.campana}`);
-        console.log(`✅ pda_acciones: ${todasLasFallas.length} acciones`);
-        console.log(`✅ pda_ciclos_evaluacion: guardado`);
-        console.log(`✅ pda_documentos: guardado`);
-
-        alert(`✅ PDA COMPLETO GUARDADO\n\n` +
-            `👤 Agente: ${informe.agente}\n` +
-            `📌 Campaña: ${pdaData.campana}\n` +
-            `📊 Ciclo: #${informe.ciclo.numero}\n` +
-            `🆔 ID: ${pdaId}`);
-
-        await cargarDatosPDA();
-        return true;
-
-    } catch (error) {
-        console.error('❌ Error:', error);
-        alert('❌ Error al guardar: ' + error.message);
-        return false;
-    }
-}
 
 // ======================================================
 // FUNCIÓN: mostrarReporteExistente
@@ -24531,417 +19028,6 @@ async function mostrarReporteExistente(agente, cicloNumero) {
         alert('❌ Error al mostrar el reporte: ' + error.message);
     }
 }
-
-// ======================================================
-// FUNCIÓN: verificarPDAFinal
-// ======================================================
-
-async function verificarPDAFinal() {
-    const db = getDB();
-    if (!db) {
-        console.error('❌ Base de datos no disponible');
-        return;
-    }
-
-    console.log('🔍 === VERIFICACIÓN FINAL ===');
-
-    // 1. Buscar en pda_cabecera
-    const { data: cabecera, error: err1 } = await db
-        .from('pda_cabecera')
-        .select('*')
-        .eq('agente', 'BARREDA TORRES HUGO DOMINGO')
-        .order('id', { ascending: false })
-        .limit(1);
-
-    if (err1) {
-        console.error('❌ Error:', err1);
-    } else if (cabecera && cabecera.length > 0) {
-        console.log('✅ PDA_CABECERA:', {
-            id: cabecera[0].id,
-            agente: cabecera[0].agente,
-            estado: cabecera[0].estado,
-            ciclo: cabecera[0].ciclo_basal_numero,
-            promedio: cabecera[0].promedio_basal
-        });
-    } else {
-        console.log('❌ No se encontró el PDA');
-    }
-
-    // 2. Contar acciones
-    const { count: totalAcciones, error: err2 } = await db
-        .from('pda_acciones')
-        .select('*', { count: 'exact', head: true })
-        .eq('pda_id', cabecera?.[0]?.id || 0);
-
-    if (err2) {
-        console.error('❌ Error:', err2);
-    } else {
-        console.log(`✅ PDA_ACCIONES: ${totalAcciones || 0} acciones`);
-    }
-
-    // 3. Verificar ciclo basal
-    const { data: ciclo, error: err3 } = await db
-        .from('pda_ciclos_evaluacion')
-        .select('*')
-        .eq('pda_origen_id', cabecera?.[0]?.id || 0)
-        .limit(1);
-
-    if (err3) {
-        console.error('❌ Error:', err3);
-    } else if (ciclo && ciclo.length > 0) {
-        console.log('✅ PDA_CICLOS_EVALUACION:', {
-            id: ciclo[0].id,
-            tipo: ciclo[0].tipo_ciclo,
-            promedio: ciclo[0].promedio_nota,
-            cuartil: ciclo[0].cuartil
-        });
-    }
-
-    // 4. Verificar documento
-    const { data: doc, error: err4 } = await db
-        .from('pda_documentos')
-        .select('*')
-        .eq('agente', 'BARREDA TORRES HUGO DOMINGO')
-        .order('id', { ascending: false })
-        .limit(1);
-
-    if (err4) {
-        console.error('❌ Error:', err4);
-    } else if (doc && doc.length > 0) {
-        console.log('✅ PDA_DOCUMENTOS:', {
-            id: doc[0].id,
-            documento_id: doc[0].documento_id,
-            estado: doc[0].estado
-        });
-    }
-
-    console.log('✅ VERIFICACIÓN COMPLETADA');
-}
-
-console.log('✅ Función verificarPDAFinal definida');
-
-// ======================================================
-// FUNCIÓN: generarIdUnicoPDA
-// ======================================================
-
-async function generarIdUnicoPDA() {
-    const db = getDB();
-    if (!db) return Date.now();
-
-    try {
-        // Obtener el ID más alto
-        const { data: maxIdData, error } = await db
-            .from('pda_cabecera')
-            .select('id')
-            .order('id', { ascending: false })
-            .limit(1);
-
-        if (error) {
-            console.warn('Error obteniendo max ID:', error);
-            return Date.now();
-        }
-
-        // Si no hay registros, usar timestamp
-        if (!maxIdData || maxIdData.length === 0) {
-            return Date.now();
-        }
-
-        // Obtener el ID más alto
-        let maxId = Number(maxIdData[0].id);
-        let nuevoId = maxId + 1;
-        let timestamp = Date.now();
-
-        // Si el timestamp es menor que el maxId, usar maxId + 1
-        if (timestamp <= maxId) {
-            return maxId + 1;
-        }
-
-        // Si el timestamp ya existe, incrementar hasta que sea único
-        let intentos = 0;
-        while (intentos < 10) {
-            const { data: verificar, error: verifError } = await db
-                .from('pda_cabecera')
-                .select('id')
-                .eq('id', timestamp)
-                .maybeSingle();
-
-            if (verifError || !verificar) {
-                // El timestamp es único, usarlo
-                return timestamp;
-            }
-            // Si ya existe, incrementar
-            timestamp++;
-            intentos++;
-        }
-
-        // Fallback: usar maxId + 1
-        return maxId + 1;
-
-    } catch (error) {
-        console.error('Error generando ID:', error);
-        return Date.now() + Math.floor(Math.random() * 1000);
-    }
-}
-
-// ======================================================
-// FUNCIÓN CORREGIDA - Usa SOLO lo que ya tienes
-// ======================================================
-async function cargarAgentesQ4PorMes() {
-    console.log('📊 cargarAgentesQ4PorMes - INICIO');
-
-    const mesSeleccionado = document.getElementById('selectorMesQ4')?.value;
-    const filtroEstadoPDA = document.getElementById('selectorEstadoPDA')?.value || 'todos';
-
-    if (!mesSeleccionado) {
-        const container = document.getElementById('agentesQ4PorMesContainer');
-        if (container) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: var(--muted);">
-                    📅 Seleccione un mes para ver los agentes en Q4
-                </div>
-            `;
-        }
-        return;
-    }
-
-    const [anio, mes] = mesSeleccionado.split('-');
-    if (!anio || !mes) {
-        console.error('Formato de mes inválido:', mesSeleccionado);
-        return;
-    }
-
-    const container = document.getElementById('agentesQ4PorMesContainer');
-    if (container) {
-        container.innerHTML = `
-            <div style="text-align: center; padding: 40px;">
-                ⏳ Cargando agentes en Q4...
-            </div>
-        `;
-    }
-
-    try {
-        // ======================================================
-        // PASO 1: Asegurar evaluaciones
-        // ======================================================
-        if (!window.evaluacionesGlobales || window.evaluacionesGlobales.length === 0) {
-            console.log('🔄 Cargando evaluaciones...');
-            await cargarEvaluacionesDesdePostgreSQL();
-        }
-
-        // ======================================================
-        // PASO 2: Asegurar ranking completo
-        // ======================================================
-        if (!window.rankingCompletoGlobal || window.rankingCompletoGlobal.length === 0) {
-            console.log('🔄 Construyendo ranking...');
-            const evaluaciones = window.evaluacionesGlobales || [];
-            window.rankingCompletoGlobal = await construirRankingAgentes(evaluaciones);
-        }
-
-        console.log(`📊 Ranking: ${window.rankingCompletoGlobal.length} agentes`);
-
-        // ======================================================
-        // PASO 3: Filtrar agentes Q4 del mes seleccionado
-        // ======================================================
-        const resultados = [];
-        const anioNum = parseInt(anio);
-        const mesNum = parseInt(mes);
-
-        for (const agente of window.rankingCompletoGlobal) {
-            if (agente.cuartil !== 'Q4') continue;
-
-            const ciclos = await agruparEvaluacionesEnCiclos(agente.agente);
-            const ciclosQ4 = ciclos.filter(c => c.cuartil === 'Q4' && c.esCompleto);
-
-            let cicloEncontrado = null;
-            for (const ciclo of ciclosQ4) {
-                if (ciclo.fechaFin && ciclo.fechaFin !== 'N/A') {
-                    let mesCiclo, anioCiclo;
-
-                    if (typeof ciclo.fechaFin === 'string') {
-                        if (ciclo.fechaFin.includes('/')) {
-                            const partes = ciclo.fechaFin.split('/');
-                            if (partes.length === 3) {
-                                mesCiclo = parseInt(partes[1]);
-                                anioCiclo = parseInt(partes[2]);
-                            }
-                        } else if (ciclo.fechaFin.includes('-')) {
-                            const partes = ciclo.fechaFin.split('-');
-                            if (partes.length >= 2) {
-                                anioCiclo = parseInt(partes[0]);
-                                mesCiclo = parseInt(partes[1]);
-                            }
-                        }
-                    } else if (ciclo.fechaFin instanceof Date || ciclo.fechaFin?.getMonth) {
-                        mesCiclo = ciclo.fechaFin.getMonth() + 1;
-                        anioCiclo = ciclo.fechaFin.getFullYear();
-                    }
-
-                    if (anioCiclo === anioNum && mesCiclo === mesNum) {
-                        cicloEncontrado = ciclo;
-                        break;
-                    }
-                }
-            }
-
-            if (!cicloEncontrado) continue;
-
-            const tienePDA = (window.datosPDA || []).some(pda =>
-                pda.agente === agente.agente &&
-                pda.ciclo_basal_numero === cicloEncontrado.numero &&
-                ['pendiente', 'notificado', 'en_gestion', 'en_seguimiento',
-                    'pendiente_operaciones', 'gestor_notificado', 'enviado_capacitacion'].includes(pda.estado)
-            );
-
-            // ✅ CORREGIDO: Usar el promedio del ciclo, NO el del ranking
-            resultados.push({
-                agente: agente.agente,
-                promedio: cicloEncontrado.promedio,  // ← AHORA USA 79.6% (no 89.8%)
-                total_evaluaciones: cicloEncontrado.totalEvaluaciones,
-                fecha_inicio: cicloEncontrado.fechaInicio,
-                fecha_fin: cicloEncontrado.fechaFin,
-                ciclo_numero: cicloEncontrado.numero,
-                tienePDAactivo: tienePDA
-            });
-        }
-
-        // ======================================================
-        // PASO 4: Aplicar filtro de estado PDA
-        // ======================================================
-        let resultadosFiltrados = resultados;
-        if (filtroEstadoPDA === 'sin_pda') {
-            resultadosFiltrados = resultados.filter(r => !r.tienePDAactivo);
-        } else if (filtroEstadoPDA === 'con_pda') {
-            resultadosFiltrados = resultados.filter(r => r.tienePDAactivo);
-        }
-
-        // ======================================================
-        // PASO 5: RENDERIZAR RESULTADOS
-        // ======================================================
-        renderizarResultadosQ4Interno(resultadosFiltrados, mesSeleccionado, resultados.length);
-
-    } catch (error) {
-        console.error('❌ Error en cargarAgentesQ4PorMes:', error);
-        if (container) {
-            container.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: var(--danger);">
-                    ❌ Error: ${error.message}
-                </div>
-            `;
-        }
-    }
-}
-
-// ======================================================
-// FUNCIÓN DE RENDERIZADO INTERNO
-// ======================================================
-function renderizarResultadosQ4Interno(resultados, mesSeleccionado, totalSinFiltrar) {
-    const container = document.getElementById('agentesQ4PorMesContainer');
-    if (!container) return;
-
-    const [anio, mesNum] = mesSeleccionado.split('-');
-    const mesesNombres = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-    const nombreMes = mesesNombres[parseInt(mesNum) - 1];
-
-    if (resultados.length === 0) {
-        container.innerHTML = `
-            <div style="background: #fff4e5; margin-top: 15px; padding: 20px; border-radius: 12px; border: 1px solid #f39c12;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 24px;">✅</span>
-                    <div>
-                        <strong>No hay agentes en Q4 para ${nombreMes} ${anio}</strong>
-                        <div style="font-size: 13px; color: var(--muted);">
-                            (Total ciclos evaluados: ${totalSinFiltrar})
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        return;
-    }
-
-    let html = `
-        <div style="margin-top: 15px;">
-            <div style="background: #f0f7ff; padding: 8px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <span>
-                    📊 Mostrando <strong>${resultados.length}</strong> resultado(s) para <strong>${nombreMes} ${anio}</strong>
-                </span>
-                <span style="font-size: 12px; color: var(--muted);">
-                    Total ciclos completos en Q4: ${totalSinFiltrar}
-                </span>
-            </div>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-    `;
-
-    for (const item of resultados) {
-        const tienePDAactivo = item.tienePDAactivo;
-        const infoPDA = obtenerInfoPDA(item.agente, 'Q4');
-
-        let estadoBadge = '';
-        let botonPDA = '';
-
-        if (tienePDAactivo) {
-            estadoBadge = '<span class="badge" style="background: var(--accent);">📋 PDA en curso</span>';
-            botonPDA = `
-                <button onclick="abrirGestionPDADesdeAlerta('${escapeHtml(item.agente)}')" 
-                        style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                    📝 Ver PDA en curso
-                </button>
-            `;
-        } else {
-            estadoBadge = '<span class="badge" style="background: var(--danger);">🔴 Requiere PDA</span>';
-            botonPDA = `
-                <button onclick="generarPDAConDocumento('${escapeHtml(item.agente)}', ${item.ciclo_numero})" 
-                        style="background: var(--warning); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                    📋 Generar PDA
-                </button>
-            `;
-        }
-
-        html += `
-            <div style="border-left: 5px solid var(--danger); padding: 16px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e0e0e0;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
-                    <div style="flex: 1; min-width: 200px;">
-                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                            <strong style="font-size: 16px;">⚠️ ${escapeHtml(item.agente)}</strong>
-                            ${estadoBadge}
-                            <span style="font-size: 11px; background: #e9ecef; padding: 2px 8px; border-radius: 12px; white-space: nowrap;">
-                                📊 Ciclo #${item.ciclo_numero} (${item.total_evaluaciones}/5 eval)
-                            </span>
-                        </div>
-                        <div style="display: flex; gap: 15px; margin-top: 8px; flex-wrap: wrap; font-size: 13px;">
-                            <span>📊 Promedio ciclo: <strong style="color: var(--danger);">${item.promedio}%</strong></span>
-                            <span>📅 Período: ${item.fecha_inicio} → ${item.fecha_fin}</span>
-                        </div>
-                        ${infoPDA.total > 0 && infoPDA.total !== '-' ? `
-                        <div style="margin-top: 6px; font-size: 11px; color: var(--muted);">
-                            📋 PDA aplicados: ${infoPDA.total} | Último PDA: ${infoPDA.ultimaFecha || 'N/A'}
-                        </div>
-                        ` : ''}
-                    </div>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        ${botonPDA}
-                        <button onclick="verEvolucionCiclos('${escapeHtml(item.agente)}')" 
-                                style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                            📊 Ver evolución
-                        </button>
-                        <button onclick="mostrarTimeline('${escapeHtml(item.agente)}')" 
-                                style="background: var(--accent); padding: 8px 16px; font-size: 12px; border-radius: 8px; border: none; cursor: pointer; color: white;">
-                            📅 Ver timeline
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    html += `
-            </div>
-        </div>
-    `;
-
-    container.innerHTML = html;
-}
-
 
 // ======================================================
 // FUNCIÓN: generarDocumentoHTML (COMPLETA Y CORREGIDA)
@@ -25514,368 +19600,8 @@ async function exportarReportePDA() {
         alert('❌ Error al exportar: ' + error.message);
     }
 }
-// ===== FIN FUNCIÓN: exportarReportePDA =================================
 
-// ===== 27. INICIO FUNCIÓN: limpiarTodosPDA =============================
-async function limpiarTodosPDA() {
-    console.log('🗑️ Ejecutando limpieza completa de todos los PDA...');
 
-    const db = getDB();
-    if (!db) {
-        console.error('❌ Base de datos no disponible');
-        alert('❌ Base de datos no disponible');
-        return;
-    }
-
-    // Obtener referencia al botón
-    const btn = document.getElementById('btnLimpiarTodosPDA') || event?.target;
-    let textoOriginal = '';
-
-    if (btn) {
-        textoOriginal = btn.innerHTML;
-        btn.innerHTML = '⏳ Eliminando todos los registros...';
-        btn.disabled = true;
-    }
-
-    try {
-        // ======================================================
-        // 1. CONTAR REGISTROS ANTES DE ELIMINAR (para el mensaje de confirmación)
-        // ======================================================
-        const { count: countCabecera } = await db
-            .from('pda_cabecera')
-            .select('*', { count: 'exact', head: true });
-
-        const { count: countAcciones } = await db
-            .from('pda_acciones')
-            .select('*', { count: 'exact', head: true });
-
-        const { count: countCiclos } = await db
-            .from('pda_ciclos_evaluacion')
-            .select('*', { count: 'exact', head: true });
-
-        const totalRegistros = (countCabecera || 0) + (countAcciones || 0) + (countCiclos || 0);
-
-        if (totalRegistros === 0) {
-            alert('✅ No hay registros de PDA para eliminar');
-            if (btn) {
-                btn.innerHTML = textoOriginal || '🗑️ Limpiar todos los PDA';
-                btn.disabled = false;
-            }
-            return;
-        }
-
-        // ======================================================
-        // 2. CONFIRMACIÓN
-        // ======================================================
-        const confirmar = confirm(
-            `⚠️ ¿ELIMINAR TODOS LOS REGISTROS DE PDA?\n\n` +
-            `Se eliminarán ${totalRegistros} registros en total:\n` +
-            `• ${countCabecera || 0} PDA (cabecera)\n` +
-            `• ${countAcciones || 0} acciones\n` +
-            `• ${countCiclos || 0} ciclos de evaluación\n\n` +
-            `⚠️ Esta acción NO se puede deshacer.\n\n` +
-            `¿Está seguro de continuar?`
-        );
-
-        if (!confirmar) {
-            if (btn) {
-                btn.innerHTML = textoOriginal || '🗑️ Limpiar todos los PDA';
-                btn.disabled = false;
-            }
-            return;
-        }
-
-        // Confirmación adicional con código
-        const codigo = prompt('Para confirmar, escribe "ELIMINAR PDA" en mayúsculas:');
-        if (codigo !== 'ELIMINAR PDA') {
-            alert('❌ Operación cancelada.');
-            if (btn) {
-                btn.innerHTML = textoOriginal || '🗑️ Limpiar todos los PDA';
-                btn.disabled = false;
-            }
-            return;
-        }
-
-        // ======================================================
-        // 3. ELIMINAR EN ORDEN
-        // ======================================================
-
-        // Paso 1: Eliminar pda_acciones
-        const { error: errorAcciones } = await db
-            .from('pda_acciones')
-            .delete()
-            .neq('id', 0);
-
-        if (errorAcciones) throw new Error(`Error en acciones: ${errorAcciones.message}`);
-
-        // Paso 2: Eliminar pda_ciclos_evaluacion
-        const { error: errorCiclos } = await db
-            .from('pda_ciclos_evaluacion')
-            .delete()
-            .neq('id', 0);
-
-        if (errorCiclos) throw new Error(`Error en ciclos: ${errorCiclos.message}`);
-
-        // Paso 3: Eliminar pda_cabecera
-        const { error: errorCabecera } = await db
-            .from('pda_cabecera')
-            .delete()
-            .neq('id', 0);
-
-        if (errorCabecera) throw new Error(`Error en cabecera: ${errorCabecera.message}`);
-
-        // ======================================================
-        // 4. LIMPIAR VARIABLES GLOBALES Y UI
-        // ======================================================
-        window.datosPDA = [];
-
-        // Actualizar listas visuales
-        const listaPendientes = document.getElementById('listaPendientes');
-        const listaSeguimiento = document.getElementById('listaSeguimiento');
-        const listaHistorial = document.getElementById('listaHistorial');
-
-        if (listaPendientes) listaPendientes.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">✅ No hay PDA pendientes</div>';
-        if (listaSeguimiento) listaSeguimiento.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">📊 No hay PDA en seguimiento</div>';
-        if (listaHistorial) listaHistorial.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--muted);">No hay PDA en el historial</div>';
-
-        // Actualizar contadores
-        const totalPendientes = document.getElementById('totalPendientes');
-        const totalSeguimiento = document.getElementById('totalSeguimiento');
-        const totalCompletados = document.getElementById('totalCompletados');
-        const totalPendientesBadge = document.getElementById('totalPendientesBadge');
-        const totalSeguimientoBadge = document.getElementById('totalSeguimientoBadge');
-
-        if (totalPendientes) totalPendientes.textContent = '0';
-        if (totalSeguimiento) totalSeguimiento.textContent = '0';
-        if (totalCompletados) totalCompletados.textContent = '0';
-        if (totalPendientesBadge) totalPendientesBadge.textContent = '0';
-        if (totalSeguimientoBadge) totalSeguimientoBadge.textContent = '0';
-
-        // ======================================================
-        // 5. MENSAJE FINAL SIMPLIFICADO
-        // ======================================================
-        alert(`✅ LIMPIEZA COMPLETADA EXITOSAMENTE\n\nSe han eliminado todos los registros de PDA (${totalRegistros} registros en total).`);
-
-        // Recargar datos si es necesario
-        if (typeof cargarDatosPDA === 'function') {
-            await cargarDatosPDA();
-        }
-
-        if (typeof generarReportes === 'function' && document.getElementById('tab-reportes')?.classList.contains('active')) {
-            await generarReportes();
-        }
-
-        console.log('✅ Limpieza completada');
-
-    } catch (error) {
-        console.error('❌ Error en limpieza:', error);
-        alert(`❌ Error durante la limpieza:\n\n${error.message}`);
-
-    } finally {
-        if (btn) {
-            btn.innerHTML = textoOriginal || '🗑️ Limpiar todos los PDA';
-            btn.disabled = false;
-        }
-    }
-}
-// ===== FIN FUNCIÓN: limpiarTodosPDA ====================================
-
-// ===== 28. INICIO FUNCIÓN: cerrarModalGestionPDA ======================
-function cerrarModalGestionPDA() {
-    const modal = document.getElementById('modalGestionPDA');
-    if (modal) modal.remove();
-    window.pdaActualGestion = null;
-}
-// ===== FIN FUNCIÓN: cerrarModalGestionPDA ===============================
-
-// ===== 29. INICIO FUNCIÓN: abrirGestionPDADesdeAlerta ==================
-async function abrirGestionPDADesdeAlerta(agente) {
-    const pdaActivo = (window.datosPDA || []).find(pda =>
-        pda.agente === agente &&
-        ['pendiente', 'notificado', 'en_gestion', 'en_seguimiento'].includes(pda.estado)
-    );
-
-    if (pdaActivo) {
-        await abrirGestionPDA(pdaActivo.id);
-    } else {
-        alert('No se encontró un PDA activo para este gestor');
-    }
-}
-// ===== FIN FUNCIÓN: abrirGestionPDADesdeAlerta =========================
-
-// ===== 30. INICIO FUNCIÓN: guardarDatosPDA =============================
-async function guardarDatosPDA() {
-    try {
-        const db = getDB();
-        if (!db) throw new Error('Base de datos no disponible');
-
-        // Para cada PDA, actualizar o insertar
-        for (const pda of datosPDA) {
-            // Convertir al formato de la base de datos
-            const pdaDB = {
-                id: pda.id,
-                agente: pda.agente,
-                items: pda.items || [],
-                items_resumen: pda.itemsResumen || '',
-                cantidad_items: pda.cantidadItems || 0,
-                fecha_quiebre: pda.fechaQuiebre || '',
-                accion: pda.accion || '',
-                responsable: pda.responsable || '',
-                fecha_aplicacion: pda.fechaAplicacion || '',
-                fecha_escucha: pda.fechaEscucha || '',
-                estado: pda.estado || 'pendiente',
-                updated_at: new Date().toISOString()
-            };
-
-            const { error } = await db
-                .from('pda_registros')
-                .upsert(pdaDB, { onConflict: 'id' });
-
-            if (error) throw error;
-        }
-
-        console.log('✅ PDA guardados en la base de datos');
-
-    } catch (error) {
-        console.error('❌ Error guardando PDA:', error);
-    }
-}
-// ===== FIN FUNCIÓN: guardarDatosPDA ====================================
-
-// ===== 31. INICIO FUNCIÓN: obtenerAccionPDA ============================
-function obtenerAccionPDA(item) {
-    const acciones = {
-        'Maneja_Objeciones': 'Role-play: manejo de objeción con 3 escenarios diferentes',
-        'Informa_Campañas': 'Repaso de campañas activas + simulación de ofrecimiento',
-        'Genera_Compromiso_de_Pago': 'Capacitación en cierre efectivo, confirmar fecha/monto/medio',
-        'Cumple_Speech': 'Revisión de guion de atención y práctica con role-play',
-        'No_Interrumpe_Dialogo': 'Ejercicio de escucha activa con toma de notas',
-        'Brinda_informacion_correcta': 'Repaso de productos y servicios activos',
-        'Tipificacion_correcta': 'Revisión de guía de tipificación + 5 ejercicios prácticos'
-    };
-    return acciones[item] || 'Refuerzo específico según matriz de evaluación';
-}
-// ===== FIN FUNCIÓN: obtenerAccionPDA ===================================
-
-// ===== 32. INICIO FUNCIÓN: abrirFormularioEdicionPDA ===================
-async function abrirFormularioEdicionPDA(id) {
-    const db = getDB();
-    if (!db) return;
-
-    const { data: pda, error } = await db
-        .from('pda_registros')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-    if (error || !pda) return;
-
-    window.pdaEnEdicion = id;
-
-    document.getElementById('pdaAgenteTexto').value = pda.agente;
-    document.getElementById('pdaAgente').value = pda.agente;
-
-    document.getElementById('pdaFechaQuiebre').value = pda.fecha_quiebre || '';
-    document.getElementById('pdaFechaQuiebre').readOnly = true;
-    document.getElementById('pdaFechaQuiebre').style.background = '#f5f5f5';
-
-    const fechaAppSugerida = new Date().toISOString().split('T')[0];
-    document.getElementById('pdaFechaAplicacion').value = fechaAppSugerida;
-
-    const fechaEscSugerida = new Date();
-    fechaEscSugerida.setDate(fechaEscSugerida.getDate() + 7);
-    document.getElementById('pdaFechaEscucha').value = fechaEscSugerida.toISOString().split('T')[0];
-
-    document.getElementById('pdaAccion').value = pda.accion || '';
-    document.getElementById('pdaResponsable').value = pda.responsable || '';
-    document.getElementById('pdaEstado').value = pda.estado || 'pendiente';
-
-    // Cargar items si existen
-    if (pda.items && pda.items.length > 0) {
-        const container = document.getElementById('pdaItemsContainer');
-        if (container) {
-            let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
-            pda.items.forEach(item => {
-                const tipo = item.tipo === 'critico' ? '🔴 Crítico' : '🟡 No crítico';
-                const frente = item.frente || determinarFrenteSubmotivo(item.submotivo);
-                const frenteColor = frente === 'cliente' ? '#019DF4' : (frente === 'negocio' ? '#7b1fa2' : '#fd7e14');
-                const frenteTexto = frente === 'cliente' ? 'ENC' : (frente === 'negocio' ? 'ECUF' : 'ECN');
-
-                html += `
-                        <label style="display: flex; align-items: center; gap: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; border-left: 3px solid ${frenteColor};">
-                            <input type="checkbox" name="pdaItems" value="${escapeHtml(item.submotivo)}" 
-                                data-bloque="${escapeHtml(item.bloque)}"
-                                data-atributo="${escapeHtml(item.atributo)}"
-                                data-tipo="${item.tipo}"
-                                data-frente="${frente}"
-                                data-ocurrencias="${item.ocurrencias}"
-                                data-peso="${item.peso}"
-                                checked
-                                style="width: 18px; height: 18px; cursor: pointer;">
-                            <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                    <strong style="font-size: 14px;">❌ ${escapeHtml(item.submotivo)}</strong>
-                                    <span style="font-size: 10px; background: ${frenteColor}; color: white; padding: 2px 6px; border-radius: 10px;">${frenteTexto}</span>
-                                    <span style="font-size: 10px; background: ${item.tipo === 'critico' ? '#d93025' : '#f39c12'}; color: white; padding: 2px 6px; border-radius: 10px;">${tipo}</span>
-                                </div>
-                                <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">
-                                    📂 ${escapeHtml(item.bloque || 'Sin bloque')} / ${escapeHtml(item.atributo || 'Sin atributo')} | ${item.ocurrencias || 0} falla(s) | Peso: ${item.peso || 0}%
-                                </div>
-                            </div>
-                        </label>
-                    `;
-            });
-            html += '</div>';
-            container.innerHTML = html;
-
-            const checkboxesNuevos = document.querySelectorAll('input[name="pdaItems"]');
-            checkboxesNuevos.forEach(cb => {
-                cb.addEventListener('change', actualizarContadorItems);
-            });
-            actualizarContadorItems();
-        }
-    }
-
-    alert(`✏️ Editando PDA para ${pda.agente}`);
-}
-// ===== FIN FUNCIÓN: abrirFormularioEdicionPDA ==========================
-
-// ===== 33. INICIO FUNCIÓN: verDetallePDA ===============================
-async function verDetallePDA(id) {
-    const db = getDB();
-    if (!db) return;
-
-    const { data: pda, error } = await db
-        .from('pda_registros')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-    if (error || !pda) return;
-
-    let mensaje = `📋 DETALLE DE PDA\n━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    mensaje += `👤 Agente: ${pda.agente}\n`;
-    mensaje += `📌 Ítems:\n`;
-    if (pda.items && pda.items.length > 0) {
-        pda.items.forEach(item => {
-            mensaje += `   • ${item.submotivo} (${item.ocurrencias || 0} fallas, ${item.peso || 0}%)\n`;
-        });
-    } else {
-        mensaje += `   • ${pda.item || pda.itemsResumen}\n`;
-    }
-    mensaje += `📅 Fecha quiebre: ${pda.fechaQuiebre}\n`;
-    mensaje += `📅 Fecha aplicación: ${pda.fechaAplicacion}\n`;
-    mensaje += `📅 Fecha nueva escucha: ${pda.fechaEscucha}\n`;
-    mensaje += `👥 Responsable: ${pda.responsable}\n`;
-    mensaje += `📝 Acción: ${pda.accion}\n`;
-    mensaje += `📊 Resultado: ${pda.estado === 'corregido' ? '✅ Corregido' : pda.estado === 'persiste' ? '❌ Persiste - Escalar' : '⏳ Pendiente'}\n`;
-    mensaje += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-
-    alert(mensaje);
-}
-// ===== FIN FUNCIÓN: verDetallePDA ======================================
-
-// ===== 34. INICIO FUNCIÓN: limpiarFormPDA ==============================
 function limpiarFormPDA() {
     document.getElementById('pdaAgenteTexto').value = '';
     document.getElementById('pdaAgente').value = '';
@@ -27247,170 +20973,6 @@ async function inicializarGestionEscuchas() {
 }
 // ===== FIN FUNCIÓN: inicializarGestionEscuchas =========================
 
-// ===== 3. INICIO FUNCIÓN: procesarArchivoEscuchas ====================
-// ======================================================
-// PROCESAR ARCHIVO DE ESCUCHAS - CON CAMPAÑA
-// ======================================================
-
-async function procesarArchivoEscuchas(file) {
-    console.log('📁 Procesando archivo con CAMPAÑA:', file.name);
-
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onload = async function (e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { raw: true, defval: "" });
-
-                console.log('📊 Total de filas:', jsonData.length);
-                console.log('📋 Columnas:', Object.keys(jsonData[0] || {}));
-
-                const tickets = [];
-                const errores = [];
-
-                for (let i = 0; i < jsonData.length; i++) {
-                    const row = jsonData[i];
-
-                    // Mapear columnas
-                    let ticket = row['Consulta[ticket]'] || row['ticket'] || row['Ticket'] || '';
-                    let supervisor = row['Consulta[responsable]'] || row['responsable'] || row['Responsable'] || '';
-                    let gestor = row['Consulta[UsuarioMov]'] || row['UsuarioMov'] || row['usuario_mov'] || '';
-                    let auditor = row['Auditor'] || row['auditor'] || '';
-                    let motivos = row['Consulta[Motivos]'] || row['Motivos'] || row['motivos'] || '';
-                    let submotivos = row['Consulta[Submotivos]'] || row['Submotivos'] || row['submotivos'] || '';
-                    let subnivel = row['Consulta[SubNivel]'] || row['SubNivel]'] || row['subnivel'] || '';
-                    let peticion = row['PETICION'] || row['peticion'] || '';
-                    let usuario_dni = row['Consulta[UsuarioDNI]'] || row['UsuarioDNI'] || row['usuario_dni'] || '';
-                    let motivo_call = row['Consulta[motivo_call]'] || row['motivo_call'] || '';
-
-                    // ======================================================
-                    // 🔴 LEER CAMPAÑA DEL EXCEL
-                    // ======================================================
-                    let campana = '';
-
-                    // Buscar en las columnas comunes
-                    if (row['Campaña']) campana = row['Campaña'];
-                    else if (row['campana']) campana = row['campana'];
-                    else if (row['CAMPANA']) campana = row['CAMPANA'];
-
-                    // Si no se encuentra, buscar cualquier columna que contenga "camp"
-                    if (!campana) {
-                        for (const key of Object.keys(row)) {
-                            if (key.toLowerCase().includes('camp') && row[key]) {
-                                campana = row[key];
-                                break;
-                            }
-                        }
-                    }
-
-                    campana = campana.toString().trim().toUpperCase();
-
-                    console.log(`🔍 Fila ${i + 1}: Ticket="${ticket}", Campaña="${campana}"`);
-
-                    // 🔴 VALIDAR CAMPAÑA
-                    let campana_id = null;
-                    let errorCampana = null;
-
-                    if (campana) {
-                        const campanaData = await obtenerCampanaPorCodigo(campana);
-                        if (campanaData && campanaData.activa) {
-                            campana_id = campanaData.id;
-                            console.log(`   ✅ Campaña "${campana}" válida (ID: ${campana_id})`);
-                        } else {
-                            errorCampana = `Campaña "${campana}" no existe o está inactiva`;
-                            console.error(`   ❌ ${errorCampana}`);
-                        }
-                    } else {
-                        errorCampana = 'Campaña vacía';
-                        console.error(`   ❌ ${errorCampana}`);
-                    }
-
-                    if (errorCampana) {
-                        errores.push(`Fila ${i + 2}: ${errorCampana}`);
-                        continue;
-                    }
-
-                    // Validar ticket
-                    if (!ticket || ticket === '') {
-                        errores.push(`Fila ${i + 2}: Ticket vacío`);
-                        continue;
-                    }
-
-                    if (!auditor || auditor === '') {
-                        auditor = 'sin_asignar';
-                    }
-
-                    // Fecha
-                    let fecha_descarga_raw = row['Fecha Descarga'] || row['fecha_descarga'] || '';
-                    let fecha_descarga = '';
-                    if (typeof fecha_descarga_raw === 'number') {
-                        fecha_descarga = excelSerialToDate(fecha_descarga_raw);
-                    } else if (typeof fecha_descarga_raw === 'string' && fecha_descarga_raw.match(/^\d{4}-\d{2}-\d{2}/)) {
-                        fecha_descarga = fecha_descarga_raw.split('T')[0];
-                    } else if (typeof fecha_descarga_raw === 'string' && fecha_descarga_raw.includes('/')) {
-                        const partes = fecha_descarga_raw.split('/');
-                        if (partes.length === 3) {
-                            fecha_descarga = `${partes[2]}-${partes[1]}-${partes[0]}`;
-                        }
-                    }
-
-                    // ======================================================
-                    // 🔴 TICKET CON CAMPAÑA
-                    // ======================================================
-                    tickets.push({
-                        ticket: ticket,
-                        supervisor_responsable: supervisor,
-                        gestor_auditado: gestor,
-                        auditor_asignado: auditor,
-                        motivos: motivos,
-                        submotivos: submotivos,
-                        subnivel: subnivel,
-                        peticion: peticion,
-                        usuario_dni: usuario_dni,
-                        usuario_mov: gestor,
-                        motivo_call: motivo_call,
-                        fecha_descarga: fecha_descarga,
-                        estado: 'pendiente',
-                        // 🔴 CAMPOS DE CAMPAÑA
-                        campana: campana,
-                        campana_id: campana_id
-                    });
-                }
-
-                console.log(`✅ Tickets procesados: ${tickets.length}`);
-                console.log(`❌ Errores: ${errores.length}`);
-
-                if (errores.length > 0) {
-                    reject(new Error(`❌ ${errores.length} errores:\n${errores.join('\n')}`));
-                    return;
-                }
-
-                if (tickets.length === 0) {
-                    reject(new Error('No se encontraron tickets válidos'));
-                    return;
-                }
-
-                resolve(tickets);
-
-            } catch (error) {
-                console.error('❌ Error:', error);
-                reject(error);
-            }
-        };
-
-        reader.onerror = function (error) {
-            console.error('❌ Error de lectura:', error);
-            reject(error);
-        };
-
-        reader.readAsArrayBuffer(file);
-    });
-}
-// ===== FIN FUNCIÓN: procesarArchivoEscuchas ============================
-
 // ===== 3.1 INICIO FUNCIÓN: validarGestoresContraTablaAgentes =================
 async function validarGestoresContraTablaAgentes(tickets) {
     console.log('🔍 Validando gestores (usuario_mov) contra tabla agentes...');
@@ -27787,7 +21349,7 @@ async function cargarYDistribuirEscuchas() {
         // 10. RECARGAR DATOS
         // ======================================================
         await refrescarMonitoreoEscuchas();
-        // await cargarHistorialLotes(); 
+        // await cargarHistorialLotes();
         fileInput.value = '';
 
     } catch (error) {
@@ -28681,7 +22243,7 @@ function mostrarResumenDistribucionConFiltro(distribucion, auditores, ticketsAsi
                         <div style="font-size: 10px; color: var(--muted);">Auditores</div>
                     </div>
                 </div>
-                
+
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     ${auditoresConTickets.slice(0, 6).map(a => {
         const ticketsAuditor = distribucion[a.usuario] || [];
@@ -28764,7 +22326,7 @@ function mostrarResumenDistribucion(resultadoDistribucion, totalTickets, omitido
                     <div style="font-size: 10px; color: var(--muted);">Auditores</div>
                 </div>
             </div>
-            
+
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 ${auditoresConTickets.slice(0, 6).map(a => {
         const cantidad = distribucion[a]?.length || 0;
@@ -28877,11 +22439,11 @@ function mostrarAdvertenciaMultiLote(filtroLote, asignaciones) {
         const warningDiv = document.createElement('div');
         warningDiv.id = 'warningMultiLote';
         warningDiv.style.cssText = `
-                background: #fff3e0; 
-                padding: 10px 15px; 
-                margin-bottom: 15px; 
-                border-radius: 8px; 
-                font-size: 12px; 
+                background: #fff3e0;
+                padding: 10px 15px;
+                margin-bottom: 15px;
+                border-radius: 8px;
+                font-size: 12px;
                 border-left: 4px solid #f39c12;
                 display: flex;
                 justify-content: space-between;
@@ -28981,11 +22543,11 @@ function actualizarTablaMonitoreo(asignaciones) {
             estadoClase = 'style="background: #fff0f0;"';
             acciones = `
                 <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                    <button onclick="verDetalleIncidenciaEscucha(${asig.id})" 
+                    <button onclick="verDetalleIncidenciaEscucha(${asig.id})"
                         style="background: var(--warning); padding: 4px 8px; font-size: 11px; border: none; border-radius: 6px; cursor: pointer;">
                         🔍 Ver
                     </button>
-                    <button onclick="marcarIncidenciaResuelta(${asig.id})" 
+                    <button onclick="marcarIncidenciaResuelta(${asig.id})"
                         style="background: var(--ok); padding: 4px 8px; font-size: 11px; border: none; border-radius: 6px; cursor: pointer;">
                         ✅ Resolver
                     </button>
@@ -29008,7 +22570,7 @@ function actualizarTablaMonitoreo(asignaciones) {
 
             if (asig.estado !== 'gestionado') {
                 acciones = `
-                    <button onclick="abrirModalReasignar(${asig.id}, '${escapeHtml(asig.ticket)}', '${escapeHtml(asig.auditor_asignado)}')" 
+                    <button onclick="abrirModalReasignar(${asig.id}, '${escapeHtml(asig.ticket)}', '${escapeHtml(asig.auditor_asignado)}')"
                             style="background: var(--warning); padding: 4px 8px; font-size: 11px; border: none; border-radius: 6px; cursor: pointer;">
                         🔄 Reasignar
                     </button>
@@ -29094,9 +22656,9 @@ function actualizarTablaMonitoreo(asignaciones) {
     html += `
         <tr style="background: #f8f9fa; font-weight: bold;">
             <td colspan="10" style="padding: 10px;">
-                📊 Resumen: ${total} tickets totales | 
-                ⏳ ${pendientes} pendientes | 
-                🔄 ${enProceso} en proceso | 
+                📊 Resumen: ${total} tickets totales |
+                ⏳ ${pendientes} pendientes |
+                🔄 ${enProceso} en proceso |
                 ✅ ${gestionados} gestionados |
                 ⚠️ ${incidencias} incidencias
                 ${resumenCampanas ? `| 📌 Campañas: ${resumenCampanas}` : ''}
@@ -29150,9 +22712,9 @@ async function actualizarTarjetasProgreso(asignaciones) {
         if (lotesActivos.length === 0) {
             container.innerHTML = `
                 <div style="
-                    text-align: center; 
-                    padding: 40px; 
-                    background: #fff8e0; 
+                    text-align: center;
+                    padding: 40px;
+                    background: #fff8e0;
                     border-radius: 12px;
                     border: 1px solid #f39c12;
                 ">
@@ -29195,9 +22757,9 @@ async function actualizarTarjetasProgreso(asignaciones) {
         if (asignacionesFiltradas.length === 0) {
             container.innerHTML = `
                 <div style="
-                    text-align: center; 
-                    padding: 40px; 
-                    background: #f0f7ff; 
+                    text-align: center;
+                    padding: 40px;
+                    background: #f0f7ff;
                     border-radius: 12px;
                     border: 1px solid #019DF4;
                 ">
@@ -29279,9 +22841,9 @@ async function actualizarTarjetasProgreso(asignaciones) {
         let html = `
             <!-- Encabezado con todos los lotes -->
             <div style="
-                background: linear-gradient(135deg, #019DF4, #00B4F0); 
-                color: white; 
-                padding: 12px 20px; 
+                background: linear-gradient(135deg, #019DF4, #00B4F0);
+                color: white;
+                padding: 12px 20px;
                 border-radius: 12px 12px 0 0;
                 display: flex;
                 justify-content: space-between;
@@ -29304,7 +22866,7 @@ async function actualizarTarjetasProgreso(asignaciones) {
                     <span>📈 Avance: <strong>${avanceGeneral}%</strong></span>
                 </div>
             </div>
-            
+
             <!-- Barra de progreso general -->
             <div style="background: #f8f9fa; padding: 8px 20px; border-bottom: 1px solid #e0e0e0;">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -29315,7 +22877,7 @@ async function actualizarTarjetasProgreso(asignaciones) {
                     <span style="font-size: 13px; font-weight: bold; color: #28a745;">${avanceGeneral}%</span>
                 </div>
             </div>
-            
+
             <!-- Tabla de auditores -->
             <div style="overflow-x: auto; border-radius: 0 0 12px 12px; border: 1px solid #e0e0e0; border-top: none;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
@@ -29396,11 +22958,11 @@ async function actualizarTarjetasProgreso(asignaciones) {
                     </tbody>
                 </table>
             </div>
-            
+
             <!-- Pie de tabla con resumen -->
             <div style="
-                background: #f8f9fa; 
-                padding: 10px 20px; 
+                background: #f8f9fa;
+                padding: 10px 20px;
                 border-radius: 0 0 12px 12px;
                 border: 1px solid #e0e0e0;
                 border-top: none;
@@ -29413,13 +22975,13 @@ async function actualizarTarjetasProgreso(asignaciones) {
                 color: var(--muted);
             ">
                 <div>
-                    📊 ${auditoresOrdenados.length} auditores activos | 
+                    📊 ${auditoresOrdenados.length} auditores activos |
                     📋 ${totalGeneral} tickets totales |
                     📦 ${lotesActivos.length} lotes activos
                 </div>
                 <div>
-                    ⏳ ${pendientesGeneral} pendientes | 
-                    🔄 ${enProcesoGeneral} en proceso | 
+                    ⏳ ${pendientesGeneral} pendientes |
+                    🔄 ${enProcesoGeneral} en proceso |
                     ✅ ${gestionadosGeneral} gestionados
                     ${incidenciasGeneral > 0 ? `| ⚠️ ${incidenciasGeneral} incidencias` : ''}
                 </div>
@@ -30265,15 +23827,15 @@ function actualizarTablaHistorialLotes(lotes) {
                     ${esActivo ? '<span class="badge" style="background: var(--ok);">✅ Activo</span>' : '<span class="badge" style="background: var(--muted);">⏸️ Inactivo</span>'}
                 </td>
                 <td style="padding: 8px 10px; text-align: center; white-space: nowrap;">
-                    <button onclick="event.stopPropagation(); procesarLoteHistorico(${lote.id}, ${forzarParam})" 
+                    <button onclick="event.stopPropagation(); procesarLoteHistorico(${lote.id}, ${forzarParam})"
                             style="background: ${procesarColor}; padding: 4px 12px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white; margin-bottom: 3px; display: inline-block;">
                         ${procesarTexto}
                     </button>
-                    <button onclick="event.stopPropagation(); verDetalleLote(${lote.id})" 
+                    <button onclick="event.stopPropagation(); verDetalleLote(${lote.id})"
                             style="background: var(--accent); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white;">
                         👁️ Ver
                     </button>
-                    <button onclick="event.stopPropagation(); eliminarLote(${lote.id})" 
+                    <button onclick="event.stopPropagation(); eliminarLote(${lote.id})"
                             style="background: #d93025; padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; color: white; margin-left: 2px;">
                         🗑️
                     </button>
@@ -30717,16 +24279,16 @@ function actualizarTablaLotesTranscripcion(lotes) {
                     </span>
                 </td>
                 <td style="padding: 8px 10px; text-align: center; white-space: nowrap;">
-                    <button onclick="procesarLoteHistorico(${lote.id}, ${forzarParam})" 
+                    <button onclick="procesarLoteHistorico(${lote.id}, ${forzarParam})"
                             style="background: ${procesarColor}; padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px; margin-bottom: 3px; display: inline-block;">
                         ${procesarTexto}
                     </button>
-                    <button onclick="verTicketsLote(${lote.id})" 
+                    <button onclick="verTicketsLote(${lote.id})"
                             style="background: var(--accent); padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px;">
                         👁️ Ver
                     </button>
                     <!-- 🔴 NUEVO BOTÓN ELIMINAR -->
-                    <button onclick="eliminarLote(${lote.id})" 
+                    <button onclick="eliminarLote(${lote.id})"
                             style="background: #d93025; padding: 4px 12px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 11px; margin-left: 2px;"
                             title="Eliminar lote completo">
                         🗑️
@@ -30863,8 +24425,8 @@ async function verTicketsLote(loteId) {
             if (t.transcripcion && t.transcripcion.trim().length > 0) {
                 // Botón para ver transcripción (usando el ID del ticket)
                 botonesHtml += `
-                        <button onclick="verTranscripcionTicket(${t.id})" 
-                                style="background: var(--accent); padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px; margin-right: 3px;" 
+                        <button onclick="verTranscripcionTicket(${t.id})"
+                                style="background: var(--accent); padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px; margin-right: 3px;"
                                 title="Ver transcripción">
                             📄
                         </button>
@@ -30873,8 +24435,8 @@ async function verTicketsLote(loteId) {
                 // Si tiene análisis de Ollama
                 if (t.analisis_ollama && t.analisis_ollama.trim().length > 0) {
                     botonesHtml += `
-                            <button onclick="verAnalisisTicket(${t.id})" 
-                                    style="background: #7b1fa2; padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px;" 
+                            <button onclick="verAnalisisTicket(${t.id})"
+                                    style="background: #7b1fa2; padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px;"
                                     title="Ver análisis de Ollama">
                                 🧠
                             </button>
@@ -30882,8 +24444,8 @@ async function verTicketsLote(loteId) {
                 } else if (t.transcripcion_estado === 'transcrito') {
                     // Si está transcrito pero no analizado
                     botonesHtml += `
-                            <button onclick="analizarTranscripcionTicket(${t.id})" 
-                                    style="background: #f39c12; padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px;" 
+                            <button onclick="analizarTranscripcionTicket(${t.id})"
+                                    style="background: #f39c12; padding: 2px 8px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 10px;"
                                     title="Analizar con Ollama">
                                 🔄
                             </button>
@@ -30978,11 +24540,11 @@ async function verTranscripcionTicket(ticketId) {
                         </div>
                         <!-- Footer -->
                         <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
-                            <button onclick="copiarTranscripcionTicket('${escapeHtml(ticket.transcripcion).replace(/'/g, "\\'")}')" 
+                            <button onclick="copiarTranscripcionTicket('${escapeHtml(ticket.transcripcion).replace(/'/g, "\\'")}')"
                                     style="background: var(--accent); padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
                                 📋 Copiar texto
                             </button>
-                            <button onclick="cerrarModalTranscripcionTicket()" 
+                            <button onclick="cerrarModalTranscripcionTicket()"
                                     style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
                                 Cerrar
                             </button>
@@ -31088,14 +24650,14 @@ async function verAnalisisTicket(ticketId) {
                             <div style="font-size: 18px; font-weight: bold; margin-top: 4px;">${analisis.sentimiento_gestor || 'neutral'}</div>
                         </div>
                     </div>
-                    
+
                     ${analisis.justificacion ? `
                         <div style="background: white; border-radius: 10px; padding: 15px; margin-bottom: 15px; border: 1px solid #e0e0e0;">
                             <div style="font-weight: 600; margin-bottom: 8px; color: #333;">📝 Justificación</div>
                             <div style="font-size: 14px; line-height: 1.6;">${escapeHtml(analisis.justificacion)}</div>
                         </div>
                     ` : ''}
-                    
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div style="background: white; border-radius: 10px; padding: 15px; border: 1px solid #e0e0e0;">
                             <div style="font-weight: 600; margin-bottom: 10px; color: #28a745;">✅ Protocolos cumplidos</div>
@@ -31116,7 +24678,7 @@ async function verAnalisisTicket(ticketId) {
                 }
                         </div>
                     </div>
-                    
+
                     ${analisis.recomendaciones && analisis.recomendaciones.length > 0 ? `
                         <div style="background: #fff8e0; border-radius: 10px; padding: 15px; margin-top: 15px; border: 1px solid #f39c12;">
                             <div style="font-weight: 600; margin-bottom: 8px; color: #f39c12;">💡 Recomendaciones</div>
@@ -31146,11 +24708,11 @@ async function verAnalisisTicket(ticketId) {
                         </div>
                         <!-- Footer -->
                         <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0; flex-shrink: 0;">
-                            <button onclick="copiarAnalisisTicket(${ticketId})" 
+                            <button onclick="copiarAnalisisTicket(${ticketId})"
                                     style="background: #7b1fa2; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
                                 📋 Copiar análisis
                             </button>
-                            <button onclick="cerrarModalAnalisisTicket()" 
+                            <button onclick="cerrarModalAnalisisTicket()"
                                     style="background: #6c757d; padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; color: white;">
                                 Cerrar
                             </button>
@@ -31562,8 +25124,8 @@ function mostrarTicketsConContextoLote(asignaciones, lote) {
                     <div>
                         <strong>📦 Lote actual:</strong> ${escapeHtml(nombreArchivo)}
                         <div style="font-size: 11px; color: var(--muted); margin-top: 3px;">
-                            📅 Cargado: ${fechaLote} | 
-                            🆔 ID: ${lote?.id} | 
+                            📅 Cargado: ${fechaLote} |
+                            🆔 ID: ${lote?.id} |
                             ${esLoteActivo ? '✅ Este es el LOTE ACTIVO' : '⚠️ Este es un LOTE HISTÓRICO (solo consulta)'}
                         </div>
                     </div>
@@ -31596,7 +25158,7 @@ function mostrarTicketsConContextoLote(asignaciones, lote) {
                         <th style="padding: 8px;">Fec. Asignación</th>
                         <th style="padding: 8px;">Fec. Gestión</th>
                         <th style="padding: 8px;">Acciones</th>
-                        
+
                     </tr>
                 </thead>
                 <tbody>
@@ -31611,7 +25173,7 @@ function mostrarTicketsConContextoLote(asignaciones, lote) {
         if (esIncidencia) {
             estadoBadge = `<span class="badge" style="background: var(--danger);">⚠️ Incidencia</span>`;
             acciones = `
-                    <button onclick="verDetalleIncidenciaEscucha(${asig.id})" 
+                    <button onclick="verDetalleIncidenciaEscucha(${asig.id})"
                             style="background: var(--warning); padding: 4px 8px; font-size: 11px; border-radius: 6px;">
                         🔍 Ver
                     </button>
@@ -31634,7 +25196,7 @@ function mostrarTicketsConContextoLote(asignaciones, lote) {
             // Solo permitir reasignación si el lote está activo
             if (asig.estado !== 'gestionado' && esLoteActivo) {
                 acciones = `
-                        <button onclick="abrirModalReasignar(${asig.id}, '${escapeHtml(asig.ticket)}', '${escapeHtml(asig.auditor_asignado)}')" 
+                        <button onclick="abrirModalReasignar(${asig.id}, '${escapeHtml(asig.ticket)}', '${escapeHtml(asig.auditor_asignado)}')"
                                 style="background: var(--warning); padding: 4px 8px; font-size: 11px; border-radius: 6px;">
                             🔄 Reasignar
                         </button>
@@ -32088,7 +25650,7 @@ function actualizarListaExcluidos() {
         html += `
                 <div style="background: #fee; border: 1px solid var(--danger); border-radius: 20px; padding: 5px 12px; display: inline-flex; align-items: center; gap: 8px;">
                     <span style="font-size: 13px;">🚫 ${escapeHtml(nombreMostrar)}</span>
-                    <button onclick="removerExclusionAuditor('${escapeHtml(auditor)}')" 
+                    <button onclick="removerExclusionAuditor('${escapeHtml(auditor)}')"
                             style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; font-weight: bold; padding: 0 4px;"
                             title="Quitar exclusión">
                         ✖
@@ -32407,11 +25969,11 @@ async function limpiarTodasLasEscuchas() {
 
 
 
-// =============================CIERRE BLOQUE 7==========================================    
+// =============================CIERRE BLOQUE 7==========================================
 
 // ======================================================================================
 // BLOQUE 8: PESTAÑA "FTE" (Gestión de Agentes) (13 funciones)
-// ====================================================================================== 
+// ======================================================================================
 
 // ===== 1. INICIO FUNCIÓN: obtenerProximoIdAgente =====================
 async function obtenerProximoIdAgente() {
@@ -32530,11 +26092,11 @@ function actualizarTablaAgentes() {
                     <td style="padding: 8px;">${escapeHtml(categoria)}</td>
                     <td style="padding: 8px; text-align: center;">${fechaRegistro}</td>
                     <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                        <button onclick="editarAgente(${agenteId})" 
+                        <button onclick="editarAgente(${agenteId})"
                                 style="background: var(--warning); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; margin-right: 5px;">
                             ✏️
                         </button>
-                        <button onclick="eliminarAgente(${agenteId})" 
+                        <button onclick="eliminarAgente(${agenteId})"
                                 style="background: #fee; color: var(--danger); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer;">
                             🗑️
                         </button>
@@ -33435,11 +26997,11 @@ document.getElementById('fileAgentes')?.addEventListener('change', function (e) 
 });
 // ===== FIN Event Listeners: GUARDAR AGENTE =============================
 
-// =============================CIERRE BLOQUE 8==========================================    
+// =============================CIERRE BLOQUE 8==========================================
 
 // ======================================================================================
 // BLOQUE 9: PESTAÑA "USUARIOS" (Gestión de Usuarios y Roles)
-// ======================================================================================    
+// ======================================================================================
 
 // ===== 1. INICIO FUNCIÓN: guardarUsuario =============================
 async function guardarUsuario(event) {
@@ -33630,15 +27192,15 @@ function actualizarTablaUsuarios() {
         if (estaActivo) {
             estadoBadge = '<span class="badge" style="background: #28a745;">✅ Activo</span>';
             accionesHtml = `
-                    <button onclick="editarUsuario(${u.id})" 
+                    <button onclick="editarUsuario(${u.id})"
                             style="background: var(--warning); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; margin-right: 5px;">
                         ✏️
                     </button>
-                    <button onclick="cambiarPasswordUsuario(${u.id})" 
+                    <button onclick="cambiarPasswordUsuario(${u.id})"
                             style="background: var(--accent); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; margin-right: 5px; color: white;">
                         🔐
                     </button>
-                    <button onclick="eliminarUsuario(${u.id})" 
+                    <button onclick="eliminarUsuario(${u.id})"
                             style="background: #fee; color: var(--danger); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer;">
                         🗑️
                     </button>
@@ -33646,11 +27208,11 @@ function actualizarTablaUsuarios() {
         } else {
             estadoBadge = '<span class="badge" style="background: #6c757d;">⏸️ Inactivo</span>';
             accionesHtml = `
-                    <button onclick="editarUsuario(${u.id})" 
+                    <button onclick="editarUsuario(${u.id})"
                             style="background: var(--warning); padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; margin-right: 5px;">
                         ✏️
                     </button>
-                    <button onclick="reactivarUsuario(${u.id})" 
+                    <button onclick="reactivarUsuario(${u.id})"
                             style="background: #28a745; padding: 5px 10px; border-radius: 6px; border: none; cursor: pointer; color: white;">
                         🔄 Reactivar
                     </button>
@@ -34212,18 +27774,18 @@ function actualizarTablaRoles() {
         if (estaActivo) {
             estadoBadge = '<span class="badge" style="background: #28a745;">✅ Activo</span>';
             accionesHtml = `
-                    <button onclick="editarRol(${r.id})" 
-                            style="background: #f39c12; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px;" 
+                    <button onclick="editarRol(${r.id})"
+                            style="background: #f39c12; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px;"
                             title="Editar rol">
                         ✏️
                     </button>
-                    <button onclick="administrarPestanasRol(${r.id}, '${escapeHtml(r.nombre)}')" 
-                            style="background: #019DF4; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; margin-right: 4px;" 
+                    <button onclick="administrarPestanasRol(${r.id}, '${escapeHtml(r.nombre)}')"
+                            style="background: #019DF4; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white; margin-right: 4px;"
                             title="Administrar pestañas">
                         📋
                     </button>
-                    <button onclick="eliminarRol(${r.id})" 
-                            style="background: #d93025; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white;" 
+                    <button onclick="eliminarRol(${r.id})"
+                            style="background: #d93025; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white;"
                             title="Desactivar rol">
                         🗑️
                     </button>
@@ -34231,13 +27793,13 @@ function actualizarTablaRoles() {
         } else {
             estadoBadge = '<span class="badge" style="background: #6c757d;">⏸️ Inactivo</span>';
             accionesHtml = `
-                    <button onclick="editarRol(${r.id})" 
-                            style="background: #f39c12; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px;" 
+                    <button onclick="editarRol(${r.id})"
+                            style="background: #f39c12; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px;"
                             title="Editar rol">
                         ✏️
                     </button>
-                    <button onclick="reactivarRol(${r.id})" 
-                            style="background: #28a745; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white;" 
+                    <button onclick="reactivarRol(${r.id})"
+                            style="background: #28a745; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; color: white;"
                             title="Reactivar rol">
                         🔄 Reactivar
                     </button>
@@ -34594,7 +28156,7 @@ async function cargarPestanasEnModalEdicion(rolId) {
             const checked = pestañasAsignadas.includes(p.codigo) ? 'checked' : '';
             html += `
                     <label style="display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-bottom: 1px solid #f0f0f0;">
-                        <input type="checkbox" value="${p.codigo}" ${checked} 
+                        <input type="checkbox" value="${p.codigo}" ${checked}
                             style="width: 16px; height: 16px; cursor: pointer;">
                         <span style="font-size: 16px;">${p.icono || '📄'}</span>
                         <span style="font-size: 13px;">${escapeHtml(p.nombre)}</span>
@@ -34656,7 +28218,7 @@ function cargarPestanasCheckboxesConPermisos(rolId) {
         const checked = pestañasAsignadas.includes(p.codigo) ? 'checked' : '';
         html += `
                 <label style="display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-bottom: 1px solid #f0f0f0;">
-                    <input type="checkbox" value="${p.codigo}" ${checked} 
+                    <input type="checkbox" value="${p.codigo}" ${checked}
                         style="width: 16px; height: 16px; cursor: pointer;">
                     <span style="font-size: 16px;">${p.icono || '📄'}</span>
                     <span style="font-size: 13px;">${escapeHtml(p.nombre)}</span>
@@ -34698,7 +28260,7 @@ async function cargarPestanasAsignadasAlRol(rolId) {
             const checked = pestañasAsignadas.includes(p.codigo) ? 'checked' : '';
             html += `
                     <label style="display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer;">
-                        <input type="checkbox" value="${p.codigo}" ${checked} 
+                        <input type="checkbox" value="${p.codigo}" ${checked}
                             style="width: 16px; height: 16px; cursor: pointer;">
                         <span style="font-size: 16px;">${p.icono}</span>
                         <span>${escapeHtml(p.nombre)}</span>
@@ -34839,13 +28401,13 @@ function mostrarModalNuevoRol() {
                     <div style="padding: 20px;">
                         <div style="margin-bottom: 15px;">
                             <label style="font-size: 12px; font-weight: 600;">Código del Rol *</label>
-                            <input type="text" id="nuevoRolCodigo" placeholder="Ej: GERENTE, COORDINADOR" 
+                            <input type="text" id="nuevoRolCodigo" placeholder="Ej: GERENTE, COORDINADOR"
                                 style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
                             <small style="color: var(--muted);">Identificador único (mayúsculas, sin espacios)</small>
                         </div>
                         <div style="margin-bottom: 15px;">
                             <label style="font-size: 12px; font-weight: 600;">Nombre del Rol *</label>
-                            <input type="text" id="nuevoRolNombre" placeholder="Ej: Gerente de Calidad" 
+                            <input type="text" id="nuevoRolNombre" placeholder="Ej: Gerente de Calidad"
                                 style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
                         </div>
                         <div style="margin-bottom: 20px;">
@@ -34938,7 +28500,7 @@ function inicializarFormularioRol() {
 
     console.log('✅ Formulario de roles inicializado correctamente');
 }
-// ===== FIN FUNCIÓN: inicializarFormularioRol =========================== 
+// ===== FIN FUNCIÓN: inicializarFormularioRol ===========================
 
 
 // ===== 20. INICIO FUNCIÓN: eliminarRol ================================
@@ -35127,7 +28689,7 @@ async function administrarPestanasRol(rolId, rolNombre) {
                             </div>
                             <button onclick="cerrarModalAdminPestanas()" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer; width: 32px; height: 32px; border-radius: 50%;">&times;</button>
                         </div>
-                        
+
                         <!-- Body -->
                         <div style="padding: 20px; overflow-y: auto; flex: 1;">
                             <p style="margin-bottom: 15px; font-size: 13px; color: var(--muted);">
@@ -35138,8 +28700,8 @@ async function administrarPestanasRol(rolId, rolNombre) {
             const checked = pestanasPermitidasSet.has(p.codigo);
             return `
                                         <label style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: ${checked ? '#e8f5e9' : '#f8f9fa'}; border-radius: 10px; cursor: pointer; transition: all 0.2s; border-left: 3px solid ${checked ? 'var(--ok)' : '#e0e0e0'};">
-                                            <input type="checkbox" 
-                                                class="modal-pestana-checkbox" 
+                                            <input type="checkbox"
+                                                class="modal-pestana-checkbox"
                                                 data-pestana-codigo="${p.codigo}"
                                                 data-pestana-nombre="${escapeHtml(p.nombre)}"
                                                 ${checked ? 'checked' : ''}
@@ -35155,7 +28717,7 @@ async function administrarPestanasRol(rolId, rolNombre) {
         }).join('')}
                             </div>
                         </div>
-                        
+
                         <!-- Footer -->
                         <div style="padding: 15px 20px; background: #f8f9fa; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #e0e0e0;">
                             <button onclick="cerrarModalAdminPestanas()" class="secondary" style="padding: 8px 20px;">Cancelar</button>
@@ -35399,19 +28961,19 @@ async function abrirModalEditarPestana(pestanaId) {
                     <div style="padding: 20px;">
                         <div style="margin-bottom: 15px;">
                             <label style="font-size: 12px; font-weight: 600;">Código</label>
-                            <input type="text" id="editarPestanaCodigo" value="${escapeHtml(pestana.codigo)}" 
+                            <input type="text" id="editarPestanaCodigo" value="${escapeHtml(pestana.codigo)}"
                                 style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line); background: #f5f5f5;" readonly>
                             <small style="color: var(--muted);">El código no se puede modificar</small>
                         </div>
                         <div style="margin-bottom: 15px;">
                             <label style="font-size: 12px; font-weight: 600;">Nombre *</label>
-                            <input type="text" id="editarPestanaNombre" value="${escapeHtml(pestana.nombre)}" 
+                            <input type="text" id="editarPestanaNombre" value="${escapeHtml(pestana.nombre)}"
                                 placeholder="Ej: Dashboard Ejecutivo"
                                 style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
                         </div>
                         <div style="margin-bottom: 15px;">
                             <label style="font-size: 12px; font-weight: 600;">Ícono *</label>
-                            <input type="text" id="editarPestanaIcono" value="${escapeHtml(pestana.icono)}" 
+                            <input type="text" id="editarPestanaIcono" value="${escapeHtml(pestana.icono)}"
                                 placeholder="Ej: 📊, 🎯, ⚙️"
                                 style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 8px; border: 1px solid var(--line);">
                         </div>
@@ -35649,7 +29211,7 @@ async function renderizarListaPestanas() {
                         ${ocultas > 0 ? `<span class="badge" style="background: #6c757d; color: white; padding: 2px 12px; border-radius: 20px; font-size: 12px;">⏸️ ${ocultas} ocultas</span>` : ''}
                     </div>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <input type="text" id="buscadorPestanas" placeholder="🔍 Buscar pestaña..." 
+                        <input type="text" id="buscadorPestanas" placeholder="🔍 Buscar pestaña..."
                                style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; font-size: 13px; width: 200px;"
                                oninput="filtrarPestanas(this.value)">
                         <button onclick="agregarNuevaPestana()" style="background: var(--ok); padding: 6px 16px; border: none; border-radius: 6px; color: white; cursor: pointer; font-size: 13px;">
@@ -35660,7 +29222,7 @@ async function renderizarListaPestanas() {
                         </button>
                     </div>
                 </div>
-                
+
                 <!-- TABLA CON SCROLL -->
                 <div style="border: 1px solid #e0e0e0; border-radius: 8px; overflow: auto; max-height: 400px; max-width: 100%;">
                     <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 700px;">
@@ -35677,7 +29239,7 @@ async function renderizarListaPestanas() {
                         </thead>
                         <tbody id="tablaPestanasBody">
                             ${pestanas.map((p, i) => `
-                                <tr class="fila-pestana" data-codigo="${p.codigo}" data-nombre="${p.nombre}" 
+                                <tr class="fila-pestana" data-codigo="${p.codigo}" data-nombre="${p.nombre}"
                                     style="border-bottom: 1px solid #f0f0f0; ${!p.visible ? 'opacity: 0.6; background: #f8f8f8;' : ''}">
                                     <td style="padding: 8px 12px; text-align: center; color: var(--muted);">${i + 1}</td>
                                     <td style="padding: 8px 12px; text-align: center; font-size: 24px;">${p.icono || '📄'}</td>
@@ -35690,17 +29252,17 @@ async function renderizarListaPestanas() {
                                         </span>
                                     </td>
                                     <td style="padding: 8px 12px; text-align: center; white-space: nowrap;">
-                                        <button onclick="abrirModalEditarPestana(${p.id})" 
+                                        <button onclick="abrirModalEditarPestana(${p.id})"
                                                 style="background: #f39c12; padding: 4px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 12px; margin-right: 4px;">
                                             ✏️
                                         </button>
-                                        <button onclick="eliminarPestana(${p.id}, '${escapeHtml(p.codigo)}')" 
-                                                style="background: ${p.visible ? '#d93025' : '#28a745'}; 
-                                                       padding: 4px 12px; 
-                                                       border: none; 
-                                                       border-radius: 4px; 
-                                                       cursor: pointer; 
-                                                       color: white; 
+                                        <button onclick="eliminarPestana(${p.id}, '${escapeHtml(p.codigo)}')"
+                                                style="background: ${p.visible ? '#d93025' : '#28a745'};
+                                                       padding: 4px 12px;
+                                                       border: none;
+                                                       border-radius: 4px;
+                                                       cursor: pointer;
+                                                       color: white;
                                                        font-size: 12px;"
                                                 title="${p.visible ? 'Ocultar pestaña' : 'Mostrar pestaña'}">
                                             ${p.visible ? '👁️' : '🔓'}
@@ -35711,13 +29273,13 @@ async function renderizarListaPestanas() {
                         </tbody>
                     </table>
                 </div>
-                
+
                 <!-- FOOTER -->
                 <div style="margin-top: 12px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                     <div>
                         📊 Mostrando <strong id="pestanasMostradas">${total}</strong> de ${total} pestañas
                         <span style="margin-left: 15px; font-size: 11px;">
-                            💡 <span style="color: #28a745;">●</span> Visible | 
+                            💡 <span style="color: #28a745;">●</span> Visible |
                             <span style="color: #6c757d;">●</span> Oculto
                         </span>
                         ${ocultas > 0 ? `<span style="margin-left: 15px; font-size: 11px; color: #6c757d;">🔓 Click en el botón para mostrar/ocultar</span>` : ''}
@@ -35825,8 +29387,8 @@ async function cargarRolesConRedirect() {
                     <td style="padding: 8px 12px; font-weight: 600;">${escapeHtml(rol.codigo)}</td>
                     <td style="padding: 8px 12px;">${escapeHtml(rol.nombre)}</td>
                     <td style="padding: 8px 12px;">
-                        <input type="text" id="redirect-${rol.id}" 
-                               value="${escapeHtml(redirectUrl)}" 
+                        <input type="text" id="redirect-${rol.id}"
+                               value="${escapeHtml(redirectUrl)}"
                                style="width: 100%; max-width: 200px; padding: 4px 8px; border-radius: 4px; border: 1px solid #ddd; font-size: 12px; font-family: monospace;"
                                placeholder="/ruta">
                         <span style="font-size: 11px; color: ${urlColor}; margin-left: 5px;">
@@ -35835,7 +29397,7 @@ async function cargarRolesConRedirect() {
                     </td>
                     <td style="padding: 8px 12px; text-align: center;">${estadoBadge}</td>
                     <td style="padding: 8px 12px; text-align: center;">
-                        <button onclick="actualizarRedirectRol(${rol.id})" 
+                        <button onclick="actualizarRedirectRol(${rol.id})"
                                 style="background: var(--ok); padding: 4px 12px; border: none; border-radius: 4px; cursor: pointer; color: white; font-size: 12px;">
                             💾 Guardar
                         </button>
@@ -36107,11 +29669,11 @@ agregarNuevaPestana = async function () {
 console.log('✅ CRUD completo de pestañas implementado');
 
 
-// =============================CIERRE BLOQUE 9==========================================    
+// =============================CIERRE BLOQUE 9==========================================
 
 // ======================================================================================
 // BLOQUE 10: PESTAÑA "BD" (Estado de Base de Datos)
-// ======================================================================================    
+// ======================================================================================
 
 // ===== 1. INICIO FUNCIÓN: refrescarEstadoBD ============================
 async function refrescarEstadoBD() {
@@ -36845,11 +30407,11 @@ function mostrarErrorBD(mensaje) {
 }
 // ===== FIN FUNCIÓN: mostrarErrorBD =====================================
 
-// =============================CIERRE BLOQUE 10==========================================    
+// =============================CIERRE BLOQUE 10==========================================
 
 // ======================================================================================
 // BLOQUE 11: PESTAÑA "VERSIONES" (Publicación de Actualizaciones)
-// ====================================================================================== 
+// ======================================================================================
 
 // ===== 1. INICIO FUNCIÓN: cargarVersionesTabla =========================
 let versionesData = [];
@@ -37206,11 +30768,11 @@ function inicializarFormVersiones() {
 }
 // ===== FIN FUNCIÓN: inicializarFormVersiones ===========================
 
-// =============================CIERRE BLOQUE 11==========================================    
+// =============================CIERRE BLOQUE 11==========================================
 
 // ======================================================================================
 // BLOQUE 12: FUNCIONES MIS SOLICITUDES Y GESTIÓN DE SOLICITUDES
-// ====================================================================================== 
+// ======================================================================================
 
 // ----------------------------------------------------------------------
 // Obtener el ID del usuario actual (adaptar según tu estructura)
@@ -37411,15 +30973,15 @@ function renderizarMisSolicitudes(solicitudes) {
                             ">${estadoTexto}</span>
                         </div>
                     </div>
-                    
+
                     <div style="display: flex; gap: 15px; margin-top: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted);">
                         <span>📅 ${fechaFormateada}</span>
                         <span>📂 ${obtenerTipoTexto(tipo)}</span>
                         <span>⏱️ ${tiempoEstimado}</span>
                     </div>
-                    
+
                     ${motivoRechazoHtml}
-                    
+
                     <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
                         <button onclick="verDetalleSolicitud(${id})" style="
                             background: var(--accent);
@@ -37653,7 +31215,7 @@ function renderizarTodasSolicitudes(solicitudes) {
                             <span class="solicitud-badge-estado ${estadoClass}">${estadoTexto}</span>
                         </div>
                     </div>
-                    
+
                     <div class="solicitud-meta" style="margin-top: 0;">
                         <span>👤 Solicitante: <strong>${escapeHtml(sol.solicitante_nombre)}</strong> (${sol.solicitante_rol})</span>
                         <span>📅 Creada: ${fechaCreacion}</span>
@@ -37661,14 +31223,14 @@ function renderizarTodasSolicitudes(solicitudes) {
                         <span>⏱️ Tiempo estimado: ${tiempoEstimado}</span>
                         ${sol.responsable_asignado ? `<span>👨‍💻 Responsable: ${escapeHtml(sol.responsable_asignado)}</span>` : ''}
                     </div>
-                    
+
                     <div class="solicitud-descripcion">
                         <strong>📝 Descripción:</strong><br>
                         ${escapeHtml(sol.descripcion)}
                     </div>
-                    
+
                     ${comentariosHtml}
-                    
+
                     <div class="solicitud-acciones">
                         <button onclick="verDetalleSolicitudAdmin(${sol.id})" style="background: var(--accent);">👁️ Gestionar</button>
                     </div>
@@ -38075,7 +31637,7 @@ async function verDetalleSolicitudAdmin(id) {
                     ✖
                 </button>
             </div>
-            
+
             <!-- BODY -->
             <div id="detalleSolicitudBody" style="
                 padding: 24px;
@@ -38087,7 +31649,7 @@ async function verDetalleSolicitudAdmin(id) {
                     ⏳ Cargando detalles...
                 </div>
             </div>
-            
+
             <!-- FOOTER -->
             <div id="detalleSolicitudFooter" style="
                 padding: 16px 24px;
@@ -38290,7 +31852,7 @@ async function verDetalleSolicitudAdmin(id) {
     body.innerHTML = `
         <!-- TIMELINE -->
         ${timelineHtml}
-        
+
         <!-- Información del solicitante -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
             <div style="background: white; padding: 14px; border-radius: 10px; border: 1px solid #e0e0e0;">
@@ -38304,18 +31866,18 @@ async function verDetalleSolicitudAdmin(id) {
                 <div style="font-size: 12px; color: #6c757d;">${solicitud.responsable_asignado ? '👨‍💻 ' + escapeHtml(solicitud.responsable_asignado) : 'Sin responsable asignado'}</div>
             </div>
         </div>
-        
+
         <!-- Detalles de la solicitud -->
         <div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e0e0e0; margin-bottom: 15px;">
             <div style="font-size: 12px; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">📌 Título</div>
             <div style="font-weight: 500; font-size: 15px;">${escapeHtml(solicitud.titulo)}</div>
         </div>
-        
+
         <div style="background: white; padding: 16px; border-radius: 10px; border: 1px solid #e0e0e0; margin-bottom: 15px;">
             <div style="font-size: 12px; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">📝 Descripción</div>
             <div style="font-size: 14px; line-height: 1.6; color: #333;">${escapeHtml(solicitud.descripcion)}</div>
         </div>
-        
+
         <!-- Meta datos -->
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
             <div style="background: white; padding: 12px; border-radius: 10px; border: 1px solid #e0e0e0; text-align: center;">
@@ -38331,14 +31893,14 @@ async function verDetalleSolicitudAdmin(id) {
                 <div style="font-weight: 500;">${formatearFechaSimple(solicitud.fecha_creacion)}</div>
             </div>
         </div>
-        
+
         ${solicitud.fecha_aprobacion ? `
             <div style="background: #e8f5e9; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #28a745;">
                 <strong style="font-size: 12px;">✅ Fecha de aprobación:</strong>
                 <span style="font-size: 13px;">${formatearFechaSimple(solicitud.fecha_aprobacion)}</span>
             </div>
         ` : ''}
-        
+
         ${solicitud.fecha_entrega ? `
             <div style="background: #e3f2fd; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #019DF4;">
                 <strong style="font-size: 12px;">📦 Fecha de entrega:</strong>
@@ -38405,7 +31967,7 @@ async function verDetalleSolicitudAdmin(id) {
             botonesHtml = `
                 <div style="width: 100%; margin-bottom: 10px;">
                     <label style="font-size: 12px; font-weight: 600; color: #333; display: block; margin-bottom: 4px;">👨‍💻 Asignar responsable:</label>
-                    <input type="text" id="responsableInput" value="${escapeHtml(solicitud.responsable_asignado || '')}" 
+                    <input type="text" id="responsableInput" value="${escapeHtml(solicitud.responsable_asignado || '')}"
                         placeholder="Nombre del responsable" style="
                         width: 100%;
                         padding: 8px 12px;
@@ -38640,12 +32202,12 @@ function abrirModalAprobarSolicitud(id) {
                         <p style="margin-bottom: 15px;"><strong>Solicitud:</strong> ${escapeHtml(solicitud.titulo)}</p>
                         <div style="margin-bottom: 15px;">
                             <label style="font-size: 12px; font-weight: 600;">⏱️ Tiempo estimado (horas) *</label>
-                            <input type="number" id="tiempoEstimadoHoras" value="${tiempoActual}" min="1" step="1" required 
+                            <input type="number" id="tiempoEstimadoHoras" value="${tiempoActual}" min="1" step="1" required
                                 style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 8px; border: 1px solid #ddd;">
                         </div>
                         <div style="margin-bottom: 15px;">
                             <label style="font-size: 12px; font-weight: 600;">👨‍💻 Responsable asignado (opcional)</label>
-                            <input type="text" id="responsableAprobacion" value="${escapeHtml(solicitud.responsable_asignado || '')}" 
+                            <input type="text" id="responsableAprobacion" value="${escapeHtml(solicitud.responsable_asignado || '')}"
                                 placeholder="Nombre del desarrollador"
                                 style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 8px; border: 1px solid #ddd;">
                         </div>
@@ -38744,7 +32306,7 @@ function abrirModalRechazarSolicitud(id) {
                         <p style="margin-bottom: 15px;"><strong>Solicitud:</strong> ${escapeHtml(solicitud.titulo)}</p>
                         <div style="margin-bottom: 15px;">
                             <label style="font-size: 12px; font-weight: 600;">📝 Motivo del rechazo *</label>
-                            <textarea id="motivoRechazo" rows="3" required placeholder="Explique por qué no se aprueba esta solicitud..." 
+                            <textarea id="motivoRechazo" rows="3" required placeholder="Explique por qué no se aprueba esta solicitud..."
                                     style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 8px; border: 1px solid #ddd;"></textarea>
                         </div>
                     </div>
@@ -39302,7 +32864,7 @@ function abrirModalNuevaSolicitud() {
                     justify-content: center;
                 ">✖</button>
             </div>
-            
+
             <!-- BODY -->
             <div style="
                 padding: 24px;
@@ -39322,7 +32884,7 @@ function abrirModalNuevaSolicitud() {
                         ">
                             📌 Título <span style="color: #d93025;">*</span>
                         </label>
-                        <input type="text" id="solicitudTitulo" required 
+                        <input type="text" id="solicitudTitulo" required
                             placeholder="Ej: Nuevo gráfico de productividad por hora" maxlength="100"
                             style="
                                 width: 100%;
@@ -39338,7 +32900,7 @@ function abrirModalNuevaSolicitud() {
                             onblur="this.style.borderColor='#e0e0e0'"
                         >
                     </div>
-                    
+
                     <!-- Tipo -->
                     <div style="margin-bottom: 18px;">
                         <label style="
@@ -39371,7 +32933,7 @@ function abrirModalNuevaSolicitud() {
                             <option value="informe">📄 Informe / Exportación</option>
                         </select>
                     </div>
-                    
+
                     <!-- Prioridad -->
                     <div style="margin-bottom: 18px;">
                         <label style="
@@ -39402,7 +32964,7 @@ function abrirModalNuevaSolicitud() {
                             <option value="baja" style="color: #28a745;">🟢 Baja - Mejora / Sugerencia</option>
                         </select>
                     </div>
-                    
+
                     <!-- Descripción -->
                     <div style="margin-bottom: 18px;">
                         <label style="
@@ -39433,7 +32995,7 @@ function abrirModalNuevaSolicitud() {
                             onblur="this.style.borderColor='#e0e0e0'"
                         ></textarea>
                     </div>
-                    
+
                     <!-- Nota -->
                     <div style="
                         background: #f8f9fa;
@@ -39447,7 +33009,7 @@ function abrirModalNuevaSolicitud() {
                     </div>
                 </form>
             </div>
-            
+
             <!-- FOOTER -->
             <div style="
                 padding: 16px 24px;
@@ -39549,11 +33111,11 @@ function formatearFechaSimple(fechaIso) {
 }
 
 
-// =============================CIERRE BLOQUE 12========================================== 
+// =============================CIERRE BLOQUE 12==========================================
 
 // ======================================================================================
 // BLOQUE 13: INFORMES MENSUALES
-// ====================================================================================== 
+// ======================================================================================
 
 // ======================================================
 // Cargar historial de informes desde la base de datos
@@ -39673,11 +33235,11 @@ function actualizarTablaInformesMensuales(informes) {
                     <td style="text-align: center;">${inf.pda_aplicados_en_mes || 0}</td>
                     <td style="text-align: center;">${persistenciaBadge}</td>
                     <td style="text-align: center;">
-                        <button onclick="event.stopPropagation(); verInformeCompleto(${inf.id})" 
+                        <button onclick="event.stopPropagation(); verInformeCompleto(${inf.id})"
                                 style="background: var(--accent); padding: 4px 10px; font-size: 11px; border-radius: 6px;">
                             👁️ Ver
                         </button>
-                        <button onclick="event.stopPropagation(); descargarInformeHTML(${inf.id})" 
+                        <button onclick="event.stopPropagation(); descargarInformeHTML(${inf.id})"
                                 style="background: var(--ok); padding: 4px 10px; font-size: 11px; border-radius: 6px; margin-left: 5px;">
                             📥
                         </button>
@@ -40947,7 +34509,11 @@ async function cargarGestionPersonasGP() {
                     evaluacionesBase,
                     contextoCacheGP
                 );
-            const ciclosCompletos = ciclos.filter(c => c.esCompleto);
+            const ciclosCompletos =
+                ciclosVisibles.filter(
+                    ciclo =>
+                        ciclo.esCompleto
+                );
 
             // 🔴 OBTENER CAMPAÑAS DEL GESTOR
             const campanasSet = campanasPorGestor[nombre] || new Set();
@@ -41698,13 +35264,13 @@ async function generarNivel1CiclosHistoricosGP(gestor) {
                             📊 ${totalCiclosMostrados} ciclo(s) | Promedio: ${promedioGlobalFiltrado}% | Errores: ${totalErroresFiltrado}
                         </div>
                     </div>
-                    
+
                     <div style="margin-bottom: 15px; display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; background: white; padding: 10px 15px; border-radius: 10px;">
                         <div><strong>🎯 ENC:</strong> ${promedioENCFiltrado}%</div>
                         <div><strong>⚠️ ECUF:</strong> ${promedioECUFFiltrado}%</div>
                         <div><strong>💰 ECN:</strong> ${promedioECNFiltrado}%</div>
                     </div>
-                    
+
                     <div class="table-container" style="max-height: 400px; overflow-y: auto;">
                         <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
                             <thead>
@@ -41761,7 +35327,7 @@ async function generarNivel1CiclosHistoricosGP(gestor) {
                 <td style="padding: 10px; text-align: center;">${ciclo.promedioECN}%</td>
                 <td style="padding: 10px; text-align: center; color: ${erroresCiclo > 0 ? '#d93025' : '#28a745'}; font-weight: bold;">${erroresCiclo}</td>
                 <td style="padding: 10px; text-align: center;">
-                    <button onclick="verDetalleCicloGP('${escapeHtml(gestor.id)}', ${ciclo.numero})" 
+                    <button onclick="verDetalleCicloGP('${escapeHtml(gestor.id)}', ${ciclo.numero})"
                             style="background: var(--accent); padding: 4px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer;">
                         🔍 Ver detalles
                     </button>
@@ -41954,8 +35520,8 @@ function generarTabEvaluacionesGP(ciclo) {
 
     for (let i = 0; i < ciclo.evaluaciones.length; i++) {
         const evalItem = ciclo.evaluaciones[i];
-        const fecha = evalItem.fechaOriginal || evalItem.fecha || 'Sin fecha';
-        const nota = evalItem.notaFinal || 0;
+        const fecha = evalItem.fecha_formateada || evalItem.fechaOriginal || evalItem.fecha || evalItem.fecha_registro || 'Sin fecha';
+        const nota = Number(evalItem.nota_final ?? evalItem.notaFinal ?? 0);
         const notaColor = nota >= 85 ? '#28a745' : '#d93025';
 
         const errores = [];
@@ -42160,7 +35726,7 @@ async function generarTabAnalisisGP(ciclo, gestor) {
                     <div><strong>💰 ECN (Proceso):</strong> ${ciclo.promedioECN}%</div>
                 </div>
             </div>
-            
+
             <div class="card" style="padding: 15px; margin-bottom: 20px;">
                 <h4 style="margin-bottom: 10px;">❌ Distribución de Errores por Bloque</h4>
                 <div style="display: flex; gap: 20px; margin-top: 10px;">
@@ -42176,7 +35742,7 @@ async function generarTabAnalisisGP(ciclo, gestor) {
                     </div>
                 </div>
             </div>
-            
+
             <div class="card" style="padding: 15px; background: #e8f5e9;">
                 <h4 style="margin-bottom: 10px;">💡 Recomendaciones</h4>
                 <ul style="margin-left: 20px;">
@@ -42184,7 +35750,7 @@ async function generarTabAnalisisGP(ciclo, gestor) {
                 </ul>
                 ${resultadoCuartil.cuartil === 'Q4' ? `
                     <div style="margin-top: 15px;">
-                        <button onclick="cerrarModalDetalleCicloGP(); generarPDAConDocumento('${escapeHtml(gestor)}', ${ciclo.numero})" 
+                        <button onclick="cerrarModalDetalleCicloGP(); generarPDAConDocumento('${escapeHtml(gestor)}', ${ciclo.numero})"
                                 style="background: var(--warning); padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer;">
                             📋 Generar PDA para este ciclo
                         </button>
@@ -42954,72 +36520,6 @@ function obtenerTipoQuiebre(item) {
 }
 // ===== FIN FUNCIÓN: obtenerTipoQuiebre =================================
 
-// ===== 16. INICIO FUNCIÓN: obtenerTipoQuiebrePDA =======================
-function obtenerTipoQuiebrePDA(submotivo) {
-    // ======================================================
-    // ERRORES NO CRÍTICOS (ENC) - No críticos
-    // ======================================================
-    const noCriticos = [
-        // PROTOCOLOS DE ATENCION
-        'Cumple_Speech',
-        'Cliente_corta_llamada',
-        'Especifica_Motivo_Llamada',
-        'Menciona_Numero_Servicio',
-        // ESCUCHA ACTIVA
-        'No_Interrumpe_Dialogo',
-        'No_Omite_Preguntas_del_Cliente',
-        // GESTION DE ESPERA
-        'No_Deja_en_Espera_al_Cliente',
-        // LENGUAJE Y COMUNICACIÓN
-        'No_Usa_Jergas',
-        'Transmite_Seguridad/confianza',
-        'Tono_de_Voz/ Vocalizacion'
-    ];
-
-    // ======================================================
-    // ERRORES CRÍTICOS (ECUF y ECN)
-    // ======================================================
-    const criticos = [
-        // ECUF - CORTE / ABANDONO DE LLAMADA
-        'No_Corta_Llamada',
-        // ECUF - RESPETO AL CLIENTE
-        'No_Genera_conflicto_con_cliente',
-        'Amabilidad',
-        // ECUF - BRINDA INFORMACION
-        'Brinda_informacion_correcta',
-        'No_Repite_Información',
-        'Informa_Campañas',
-        // ECN - SONDEO
-        'Identifica_Responsable_de_Pago',
-        'Valida_Pago_de_Deuda',
-        // ECN - NEGOCIACION Y REBATE
-        'Genera_Compromiso_de_Pago',
-        'Maneja_Objeciones',
-        'Resuelve_dudas',
-        // ECN - MOTIVO DE NO PAGO
-        'Pregunta_motivo_no_pago',
-        // ECN - LUGARES DE PAGO
-        'Prioriza_pagos_APP_Digitales',
-        'Prioriza_pagos_Bancos/Agentes',
-        // ECN - CIERRE
-        'Confirma_Compromiso_de_Pago',
-        'Cierre_correcto',
-        // ECN - IMAGEN CORPORATIVA
-        'No_Perjudica_imagen_Movistar',
-        'No_Compara_con_otros_clientes',
-        'No_Induce Baja',
-        'No_Induce Baja/Reclamo',
-        // ECN - TIPIFICACION
-        'Tipificacion_correcta'
-    ];
-
-    if (criticos.includes(submotivo)) {
-        return 'critico';
-    }
-    return 'no_critico';
-}
-// ===== FIN FUNCIÓN: obtenerTipoQuiebrePDA ==============================
-
 // ===== 17. INICIO FUNCIÓN: determinarFrenteSubmotivo ===================
 function determinarFrenteSubmotivo(submotivo) {
     const mapa = {
@@ -43362,8 +36862,17 @@ function procesarArchivos() {
         if (archivosProcesados === archivosPendientes) {
             consolidarDatosEnLocalStorage();
             actualizarResumenCarga();
-            generarReportes();
-            showTab('reportes', null);
+            showTab(
+                'reportes',
+                null
+            );
+
+            if (
+                typeof cargarAnalyticsDashboard ===
+                    'function'
+            ) {
+                cargarAnalyticsDashboard();
+            }
             mostrarInfoCarga(`✅ Procesados ${archivosPendientes} archivo(s). Total evaluaciones: ${datosEvaluaciones.length}`);
         }
     }
@@ -43405,7 +36914,6 @@ function limpiarDuplicados() {
     if (eliminados > 0) {
         consolidarDatosEnLocalStorage();
         actualizarResumenCarga();
-        generarReportes();
         alert(`✅ Se eliminaron ${eliminados} duplicados. Total antes: ${totalAntes}, Total ahora: ${datosEvaluaciones.length}`);
     } else {
         alert('✅ No se encontraron registros duplicados');
@@ -43459,9 +36967,14 @@ function limpiarDatos() {
 
         alert('✅ Todos los datos (evaluaciones y PDA) han sido eliminados correctamente');
 
-        // Actualizar ranking si está visible
-        if (document.getElementById('tab-reportes')?.classList.contains('active')) {
-            generarReportes();
+       if (
+            document
+                .getElementById('tab-reportes')
+                ?.classList.contains('active') &&
+            typeof cargarAnalyticsDashboard ===
+                'function'
+        ) {
+            cargarAnalyticsDashboard();
         }
     }
     // Limpiar gráfico evolutivo
@@ -43506,8 +37019,6 @@ function actualizarResumenCarga() {
     }
 
 
-    // Generar reportes automáticamente
-    generarReportes();
     showTab('reportes', null);
 }
 // ===== FIN FUNCIÓN: actualizarResumenCarga =============================
@@ -43593,56 +37104,6 @@ function formatearFechaParaDocumento(fecha) {
     return String(fecha);
 }
 // ===== FIN FUNCIÓN: formatearFechaParaDocumento ========================
-
-// ===== 32. INICIO FUNCIÓN: crearPDAEnPostgreSQL ==========================
-async function crearPDAEnPostgreSQL(data) {
-    const db = getDB();
-    if (!db) return null;
-
-    try {
-        // Obtener el siguiente ID
-        const { data: maxIdData } = await db
-            .from('pda_cabecera')
-            .select('id')
-            .order('id', { ascending: false })
-            .limit(1);
-
-        let nuevoId = 1;
-        if (maxIdData && maxIdData.length > 0) {
-            nuevoId = maxIdData[0].id + 1;
-        } else {
-            nuevoId = Date.now();
-        }
-
-        const nuevoPDA = {
-            id: nuevoId,
-            agente: data.agente,
-            fecha_deteccion: data.fechaDeteccion,
-            fecha_inicio_ciclo_basal: data.fechaInicioCicloBasal,
-            fecha_fin_ciclo_basal: data.fechaFinCicloBasal,
-            ciclo_basal_numero: data.cicloBasalNumero, // ← NUEVO CAMPO
-            cuartil_basal: data.cuartilBasal,
-            promedio_basal: data.promedioBasal,
-            estado: data.estado,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        };
-
-        const { error } = await db
-            .from('pda_cabecera')
-            .insert(nuevoPDA);
-
-        if (error) throw error;
-
-        console.log(`✅ PDA creado: ID ${nuevoId}`);
-        return nuevoId;
-
-    } catch (error) {
-        console.error('Error creando PDA:', error);
-        return null;
-    }
-}
-// ===== FIN FUNCIÓN: crearPDAEnPostgreSQL =================================
 
 
 // ======================================================
@@ -44000,11 +37461,11 @@ async function actualizarAgentesQ4ConFiltro(evaluacionesFiltradas) {
                             ` : ''}
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            <button onclick="generarPDAConDocumento('${escapeHtml(agente.agente)}')" 
+                            <button onclick="generarPDAConDocumento('${escapeHtml(agente.agente)}')"
                                     style="background: var(--warning); padding: 8px 16px; font-size: 12px;">
                                 📋 Generar PDA
                             </button>
-                            <button onclick="mostrarTimeline('${escapeHtml(agente.agente)}')" 
+                            <button onclick="mostrarTimeline('${escapeHtml(agente.agente)}')"
                                     style="background: var(--accent); padding: 8px 16px; font-size: 12px;">
                                 📅 Ver Timeline
                             </button>
@@ -44039,88 +37500,6 @@ function parseFechaDeString(fechaStr) {
     return new Date();
 }
 // ===== FIN FUNCIÓN: parseFechaDeString =================================
-
-// ======================================================
-// FUNCIÓN: guardarAccionesPDA
-// ======================================================
-
-async function guardarAccionesPDA(pdaId, informe) {
-    console.log(`📝 Guardando acciones para PDA #${pdaId}`);
-
-    const db = getDB();
-    if (!db) return false;
-
-    try {
-        // Obtener ID máximo en pda_acciones
-        const { data: maxIdData } = await db
-            .from('pda_acciones')
-            .select('id')
-            .order('id', { ascending: false })
-            .limit(1);
-
-        let nextId = 1;
-        if (maxIdData && maxIdData.length > 0) {
-            nextId = Number(maxIdData[0].id) + 1;
-            console.log(`   ID máximo actual: ${maxIdData[0].id}, próximo ID: ${nextId}`);
-        } else {
-            nextId = Math.floor(Date.now() * 1000);
-            console.log(`   No hay registros, usando timestamp: ${nextId}`);
-        }
-
-        // Recolectar todas las fallas únicas
-        const fallasUnicas = {};
-        for (const ev of informe.evaluaciones) {
-            for (const falla of ev.fallas) {
-                if (!fallasUnicas[falla.submotivo]) {
-                    fallasUnicas[falla.submotivo] = {
-                        submotivo: falla.submotivo,
-                        atributo: falla.atributo || 'Sin atributo',
-                        tipo: falla.tipo || 'proceso',
-                        requiere_codigo: falla.tipo !== 'feedback'
-                    };
-                }
-            }
-        }
-
-        const acciones = Object.values(fallasUnicas).map((f, i) => ({
-            id: nextId + i,
-            pda_id: pdaId,
-            atributo: f.atributo,
-            submotivo: f.submotivo,
-            tipo_accion: f.tipo,
-            requiere_codigo: f.requiere_codigo,
-            completado: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        }));
-
-        if (acciones.length === 0) {
-            console.log('⚠️ No hay acciones para guardar');
-            return true;
-        }
-
-        console.log(`📤 Insertando ${acciones.length} acciones...`);
-        console.log('   Tipos:', [...new Set(acciones.map(a => a.tipo_accion))]);
-
-        for (const accion of acciones) {
-            const { error } = await db
-                .from('pda_acciones')
-                .insert(accion);
-
-            if (error) {
-                console.error('❌ Error insertando acción:', error);
-                console.error('   Datos:', accion);
-            }
-        }
-
-        console.log(`✅ ${acciones.length} acciones guardadas`);
-        return true;
-
-    } catch (error) {
-        console.error('❌ Error guardando acciones:', error);
-        return false;
-    }
-}
 
 // ======================================================
 // FUNCIÓN: guardarCicloBasalPDA
@@ -44402,50 +37781,6 @@ async function guardarPDAEnBaseDeDatos(informe) {
 
 console.log('✅ Todas las funciones de guardado están definidas');
 
-// ===== 40. INICIO FUNCIÓN: agregarBotonLimpiarPDA ======================
-window.limpiarTodosPDA = limpiarTodosPDA;
-function agregarBotonLimpiarPDA() {
-    const headerEstadisticas = document.querySelector('#tab-gestionPDA .card:last-child h3');
-    if (headerEstadisticas && !document.getElementById('btnLimpiarTodosPDA')) {
-        const limpiarBtn = document.createElement('button');
-        limpiarBtn.id = 'btnLimpiarTodosPDA';
-        limpiarBtn.innerHTML = '🗑️ Limpiar Todos los PDA';
-        limpiarBtn.style.background = 'var(--danger)';
-        limpiarBtn.style.padding = '8px 16px';
-        limpiarBtn.style.fontSize = '12px';
-        limpiarBtn.style.borderRadius = '8px';
-        limpiarBtn.style.cursor = 'pointer';
-        limpiarBtn.style.border = 'none';
-        limpiarBtn.style.color = 'white';
-        limpiarBtn.onclick = () => limpiarTodosPDA();
-
-        const existingBtn = headerEstadisticas.querySelector('button');
-        if (existingBtn) {
-            existingBtn.remove();
-        }
-
-        const wrapper = document.createElement('div');
-        wrapper.style.display = 'flex';
-        wrapper.style.gap = '10px';
-
-        const exportBtn = document.querySelector('#tab-gestionPDA .card:last-child button:first-child');
-        if (exportBtn && exportBtn.parentNode) {
-            const parent = exportBtn.parentNode;
-            wrapper.appendChild(exportBtn.cloneNode(true));
-            wrapper.appendChild(limpiarBtn);
-            parent.innerHTML = '';
-            parent.appendChild(wrapper);
-
-            // Re-asignar eventos
-            wrapper.querySelector('button:first-child').onclick = () => exportarReportePDA();
-            wrapper.querySelector('button:last-child').onclick = () => limpiarTodosPDA();
-        } else {
-            headerEstadisticas.appendChild(limpiarBtn);
-        }
-    }
-}
-
-
 async function cargarDatosYMostrarUI() {
     console.log('📂 Cargando datos del sistema...');
 
@@ -44457,12 +37792,6 @@ async function cargarDatosYMostrarUI() {
 
     // 🔴 AGREGAR ESTA LÍNEA - Cargar roles
     await cargarRoles();
-
-    // Generar reportes si hay datos
-    if (window.evaluacionesGlobales.length > 0) {
-        await generarReportes();
-
-    }
 
     // Inicializar componentes adicionales
     //await cargarResumenPorLider();
@@ -44493,9 +37822,14 @@ window.forzarCargaEvaluaciones = async function () {
             setTimeout(() => { infoDiv.style.display = 'none'; }, 3000);
         }
 
-        // Regenerar reportes
-        if (typeof generarReportes === 'function') {
-            generarReportes();
+        if (
+            document
+                .getElementById('tab-reportes')
+                ?.classList.contains('active') &&
+            typeof cargarAnalyticsDashboard ===
+                'function'
+        ) {
+            await cargarAnalyticsDashboard();
         }
 
 
@@ -44602,7 +37936,7 @@ function cargarItemsQuiebreAgente(agente) {
 
         html += `
                 <label style="display: flex; align-items: center; gap: 12px; padding: 10px; background: #f8f9fa; border-radius: 8px; cursor: pointer; border-left: 3px solid ${frenteColor};">
-                    <input type="checkbox" name="pdaItems" value="${escapeHtml(item.submotivo)}" 
+                    <input type="checkbox" name="pdaItems" value="${escapeHtml(item.submotivo)}"
                         data-bloque="${escapeHtml(item.bloque)}"
                         data-atributo="${escapeHtml(item.atributo)}"
                         data-tipo="${tipo}"
@@ -44693,18 +38027,18 @@ function parseFechaString(fechaStr) {
 }
 // ===== FIN FUNCIÓN: parseFechaString ===================================
 
-// =============================CIERRE BLOQUE 14=========================================    
+// =============================CIERRE BLOQUE 14=========================================
 
 // ======================================================================================
 // BLOQUE 15 – EVENTOS PRINCIPALES Y OVERRIDES (10 elementos)
-// ======================================================================================         
+// ======================================================================================
 
 
 
 
 
 // ===== 3. MODIFICAR inicializarGestionEscuchas PARA CARGAR HISTORIAL =======
-const originalInicializarGestionEscuchas = window.inicializarGestionEscuchas || function () { }; // Guardar referencia original            
+const originalInicializarGestionEscuchas = window.inicializarGestionEscuchas || function () { }; // Guardar referencia original
 window.inicializarGestionEscuchas = async function () { // Sobrescribir para incluir carga de historial
     console.log('🚀 inicializarGestionEscuchas (versión con historial)');
     if (typeof originalInicializarGestionEscuchas === 'function') {// Llamar a la función original si existe
@@ -44732,111 +38066,7 @@ window.cargarDatosPDA = async function () {
 };
 // ===== FIN : originalCargarDatosPDA =======================================
 
-// ===== 5. Verificar que al generar PDA desde Q4, se refleje inmediatamente 
-const originalGenerarPDA = window.generarPDA;
-window.generarPDA = async function (agente) {
-    console.log('📝 Generando PDA para:', agente);
 
-    const db = getDB();
-    if (!db) return;
-
-    try {
-        // Verificar si ya tiene pendiente
-        const { data: existente } = await db
-            .from('pda_registros')
-            .select('id')
-            .eq('agente', agente)
-            .eq('estado', 'pendiente')
-            .maybeSingle();
-
-        if (existente) {
-            alert(`⚠️ El agente ${agente} ya tiene un PDA pendiente.\nComplete el resultado antes de crear uno nuevo.`);
-            return;
-        }
-
-        // Obtener evaluaciones del agente
-        const { data: evaluacionesAgente, error: evalError } = await db
-            .from('evaluaciones')
-            .select('*')
-            .eq('agente', agente);
-
-        if (evalError || !evaluacionesAgente || evaluacionesAgente.length === 0) {
-            alert(`⚠️ No hay evaluaciones para el agente ${agente}`);
-            return;
-        }
-
-        // Recolectar fallas
-        let fallasPorSubmotivo = {};
-        for (const evalu of evaluacionesAgente) {
-            const { data: detalles } = await db
-                .from('detalles_evaluacion')
-                .select('*')
-                .eq('evaluacion_id', evalu.id);
-
-            if (detalles) {
-                detalles.forEach(det => {
-                    if (!det.cumple && det.submotivo) {
-                        if (!fallasPorSubmotivo[det.submotivo]) {
-                            fallasPorSubmotivo[det.submotivo] = {
-                                submotivo: det.submotivo,
-                                bloque: det.bloque,
-                                atributo: det.atributo,
-                                ocurrencias: 0,
-                                peso: det.peso
-                            };
-                        }
-                        fallasPorSubmotivo[det.submotivo].ocurrencias++;
-                    }
-                });
-            }
-        }
-
-        const itemsQuiebre = Object.values(fallasPorSubmotivo).sort((a, b) => b.ocurrencias - a.ocurrencias);
-        if (itemsQuiebre.length === 0) {
-            alert(`⚠️ No se encontraron fallas para ${agente}`);
-            return;
-        }
-
-        const fechaHoy = new Date().toISOString().split('T')[0];
-        const nuevoPDA = {
-            id: Date.now(),
-            agente: agente,
-            items: itemsQuiebre,
-            items_resumen: itemsQuiebre.map(i => i.submotivo).join(', '),
-            cantidad_items: itemsQuiebre.length,
-            fecha_quiebre: fechaHoy,
-            accion: `Plan integral para corregir: ${itemsQuiebre.slice(0, 3).map(i => i.submotivo).join(', ')}`,
-            responsable: '',
-            fecha_aplicacion: '',
-            fecha_escucha: '',
-            estado: 'pendiente',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        };
-
-        const { error: insertError } = await db
-            .from('pda_registros')
-            .insert(nuevoPDA);
-
-        if (insertError) throw insertError;
-
-        alert(`✅ PDA generado para ${agente}\n📌 Ítems: ${itemsQuiebre.length} áreas de mejora`);
-
-        // Recargar datos para que aparezca en la lista
-        await cargarDatosPDA();
-        //await refrescarPendientesDesdePostgreSQL();
-
-        // Preguntar si quiere ir a gestión
-        if (confirm('¿Desea ir a la pestaña de Gestión PDA para completar los detalles?')) {
-            showTab('gestionPDA', null);
-        }
-
-    } catch (error) {
-        console.error('Error generando PDA:', error);
-        alert('❌ Error al generar PDA: ' + error.message);
-    }
-};
-// ===== FIN : originalGenerarPDA ===========================================
 
 async function inicializarSelectorContextoMatriz() {
 
@@ -45409,31 +38639,30 @@ async function cargarCatalogoQuiebres() {
                     q => `
                         <tr
                             style="
-                                ${
-                                    q.activo
-                                        ? ''
-                                        : 'opacity:.6;'
-                                }
+                                ${q.activo
+                            ? ''
+                            : 'opacity:.6;'
+                        }
                             "
                         >
                             <td style="padding:8px;">
                                 <strong>
                                     ${escapeHtml(
-                                        q.codigo || ''
-                                    )}
+                            q.codigo || ''
+                        )}
                                 </strong>
                             </td>
 
                             <td style="padding:8px;">
                                 ${escapeHtml(
-                                    q.nombre || ''
-                                )}
+                            q.nombre || ''
+                        )}
                             </td>
 
                             <td style="padding:8px;">
                                 ${escapeHtml(
-                                    q.descripcion || ''
-                                )}
+                            q.descripcion || ''
+                        )}
                             </td>
 
                             <td
@@ -45442,11 +38671,10 @@ async function cargarCatalogoQuiebres() {
                                     text-align:center;
                                 "
                             >
-                                ${
-                                    q.activo
-                                        ? '✅ Activo'
-                                        : '⏸️ Inactivo'
-                                }
+                                ${q.activo
+                            ? '✅ Activo'
+                            : '⏸️ Inactivo'
+                        }
                             </td>
 
                             <td
@@ -45470,17 +38698,15 @@ async function cargarCatalogoQuiebres() {
                                         ${Number(q.id)},
                                         ${!q.activo}
                                     )"
-                                    title="${
-                                        q.activo
-                                            ? 'Desactivar'
-                                            : 'Reactivar'
-                                    }"
+                                    title="${q.activo
+                            ? 'Desactivar'
+                            : 'Reactivar'
+                        }"
                                 >
-                                    ${
-                                        q.activo
-                                            ? '⏸️'
-                                            : '▶️'
-                                    }
+                                    ${q.activo
+                            ? '⏸️'
+                            : '▶️'
+                        }
                                 </button>
                             </td>
                         </tr>
@@ -45562,8 +38788,8 @@ async function cargarCatalogoCampanas() {
 
                             <td style="padding:8px;">
                                 ${escapeHtml(
-                                    c.descripcion || ''
-                                )}
+                        c.descripcion || ''
+                    )}
                             </td>
 
                             <td
@@ -45572,11 +38798,10 @@ async function cargarCatalogoCampanas() {
                                     text-align:center;
                                 "
                             >
-                                ${
-                                    c.activa
-                                        ? '✅ Activa'
-                                        : '⏸️ Inactiva'
-                                }
+                                ${c.activa
+                            ? '✅ Activa'
+                            : '⏸️ Inactiva'
+                        }
                             </td>
 
                             <td
@@ -45598,11 +38823,10 @@ async function cargarCatalogoCampanas() {
                                         ${!c.activa}
                                     )"
                                 >
-                                    ${
-                                        c.activa
-                                            ? '⏸️'
-                                            : '▶️'
-                                    }
+                                    ${c.activa
+                            ? '⏸️'
+                            : '▶️'
+                        }
                                 </button>
                             </td>
                         </tr>
@@ -45881,8 +39105,8 @@ async function cargarCatalogoMatrices() {
                             >
                                 <strong>
                                     ${escapeHtml(
-                                        matriz.codigo || ''
-                                    )}
+                        matriz.codigo || ''
+                    )}
                                 </strong>
                             </td>
 
@@ -45893,8 +39117,8 @@ async function cargarCatalogoMatrices() {
                                 "
                             >
                                 ${escapeHtml(
-                                    matriz.nombre || ''
-                                )}
+                        matriz.nombre || ''
+                    )}
                             </td>
 
 
@@ -45905,17 +39129,16 @@ async function cargarCatalogoMatrices() {
                             >
                                 <strong>
                                     ${escapeHtml(
-                                        String(
-                                            matriz.quiebre_codigo ||
-                                            matriz.quiebre_id ||
-                                            ''
-                                        )
-                                    )}
+                        String(
+                            matriz.quiebre_codigo ||
+                            matriz.quiebre_id ||
+                            ''
+                        )
+                    )}
                                 </strong>
 
-                                ${
-                                    matriz.quiebre_nombre
-                                        ? `
+                                ${matriz.quiebre_nombre
+                            ? `
                                             <div
                                                 style="
                                                     font-size:11px;
@@ -45923,12 +39146,12 @@ async function cargarCatalogoMatrices() {
                                                 "
                                             >
                                                 ${escapeHtml(
-                                                    matriz.quiebre_nombre
-                                                )}
+                                matriz.quiebre_nombre
+                            )}
                                             </div>
                                         `
-                                        : ''
-                                }
+                            : ''
+                        }
                             </td>
 
 
@@ -45938,11 +39161,10 @@ async function cargarCatalogoMatrices() {
                                     text-align:center;
                                 "
                             >
-                                ${
-                                    matriz.activa
-                                        ? '✅ Activa'
-                                        : '⏸️ Inactiva'
-                                }
+                                ${matriz.activa
+                            ? '✅ Activa'
+                            : '⏸️ Inactiva'
+                        }
                             </td>
 
 
@@ -45994,29 +39216,26 @@ async function cargarCatalogoMatrices() {
                                         ${Number(matriz.id)},
                                         ${!matriz.activa}
                                     )"
-                                    title="${
-                                        matriz.activa
-                                            ? '⏸️'
-                                            : '▶️'
-                                    }"
+                                    title="${matriz.activa
+                            ? '⏸️'
+                            : '▶️'
+                        }"
                                     style="
                                         border:none;
                                         border-radius:6px;
                                         padding:6px 9px;
                                         cursor:pointer;
-                                        background:${
-                                            matriz.activa
-                                                ? 'var(--danger)'
-                                                : 'var(--ok)'
-                                        };
+                                        background:${matriz.activa
+                            ? 'var(--danger)'
+                            : 'var(--ok)'
+                        };
                                         color:white;
                                     "
                                 >
-                                    ${
-                                        matriz.activa
-                                            ? '⏸️'
-                                            : '▶️'
-                                    }
+                                    ${matriz.activa
+                            ? '⏸️'
+                            : '▶️'
+                        }
                                 </button>
 
                             </td>
@@ -46034,7 +39253,7 @@ async function cargarCatalogoMatrices() {
                     Number.isInteger(
                         quiebreId
                     ) &&
-                    quiebreId > 0
+                        quiebreId > 0
                         ? quiebreId
                         : 'todos',
 
@@ -46065,9 +39284,9 @@ async function cargarCatalogoMatrices() {
                     "
                 >
                     ❌ ${escapeHtml(
-                        error.message ||
-                        'Error cargando matrices'
-                    )}
+            error.message ||
+            'Error cargando matrices'
+        )}
                 </td>
             </tr>
         `;
@@ -46273,11 +39492,10 @@ function construirModalQuiebreDominio(
                 "
             >
                 <strong>
-                    ${
-                        editando
-                            ? '✏️ Editar Quiebre'
-                            : '➕ Nuevo Quiebre'
-                    }
+                    ${editando
+            ? '✏️ Editar Quiebre'
+            : '➕ Nuevo Quiebre'
+        }
                 </strong>
 
                 <button
@@ -46301,9 +39519,8 @@ function construirModalQuiebreDominio(
                 <input
                     type="hidden"
                     id="quiebreDominioId"
-                    value="${
-                        quiebre?.id || ''
-                    }"
+                    value="${quiebre?.id || ''
+        }"
                 >
 
 
@@ -46322,8 +39539,8 @@ function construirModalQuiebreDominio(
                         id="quiebreDominioCodigo"
                         maxlength="20"
                         value="${escapeHtml(
-                            quiebre?.codigo || ''
-                        )}"
+            quiebre?.codigo || ''
+        )}"
                         style="
                             width:100%;
                             padding:10px;
@@ -46349,8 +39566,8 @@ function construirModalQuiebreDominio(
                     <input
                         id="quiebreDominioNombre"
                         value="${escapeHtml(
-                            quiebre?.nombre || ''
-                        )}"
+            quiebre?.nombre || ''
+        )}"
                         style="
                             width:100%;
                             padding:10px;
@@ -46385,8 +39602,8 @@ function construirModalQuiebreDominio(
                             box-sizing:border-box;
                         "
                     >${escapeHtml(
-                        quiebre?.descripcion || ''
-                    )}</textarea>
+            quiebre?.descripcion || ''
+        )}</textarea>
                 </div>
 
 
@@ -46412,22 +39629,20 @@ function construirModalQuiebreDominio(
                     >
                         <option
                             value="true"
-                            ${
-                                quiebre?.activo !== false
-                                    ? 'selected'
-                                    : ''
-                            }
+                            ${quiebre?.activo !== false
+            ? 'selected'
+            : ''
+        }
                         >
                             Activo
                         </option>
 
                         <option
                             value="false"
-                            ${
-                                quiebre?.activo === false
-                                    ? 'selected'
-                                    : ''
-                            }
+                            ${quiebre?.activo === false
+            ? 'selected'
+            : ''
+        }
                         >
                             Inactivo
                         </option>
@@ -47189,7 +40404,7 @@ function renderMatrizVersionada(estructura, versionInfo) {
                     ${version.descripcion ? `<div style="font-size: 12px; color: var(--muted); margin-top: 4px;">📝 ${escapeHtml(version.descripcion)}</div>` : ''}
                 </div>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    ${esEditable? `
+                    ${esEditable ? `
                         <button onclick="abrirModalNuevaVersion()" style="background: #7b1fa2; padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
                             📦 Nueva Versión
                         </button>
@@ -47213,7 +40428,7 @@ function renderMatrizVersionada(estructura, versionInfo) {
                 ${esVistaPrevia ? `<span style="color: #f39c12;">👁️ Modo vista previa - Los cambios no se guardarán</span>` : ''}
             </div>
         </div>
-        
+
         <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
             ${esEditable ? `
                 <button onclick="abrirModalNuevoFrente()" style="background: var(--ok); padding: 8px 16px; border: none; border-radius: 8px; color: white; cursor: pointer;">
@@ -47231,14 +40446,14 @@ function renderMatrizVersionada(estructura, versionInfo) {
             ` : `
                 <span style="color: var(--muted); font-size: 13px; padding: 8px 0;">
                     ${esBorrador
-                    ? '📝 BORRADOR - Puede editar esta versión antes de activarla'
-                    : esHistorica
-                        ? '📚 VERSIÓN HISTÓRICA - Solo consulta'
-                        : '👁️ Modo solo lectura'}
+            ? '📝 BORRADOR - Puede editar esta versión antes de activarla'
+            : esHistorica
+                ? '📚 VERSIÓN HISTÓRICA - Solo consulta'
+                : '👁️ Modo solo lectura'}
                 </span>
             `}
         </div>
-        
+
         <div class="matriz-tree">
     `;
 
@@ -48067,9 +41282,9 @@ async function cargarSelectorVersiones(
             ">
                 ❌ Error cargando versiones:
                 ${escapeHtml(
-                    error?.message ||
-                    'Error desconocido'
-                )}
+            error?.message ||
+            'Error desconocido'
+        )}
 
                 <button
                     onclick="cargarSelectorVersiones()"
@@ -49533,9 +42748,9 @@ async function guardarAtributo() {
 
         const estructuraActual =
             window.matrizData?.version &&
-            Number(
-                window.matrizData.version.id
-            ) === versionId
+                Number(
+                    window.matrizData.version.id
+                ) === versionId
                 ? window.matrizData
                 : await API.getEstructuraVersion(
                     versionId
@@ -49651,13 +42866,13 @@ async function guardarAtributo() {
             {
                 operacion:
                     Number.isInteger(id) &&
-                    id > 0
+                        id > 0
                         ? 'UPDATE'
                         : 'CREATE',
 
                 atributo_id:
                     Number.isInteger(id) &&
-                    id > 0
+                        id > 0
                         ? id
                         : null,
 
@@ -49704,7 +42919,7 @@ async function guardarAtributo() {
 
         alert(
             Number.isInteger(id) &&
-            id > 0
+                id > 0
                 ? '✅ Atributo actualizado correctamente.'
                 : '✅ Atributo creado correctamente.'
         );
@@ -49960,6 +43175,15 @@ function abrirModalNuevoSubMotivo(atributoId) {
     document.getElementById('subMotivoDescripcion').value = '';
     document.getElementById('subMotivoPeso').value = '';
     document.getElementById('subMotivoOrden').value = '0';
+    cargarSelectClasificacionPdaMatriz()
+    .catch(
+        error => {
+            console.error(
+                '❌ No se pudo cargar clasificación PDA:',
+                error
+            );
+        }
+    );
     document.getElementById('modalSubMotivo').style.display = 'flex';
 }
 
@@ -50104,6 +43328,12 @@ async function editarSubMotivo(id) {
         ).value =
             subMotivo.orden ?? 0;
 
+        await cargarSelectClasificacionPdaMatriz(
+            subMotivo.clasificacion_pda?.id ??
+            subMotivo.clasificacion_pda_id ??
+            null
+        );
+
         document.getElementById(
             'modalSubMotivo'
         ).style.display =
@@ -50173,6 +43403,8 @@ async function guardarSubMotivo() {
             )?.value || 0
         );
 
+    const clasificacionPdaId =
+    obtenerClasificacionPdaIdMatriz();
 
     // ======================================================
     // 1. VALIDACIONES DEL FORMULARIO
@@ -50219,6 +43451,13 @@ async function guardarSubMotivo() {
         return;
     }
 
+    if (!clasificacionPdaId) {
+        alert(
+            '⚠️ Seleccione la clasificación PDA.'
+        );
+
+        return;
+    }
 
     // ======================================================
     // 2. CONTEXTO MATRIZ / VERSIÓN
@@ -50509,7 +43748,6 @@ async function guardarSubMotivo() {
         // ==================================================
 
         const payload = {
-
             atributo_id:
                 atributoId,
 
@@ -50528,6 +43766,12 @@ async function guardarSubMotivo() {
             activo:
                 true,
 
+            /*
+            * Clasificación PDA normalizada.
+            */
+            clasificacion_pda_id:
+                clasificacionPdaId,
+
             matriz_id:
                 matrizId,
 
@@ -50541,13 +43785,13 @@ async function guardarSubMotivo() {
             {
                 operacion:
                     Number.isInteger(id) &&
-                    id > 0
+                        id > 0
                         ? 'UPDATE'
                         : 'CREATE',
 
                 sub_motivo_id:
                     Number.isInteger(id) &&
-                    id > 0
+                        id > 0
                         ? id
                         : null,
 
@@ -50594,7 +43838,7 @@ async function guardarSubMotivo() {
 
         alert(
             Number.isInteger(id) &&
-            id > 0
+                id > 0
                 ? '✅ Sub-motivo actualizado correctamente.'
                 : '✅ Sub-motivo creado correctamente.'
         );
@@ -51203,9 +44447,9 @@ async function abrirModalNuevaVersion() {
         explicacion = `
             La nueva versión será una copia de
             <strong>${escapeHtml(
-                versionActiva.version ||
-                String(versionActiva.id)
-            )}</strong>.
+            versionActiva.version ||
+            String(versionActiva.id)
+        )}</strong>.
 
             Podrás modificarla sin afectar
             la versión actualmente activa.
@@ -51319,8 +44563,8 @@ async function abrirModalNuevaVersion() {
                             type="text"
                             id="nuevaVersionNombre"
                             value="${escapeHtml(
-                                nombreSugerido
-                            )}"
+        nombreSugerido
+    )}"
                             placeholder="Ej: v1.0.0"
                             style="
                                 width:100%;
@@ -51362,11 +44606,10 @@ async function abrirModalNuevaVersion() {
                         <input
                             type="date"
                             id="nuevaVersionFecha"
-                            value="${
-                                new Date()
-                                    .toISOString()
-                                    .split('T')[0]
-                            }"
+                            value="${new Date()
+            .toISOString()
+            .split('T')[0]
+        }"
                             style="
                                 width:100%;
                                 padding:10px;
@@ -51451,11 +44694,10 @@ async function abrirModalNuevaVersion() {
                                 font-weight:600;
                             "
                         >
-                            ${
-                                versionActiva
-                                    ? '📸 Crear snapshot'
-                                    : '🆕 Crear versión'
-                            }
+                            ${versionActiva
+            ? '📸 Crear snapshot'
+            : '🆕 Crear versión'
+        }
                         </button>
 
                     </div>
@@ -52067,10 +45309,44 @@ async function getVersionActivaId() {
 window.historialCampanaMatrizActual = [];
 window.matricesAsignablesCache = [];
 window.campanaAsignacionActual = null;
+window.quiebreAsignacionActual = null;
+window.tipoAsignacionMatrizActual = null;
 
 async function cargarEstructuraDesdeAsignacion(
-    campanaId
+    campanaId = null,
+    quiebreId = null
 ) {
+    const campanaNormalizada =
+        Number(campanaId);
+
+    const quiebreNormalizado =
+        Number(quiebreId);
+
+    const tieneCampana =
+        Number.isInteger(
+            campanaNormalizada
+        ) &&
+        campanaNormalizada > 0;
+
+    const tieneQuiebre =
+        Number.isInteger(
+            quiebreNormalizado
+        ) &&
+        quiebreNormalizado > 0;
+
+    if (
+        !tieneCampana &&
+        !tieneQuiebre
+    ) {
+        throw new Error(
+            'No existe contexto de campaña o quiebre para cargar la matriz.'
+        );
+    }
+
+    const esDirecto =
+        !tieneCampana &&
+        tieneQuiebre;
+
     const info =
         document.getElementById(
             'contextoMatrizInfo'
@@ -52101,9 +45377,13 @@ async function cargarEstructuraDesdeAsignacion(
 
     if (historial.length === 0) {
         historial =
-            await cargarHistorialCampanaMatriz(
-                campanaId
-            );
+            esDirecto
+                ? await cargarHistorialQuiebreMatriz(
+                    quiebreNormalizado
+                )
+                : await cargarHistorialCampanaMatriz(
+                    campanaNormalizada
+                );
     }
 
 
@@ -52219,8 +45499,15 @@ async function cargarEstructuraDesdeAsignacion(
      * una versión aplicable.
      */
     window.contextoEvaluacionActual = {
+        quiebre_id:
+            tieneQuiebre
+                ? quiebreNormalizado
+                : null,
+
         campana_id:
-            Number(campanaId),
+            tieneCampana
+                ? campanaNormalizada
+                : null,
 
         matriz_id:
             matrizId,
@@ -52237,15 +45524,29 @@ async function cargarEstructuraDesdeAsignacion(
             null,
 
         tipo:
-            'ADMINISTRACION'
+            esDirecto
+                ? 'ADMINISTRACION_DIRECTA'
+                : 'ADMINISTRACION'
     };
 
 
     console.log(
         '🔗 Matriz recibida desde asignación:',
         {
+            quiebre_id:
+                tieneQuiebre
+                    ? quiebreNormalizado
+                    : null,
+
             campana_id:
-                Number(campanaId),
+                tieneCampana
+                    ? campanaNormalizada
+                    : null,
+
+            tipo:
+                esDirecto
+                    ? 'QUIEBRE'
+                    : 'CAMPANA',
 
             matriz_id:
                 matrizId,
@@ -52265,24 +45566,33 @@ async function cargarEstructuraDesdeAsignacion(
 
     if (info) {
 
+        const etiquetaContexto =
+            esDirecto
+                ? 'Quiebre'
+                : 'Campaña';
+
+        const valorContexto =
+            esDirecto
+                ? quiebreNormalizado
+                : campanaNormalizada;
+
         info.innerHTML = `
-            Campaña:
+            ${etiquetaContexto}:
             <strong>${escapeHtml(
-                String(campanaId)
-            )}</strong>
+            String(valorContexto)
+        )}</strong>
 
             · Matriz asignada:
             <strong>${escapeHtml(
-                asignacionActual.matriz_codigo ||
-                String(matrizId)
-            )}</strong>
+            asignacionActual.matriz_codigo ||
+            String(matrizId)
+        )}</strong>
 
-            ${
-                asignacionActual.matriz_nombre
-                    ? ` · ${escapeHtml(
-                        asignacionActual.matriz_nombre
-                    )}`
-                    : ''
+            ${asignacionActual.matriz_nombre
+                ? ` · ${escapeHtml(
+                    asignacionActual.matriz_nombre
+                )}`
+                : ''
             }
         `;
     }
@@ -52454,15 +45764,14 @@ async function cargarEstructuraDesdeAsignacion(
                 · Versión mostrada:
                 <strong>
                     ${escapeHtml(
-                        candidata.version ||
-                        String(candidata.id)
-                    )}
+                candidata.version ||
+                String(candidata.id)
+            )}
                 </strong>
 
-                ${
-                    esActiva
-                        ? ' ✅'
-                        : ' 📝'
+                ${esActiva
+                    ? ' ✅'
+                    : ' 📝'
                 }
             `;
         }
@@ -52489,9 +45798,9 @@ async function cargarEstructuraDesdeAsignacion(
                     "
                 >
                     ❌ ${escapeHtml(
-                        error.message ||
-                        'Error cargando matriz'
-                    )}
+                error.message ||
+                'Error cargando matriz'
+            )}
                 </div>
             `;
         }
@@ -52752,9 +46061,11 @@ async function cargarQuiebresAsignacionMatriz() {
 
 async function cambiarQuiebreAsignacionMatriz() {
     const quiebreId =
-        document.getElementById(
-            'asignacionQuiebre'
-        )?.value;
+        Number(
+            document.getElementById(
+                'asignacionQuiebre'
+            )?.value
+        );
 
     const campanaSelect =
         document.getElementById(
@@ -52763,19 +46074,31 @@ async function cambiarQuiebreAsignacionMatriz() {
 
     limpiarDetalleAsignacionMatriz();
 
+    window.tipoAsignacionMatrizActual =
+        null;
+
+    window.quiebreAsignacionActual =
+        null;
+
     if (!campanaSelect) {
         return;
     }
 
     campanaSelect.innerHTML =
-        '<option value="">Seleccione campaña</option>';
+        '<option value="">Seleccione campaña o asignación directa</option>';
 
-    if (!quiebreId) {
+    if (
+        !Number.isInteger(quiebreId) ||
+        quiebreId <= 0
+    ) {
         campanaSelect.disabled =
             true;
 
         return;
     }
+
+    window.quiebreAsignacionActual =
+        quiebreId;
 
     try {
         const campanas =
@@ -52786,6 +46109,28 @@ async function cambiarQuiebreAsignacionMatriz() {
                         String(quiebreId)
                 }).toString()
             );
+
+        /*
+         * Opción administrativa.
+         *
+         * __DIRECT__ existe solamente en la UI.
+         * Nunca representa una campaña real y
+         * nunca se almacena en PostgreSQL.
+         */
+        const directOption =
+            document.createElement(
+                'option'
+            );
+
+        directOption.value =
+            '__DIRECT__';
+
+        directOption.textContent =
+            'Sin campaña — asignación directa al quiebre';
+
+        campanaSelect.appendChild(
+            directOption
+        );
 
         for (const c of campanas) {
             const option =
@@ -52809,6 +46154,20 @@ async function cambiarQuiebreAsignacionMatriz() {
 
         campanaSelect.disabled =
             false;
+
+        /*
+         * Si el quiebre no posee campañas,
+         * entrar automáticamente al modo directo.
+         */
+        if (
+            !Array.isArray(campanas) ||
+            campanas.length === 0
+        ) {
+            campanaSelect.value =
+                '__DIRECT__';
+
+            await cambiarCampanaAsignacionMatriz();
+        }
 
     } catch (error) {
         console.error(
@@ -53101,31 +46460,117 @@ async function cargarMatricesAsignables() {
     return matrices;
 }
 
+async function cargarHistorialQuiebreMatriz(
+    quiebreId
+) {
+    const id =
+        Number(quiebreId);
+
+    if (
+        !Number.isInteger(id) ||
+        id <= 0
+    ) {
+        throw new Error(
+            'quiebreId inválido para cargar historial'
+        );
+    }
+
+    const historial =
+        await domainRequest(
+            '/api/domain/quiebre-matriz?' +
+            new URLSearchParams({
+                quiebreId:
+                    String(id)
+            }).toString()
+        );
+
+    const registros =
+        Array.isArray(historial)
+            ? historial
+            : [];
+
+    /*
+     * Reutilizamos el cache histórico existente
+     * para no duplicar todo el renderizado.
+     */
+    window.historialCampanaMatrizActual =
+        registros;
+
+    console.log(
+        '🕓 Historial Quiebre ↔ Matriz:',
+        {
+            quiebre_id:
+                id,
+
+            registros:
+                registros.length,
+
+            historial:
+                registros
+        }
+    );
+
+    renderHistorialCampanaMatriz(
+        registros
+    );
+
+    renderAsignacionMatrizActual(
+        registros
+    );
+
+    return registros;
+}
 
 // ======================================================
 // CAMBIO DE CAMPAÑA
 // ======================================================
 
 async function cambiarCampanaAsignacionMatriz() {
+    const quiebreId =
+        Number(
+            document.getElementById(
+                'asignacionQuiebre'
+            )?.value
+        );
+
     const select =
         document.getElementById(
             'asignacionCampana'
         );
 
+    const valorContexto =
+        String(
+            select?.value ?? ''
+        ).trim();
+
+    const esDirecto =
+        valorContexto ===
+        '__DIRECT__';
 
     const campanaId =
-        Number(
-            select?.value
-        );
-
+        esDirecto
+            ? null
+            : Number(
+                valorContexto
+            );
 
     if (
-        !Number.isInteger(campanaId) ||
-        campanaId <= 0
+        !Number.isInteger(quiebreId) ||
+        quiebreId <= 0
     ) {
-
         limpiarDetalleAsignacionMatriz();
 
+        return;
+    }
+
+    if (
+        !esDirecto &&
+        (
+            !Number.isInteger(campanaId) ||
+            campanaId <= 0
+        )
+    ) {
+        limpiarDetalleAsignacionMatriz();
 
         window.contextoEvaluacionActual =
             null;
@@ -53136,66 +46581,77 @@ async function cambiarCampanaAsignacionMatriz() {
         window.versionMatrizActualId =
             null;
 
+        window.tipoAsignacionMatrizActual =
+            null;
 
         return;
     }
 
+    window.quiebreAsignacionActual =
+        quiebreId;
 
     window.campanaAsignacionActual =
-        campanaId;
+        esDirecto
+            ? null
+            : campanaId;
 
+    window.tipoAsignacionMatrizActual =
+        esDirecto
+            ? 'QUIEBRE'
+            : 'CAMPANA';
 
     const matrizSelect =
         document.getElementById(
             'asignacionMatriz'
         );
 
-
     const btnGuardar =
         document.getElementById(
             'btnGuardarAsignacionMatriz'
         );
-
 
     if (matrizSelect) {
         matrizSelect.disabled =
             false;
     }
 
-
     if (btnGuardar) {
         btnGuardar.disabled =
             false;
     }
 
-
     try {
 
-        // ==================================================
-        // 1. BLOQUE 1
-        // HISTORIAL / ASIGNACIÓN
-        // ==================================================
+        if (esDirecto) {
+            await cargarHistorialQuiebreMatriz(
+                quiebreId
+            );
+
+            await cargarEstructuraDesdeAsignacion(
+                null,
+                quiebreId
+            );
+
+            return;
+        }
 
         await cargarHistorialCampanaMatriz(
             campanaId
         );
 
-
-        // ==================================================
-        // 2. BLOQUE 2
-        // MATRIZ → VERSIONES → ESTRUCTURA
-        // ==================================================
-
         await cargarEstructuraDesdeAsignacion(
             campanaId
         );
 
-
     } catch (error) {
-
         console.error(
             '❌ Error sincronizando administración de matriz:',
             error
+        );
+
+        alert(
+            '❌ Error sincronizando administración de matriz: ' +
+            error.message
         );
     }
 }
@@ -53324,9 +46780,9 @@ async function cargarHistorialCampanaMatriz(
                     "
                 >
                     ❌ ${escapeHtml(
-                        error.message ||
-                        'Error cargando historial'
-                    )}
+            error.message ||
+            'Error cargando historial'
+        )}
                 </td>
             </tr>
         `;
@@ -53594,9 +47050,8 @@ function renderHistorialCampanaMatriz(
                     ✏️
                 </button>
 
-                ${
-                    activa
-                        ? `
+                ${activa
+                ? `
                             <button
                                 type="button"
                                 onclick="desactivarAsignacionCampanaMatriz(${id})"
@@ -53613,8 +47068,8 @@ function renderHistorialCampanaMatriz(
                                 ⏸️
                             </button>
                         `
-                        : ''
-                }
+                : ''
+            }
 
             </div>
         `;
@@ -53641,8 +47096,8 @@ function renderHistorialCampanaMatriz(
                     "
                 >
                     ${escapeHtml(
-                        desdeVisual
-                    )}
+            desdeVisual
+        )}
                 </td>
 
 
@@ -53654,8 +47109,8 @@ function renderHistorialCampanaMatriz(
                     "
                 >
                     ${escapeHtml(
-                        hastaVisual
-                    )}
+            hastaVisual
+        )}
                 </td>
 
 
@@ -53667,13 +47122,12 @@ function renderHistorialCampanaMatriz(
 
                     <strong>
                         ${escapeHtml(
-                            matrizCodigo
-                        )}
+            matrizCodigo
+        )}
                     </strong>
 
-                    ${
-                        matrizNombre
-                            ? `
+                    ${matrizNombre
+                ? `
                                 <div
                                     style="
                                         margin-top:3px;
@@ -53682,12 +47136,12 @@ function renderHistorialCampanaMatriz(
                                     "
                                 >
                                     ${escapeHtml(
-                                        matrizNombre
-                                    )}
+                    matrizNombre
+                )}
                                 </div>
                             `
-                            : ''
-                    }
+                : ''
+            }
 
                 </td>
 
@@ -53898,17 +47352,114 @@ function renderAsignacionMatrizActual(
 }
 
 
+function obtenerContextoAsignacionMatrizActual() {
+    const quiebreId =
+        Number(
+            document.getElementById(
+                'asignacionQuiebre'
+            )?.value
+        );
+
+    const valorCampana =
+        String(
+            document.getElementById(
+                'asignacionCampana'
+            )?.value ?? ''
+        ).trim();
+
+    const esDirecto =
+        valorCampana === '__DIRECT__';
+
+    const campanaId =
+        esDirecto
+            ? null
+            : Number(valorCampana);
+
+    if (
+        !Number.isInteger(quiebreId) ||
+        quiebreId <= 0
+    ) {
+        throw new Error(
+            'Seleccione un quiebre válido.'
+        );
+    }
+
+    if (
+        !esDirecto &&
+        (
+            !Number.isInteger(campanaId) ||
+            campanaId <= 0
+        )
+    ) {
+        throw new Error(
+            'Seleccione una campaña o la asignación directa al quiebre.'
+        );
+    }
+
+    return {
+        tipo:
+            esDirecto
+                ? 'QUIEBRE'
+                : 'CAMPANA',
+
+        esDirecto,
+
+        quiebreId,
+
+        campanaId,
+
+        endpointBase:
+            esDirecto
+                ? '/api/domain/quiebre-matriz'
+                : '/api/domain/campana-matriz'
+    };
+}
+
+
+function construirPayloadAsignacionMatriz(
+    contexto,
+    matrizId,
+    vigenteDesde,
+    vigenteHasta,
+    activa = true
+) {
+    const payload = {
+        matrizId,
+        vigenteDesde,
+        vigenteHasta,
+        activa
+    };
+
+    if (contexto.esDirecto) {
+        payload.quiebreId =
+            contexto.quiebreId;
+    } else {
+        payload.campanaId =
+            contexto.campanaId;
+    }
+
+    return payload;
+}
+
+
+
 // ======================================================
 // GUARDAR / CAMBIAR MATRIZ
 // ======================================================
 
 async function guardarAsignacionCampanaMatriz() {
-    const campanaId =
-        Number(
-            document.getElementById(
-                'asignacionCampana'
-            )?.value
+    let contexto;
+
+    try {
+        contexto =
+            obtenerContextoAsignacionMatrizActual();
+    } catch (error) {
+        alert(
+            '⚠️ ' + error.message
         );
+
+        return;
+    }
 
     const matrizId =
         Number(
@@ -53927,23 +47478,6 @@ async function guardarAsignacionCampanaMatriz() {
             'asignacionVigenteHasta'
         )?.value || null;
 
-
-    // ======================================================
-    // VALIDACIONES BÁSICAS
-    // ======================================================
-
-    if (
-        !Number.isInteger(campanaId) ||
-        campanaId <= 0
-    ) {
-        alert(
-            '⚠️ Seleccione una campaña.'
-        );
-
-        return;
-    }
-
-
     if (
         !Number.isInteger(matrizId) ||
         matrizId <= 0
@@ -53955,7 +47489,6 @@ async function guardarAsignacionCampanaMatriz() {
         return;
     }
 
-
     if (!vigenteDesde) {
         alert(
             '⚠️ Indique la fecha de inicio.'
@@ -53963,7 +47496,6 @@ async function guardarAsignacionCampanaMatriz() {
 
         return;
     }
-
 
     if (
         vigenteHasta &&
@@ -53976,7 +47508,6 @@ async function guardarAsignacionCampanaMatriz() {
         return;
     }
 
-
     const historial =
         Array.isArray(
             window.historialCampanaMatrizActual
@@ -53984,31 +47515,21 @@ async function guardarAsignacionCampanaMatriz() {
             ? window.historialCampanaMatrizActual
             : [];
 
-
-    // ======================================================
-    // 1. ¿YA EXISTE UNA ASIGNACIÓN CON EL MISMO INICIO?
-    // ======================================================
-
     const mismaFecha =
         historial.find(
             item =>
-                Number(
-                    item.campana_id
-                ) === campanaId &&
                 fechaSoloAsignacion(
                     item.vigente_desde
                 ) === vigenteDesde
         );
 
-
-    // ======================================================
-    // 2. BUSCAR VIGENCIA ABIERTA
-    // ======================================================
-
     const abierta =
         historial.find(
             item =>
-                item.activa &&
+                (
+                    item.activa === true ||
+                    item.activa === 'true'
+                ) &&
                 !item.vigente_hasta &&
                 (
                     !mismaFecha ||
@@ -54016,7 +47537,6 @@ async function guardarAsignacionCampanaMatriz() {
                     Number(mismaFecha.id)
                 )
         );
-
 
     const btn =
         document.getElementById(
@@ -54026,7 +47546,6 @@ async function guardarAsignacionCampanaMatriz() {
     const textoOriginal =
         btn?.innerHTML;
 
-
     if (btn) {
         btn.disabled =
             true;
@@ -54035,20 +47554,16 @@ async function guardarAsignacionCampanaMatriz() {
             '⏳ Guardando...';
     }
 
-
     let respaldoAbierta =
         null;
 
-
     try {
-
         // ==================================================
-        // CASO A
-        // MISMA FECHA DE INICIO → EDITAR / REEMPLAZAR
+        // CASO A:
+        // MISMA FECHA → ACTUALIZAR
         // ==================================================
 
         if (mismaFecha) {
-
             const matrizAnterior =
                 mismaFecha.matriz_codigo ||
                 mismaFecha.matriz_id;
@@ -54065,68 +47580,61 @@ async function guardarAsignacionCampanaMatriz() {
                 matrizNueva?.codigo ||
                 matrizId;
 
-
             const confirmar =
                 confirm(
                     `Ya existe una asignación desde ${vigenteDesde}.\n\n` +
                     `Matriz actual: ${matrizAnterior}\n` +
                     `Nueva matriz: ${nombreNueva}\n\n` +
-                    `¿Desea reemplazar la asignación existente?`
+                    '¿Desea reemplazar la asignación existente?'
                 );
-
 
             if (!confirmar) {
                 return;
             }
 
-
             await domainRequest(
-                `/api/domain/campana-matriz/${mismaFecha.id}`,
+                `${contexto.endpointBase}/${mismaFecha.id}`,
                 {
                     method:
                         'PUT',
 
                     body:
-                        JSON.stringify({
-                            campanaId,
-                            matrizId,
-                            vigenteDesde,
-                            vigenteHasta,
-                            activa:
+                        JSON.stringify(
+                            construirPayloadAsignacionMatriz(
+                                contexto,
+                                matrizId,
+                                vigenteDesde,
+                                vigenteHasta,
                                 true
-                        })
+                            )
+                        )
                 }
             );
-
 
             alert(
                 '✅ Asignación actualizada correctamente.'
             );
 
+            await recargarAsignacionCampanaMatriz();
 
-            await cambiarCampanaAsignacionMatriz();
-
+            await cargarEstructuraDesdeAsignacion(
+                contexto.campanaId,
+                contexto.quiebreId
+            );
 
             return;
         }
 
-
         // ==================================================
-        // CASO B
-        // NUEVO PERÍODO
+        // CASO B:
+        // NUEVA VIGENCIA
         // ==================================================
 
-        /*
-         * Si existe una asignación abierta anterior,
-         * cerrarla el día previo a la nueva.
-         */
         if (abierta) {
-
             const abiertaDesde =
                 fechaSoloAsignacion(
                     abierta.vigente_desde
                 );
-
 
             if (
                 vigenteDesde <=
@@ -54137,23 +47645,14 @@ async function guardarAsignacionCampanaMatriz() {
                 );
             }
 
-
             const cerrarEn =
                 fechaAnteriorAsignacion(
                     vigenteDesde
                 );
 
-
             respaldoAbierta = {
                 id:
-                    Number(
-                        abierta.id
-                    ),
-
-                campanaId:
-                    Number(
-                        abierta.campana_id
-                    ),
+                    Number(abierta.id),
 
                 matrizId:
                     Number(
@@ -54176,105 +47675,73 @@ async function guardarAsignacionCampanaMatriz() {
                     )
             };
 
-
             await domainRequest(
-                `/api/domain/campana-matriz/${abierta.id}`,
+                `${contexto.endpointBase}/${abierta.id}`,
                 {
                     method:
                         'PUT',
 
                     body:
-                        JSON.stringify({
-                            campanaId:
-                                Number(
-                                    abierta.campana_id
-                                ),
-
-                            matrizId:
-                                Number(
-                                    abierta.matriz_id
-                                ),
-
-                            vigenteDesde:
+                        JSON.stringify(
+                            construirPayloadAsignacionMatriz(
+                                contexto,
+                                respaldoAbierta.matrizId,
                                 abiertaDesde,
-
-                            vigenteHasta:
                                 cerrarEn,
-
-                            activa:
                                 true
-                        })
+                            )
+                        )
                 }
             );
         }
 
-
-        // ==================================================
-        // CREAR NUEVO PERÍODO
-        // ==================================================
-
         try {
-
             await domainRequest(
-                '/api/domain/campana-matriz',
+                contexto.endpointBase,
                 {
                     method:
                         'POST',
 
                     body:
-                        JSON.stringify({
-                            campanaId,
-                            matrizId,
-                            vigenteDesde,
-                            vigenteHasta,
-                            activa:
+                        JSON.stringify(
+                            construirPayloadAsignacionMatriz(
+                                contexto,
+                                matrizId,
+                                vigenteDesde,
+                                vigenteHasta,
                                 true
-                        })
+                            )
+                        )
                 }
             );
 
-
         } catch (errorNueva) {
-
-            // ==============================================
-            // COMPENSACIÓN
-            // ==============================================
-
+            /*
+             * Si cerramos una vigencia anterior
+             * y falla la nueva, restaurarla.
+             */
             if (respaldoAbierta) {
-
                 try {
-
                     await domainRequest(
-                        `/api/domain/campana-matriz/${respaldoAbierta.id}`,
+                        `${contexto.endpointBase}/${respaldoAbierta.id}`,
                         {
                             method:
                                 'PUT',
 
                             body:
-                                JSON.stringify({
-                                    campanaId:
-                                        respaldoAbierta.campanaId,
-
-                                    matrizId:
+                                JSON.stringify(
+                                    construirPayloadAsignacionMatriz(
+                                        contexto,
                                         respaldoAbierta.matrizId,
-
-                                    vigenteDesde:
                                         respaldoAbierta.vigenteDesde,
-
-                                    vigenteHasta:
                                         respaldoAbierta.vigenteHasta,
-
-                                    activa:
                                         respaldoAbierta.activa
-                                })
+                                    )
+                                )
                         }
                     );
 
-
-                } catch (
-                rollbackError
-                ) {
-
+                } catch (rollbackError) {
                     console.error(
                         '❌ No se pudo restaurar la asignación anterior:',
                         rollbackError
@@ -54282,54 +47749,42 @@ async function guardarAsignacionCampanaMatriz() {
                 }
             }
 
-
             throw errorNueva;
         }
-
 
         alert(
             '✅ Nueva vigencia de matriz creada correctamente.'
         );
 
+        await recargarAsignacionCampanaMatriz();
 
-        await cargarHistorialCampanaMatriz(
-            campanaId
+        await cargarEstructuraDesdeAsignacion(
+            contexto.campanaId,
+            contexto.quiebreId
         );
 
-
-        await cambiarCampanaAsignacionMatriz();
-
-
     } catch (error) {
-
         console.error(
             '❌ Error guardando asignación:',
             error
         );
 
-
         if (
             error.code ===
             'ASSIGNMENT_OVERLAP'
         ) {
-
             alert(
                 '⚠️ Existe otra matriz cuya vigencia se cruza con las fechas seleccionadas.'
             );
-
         } else {
-
             alert(
                 '❌ ' +
                 error.message
             );
         }
 
-
     } finally {
-
         if (btn) {
-
             btn.disabled =
                 false;
 
@@ -54451,8 +47906,11 @@ async function desactivarAsignacionCampanaMatriz(
     }
 
     try {
+        const contexto =
+            obtenerContextoAsignacionMatrizActual();
+
         await domainRequest(
-            `/api/domain/campana-matriz/${id}/estado`,
+            `${contexto.endpointBase}/${id}/estado`,
             {
                 method:
                     'PATCH',
@@ -54466,6 +47924,11 @@ async function desactivarAsignacionCampanaMatriz(
         );
 
         await recargarAsignacionCampanaMatriz();
+
+        await cargarEstructuraDesdeAsignacion(
+            contexto.campanaId,
+            contexto.quiebreId
+        );
 
     } catch (error) {
         alert(
@@ -54481,22 +47944,24 @@ async function desactivarAsignacionCampanaMatriz(
 // ======================================================
 
 async function recargarAsignacionCampanaMatriz() {
-    const campanaId =
-        Number(
-            document.getElementById(
-                'asignacionCampana'
-            )?.value
-        );
+    let contexto;
 
-    if (
-        !Number.isInteger(campanaId) ||
-        campanaId <= 0
-    ) {
-        return;
+    try {
+        contexto =
+            obtenerContextoAsignacionMatrizActual();
+
+    } catch (_) {
+        return [];
     }
 
-    await cargarHistorialCampanaMatriz(
-        campanaId
+    if (contexto.esDirecto) {
+        return cargarHistorialQuiebreMatriz(
+            contexto.quiebreId
+        );
+    }
+
+    return cargarHistorialCampanaMatriz(
+        contexto.campanaId
     );
 }
 
@@ -54519,7 +47984,7 @@ function limpiarDetalleAsignacionMatriz() {
 
     if (actual) {
         actual.textContent =
-            'Seleccione una campaña.';
+            'Seleccione una campaña o asignación directa.';
     }
 
     const matrixSelect =
@@ -54561,7 +48026,7 @@ function limpiarDetalleAsignacionMatriz() {
                         color:var(--muted);
                     "
                 >
-                    Seleccione una campaña.
+                    Seleccione una campaña o asignación directa.
                 </td>
             </tr>
         `;
@@ -54649,17 +48114,17 @@ async function cargarCriteriosCuartilesTabla() {
                     <td style="padding: 8px; font-size: 12px;">${vigencia}</td>
                     <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
                     <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                        <button onclick="editarCriterioCuartil(${c.id})" 
+                        <button onclick="editarCriterioCuartil(${c.id})"
                                 style="background: var(--warning); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; margin-right: 5px;">
                             ✏️
                         </button>
                         ${c.activo ? `
-                            <button onclick="desactivarCriterioCuartil(${c.id})" 
+                            <button onclick="desactivarCriterioCuartil(${c.id})"
                                     style="background: var(--danger); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; color: white;">
                                 🗑️
                             </button>
                         ` : `
-                            <button onclick="activarCriterioCuartil(${c.id})" 
+                            <button onclick="activarCriterioCuartil(${c.id})"
                                     style="background: var(--ok); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; color: white;">
                                 ✅ Activar
                             </button>
@@ -55223,10 +48688,10 @@ function agregarEstilosMatriz() {
     style.textContent = `
         .matriz-tree { font-family: system-ui, sans-serif; }
         .matriz-node { margin: 5px 0; border-left: 2px solid var(--line); }
-        .matriz-node-header { 
-            display: flex; 
-            align-items: center; 
-            gap: 8px; 
+        .matriz-node-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
             padding: 8px 12px;
             background: #f8f9fa;
             border-radius: 8px;
@@ -55236,19 +48701,19 @@ function agregarEstilosMatriz() {
         .matriz-node-header:hover { background: #e9ecef; }
         .matriz-expand { font-size: 12px; color: var(--muted); width: 20px; }
         .matriz-icon { font-size: 16px; }
-        .matriz-badge { 
-            background: var(--accent); 
-            color: white; 
-            padding: 2px 8px; 
-            border-radius: 20px; 
+        .matriz-badge {
+            background: var(--accent);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 20px;
             font-size: 11px;
             font-weight: normal;
         }
         .matriz-actions { margin-left: auto; display: flex; gap: 5px; }
-        .btn-icon { 
-            background: none; 
-            border: none; 
-            cursor: pointer; 
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
             padding: 4px 8px;
             border-radius: 4px;
             font-size: 14px;
@@ -55285,12 +48750,8 @@ window.onload = async function () {
 
     // Inicializar componentes
     if (typeof cargarResumenPorLider === 'function') await cargarResumenPorLider();
-    if (typeof inicializarFiltroReportes === 'function') inicializarFiltroReportes();
     if (typeof inicializarBuscadorAgentes === 'function') inicializarBuscadorAgentes();
 
-    // Cargar datos principales
-    if (typeof cargarRankingAgentesCompleto === 'function') await cargarRankingAgentesCompleto();
-    if (typeof cargarLideresEnSelectRanking === 'function') await cargarLideresEnSelectRanking();
 
     // ======================================================
     // 🔴 AGREGAR EVENT LISTENERS PARA FILTROS DE AUDITORES
@@ -55482,9 +48943,14 @@ if (formPDA) {
             await cargarDatosPDA();
             limpiarFormPDA();
 
-            // Actualizar reportes si está visible
-            if (document.getElementById('tab-reportes')?.classList.contains('active')) {
-                generarReportes();
+            if (
+                document
+                    .getElementById('tab-reportes')
+                    ?.classList.contains('active') &&
+                typeof cargarAnalyticsDashboard ===
+                    'function'
+            ) {
+                await cargarAnalyticsDashboard();
             }
 
         } catch (error) {
@@ -55634,7 +49100,7 @@ function renderizarTablaReglas(reglas, versionActiva, subMotivos, atributos, fre
                     </button>
                 </div>
             </div>
-            
+
             <div style="overflow-x: auto; border: 1px solid var(--line); border-radius: 12px;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                     <thead>
@@ -55713,11 +49179,11 @@ function renderizarTablaReglas(reglas, versionActiva, subMotivos, atributos, fre
                         ${excepciones.map(e => `<span style="background: #fff3e0; padding: 1px 6px; border-radius: 10px; margin: 1px;">${e}</span>`).join(' ')}
                     </td>
                     <td style="padding: 10px 12px; text-align: center; white-space: nowrap;">
-                        <button onclick="abrirModalEditarRegla(${r.id})" 
+                        <button onclick="abrirModalEditarRegla(${r.id})"
                                 style="background: var(--warning); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; color: white; margin-right: 5px;">
                             ✏️
                         </button>
-                        <button onclick="eliminarRegla(${r.id})" 
+                        <button onclick="eliminarRegla(${r.id})"
                                 style="background: var(--danger); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; color: white;">
                             🗑️
                         </button>
@@ -56114,16 +49580,15 @@ async function abrirModalNuevaRegla() {
                                             Seleccionar
                                         </option>
 
-                                        ${
-                                            frentes
-                                                .map(
-                                                    frente =>
-                                                        `<option value="${frente.codigo}">
+                                        ${frentes
+            .map(
+                frente =>
+                    `<option value="${frente.codigo}">
                                                             ${frente.codigo}
                                                         </option>`
-                                                )
-                                                .join('')
-                                        }
+            )
+            .join('')
+        }
 
                                     </select>
                                 </div>
@@ -56337,16 +49802,15 @@ async function abrirModalNuevaRegla() {
                                             (vacío = todos)
                                         </option>
 
-                                        ${
-                                            subMotivos
-                                                .map(
-                                                    subMotivo =>
-                                                        `<option value="${subMotivo.codigo}">
+                                        ${subMotivos
+            .map(
+                subMotivo =>
+                    `<option value="${subMotivo.codigo}">
                                                             ${subMotivo.codigo}
                                                         </option>`
-                                                )
-                                                .join('')
-                                        }
+            )
+            .join('')
+        }
 
                                     </select>
 
@@ -56384,16 +49848,15 @@ async function abrirModalNuevaRegla() {
                                                border: 1px solid var(--line);
                                                min-height: 80px;"
                                     >
-                                        ${
-                                            subMotivos
-                                                .map(
-                                                    subMotivo =>
-                                                        `<option value="${subMotivo.codigo}">
+                                        ${subMotivos
+            .map(
+                subMotivo =>
+                    `<option value="${subMotivo.codigo}">
                                                             ${subMotivo.codigo}
                                                         </option>`
-                                                )
-                                                .join('')
-                                        }
+            )
+            .join('')
+        }
                                     </select>
 
                                     <small style="color: var(--muted);">
@@ -56651,7 +50114,7 @@ async function abrirModalEditarRegla(id) {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Condición y Acción -->
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                             <div style="background: #fff8e0; padding: 15px; border-radius: 10px; border-left: 4px solid #f39c12;">
@@ -56686,7 +50149,7 @@ async function abrirModalEditarRegla(id) {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Afectados y Excepciones -->
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                             <div style="background: #f0f7ff; padding: 15px; border-radius: 10px; border-left: 4px solid #019DF4;">
@@ -56717,7 +50180,7 @@ async function abrirModalEditarRegla(id) {
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Orden -->
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div>
@@ -56916,11 +50379,11 @@ function actualizarSelectSubmotivos(
                     Number(
                         a.frente_id
                     ) ===
-                        Number(
-                            frente.id
-                        ) &&
+                    Number(
+                        frente.id
+                    ) &&
                     a.nombre ===
-                        atributoNombre
+                    atributoNombre
             );
 
         if (!atributo) {
@@ -57104,7 +50567,7 @@ async function guardarRegla() {
         if (
             afectadosSelect &&
             afectadosSelect.selectedOptions.length >
-                0
+            0
         ) {
             submotivosAfectados =
                 Array
@@ -57915,11 +51378,10 @@ async function cambiarVersionReglas() {
                 <strong>
                     Matriz:
                 </strong>
-                ${
-                    matrizSelector
-                        .options[
-                            matrizSelector.selectedIndex
-                        ]?.textContent || matrizId
+                ${matrizSelector
+                    .options[
+                    matrizSelector.selectedIndex
+                ]?.textContent || matrizId
                 }
 
                 &nbsp; | &nbsp;
@@ -58206,11 +51668,11 @@ function actualizarTablaReportes(archivos) {
                 <td>${tamanio}</td>
                 <td>${estadoBadge}</td>
                 <td>
-                    <button onclick="verReporte('${escapeHtml(nombre)}')" 
+                    <button onclick="verReporte('${escapeHtml(nombre)}')"
                             style="background: var(--accent); padding: 4px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 5px;">
                         👁️ Ver
                     </button>
-                    <button onclick="descargarReporte('${escapeHtml(nombre)}')" 
+                    <button onclick="descargarReporte('${escapeHtml(nombre)}')"
                             style="background: var(--ok); padding: 4px 10px; border: none; border-radius: 4px; color: white; cursor: pointer;">
                         📥
                     </button>
@@ -58586,11 +52048,11 @@ async function cargarTareasReportes() {
                             <td style="padding: 8px; text-align: center;">${t.ultima_ejecucion || 'Nunca'}</td>
                             <td style="padding: 8px; text-align: center;">${estadoBadge}</td>
                             <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                                <button onclick="editarTareaReporte(${t.id})" 
+                                <button onclick="editarTareaReporte(${t.id})"
                                         style="background: #f39c12; padding: 6px 12px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 4px; font-size: 12px; font-weight: 500;">
                                     ✏️
                                 </button>
-                                <button onclick="eliminarTareaReporte(${t.id})" 
+                                <button onclick="eliminarTareaReporte(${t.id})"
                                         style="background: #d93025; padding: 6px 12px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 12px; font-weight: 500;">
                                     🗑️
                                 </button>
@@ -58658,11 +52120,11 @@ async function actualizarUltimosReportes() {
                     <td style="padding: 8px; text-align: center;">${tamanio}</td>
                     <td style="padding: 8px; text-align: center;"><span class="badge" style="background: #28a745;">✅ Exitoso</span></td>
                     <td style="padding: 8px; text-align: center; white-space: nowrap;">
-                        <button onclick="verReporte('${escapeHtml(nombre)}')" 
+                        <button onclick="verReporte('${escapeHtml(nombre)}')"
                                 style="background: #019DF4; padding: 4px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-right: 4px; font-size: 11px;">
                             👁️ Ver
                         </button>
-                        <button onclick="descargarReporte('${escapeHtml(nombre)}')" 
+                        <button onclick="descargarReporte('${escapeHtml(nombre)}')"
                                 style="background: #28a745; padding: 4px 10px; border: none; border-radius: 4px; color: white; cursor: pointer; font-size: 11px;">
                             📥
                         </button>
@@ -59678,12 +53140,6 @@ function esAdministrador() {
 function mostrarBotonesSegunRol() {
     const admin = esAdministrador();
 
-    const btn = document.getElementById('btnLimpiarTodosPDA');
-    if (btn) {
-        btn.style.display = admin ? 'inline-flex' : 'none';
-        btn.style.visibility = admin ? 'visible' : 'hidden';
-        console.log(`🔒 Botón Limpiar PDA: ${admin ? '✅ VISIBLE' : '❌ OCULTO'}`);
-    }
 }
 
 
@@ -60607,7 +54063,7 @@ function mostrarResultadosProgresoAudioConEstadisticas(result, tickets) {
         }
 
         html += `<div style="color: ${color}; padding: 3px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px;">
-            ${icono} <strong>${ticket ? ticket.ticket : r.ticket_id}</strong> 
+            ${icono} <strong>${ticket ? ticket.ticket : r.ticket_id}</strong>
             (${ident}) → ${mensaje}
         </div>`;
     }
@@ -60650,13 +54106,13 @@ function mostrarResultadosProgresoAudioConEstadisticas(result, tickets) {
                 </div>
             </div>
             <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; text-align: center; font-size: 13px;">
-                📊 Total procesados: ${total} | 
-                📝 Transcritos: ${transcritos} | 
+                📊 Total procesados: ${total} |
+                📝 Transcritos: ${transcritos} |
                 ${reprocesados > 0 ? '🔄 ' + reprocesados + ' reprocesados | ' : ''}
                 ${omitidos > 0 ? '⏭️ ' + omitidos + ' omitidos | ' : ''}
                 ✅ ${exitosos} exitosos
             </div>
-            <button onclick="document.getElementById('audioProgress').remove()" 
+            <button onclick="document.getElementById('audioProgress').remove()"
                     style="margin-top: 15px; padding: 10px 20px; background: #28a745; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 14px; width: 100%; font-weight: bold;">
                 ✅ Cerrar
             </button>
@@ -60698,7 +54154,7 @@ function crearModalProgreso() {
                 <span id="progressIcon">🔄</span>
                 <span id="progressTitle">Procesando audios...</span>
             </h3>
-            
+
             <div style="margin: 15px 0;">
                 <div style="display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 5px;">
                     <span id="progressLabel">Progreso</span>
@@ -60708,7 +54164,7 @@ function crearModalProgreso() {
                     <div id="progressFill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #019DF4, #00B4F0); border-radius: 10px; transition: width 0.5s;"></div>
                 </div>
             </div>
-            
+
             <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 15px;">
                 <div style="background: #e3f2fd; border-radius: 8px; padding: 8px; text-align: center;">
                     <div id="progressTotal" style="font-size: 18px; font-weight: bold; color: #019DF4;">0</div>
@@ -60735,19 +54191,19 @@ function crearModalProgreso() {
                     <div style="font-size: 10px; color: var(--muted);">❌ Error</div>
                 </div>
             </div>
-            
+
             <div id="progressTicketActual" style="font-size: 13px; color: var(--muted); margin-bottom: 10px; padding: 8px; background: #f0f7ff; border-radius: 8px;">
                 📌 Procesando TICKET: <span id="progressTicketNombre">-</span>
             </div>
-            
+
             <div id="progressEstadoTickets" style="margin-bottom: 10px; max-height: 100px; overflow-y: auto;"></div>
-            
+
             <div style="background: #f8f9fa; border-radius: 8px; padding: 10px; max-height: 150px; overflow-y: auto; font-size: 12px; font-family: monospace;">
                 <div id="progressLogs"></div>
             </div>
-            
+
             <div style="margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
-                <button id="btnCerrarProgreso" onclick="cerrarMonitorProgreso()" 
+                <button id="btnCerrarProgreso" onclick="cerrarMonitorProgreso()"
                         style="padding: 8px 20px; background: #6c757d; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 13px; display: none;">
                     Cerrar
                 </button>
@@ -60823,7 +54279,7 @@ function mostrarResultadosProgresoAudio(result, tickets) {
         }
 
         html += `<div style="color: ${color}; padding: 3px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px;">
-            ${icono} <strong>${ticket ? ticket.ticket : r.ticket_id}</strong> 
+            ${icono} <strong>${ticket ? ticket.ticket : r.ticket_id}</strong>
             (${ident}) → ${mensaje}
             ${rutaInfo ? `<br><span style="font-size: 10px; color: var(--muted); margin-left: 20px;">${rutaInfo}</span>` : ''}
         </div>`;
@@ -60865,7 +54321,7 @@ function mostrarResultadosProgresoAudio(result, tickets) {
                 <br>Verifique que los archivos sean audios válidos y tengan la extensión correcta.
             </div>
             ` : ''}
-            <button onclick="document.getElementById('audioProgress').remove()" 
+            <button onclick="document.getElementById('audioProgress').remove()"
                     style="margin-top: 15px; padding: 10px 20px; background: #28a745; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 14px; width: 100%; font-weight: bold;">
                 ✅ Cerrar
             </button>
@@ -61119,15 +54575,96 @@ async function cargarSelectGestoresRegistro() {
 // 4. INICIALIZAR REGISTRO DE VOZ AL CARGAR
 // ======================================================
 function inicializarRegistroVoz() {
-    console.log('🎤 Inicializando registro de voz...');
-    // Cargar gestores para el buscador
-    cargarGestoresParaRegistro();
-    // Inicializar el buscador
-    inicializarBuscadorGestoresRegistro();
-    // Cargar lista de gestores ya registrados
-    cargarGestoresRegistrados();
 
-    console.log('✅ Registro de voz inicializado');
+    // ======================================================
+    // EVITAR INICIALIZACIÓN DUPLICADA
+    // ======================================================
+
+    if (
+        window.registroVozInicializado ===
+        true
+    ) {
+        return;
+    }
+
+
+    console.log(
+        '🎤 Inicializando registro de voz...'
+    );
+
+
+    // ======================================================
+    // VALIDAR QUE LA VISTA EXISTA
+    // ======================================================
+
+    const input =
+        document.getElementById(
+            'buscarGestorRegistro'
+        );
+
+
+    const dropdown =
+        document.getElementById(
+            'gestorRegistroDropdown'
+        );
+
+
+    if (
+        !input ||
+        !dropdown
+    ) {
+        console.log(
+            'ℹ️ Registro de voz no está visible; se omite inicialización.'
+        );
+
+        return;
+    }
+
+
+    // ======================================================
+    // MARCAR INICIALIZADO
+    // ======================================================
+
+    window.registroVozInicializado =
+        true;
+
+
+    // ======================================================
+    // BUSCADOR
+    //
+    // NO precargamos /api/agentes.
+    //
+    // inicializarBuscadorGestoresRegistro()
+    // ya carga gestores al hacer focus cuando
+    // gestoresRegistroLista está vacío.
+    // ======================================================
+
+    if (
+        typeof inicializarBuscadorGestoresRegistro ===
+        'function'
+    ) {
+        inicializarBuscadorGestoresRegistro();
+    }
+
+
+    // ======================================================
+    // GESTORES CON VOZ REGISTRADA
+    //
+    // Esta consulta sí pertenece específicamente
+    // al módulo Registro de Voz.
+    // ======================================================
+
+    if (
+        typeof cargarGestoresRegistrados ===
+        'function'
+    ) {
+        cargarGestoresRegistrados();
+    }
+
+
+    console.log(
+        '✅ Registro de voz inicializado'
+    );
 }
 
 // ======================================================
@@ -61375,7 +54912,7 @@ function inicializarBuscadorGestoresRegistro() {
         const mostrar = gestores.slice(0, 15);
         mostrar.forEach(gestor => {
             html += `
-                <div class="select-buscador-option" 
+                <div class="select-buscador-option"
                      data-value="${escapeHtml(gestor)}"
                      onclick="seleccionarGestorRegistro('${escapeHtml(gestor).replace(/'/g, "\\'")}')">
                     <span>👤 ${resaltarCoincidencia(gestor, busqueda)}</span>
@@ -61553,11 +55090,11 @@ window.cargarHistorialEvaluaciones = cargarHistorialEvaluaciones;
 // ======================================================
 // 5. FUNCIONES DE REPORTES Y PDA
 // ======================================================
-window.generarReportes = generarReportes;
+
 window.generarReporteConsolidadoPDA = generarReporteConsolidadoPDA;
 window.generarHTMLConsolidado = generarHTMLConsolidado;
 window.agruparPDAPorEstado = agruparPDAPorEstado;
-window.verReportePDA = verReportePDA;
+
 
 // ======================================================
 // 6. FUNCIONES DE EVOLUCIÓN Y CUARTILES
@@ -61593,28 +55130,40 @@ window.inicializarRegistroVoz = inicializarRegistroVoz;
 // ======================================================
 
 document.addEventListener('DOMContentLoaded', function () {
-    console.log('🚀 [DOMContentLoaded] Inicializando sistema de supervisión...');
+    console.log(
+        '🚀 [DOMContentLoaded] Inicializando sistema de supervisión...'
+    );
+
+    // ======================================================
+    // MECA ANALYTICS 2.0 - SECCIONES COLAPSABLES
+    // ======================================================
+    if (
+        typeof inicializarSeccionesColapsablesAnalytics ===
+        'function'
+    ) {
+        inicializarSeccionesColapsablesAnalytics();
+
+        console.log(
+            '✅ Secciones colapsables de Analytics inicializadas'
+        );
+    }
+
 
     // ======================================================
     // 1. INICIALIZAR EVENTO DE CARGA DE AGENTES (Excel)
     // ======================================================
-    if (typeof inicializarEventoAgentes === 'function') {
+    if (
+        typeof inicializarEventoAgentes ===
+        'function'
+    ) {
         inicializarEventoAgentes();
-        console.log('✅ Evento de carga de agentes inicializado');
+
+        console.log(
+            '✅ Evento de carga de agentes inicializado'
+        );
     }
 
-    // ======================================================
-    // 2. CONFIGURAR BUSCADOR DEL RANKING
-    // ======================================================
-    const buscador = document.getElementById('buscadorAgenteRanking');
-    if (buscador) {
-        buscador.addEventListener('input', function () {
-            if (typeof filtrarRankingPorBusqueda === 'function') {
-                filtrarRankingPorBusqueda();
-            }
-        });
-        console.log('✅ Buscador ranking configurado');
-    }
+
 
     // ======================================================
     // 3. INICIALIZAR FORMULARIOS
@@ -61635,6 +55184,13 @@ document.addEventListener('DOMContentLoaded', function () {
     if (typeof inicializarBuscadorGestores === 'function') {
         inicializarBuscadorGestores();
         console.log('✅ Buscador de gestores inicializado');
+    }
+
+    if (
+        typeof inicializarGestoresDashboard ===
+        'function'
+    ) {
+        inicializarGestoresDashboard();
     }
 
     // ======================================================
@@ -61762,14 +55318,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // 8. AGREGAR BOTONES (con retrasos para asegurar DOM)
     // ======================================================
     setTimeout(() => {
-        if (typeof agregarBotonLimpiarPDA === 'function') {
-            agregarBotonLimpiarPDA();
-            console.log('✅ Botón de limpieza PDA agregado');
-        }
-        if (typeof agregarBotonRefreshPDA === 'function') {
-            agregarBotonRefreshPDA();
-            console.log('✅ Botón refresh PDA agregado');
-        }
+
         if (typeof mostrarBotonesSegunRol === 'function') {
             mostrarBotonesSegunRol();
             console.log('✅ Botones según rol actualizados');
@@ -61794,14 +55343,14 @@ document.addEventListener('DOMContentLoaded', function () {
     // ======================================================
     // 10. 🔴 NUEVO: INICIALIZAR REGISTRO DE VOZ DE GESTORES
     // ======================================================
-    setTimeout(() => {
-        if (typeof inicializarRegistroVoz === 'function') {
-            inicializarRegistroVoz();
-            console.log('✅ Registro de voz inicializado');
-        } else {
-            console.warn('⚠️ inicializarRegistroVoz no está definida');
-        }
-    }, 800);
+    // setTimeout(() => {
+    //     if (typeof inicializarRegistroVoz === 'function') {
+    //       inicializarRegistroVoz();
+    //        console.log('✅ Registro de voz inicializado');
+    //    } else {
+    //        console.warn('⚠️ inicializarRegistroVoz no está definida');
+    //    }
+    //}, 800);
 
     // ======================================================
     // 11. CARGAR ESTADO DE REPORTES (si la pestaña está activa)
@@ -62315,17 +55864,17 @@ async function cargarTablaCampanas() {
                     <td style="padding: 10px; text-align: center;">${estadoBadge}</td>
                     <td style="padding: 10px; text-align: center;">${c.created_at ? new Date(c.created_at).toLocaleDateString('es-ES') : '-'}</td>
                     <td style="padding: 10px; text-align: center;">
-                        <button onclick="abrirModalEditarCampana(${c.id})" 
+                        <button onclick="abrirModalEditarCampana(${c.id})"
                                 style="background: var(--warning); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; margin-right: 5px; color: white;">
                             ✏️
                         </button>
                         ${c.activa ? `
-                            <button onclick="eliminarCampanaUI(${c.id})" 
+                            <button onclick="eliminarCampanaUI(${c.id})"
                                     style="background: var(--danger); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; color: white;">
                                 🗑️
                             </button>
                         ` : `
-                            <button onclick="reactivarCampanaUI(${c.id})" 
+                            <button onclick="reactivarCampanaUI(${c.id})"
                                     style="background: var(--ok); padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; color: white;">
                                 🔄 Reactivar
                             </button>
@@ -62576,10 +56125,9 @@ async function guardarCampana() {
 
         if (resultado.success) {
             alert(
-                `✅ Campaña ${
-                    id
-                        ? 'actualizada'
-                        : 'creada'
+                `✅ Campaña ${id
+                    ? 'actualizada'
+                    : 'creada'
                 } correctamente`
             );
 
@@ -63216,10 +56764,12 @@ function validarCabecerasPlantillaEscuchas(columnasExcel, plantilla) {
 // 3. MODIFICACIÓN DE LA FUNCIÓN DE PROCESAMIENTO DE ARCHIVOS
 // ======================================================
 
-// 🔴 SOBRESCRIBIR la función procesarArchivoEscuchas para incluir validación de campaña
-const originalProcesarArchivoEscuchas = window.procesarArchivoEscuchas || function () { };
+// ======================================================
+// PROCESAR ARCHIVO DE ESCUCHAS
+// Plantilla dinámica + contexto multidominio
+// ======================================================
 
-window.procesarArchivoEscuchas = async function (file) {
+async function procesarArchivoEscuchas(file) {
     console.log('📁 Iniciando procesamiento del archivo:', file.name);
 
     // ======================================================
@@ -63432,13 +56982,7 @@ window.procesarArchivoEscuchas = async function (file) {
                         continue;
                     }
 
-                    if (!campana) {
-                        errores.push(
-                            `Fila ${numeroFilaExcel}: Campaña vacía`
-                        );
 
-                        continue;
-                    }
 
                     // La existencia y relación Quiebre ↔ Campaña
                     // NO se valida aquí.
@@ -63535,7 +57079,7 @@ window.procesarArchivoEscuchas = async function (file) {
                             : '';
 
                     const mensajeError =
-`❌ ERRORES EN EL ARCHIVO (${errores.length}):
+                        `❌ ERRORES EN EL ARCHIVO (${errores.length}):
 
 ${primerosErrores}${erroresRestantes}
 
@@ -63673,11 +57217,11 @@ window.actualizarTablaMonitoreo = function (asignaciones) {
             estadoClase = 'style="background: #fff0f0;"';
             acciones = `
                 <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                    <button onclick="verDetalleIncidenciaEscucha(${asig.id})" 
+                    <button onclick="verDetalleIncidenciaEscucha(${asig.id})"
                         style="background: var(--warning); padding: 4px 8px; font-size: 11px; border: none; border-radius: 6px; cursor: pointer;">
                         🔍 Ver
                     </button>
-                    <button onclick="marcarIncidenciaResuelta(${asig.id})" 
+                    <button onclick="marcarIncidenciaResuelta(${asig.id})"
                         style="background: var(--ok); padding: 4px 8px; font-size: 11px; border: none; border-radius: 6px; cursor: pointer;">
                         ✅ Resolver
                     </button>
@@ -63700,7 +57244,7 @@ window.actualizarTablaMonitoreo = function (asignaciones) {
 
             if (asig.estado !== 'gestionado') {
                 acciones = `
-                    <button onclick="abrirModalReasignar(${asig.id}, '${escapeHtml(asig.ticket)}', '${escapeHtml(asig.auditor_asignado)}')" 
+                    <button onclick="abrirModalReasignar(${asig.id}, '${escapeHtml(asig.ticket)}', '${escapeHtml(asig.auditor_asignado)}')"
                             style="background: var(--warning); padding: 4px 8px; font-size: 11px; border: none; border-radius: 6px; cursor: pointer;">
                         🔄 Reasignar
                     </button>
@@ -63786,9 +57330,9 @@ window.actualizarTablaMonitoreo = function (asignaciones) {
     html += `
         <tr style="background: #f8f9fa; font-weight: bold;">
             <td colspan="11" style="padding: 10px;">
-                📊 Resumen: ${total} tickets totales | 
-                ⏳ ${pendientes} pendientes | 
-                🔄 ${enProceso} en proceso | 
+                📊 Resumen: ${total} tickets totales |
+                ⏳ ${pendientes} pendientes |
+                🔄 ${enProceso} en proceso |
                 ✅ ${gestionados} gestionados |
                 ⚠️ ${incidencias} incidencias
                 ${resumenCampanas ? `| 📌 Campañas: ${resumenCampanas}` : ''}
@@ -64112,11 +57656,10 @@ async function construirModalMatrizDominio(
                 "
             >
                 <strong>
-                    ${
-                        editando
-                            ? '✏️ Editar Matriz'
-                            : '➕ Nueva Matriz'
-                    }
+                    ${editando
+            ? '✏️ Editar Matriz'
+            : '➕ Nueva Matriz'
+        }
                 </strong>
 
                 <button
@@ -64140,9 +57683,8 @@ async function construirModalMatrizDominio(
                 <input
                     type="hidden"
                     id="matrizDominioId"
-                    value="${
-                        matriz?.id || ''
-                    }"
+                    value="${matriz?.id || ''
+        }"
                 >
 
 
@@ -64170,35 +57712,33 @@ async function construirModalMatrizDominio(
                             Seleccione quiebre
                         </option>
 
-                        ${
-                            quiebresActivos
-                                .map(
-                                    q => `
+                        ${quiebresActivos
+            .map(
+                q => `
                                         <option
                                             value="${Number(q.id)}"
-                                            ${
-                                                Number(
-                                                    q.id
-                                                ) ===
-                                                Number(
-                                                    matriz?.quiebre_id
-                                                )
-                                                    ? 'selected'
-                                                    : ''
-                                            }
+                                            ${Number(
+                    q.id
+                ) ===
+                        Number(
+                            matriz?.quiebre_id
+                        )
+                        ? 'selected'
+                        : ''
+                    }
                                         >
                                             ${escapeHtml(
-                                                q.codigo
-                                            )}
+                        q.codigo
+                    )}
                                             -
                                             ${escapeHtml(
-                                                q.nombre
-                                            )}
+                        q.nombre
+                    )}
                                         </option>
                                     `
-                                )
-                                .join('')
-                        }
+            )
+            .join('')
+        }
 
                     </select>
 
@@ -64227,8 +57767,8 @@ async function construirModalMatrizDominio(
                     <input
                         id="matrizDominioCodigo"
                         value="${escapeHtml(
-                            matriz?.codigo || ''
-                        )}"
+            matriz?.codigo || ''
+        )}"
                         style="
                             width:100%;
                             padding:10px;
@@ -64254,8 +57794,8 @@ async function construirModalMatrizDominio(
                     <input
                         id="matrizDominioNombre"
                         value="${escapeHtml(
-                            matriz?.nombre || ''
-                        )}"
+            matriz?.nombre || ''
+        )}"
                         style="
                             width:100%;
                             padding:10px;
@@ -64290,8 +57830,8 @@ async function construirModalMatrizDominio(
                             resize:vertical;
                         "
                     >${escapeHtml(
-                        matriz?.descripcion || ''
-                    )}</textarea>
+            matriz?.descripcion || ''
+        )}</textarea>
                 </div>
 
 
@@ -64317,22 +57857,20 @@ async function construirModalMatrizDominio(
                     >
                         <option
                             value="true"
-                            ${
-                                matriz?.activa !== false
-                                    ? 'selected'
-                                    : ''
-                            }
+                            ${matriz?.activa !== false
+            ? 'selected'
+            : ''
+        }
                         >
                             Activa
                         </option>
 
                         <option
                             value="false"
-                            ${
-                                matriz?.activa === false
-                                    ? 'selected'
-                                    : ''
-                            }
+                            ${matriz?.activa === false
+            ? 'selected'
+            : ''
+        }
                         >
                             Inactiva
                         </option>
@@ -64756,21 +58294,21 @@ async function seleccionarMatrizParaAdministrar(
             Matriz:
             <strong>
                 ${escapeHtml(
-                    matriz.codigo
-                )}
+            matriz.codigo
+        )}
             </strong>
             ·
             ${escapeHtml(
-                matriz.nombre || ''
-            )}
+            matriz.nombre || ''
+        )}
             · Origen:
             <strong>
                 ${escapeHtml(
-                    String(
-                        matriz.quiebre_codigo ||
-                        matriz.quiebre_id
-                    )
-                )}
+            String(
+                matriz.quiebre_codigo ||
+                matriz.quiebre_id
+            )
+        )}
             </strong>
         `;
     }
@@ -64945,7 +58483,7 @@ async function cargarTablaCampanasCompleta() {
                     </td>
                     <td style="padding: 10px 12px; text-align: center; white-space: nowrap;">
                         ${botones}
-                        <button class="btn-campana-accion" onclick="verTicketsPorCampana('${escapeHtml(c.codigo)}')" 
+                        <button class="btn-campana-accion" onclick="verTicketsPorCampana('${escapeHtml(c.codigo)}')"
                                 style="background: #019DF4; color: white; padding: 4px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 11px;"
                                 title="Ver tickets de esta campaña">
                             👁️
@@ -65777,3 +59315,5 @@ async function normalizarFiltroCampanaReportesAIds() {
         );
     }
 }
+
+

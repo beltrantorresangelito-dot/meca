@@ -57,12 +57,53 @@ test('PDAMOD-004 detalle conserva id de ruta', async () => {
       async query(sql, params) {
         seen.push(params || []);
 
-        if (String(sql).includes('FROM pda_cabecera WHERE id = $1')) {
-          return { rows: [{ id: '15' }] };
+        const normalizedSql =
+          String(sql)
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (
+          normalizedSql.includes(
+            'FROM pda_cabecera WHERE id = $1'
+          )
+        ) {
+          return {
+            rows: [
+              {
+                id: '15'
+              }
+            ]
+          };
         }
 
-        if (String(sql).includes('FROM pda_acciones WHERE pda_id = $1')) {
-          return { rows: [] };
+        if (
+          normalizedSql.includes(
+            'FROM pda_acciones WHERE pda_id = $1'
+          )
+        ) {
+          return {
+            rows: []
+          };
+        }
+
+        if (
+          normalizedSql.includes(
+            'FROM pda_ciclos_evaluacion'
+          )
+        ) {
+          return {
+            rows: []
+          };
+        }
+
+        if (
+          normalizedSql.includes(
+            'FROM pda_documentos'
+          )
+        ) {
+          return {
+            rows: []
+          };
         }
 
         return { rows: [] };
@@ -80,7 +121,7 @@ test('PDAMOD-004 detalle conserva id de ruta', async () => {
     },
     respuesta: {
       writeHead(code) { status = code; },
-      end() {}
+      end() { }
     }
   });
 
@@ -103,7 +144,7 @@ test('PDAMOD-005 exportar conserva 200', async () => {
     },
     respuesta: {
       writeHead(code) { status = code; },
-      end() {}
+      end() { }
     }
   });
 

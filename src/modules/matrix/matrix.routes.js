@@ -40,6 +40,23 @@ if (ruta === '/api/matriz/sub-motivos') {
   return true;
 }
 
+if (
+  ruta ===
+  '/api/matriz/clasificaciones-pda'
+) {
+  console.log(
+    '[API] GET /api/matriz/clasificaciones-pda'
+  );
+
+  await controller
+    .listPdaClassifications(
+      peticion,
+      respuesta
+    );
+
+  return true;
+}
+
 if (ruta === '/api/reglas-evaluacion') {
   console.log('[API] GET /api/reglas-evaluacion');
 

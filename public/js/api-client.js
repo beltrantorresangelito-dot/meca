@@ -1,11 +1,11 @@
 // ======================================================
 // api-client.js - Cliente API unificado
 // ======================================================
-// 
-// 📌 PROPÓSITO: Proporcionar una interfaz unificada para todas las 
+//
+// 📌 PROPÓSITO: Proporcionar una interfaz unificada para todas las
 //    operaciones de la API, manejando autenticación y tokens
 // 📌 TECNOLOGÍA: JavaScript nativo (fetch) con Promesas
-// 📌 ESTRUCTURA: 
+// 📌 ESTRUCTURA:
 //    1. Funciones auxiliares (hash, token, sesiones)
 //    2. Módulos por funcionalidad (Auth, Auditor, Supervisor, etc.)
 //    3. API pública (return de objetos con todos los métodos)
@@ -34,7 +34,7 @@ async function hashSHA256(texto) {
 // 2. CONFIGURACIÓN Y MÓDULO PRINCIPAL
 // ======================================================
 
-const API = (function() {
+const API = (function () {
     // Todas las operaciones usan la API local PostgreSQL
 
     // ======================================================
@@ -42,109 +42,109 @@ const API = (function() {
     // ======================================================
 
     // En api-client.js - login() - Versión simplificada
-async function login(usuario, contrasena) {
-    console.log('🔐 Intentando iniciar sesión...');
+    async function login(usuario, contrasena) {
+        console.log('🔐 Intentando iniciar sesión...');
 
-    if (!usuario || !contrasena) {
-        mostrarErrorLogin('⚠️ Complete ambos campos');
-        return { success: false, error: 'Complete ambos campos' };
-    }
-
-    const btn = document.querySelector('#loginForm button[type="submit"]');
-    const textoOriginal = btn?.innerHTML || 'Iniciar sesión';
-    
-    if (btn) {
-        btn.innerHTML = '⏳ Verificando...';
-        btn.disabled = true;
-    }
-
-    try {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ usuario, contrasena })
-        });
-        
-        const data = await response.json();
-        console.log('📊 Respuesta del login:', data);
-
-        if (data.success && data.token) {
-            // ✅ Guardar token
-            localStorage.setItem('meca_token', data.token);
-            
-            // ✅ Guardar usuario
-            const usuarioData = {
-                id: data.usuario.id,
-                usuario: data.usuario.usuario,
-                nombre_completo: data.usuario.nombre_completo || usuario,
-                rol_id: data.usuario.rol_id,
-                rol: data.usuario.rol || data.usuario.rol_codigo || 'AUDITOR'
-            };
-            localStorage.setItem('meca_usuario', JSON.stringify(usuarioData));
-            window.usuarioActual = usuarioData;
-            usuarioActual = usuarioData;
-            
-            console.log('✅ Login exitoso');
-            console.log('   Usuario:', usuarioData.usuario);
-            console.log('   Rol:', usuarioData.rol);
-            
-            // ✅ REDIRECCIÓN USANDO EL ENDPOINT DEL SERVIDOR
-            console.log('🔄 Solicitando redirección al servidor...');
-            
-            try {
-                const redirectResponse = await fetch('/api/auth/redirect', {
-                    headers: {
-                        'Authorization': `Bearer ${data.token}`
-                    }
-                });
-                
-                if (redirectResponse.ok) {
-                    const redirectData = await redirectResponse.json();
-                    console.log(`🔄 Redirigiendo a ${redirectData.redirectUrl}`);
-                    if (btn) {
-                        btn.innerHTML = textoOriginal;
-                        btn.disabled = false;
-                    }
-                    window.location.href = redirectData.redirectUrl;
-                    return data;
-                } else {
-                    console.warn('⚠️ Endpoint de redirección falló, usando fallback');
-                }
-            } catch (redirectError) {
-                console.warn('⚠️ Error en redirección:', redirectError.message);
-            }
-            
-            // ✅ FALLBACK: Redirección manual
-            const redirectUrl = usuarioData.rol === 'AUDITOR' ? '/auditor' : '/supervisor';
-            console.log(`🔄 Fallback: redirigiendo a ${redirectUrl}`);
-            if (btn) {
-                btn.innerHTML = textoOriginal;
-                btn.disabled = false;
-            }
-            window.location.href = redirectUrl;
-            return data;
-            
-        } else {
-            const errorMsg = data.error || 'Credenciales incorrectas';
-            mostrarErrorLogin(errorMsg);
-            if (btn) {
-                btn.innerHTML = textoOriginal;
-                btn.disabled = false;
-            }
-            return data;
+        if (!usuario || !contrasena) {
+            mostrarErrorLogin('⚠️ Complete ambos campos');
+            return { success: false, error: 'Complete ambos campos' };
         }
-        
-    } catch (error) {
-        console.error('❌ Error en login:', error);
-        mostrarErrorLogin('Error al iniciar sesión: ' + error.message);
+
+        const btn = document.querySelector('#loginForm button[type="submit"]');
+        const textoOriginal = btn?.innerHTML || 'Iniciar sesión';
+
         if (btn) {
-            btn.innerHTML = textoOriginal;
-            btn.disabled = false;
+            btn.innerHTML = '⏳ Verificando...';
+            btn.disabled = true;
         }
-        return { success: false, error: error.message };
+
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usuario, contrasena })
+            });
+
+            const data = await response.json();
+            console.log('📊 Respuesta del login:', data);
+
+            if (data.success && data.token) {
+                // ✅ Guardar token
+                localStorage.setItem('meca_token', data.token);
+
+                // ✅ Guardar usuario
+                const usuarioData = {
+                    id: data.usuario.id,
+                    usuario: data.usuario.usuario,
+                    nombre_completo: data.usuario.nombre_completo || usuario,
+                    rol_id: data.usuario.rol_id,
+                    rol: data.usuario.rol || data.usuario.rol_codigo || 'AUDITOR'
+                };
+                localStorage.setItem('meca_usuario', JSON.stringify(usuarioData));
+                window.usuarioActual = usuarioData;
+                usuarioActual = usuarioData;
+
+                console.log('✅ Login exitoso');
+                console.log('   Usuario:', usuarioData.usuario);
+                console.log('   Rol:', usuarioData.rol);
+
+                // ✅ REDIRECCIÓN USANDO EL ENDPOINT DEL SERVIDOR
+                console.log('🔄 Solicitando redirección al servidor...');
+
+                try {
+                    const redirectResponse = await fetch('/api/auth/redirect', {
+                        headers: {
+                            'Authorization': `Bearer ${data.token}`
+                        }
+                    });
+
+                    if (redirectResponse.ok) {
+                        const redirectData = await redirectResponse.json();
+                        console.log(`🔄 Redirigiendo a ${redirectData.redirectUrl}`);
+                        if (btn) {
+                            btn.innerHTML = textoOriginal;
+                            btn.disabled = false;
+                        }
+                        window.location.href = redirectData.redirectUrl;
+                        return data;
+                    } else {
+                        console.warn('⚠️ Endpoint de redirección falló, usando fallback');
+                    }
+                } catch (redirectError) {
+                    console.warn('⚠️ Error en redirección:', redirectError.message);
+                }
+
+                // ✅ FALLBACK: Redirección manual
+                const redirectUrl = usuarioData.rol === 'AUDITOR' ? '/auditor' : '/supervisor';
+                console.log(`🔄 Fallback: redirigiendo a ${redirectUrl}`);
+                if (btn) {
+                    btn.innerHTML = textoOriginal;
+                    btn.disabled = false;
+                }
+                window.location.href = redirectUrl;
+                return data;
+
+            } else {
+                const errorMsg = data.error || 'Credenciales incorrectas';
+                mostrarErrorLogin(errorMsg);
+                if (btn) {
+                    btn.innerHTML = textoOriginal;
+                    btn.disabled = false;
+                }
+                return data;
+            }
+
+        } catch (error) {
+            console.error('❌ Error en login:', error);
+            mostrarErrorLogin('Error al iniciar sesión: ' + error.message);
+            if (btn) {
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
+            return { success: false, error: error.message };
+        }
     }
-}
-    
+
     // ======================================================
     // FUNCIONES DE UTILIDAD - API CLIENT
     // ======================================================
@@ -155,10 +155,10 @@ async function login(usuario, contrasena) {
      */
     function mostrarErrorLogin(mensaje) {
         console.log('🔴 mostrarErrorLogin:', mensaje);
-        
+
         // Buscar el elemento donde se muestra el error
         const errorDiv = document.getElementById('loginError');
-        
+
         if (errorDiv) {
             // Establecer el texto del error
             errorDiv.textContent = mensaje;
@@ -170,7 +170,7 @@ async function login(usuario, contrasena) {
             errorDiv.style.border = '1px solid #ffcfcf';
             errorDiv.style.marginTop = '10px';
             errorDiv.style.marginBottom = '10px';
-            
+
             // Ocultar automáticamente después de 4 segundos
             if (window.timeoutErrorLogin) {
                 clearTimeout(window.timeoutErrorLogin);
@@ -187,7 +187,7 @@ async function login(usuario, contrasena) {
 
     // Exponer la función globalmente para que otros scripts la usen
     window.mostrarErrorLogin = mostrarErrorLogin;
-    
+
     /**
      * loginConAPI - Llama al endpoint de login
      * @param {string} usuario - Nombre de usuario
@@ -195,53 +195,53 @@ async function login(usuario, contrasena) {
      * @returns {Object} Respuesta del servidor
      */
     // En api-client.js - loginConAPI()
-async function loginConAPI(usuario, contrasena) {
-    try {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ usuario, contrasena })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success && data.usuario) {
-            // ✅ Asegurar que todos los campos estén presentes
-            let nombreCompleto = data.usuario.nombre_completo || data.usuario.nombre || usuario;
-            let rol = data.usuario.rol || data.usuario.rol_codigo || 'AUDITOR';
-            
-            const usuarioData = {
-                id: data.usuario.id,
-                usuario: data.usuario.usuario,
-                nombre_completo: nombreCompleto,
-                rol_id: data.usuario.rol_id,
-                rol: rol,
-                rol_codigo: data.usuario.rol_codigo || rol,
-                rol_nombre: data.usuario.rol_nombre
-            };
-            
-            console.log('📝 Guardando usuario:', usuarioData);
-            
-            // ✅ Guardar en localStorage
-            localStorage.setItem('meca_usuario', JSON.stringify(usuarioData));
-            
-            // ✅ ASIGNAR usuarioActual GLOBALMENTE
-            window.usuarioActual = usuarioData;
-            usuarioActual = usuarioData;
-            
-            console.log('✅ usuarioActual asignado:', window.usuarioActual);
-        }
-        
-        // ✅ SIEMPRE devolver los datos
-        return data;
-        
-    } catch (error) {
-        console.error('❌ Error en loginConAPI:', error);
-        return { success: false, error: error.message };
-    }
-}
+    async function loginConAPI(usuario, contrasena) {
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usuario, contrasena })
+            });
 
-    
+            const data = await response.json();
+
+            if (data.success && data.usuario) {
+                // ✅ Asegurar que todos los campos estén presentes
+                let nombreCompleto = data.usuario.nombre_completo || data.usuario.nombre || usuario;
+                let rol = data.usuario.rol || data.usuario.rol_codigo || 'AUDITOR';
+
+                const usuarioData = {
+                    id: data.usuario.id,
+                    usuario: data.usuario.usuario,
+                    nombre_completo: nombreCompleto,
+                    rol_id: data.usuario.rol_id,
+                    rol: rol,
+                    rol_codigo: data.usuario.rol_codigo || rol,
+                    rol_nombre: data.usuario.rol_nombre
+                };
+
+                console.log('📝 Guardando usuario:', usuarioData);
+
+                // ✅ Guardar en localStorage
+                localStorage.setItem('meca_usuario', JSON.stringify(usuarioData));
+
+                // ✅ ASIGNAR usuarioActual GLOBALMENTE
+                window.usuarioActual = usuarioData;
+                usuarioActual = usuarioData;
+
+                console.log('✅ usuarioActual asignado:', window.usuarioActual);
+            }
+
+            // ✅ SIEMPRE devolver los datos
+            return data;
+
+        } catch (error) {
+            console.error('❌ Error en loginConAPI:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+
     // ======================================================
     // Módulo: Auditor - Escuchas
     // ======================================================
@@ -252,86 +252,86 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Array} Lista de escuchas asignadas
      */
     async function getMisEscuchas(auditor) {
-    const token = localStorage.getItem('meca_token');
+        const token = localStorage.getItem('meca_token');
 
-    if (!token) {
-        throw new Error('No hay token de autenticación disponible');
-    }
-
-    const response = await fetch(
-        `/api/escuchas/mis-escuchas?auditor=${encodeURIComponent(auditor)}`,
-        {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+        if (!token) {
+            throw new Error('No hay token de autenticación disponible');
         }
-    );
 
-    const data = await response.json();
-
-    if (!response.ok) {
-        console.error(
-            '❌ Error getMisEscuchas:',
-            response.status,
-            data
+        const response = await fetch(
+            `/api/escuchas/mis-escuchas?auditor=${encodeURIComponent(auditor)}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            }
         );
 
-        throw new Error(
-            data?.error || `HTTP ${response.status}`
-        );
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error(
+                '❌ Error getMisEscuchas:',
+                response.status,
+                data
+            );
+
+            throw new Error(
+                data?.error || `HTTP ${response.status}`
+            );
+        }
+
+        return data;
     }
 
-    return data;
-}
-    
     /**
      * iniciarGestionEscucha - Marca una escucha como "en proceso"
      * @param {number} id - ID de la escucha
      * @returns {Object} Resultado de la operación
      */
     async function iniciarGestionEscucha(id) {
-    const token =
-        localStorage.getItem('meca_token');
+        const token =
+            localStorage.getItem('meca_token');
 
-    if (!token) {
-        throw new Error(
-            'Token de autenticación no disponible'
-        );
-    }
-
-    const response = await fetch(
-        `/api/escuchas/${id}/iniciar`,
-        {
-            method: 'POST',
-            headers: {
-                'Authorization':
-                    `Bearer ${token}`,
-                'Content-Type':
-                    'application/json'
-            }
+        if (!token) {
+            throw new Error(
+                'Token de autenticación no disponible'
+            );
         }
-    );
 
-    if (!response.ok) {
-        let error = {};
-
-        try {
-            error =
-                await response.json();
-        } catch (_) {}
-
-        throw new Error(
-            error.error ||
-            error.message ||
-            `Error al iniciar gestión (${response.status})`
+        const response = await fetch(
+            `/api/escuchas/${id}/iniciar`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+                    'Content-Type':
+                        'application/json'
+                }
+            }
         );
+
+        if (!response.ok) {
+            let error = {};
+
+            try {
+                error =
+                    await response.json();
+            } catch (_) { }
+
+            throw new Error(
+                error.error ||
+                error.message ||
+                `Error al iniciar gestión (${response.status})`
+            );
+        }
+
+        return await response.json();
     }
 
-    return await response.json();
-}
-    
     /**
      * reportarIncidencia - Reporta una incidencia en una escucha
      * @param {number} id - ID de la escucha
@@ -339,48 +339,48 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} Resultado de la operación
      */
     async function reportarIncidencia(id, motivo) {
-    const token =
-        localStorage.getItem('meca_token');
+        const token =
+            localStorage.getItem('meca_token');
 
-    if (!token) {
-        throw new Error(
-            'Token de autenticación no disponible'
-        );
-    }
-
-    const response = await fetch(
-        `/api/escuchas/${id}/incidencia`,
-        {
-            method: 'POST',
-            headers: {
-                'Authorization':
-                    `Bearer ${token}`,
-                'Content-Type':
-                    'application/json'
-            },
-            body: JSON.stringify({
-                motivo
-            })
+        if (!token) {
+            throw new Error(
+                'Token de autenticación no disponible'
+            );
         }
-    );
 
-    if (!response.ok) {
-        let error = {};
-
-        try {
-            error = await response.json();
-        } catch (_) {}
-
-        throw new Error(
-            error.error ||
-            error.message ||
-            `Error al reportar incidencia (${response.status})`
+        const response = await fetch(
+            `/api/escuchas/${id}/incidencia`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+                    'Content-Type':
+                        'application/json'
+                },
+                body: JSON.stringify({
+                    motivo
+                })
+            }
         );
+
+        if (!response.ok) {
+            let error = {};
+
+            try {
+                error = await response.json();
+            } catch (_) { }
+
+            throw new Error(
+                error.error ||
+                error.message ||
+                `Error al reportar incidencia (${response.status})`
+            );
+        }
+
+        return await response.json();
     }
 
-    return await response.json();
-}
-    
     // ======================================================
     // Módulo: Auditor - Historial de Evaluaciones
     // ======================================================
@@ -396,7 +396,7 @@ async function loginConAPI(usuario, contrasena) {
         if (!response.ok) throw new Error('Error al obtener historial');
         return await response.json();
     }
-    
+
     // ======================================================
     // Módulo: Auditor - Eliminar Evaluación
     // ======================================================
@@ -410,7 +410,7 @@ async function loginConAPI(usuario, contrasena) {
         const response = await fetch(`/api/evaluaciones/${id}`, { method: 'DELETE' });
         return await response.json();
     }
-    
+
     // ======================================================
     // Módulo: Auditor - Agentes y Auditores
     // ======================================================
@@ -446,7 +446,7 @@ async function loginConAPI(usuario, contrasena) {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return await response.json();
     }
-    
+
     /**
      * getAuditores - Obtiene lista de auditores
      * @returns {Array} Lista de auditores
@@ -499,6 +499,11 @@ async function loginConAPI(usuario, contrasena) {
                     evaluacion.tiempoAuditoriaFormateado,
 
                 // Contexto histórico de la evaluación
+                quiebre_id:
+                    evaluacion.quiebre_id ??
+                    evaluacion.quiebreId ??
+                    null,
+
                 campana_id:
                     evaluacion.campana_id ??
                     evaluacion.campanaId ??
@@ -519,6 +524,11 @@ async function loginConAPI(usuario, contrasena) {
                 version_matriz_id:
                     evaluacion.version_matriz_id ??
                     evaluacion.versionMatrizId ??
+                    null,
+
+                escucha_id:
+                    evaluacion.escucha_id ??
+                    evaluacion.escuchaId ??
                     null
             })
         });
@@ -528,7 +538,7 @@ async function loginConAPI(usuario, contrasena) {
 
             try {
                 error = await response.json();
-            } catch (_) {}
+            } catch (_) { }
 
             throw new Error(
                 error.error ||
@@ -539,7 +549,46 @@ async function loginConAPI(usuario, contrasena) {
 
         return await response.json();
     }
-    
+
+    /**
+ * actualizarEvaluacion - Actualiza una evaluación completa de forma transaccional
+ * @param {number|string} id - ID de la evaluación
+ * @param {Object} evaluacion - Datos completos de la evaluación
+ * @returns {Object} Resultado de la actualización
+ */
+    async function actualizarEvaluacion(id, evaluacion) {
+        const response = await fetch(`/api/evaluaciones/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(evaluacion)
+        });
+
+        if (!response.ok) {
+            let error;
+
+            try {
+                error = await response.json();
+            } catch {
+                error = null;
+            }
+
+            const err = new Error(
+                error?.error ||
+                error?.message ||
+                'Error al actualizar la evaluación'
+            );
+
+            err.status = response.status;
+            err.code = error?.code || null;
+
+            throw err;
+        }
+
+        return await response.json();
+    }
+
     // ======================================================
     // Módulo: Auditor - Gestionar Escucha
     // ======================================================
@@ -572,7 +621,7 @@ async function loginConAPI(usuario, contrasena) {
 
             try {
                 error = await response.json();
-            } catch (_) {}
+            } catch (_) { }
 
             throw new Error(
                 error.error ||
@@ -628,67 +677,103 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} Resultado de la operación
      */
     async function reactivarEscuchaPorTicket(ticketPSI) {
-    const token =
-        localStorage.getItem('meca_token');
+        const token =
+            localStorage.getItem('meca_token');
 
-    if (!token) {
-        throw new Error(
-            'Token de autenticación no disponible'
-        );
-    }
-
-    const response = await fetch(
-        `/api/escuchas/reactivar?ticket=${
-            encodeURIComponent(ticketPSI)
-        }`,
-        {
-            method: 'PUT',
-            headers: {
-                'Authorization':
-                    `Bearer ${token}`,
-                'Content-Type':
-                    'application/json'
-            }
+        if (!token) {
+            throw new Error(
+                'Token de autenticación no disponible'
+            );
         }
-    );
 
-    if (!response.ok) {
-        let error = {};
-
-        try {
-            error = await response.json();
-        } catch (_) {}
-
-        throw new Error(
-            error.error ||
-            error.message ||
-            `Error al reactivar escucha (${response.status})`
+        const response = await fetch(
+            `/api/escuchas/reactivar?ticket=${encodeURIComponent(ticketPSI)
+            }`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+                    'Content-Type':
+                        'application/json'
+                }
+            }
         );
-    }
-
-    return await response.json();
-}
-
-    // ======================================================
-    // Módulo: Auditor - Detalles de Evaluación
-    // ======================================================
-
-    /**
-     * getDetallesEvaluacion - Obtiene detalles de una evaluación
-     * @param {number} evaluacionId - ID de la evaluación
-     * @returns {Object} Detalles de la evaluación
-     */
-    async function getDetallesEvaluacion(evaluacionId) {
-        const response = await fetch(`/api/evaluaciones/${evaluacionId}/detalles`);
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || 'Error al obtener detalles');
+            let error = {};
+
+            try {
+                error = await response.json();
+            } catch (_) { }
+
+            throw new Error(
+                error.error ||
+                error.message ||
+                `Error al reactivar escucha (${response.status})`
+            );
         }
 
         return await response.json();
     }
 
+    // ======================================================
+    // Módulo: Auditor - Detalles de Evaluación
+    // ======================================================
+
+    async function getDetallesEvaluacion(
+        evaluacionId
+    ) {
+        const token =
+            localStorage.getItem(
+                'meca_token'
+            );
+
+        if (
+            evaluacionId === null ||
+            evaluacionId === undefined ||
+            String(evaluacionId).trim() === ''
+        ) {
+            throw new Error(
+                'evaluacionId requerido'
+            );
+        }
+
+        const response =
+            await fetch(
+                `/api/evaluaciones/${encodeURIComponent(
+                    String(evaluacionId)
+                )}/detalles`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Authorization':
+                            `Bearer ${token}`
+                    }
+                }
+            );
+
+        if (!response.ok) {
+            let errorBody = {};
+
+            try {
+                errorBody =
+                    await response.json();
+            } catch (_) { }
+
+            throw new Error(
+                errorBody.error ||
+                `Error obteniendo detalles de evaluación (${response.status})`
+            );
+        }
+
+        const data =
+            await response.json();
+
+        return Array.isArray(data)
+            ? data
+            : [];
+    }
     // ======================================================
     // Módulo: Supervisor - Reportes y Rankings
     // ======================================================
@@ -710,6 +795,141 @@ async function loginConAPI(usuario, contrasena) {
         const response = await fetch('/api/reportes/ranking');
         return await response.json();
     }
+
+    /**
+ * getGestoresResumen
+ * Obtiene el universo consolidado de Gestores 2.0.
+ *
+ * La lógica de ranking, ciclos basales,
+ * cuartiles y alertas PDA vive en backend.
+ */
+    async function getGestoresResumen(
+        filtros = {}
+    ) {
+        const token =
+            localStorage.getItem(
+                'meca_token'
+            );
+
+
+        const params =
+            new URLSearchParams();
+
+
+        // ======================================================
+        // PERÍODO
+        // ======================================================
+
+        if (
+            filtros.periodo
+        ) {
+            params.set(
+                'periodo',
+                String(
+                    filtros.periodo
+                )
+            );
+        }
+
+
+        // ======================================================
+        // QUIEBRE
+        // ======================================================
+
+        if (
+            filtros.quiebreId
+        ) {
+            params.set(
+                'quiebre_id',
+                String(
+                    filtros.quiebreId
+                )
+            );
+        }
+
+
+        // ======================================================
+        // CAMPAÑA
+        // ======================================================
+
+        if (
+            filtros.campanaId
+        ) {
+            params.set(
+                'campana_id',
+                String(
+                    filtros.campanaId
+                )
+            );
+        }
+
+
+        // ======================================================
+        // URL
+        // ======================================================
+
+        const queryString =
+            params.toString();
+
+
+        const endpoint =
+            queryString
+                ? `/api/gestores/resumen?${queryString}`
+                : '/api/gestores/resumen';
+
+
+        // ======================================================
+        // REQUEST
+        // ======================================================
+
+        const response =
+            await fetch(
+                endpoint,
+                {
+                    headers: {
+                        'Authorization':
+                            `Bearer ${token}`,
+                        'Content-Type':
+                            'application/json'
+                    }
+                }
+            );
+
+
+        // ======================================================
+        // ERROR
+        // ======================================================
+
+        if (!response.ok) {
+            let detalle =
+                null;
+
+
+            try {
+                detalle =
+                    await response.json();
+
+            } catch {
+                detalle =
+                    null;
+            }
+
+
+            throw new Error(
+                detalle?.error ||
+                `Error obteniendo Gestores: HTTP ${response.status}`
+            );
+        }
+
+
+        // ======================================================
+        // RESPUESTA
+        // ======================================================
+
+        return await response.json();
+    }
+
+
 
     /**
      * getEvolutivo - Obtiene datos evolutivos por período
@@ -1227,12 +1447,66 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} PDA creado
      */
     async function crearPDA(pda) {
-        const response = await fetch('/api/pda', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(pda)
-        });
-        return await response.json();
+        const token =
+            localStorage.getItem(
+                'meca_token'
+            );
+
+        const response =
+            await fetch(
+                '/api/pda',
+                {
+                    method: 'POST',
+
+                    headers: {
+                        'Authorization':
+                            `Bearer ${token}`,
+
+                        'Content-Type':
+                            'application/json'
+                    },
+
+                    body:
+                        JSON.stringify(
+                            pda
+                        )
+                }
+            );
+
+
+        const data =
+            await response.json()
+                .catch(
+                    () => ({})
+                );
+
+
+        if (!response.ok) {
+            if (
+                response.status === 401
+            ) {
+                throw new Error(
+                    'No autorizado'
+                );
+            }
+
+            if (
+                response.status === 409
+            ) {
+                throw new Error(
+                    data.error ||
+                    'El PDA ya existe para este ciclo y contexto'
+                );
+            }
+
+            throw new Error(
+                data.error ||
+                `HTTP ${response.status}`
+            );
+        }
+
+
+        return data;
     }
 
     /**
@@ -1452,7 +1726,7 @@ async function loginConAPI(usuario, contrasena) {
      */
     async function getSesionesUsuario(usuarioId, soloActivas = false) {
         const token = localStorage.getItem('meca_token');
-        const url = soloActivas 
+        const url = soloActivas
             ? `/api/sesiones/usuarios/${usuarioId}?activas=true`
             : `/api/sesiones/usuarios/${usuarioId}`;
         const response = await fetch(url, {
@@ -1511,44 +1785,44 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Array} Lista de lotes
      */
     async function getLotesEscuchas() {
-    const token =
-        localStorage.getItem('meca_token');
+        const token =
+            localStorage.getItem('meca_token');
 
-    if (!token) {
-        throw new Error(
-            'Token de autenticación no disponible'
-        );
-    }
-
-    const response = await fetch(
-        '/api/escuchas/lotes',
-        {
-            method: 'GET',
-            headers: {
-                'Authorization':
-                    `Bearer ${token}`,
-                'Content-Type':
-                    'application/json'
-            }
+        if (!token) {
+            throw new Error(
+                'Token de autenticación no disponible'
+            );
         }
-    );
 
-    if (!response.ok) {
-        let error = {};
-
-        try {
-            error = await response.json();
-        } catch (_) {}
-
-        throw new Error(
-            error.error ||
-            error.message ||
-            `Error al obtener lotes (${response.status})`
+        const response = await fetch(
+            '/api/escuchas/lotes',
+            {
+                method: 'GET',
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+                    'Content-Type':
+                        'application/json'
+                }
+            }
         );
-    }
 
-    return await response.json();
-}
+        if (!response.ok) {
+            let error = {};
+
+            try {
+                error = await response.json();
+            } catch (_) { }
+
+            throw new Error(
+                error.error ||
+                error.message ||
+                `Error al obtener lotes (${response.status})`
+            );
+        }
+
+        return await response.json();
+    }
 
     /**
      * getTicketsPorLote - Obtiene tickets de un lote específico
@@ -1557,21 +1831,21 @@ async function loginConAPI(usuario, contrasena) {
      */
     async function getTicketsPorLote(loteId) {
         const token = localStorage.getItem('meca_token');
-        
+
         try {
             const response = await fetch(`/api/escuchas/lotes/${loteId}/tickets`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            
+
             if (!response.ok) {
                 console.warn(`⚠️ Error ${response.status} al obtener tickets del lote ${loteId}`);
                 // ✅ DEVOLVER UN ARRAY VACÍO EN VEZ DE LANZAR ERROR
                 return [];
             }
-            
+
             const data = await response.json();
             return Array.isArray(data) ? data : [];
-            
+
         } catch (error) {
             console.error('Error obteniendo tickets:', error);
             // ✅ DEVOLVER UN ARRAY VACÍO EN VEZ DE LANZAR ERROR
@@ -1585,44 +1859,44 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} Resultado de la operación
      */
     async function activarLote(loteId) {
-    const token =
-        localStorage.getItem('meca_token');
+        const token =
+            localStorage.getItem('meca_token');
 
-    if (!token) {
-        throw new Error(
-            'Token de autenticación no disponible'
-        );
-    }
-
-    const response = await fetch(
-        `/api/escuchas/lotes/${loteId}/activar`,
-        {
-            method: 'PUT',
-            headers: {
-                'Authorization':
-                    `Bearer ${token}`,
-                'Content-Type':
-                    'application/json'
-            }
+        if (!token) {
+            throw new Error(
+                'Token de autenticación no disponible'
+            );
         }
-    );
 
-    if (!response.ok) {
-        let error = {};
-
-        try {
-            error = await response.json();
-        } catch (_) {}
-
-        throw new Error(
-            error.error ||
-            error.message ||
-            `Error al activar lote (${response.status})`
+        const response = await fetch(
+            `/api/escuchas/lotes/${loteId}/activar`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+                    'Content-Type':
+                        'application/json'
+                }
+            }
         );
-    }
 
-    return await response.json();
-}
+        if (!response.ok) {
+            let error = {};
+
+            try {
+                error = await response.json();
+            } catch (_) { }
+
+            throw new Error(
+                error.error ||
+                error.message ||
+                `Error al activar lote (${response.status})`
+            );
+        }
+
+        return await response.json();
+    }
 
     /**
      * eliminarLote - Elimina un lote de escuchas
@@ -1630,44 +1904,44 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Object} Resultado de la operación
      */
     async function eliminarLote(loteId) {
-    const token =
-        localStorage.getItem('meca_token');
+        const token =
+            localStorage.getItem('meca_token');
 
-    if (!token) {
-        throw new Error(
-            'Token de autenticación no disponible'
-        );
-    }
-
-    const response = await fetch(
-        `/api/escuchas/lotes/${loteId}`,
-        {
-            method: 'DELETE',
-            headers: {
-                'Authorization':
-                    `Bearer ${token}`,
-                'Content-Type':
-                    'application/json'
-            }
+        if (!token) {
+            throw new Error(
+                'Token de autenticación no disponible'
+            );
         }
-    );
 
-    if (!response.ok) {
-        let error = {};
-
-        try {
-            error = await response.json();
-        } catch (_) {}
-
-        throw new Error(
-            error.error ||
-            error.message ||
-            `Error al eliminar lote (${response.status})`
+        const response = await fetch(
+            `/api/escuchas/lotes/${loteId}`,
+            {
+                method: 'DELETE',
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+                    'Content-Type':
+                        'application/json'
+                }
+            }
         );
-    }
 
-    return await response.json();
-}
+        if (!response.ok) {
+            let error = {};
+
+            try {
+                error = await response.json();
+            } catch (_) { }
+
+            throw new Error(
+                error.error ||
+                error.message ||
+                `Error al eliminar lote (${response.status})`
+            );
+        }
+
+        return await response.json();
+    }
 
     // ======================================================
     // Módulo: Supervisor - Solicitudes y Requerimientos
@@ -1781,7 +2055,7 @@ async function loginConAPI(usuario, contrasena) {
     // ======================================================
     async function getFrentes() {
         const token = localStorage.getItem('meca_token');
-        
+
         try {
             // 1. Obtener la versión activa
             const versionActiva = await getVersionActiva();
@@ -1789,9 +2063,9 @@ async function loginConAPI(usuario, contrasena) {
                 console.warn('⚠️ No hay versión activa');
                 return [];
             }
-            
+
             console.log(`📌 getFrentes() - Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
-            
+
             // 2. Obtener frentes de la versión activa
             const response = await fetch('/api/query', {
                 method: 'POST',
@@ -1818,11 +2092,11 @@ async function loginConAPI(usuario, contrasena) {
                     ]
                 })
             });
-            
+
             if (!response.ok) throw new Error('Error al cargar frentes');
-            
+
             const result = await response.json();
-            
+
             // Asegurar que los datos tengan el formato esperado
             return (result.data || []).map(item => ({
                 id: item.id,
@@ -1832,7 +2106,7 @@ async function loginConAPI(usuario, contrasena) {
                 orden: parseInt(item.orden) || 0,
                 activo: item.activo === true || item.activo === 'true'
             }));
-            
+
         } catch (error) {
             console.error('❌ Error en getFrentes:', error);
             return [];
@@ -1985,7 +2259,7 @@ async function loginConAPI(usuario, contrasena) {
     // ======================================================
     async function actualizarFrente(id, data) {
         const token = localStorage.getItem('meca_token');
-        
+
         const response = await fetch('/api/query', {
             method: 'POST',
             headers: {
@@ -2008,12 +2282,12 @@ async function loginConAPI(usuario, contrasena) {
                 ]
             })
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Error al actualizar frente');
         }
-        
+
         const result = await response.json();
         return result.data && result.data.length > 0 ? result.data[0] : null;
     }
@@ -2022,105 +2296,105 @@ async function loginConAPI(usuario, contrasena) {
     // ELIMINAR FRENTE - USAR VERSION_FRENTES
     // ======================================================
     async function eliminarFrente(
-    id,
-    contexto = {}
-) {
-    const token =
-        localStorage.getItem(
-            'meca_token'
-        );
-
-    const frenteId =
-        Number(id);
-
-    const matrizId =
-        Number(
-            contexto.matriz_id
-        );
-
-    const versionId =
-        Number(
-            contexto.version_matriz_id
-        );
-
-    if (
-        !Number.isInteger(frenteId) ||
-        frenteId <= 0
+        id,
+        contexto = {}
     ) {
-        throw new Error(
-            'ID de frente inválido'
-        );
+        const token =
+            localStorage.getItem(
+                'meca_token'
+            );
+
+        const frenteId =
+            Number(id);
+
+        const matrizId =
+            Number(
+                contexto.matriz_id
+            );
+
+        const versionId =
+            Number(
+                contexto.version_matriz_id
+            );
+
+        if (
+            !Number.isInteger(frenteId) ||
+            frenteId <= 0
+        ) {
+            throw new Error(
+                'ID de frente inválido'
+            );
+        }
+
+        if (
+            !Number.isInteger(matrizId) ||
+            matrizId <= 0
+        ) {
+            throw new Error(
+                'matriz_id requerido para eliminar frente'
+            );
+        }
+
+        if (
+            !Number.isInteger(versionId) ||
+            versionId <= 0
+        ) {
+            throw new Error(
+                'version_matriz_id requerido para eliminar frente'
+            );
+        }
+
+        const response =
+            await fetch(
+                `/api/matriz/frentes/${frenteId}`,
+                {
+                    method:
+                        'DELETE',
+
+                    headers: {
+                        'Authorization':
+                            `Bearer ${token}`,
+
+                        'Content-Type':
+                            'application/json'
+                    },
+
+                    body:
+                        JSON.stringify({
+                            matriz_id:
+                                matrizId,
+
+                            version_matriz_id:
+                                versionId
+                        })
+                }
+            );
+
+        let result = null;
+
+        try {
+            result =
+                await response.json();
+        } catch (_) {
+            result = null;
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                result?.error ||
+                `HTTP ${response.status}`
+            );
+        }
+
+        return result;
     }
-
-    if (
-        !Number.isInteger(matrizId) ||
-        matrizId <= 0
-    ) {
-        throw new Error(
-            'matriz_id requerido para eliminar frente'
-        );
-    }
-
-    if (
-        !Number.isInteger(versionId) ||
-        versionId <= 0
-    ) {
-        throw new Error(
-            'version_matriz_id requerido para eliminar frente'
-        );
-    }
-
-    const response =
-        await fetch(
-            `/api/matriz/frentes/${frenteId}`,
-            {
-                method:
-                    'DELETE',
-
-                headers: {
-                    'Authorization':
-                        `Bearer ${token}`,
-
-                    'Content-Type':
-                        'application/json'
-                },
-
-                body:
-                    JSON.stringify({
-                        matriz_id:
-                            matrizId,
-
-                        version_matriz_id:
-                            versionId
-                    })
-            }
-        );
-
-    let result = null;
-
-    try {
-        result =
-            await response.json();
-    } catch (_) {
-        result = null;
-    }
-
-    if (!response.ok) {
-        throw new Error(
-            result?.error ||
-            `HTTP ${response.status}`
-        );
-    }
-
-    return result;
-}
 
     // ======================================================
     // GET ATRIBUTOS - SOLO VERSIÓN ACTIVA (SIN JOIN)
     // ======================================================
     async function getAtributos(frenteId) {
         const token = localStorage.getItem('meca_token');
-        
+
         try {
             // 1. Obtener la versión activa
             const versionActiva = await getVersionActiva();
@@ -2128,9 +2402,9 @@ async function loginConAPI(usuario, contrasena) {
                 console.warn('⚠️ No hay versión activa');
                 return [];
             }
-            
+
             console.log(`📌 getAtributos() - Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
-            
+
             // 2. Primero, obtener los frentes de la versión activa
             const frentesResponse = await fetch('/api/query', {
                 method: 'POST',
@@ -2148,21 +2422,21 @@ async function loginConAPI(usuario, contrasena) {
                     ]
                 })
             });
-            
+
             if (!frentesResponse.ok) throw new Error('Error al obtener frentes de la versión activa');
             const frentesResult = await frentesResponse.json();
             const frenteIds = (frentesResult.data || []).map(f => f.id);
-            
+
             if (frenteIds.length === 0) {
                 console.log('⚠️ No hay frentes en la versión activa');
                 return [];
             }
-            
+
             // 3. Construir filtro para atributos (solo de los frentes de la versión activa)
             let filters = [
                 { type: 'eq', column: 'activo', value: true }
             ];
-            
+
             // Si se pasa frenteId, filtrar por él
             if (frenteId) {
                 filters.push({ type: 'eq', column: 'version_frente_id', value: parseInt(frenteId) });
@@ -2170,7 +2444,7 @@ async function loginConAPI(usuario, contrasena) {
                 // Si no se pasa frenteId, filtrar por los frentes de la versión activa
                 filters.push({ type: 'in', column: 'version_frente_id', values: frenteIds });
             }
-            
+
             // 4. Obtener atributos
             const response = await fetch('/api/query', {
                 method: 'POST',
@@ -2192,11 +2466,11 @@ async function loginConAPI(usuario, contrasena) {
                     filters: filters
                 })
             });
-            
+
             if (!response.ok) throw new Error('Error al cargar atributos');
-            
+
             const result = await response.json();
-            
+
             return (result.data || []).map(item => ({
                 id: item.id,
                 nombre: item.nombre,
@@ -2205,7 +2479,7 @@ async function loginConAPI(usuario, contrasena) {
                 activo: item.activo === true || item.activo === 'true',
                 frente_id: item.frente_id || item.version_frente_id
             }));
-            
+
         } catch (error) {
             console.error('❌ Error en getAtributos:', error);
             return [];
@@ -2216,167 +2490,167 @@ async function loginConAPI(usuario, contrasena) {
     // CREAR ATRIBUTO - USAR /api/query
     // ======================================================
     async function crearAtributo(data = {}) {
-    const token =
-        localStorage.getItem(
-            'meca_token'
-        );
-
-
-    const matrizId =
-        Number(
-            data.matriz_id ??
-            data.matrizId ??
-            0
-        );
-
-
-    const versionId =
-        Number(
-            data.version_matriz_id ??
-            data.versionId ??
-            data.version_id ??
-            0
-        );
-
-
-    const frenteId =
-        Number(
-            data.frente_id ??
-            data.frenteId ??
-            0
-        );
-
-
-    if (
-        !Number.isInteger(matrizId) ||
-        matrizId <= 0
-    ) {
-        throw new Error(
-            'matriz_id requerido para crear atributo'
-        );
-    }
-
-
-    if (
-        !Number.isInteger(versionId) ||
-        versionId <= 0
-    ) {
-        throw new Error(
-            'version_matriz_id requerido para crear atributo'
-        );
-    }
-
-
-    if (
-        !Number.isInteger(frenteId) ||
-        frenteId <= 0
-    ) {
-        throw new Error(
-            'frente_id requerido para crear atributo'
-        );
-    }
-
-
-    const payload = {
-        frente_id:
-            frenteId,
-
-        nombre:
-            data.nombre,
-
-        peso_maximo:
-            data.peso_maximo,
-
-        orden:
-            data.orden ?? 0,
-
-        activo:
-            data.activo !== false,
-
-        matriz_id:
-            matrizId,
-
-        version_matriz_id:
-            versionId
-    };
-
-
-    console.log(
-        '📤 API.crearAtributo:',
-        payload
-    );
-
-
-    const response =
-        await fetch(
-            '/api/matriz/atributos',
-            {
-                method:
-                    'POST',
-
-                headers: {
-                    'Content-Type':
-                        'application/json',
-
-                    ...(token
-                        ? {
-                            Authorization:
-                                `Bearer ${token}`
-                        }
-                        : {})
-                },
-
-                body:
-                    JSON.stringify(
-                        payload
-                    )
-            }
-        );
-
-
-    let result = null;
-
-
-    try {
-        result =
-            await response.json();
-
-    } catch (_) {
-        result =
-            null;
-    }
-
-
-    if (!response.ok) {
-        const error =
-            new Error(
-                result?.error ||
-                `Error HTTP ${response.status}`
+        const token =
+            localStorage.getItem(
+                'meca_token'
             );
 
-        error.status =
-            response.status;
 
-        error.code =
-            result?.code ||
-            null;
+        const matrizId =
+            Number(
+                data.matriz_id ??
+                data.matrizId ??
+                0
+            );
 
-        error.data =
-            result;
 
-        throw error;
+        const versionId =
+            Number(
+                data.version_matriz_id ??
+                data.versionId ??
+                data.version_id ??
+                0
+            );
+
+
+        const frenteId =
+            Number(
+                data.frente_id ??
+                data.frenteId ??
+                0
+            );
+
+
+        if (
+            !Number.isInteger(matrizId) ||
+            matrizId <= 0
+        ) {
+            throw new Error(
+                'matriz_id requerido para crear atributo'
+            );
+        }
+
+
+        if (
+            !Number.isInteger(versionId) ||
+            versionId <= 0
+        ) {
+            throw new Error(
+                'version_matriz_id requerido para crear atributo'
+            );
+        }
+
+
+        if (
+            !Number.isInteger(frenteId) ||
+            frenteId <= 0
+        ) {
+            throw new Error(
+                'frente_id requerido para crear atributo'
+            );
+        }
+
+
+        const payload = {
+            frente_id:
+                frenteId,
+
+            nombre:
+                data.nombre,
+
+            peso_maximo:
+                data.peso_maximo,
+
+            orden:
+                data.orden ?? 0,
+
+            activo:
+                data.activo !== false,
+
+            matriz_id:
+                matrizId,
+
+            version_matriz_id:
+                versionId
+        };
+
+
+        console.log(
+            '📤 API.crearAtributo:',
+            payload
+        );
+
+
+        const response =
+            await fetch(
+                '/api/matriz/atributos',
+                {
+                    method:
+                        'POST',
+
+                    headers: {
+                        'Content-Type':
+                            'application/json',
+
+                        ...(token
+                            ? {
+                                Authorization:
+                                    `Bearer ${token}`
+                            }
+                            : {})
+                    },
+
+                    body:
+                        JSON.stringify(
+                            payload
+                        )
+                }
+            );
+
+
+        let result = null;
+
+
+        try {
+            result =
+                await response.json();
+
+        } catch (_) {
+            result =
+                null;
+        }
+
+
+        if (!response.ok) {
+            const error =
+                new Error(
+                    result?.error ||
+                    `Error HTTP ${response.status}`
+                );
+
+            error.status =
+                response.status;
+
+            error.code =
+                result?.code ||
+                null;
+
+            error.data =
+                result;
+
+            throw error;
+        }
+
+
+        return result;
     }
-
-
-    return result;
-}
 
     // ======================================================
     // ACTUALIZAR ATRIBUTO - USAR /api/query
     // ======================================================
     async function actualizarAtributo(id, data) {
         const token = localStorage.getItem('meca_token');
-        
+
         // 🔴 CAMBIAR: Usar /api/query en lugar de /api/matriz/atributos/:id
         const response = await fetch('/api/query', {
             method: 'POST',
@@ -2399,12 +2673,12 @@ async function loginConAPI(usuario, contrasena) {
                 ]
             })
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Error al actualizar atributo');
         }
-        
+
         const result = await response.json();
         return result.data && result.data.length > 0 ? result.data[0] : null;
     }
@@ -2414,7 +2688,7 @@ async function loginConAPI(usuario, contrasena) {
     // ======================================================
     async function eliminarAtributo(id) {
         const token = localStorage.getItem('meca_token');
-        
+
         const response = await fetch('/api/query', {
             method: 'POST',
             headers: {
@@ -2429,18 +2703,18 @@ async function loginConAPI(usuario, contrasena) {
                 ]
             })
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Error al eliminar atributo');
         }
-        
+
         const result = await response.json();
-        
+
         if (result.error) {
             throw new Error(result.error);
         }
-        
+
         return {
             success: true,
             message: 'Atributo eliminado correctamente',
@@ -2450,78 +2724,135 @@ async function loginConAPI(usuario, contrasena) {
     }
 
     // ======================================================
-    // CREAR SUB-MOTIVO - USAR /api/query
+    // CLASIFICACIONES PDA
     // ======================================================
-    async function crearSubMotivo(data) {
-        const token = localStorage.getItem('meca_token');
-        
-        const response = await fetch('/api/query', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                table: 'version_sub_motivos',
-                operation: 'insert',
-                data: {
-                    version_atributo_id: data.atributo_id,
-                    codigo: data.codigo,
-                    descripcion: data.descripcion,
-                    peso_individual: data.peso_individual,
-                    orden: data.orden || 0,
-                    activo: data.activo !== undefined ? data.activo : true,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
+    async function getClasificacionesPda() {
+        const token =
+            localStorage.getItem(
+                'meca_token'
+            );
+
+        const response =
+            await fetch(
+                '/api/matriz/clasificaciones-pda',
+                {
+                    headers: {
+                        'Authorization':
+                            `Bearer ${token}`,
+                        'Content-Type':
+                            'application/json'
+                    }
                 }
-            })
-        });
-        
+            );
+
+        const result =
+            await response.json();
+
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al crear sub-motivo');
+            throw new Error(
+                result?.error ||
+                'Error al cargar clasificaciones PDA'
+            );
         }
-        
-        const result = await response.json();
-        return result.data && result.data.length > 0 ? result.data[0] : null;
+
+        return Array.isArray(result)
+            ? result
+            : [];
     }
 
     // ======================================================
-    // ACTUALIZAR SUB-MOTIVO - USAR /api/query
+    // CREAR SUB-MOTIVO - API MATRIX
     // ======================================================
-    async function actualizarSubMotivo(id, data) {
+    async function crearSubMotivo(data) {
         const token = localStorage.getItem('meca_token');
-        
-        const response = await fetch('/api/query', {
+
+        const response = await fetch('/api/matriz/sub-motivos', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                table: 'version_sub_motivos',
-                operation: 'update',
-                data: {
+                atributo_id: data.atributo_id,
+                codigo: data.codigo,
+                descripcion: data.descripcion,
+                peso_individual: data.peso_individual,
+                orden: data.orden ?? 0,
+                activo: data.activo !== undefined
+                    ? data.activo
+                    : true,
+
+                // Clasificación PDA
+                clasificacion_pda_id:
+                    data.clasificacion_pda_id,
+
+                // Contexto de matriz / versión
+                matriz_id: data.matriz_id,
+                version_matriz_id:
+                    data.version_matriz_id
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                result?.error ||
+                result?.message ||
+                'Error al crear sub-motivo'
+            );
+        }
+
+        return result;
+    }
+
+    // ======================================================
+    // ACTUALIZAR SUB-MOTIVO - API MATRIX
+    // ======================================================
+    async function actualizarSubMotivo(id, data) {
+        const token = localStorage.getItem('meca_token');
+
+        const response = await fetch(
+            `/api/matriz/sub-motivos/${encodeURIComponent(id)}`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    atributo_id: data.atributo_id,
                     codigo: data.codigo,
                     descripcion: data.descripcion,
                     peso_individual: data.peso_individual,
-                    orden: data.orden || 0,
-                    activo: data.activo !== undefined ? data.activo : true,
-                    updated_at: new Date().toISOString()
-                },
-                filters: [
-                    { type: 'eq', column: 'id', value: parseInt(id) }
-                ]
-            })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Error al actualizar sub-motivo');
-        }
-        
+                    orden: data.orden ?? 0,
+                    activo: data.activo !== undefined
+                        ? data.activo
+                        : true,
+
+                    // Clasificación PDA
+                    clasificacion_pda_id:
+                        data.clasificacion_pda_id,
+
+                    // Contexto de matriz / versión
+                    matriz_id: data.matriz_id,
+                    version_matriz_id:
+                        data.version_matriz_id
+                })
+            }
+        );
+
         const result = await response.json();
-        return result.data && result.data.length > 0 ? result.data[0] : null;
+
+        if (!response.ok) {
+            throw new Error(
+                result?.error ||
+                result?.message ||
+                'Error al actualizar sub-motivo'
+            );
+        }
+
+        return result;
     }
 
     // ======================================================
@@ -2529,7 +2860,7 @@ async function loginConAPI(usuario, contrasena) {
     // ======================================================
     async function getSubMotivos(atributoId) {
         const token = localStorage.getItem('meca_token');
-        
+
         try {
             // 1. Obtener la versión activa
             const versionActiva = await getVersionActiva();
@@ -2537,9 +2868,9 @@ async function loginConAPI(usuario, contrasena) {
                 console.warn('⚠️ No hay versión activa');
                 return [];
             }
-            
+
             console.log(`📌 getSubMotivos() - Versión activa: ${versionActiva.version} (ID: ${versionActiva.id})`);
-            
+
             // 2. Obtener los frentes de la versión activa
             const frentesResponse = await fetch('/api/query', {
                 method: 'POST',
@@ -2557,16 +2888,16 @@ async function loginConAPI(usuario, contrasena) {
                     ]
                 })
             });
-            
+
             if (!frentesResponse.ok) throw new Error('Error al obtener frentes de la versión activa');
             const frentesResult = await frentesResponse.json();
             const frenteIds = (frentesResult.data || []).map(f => f.id);
-            
+
             if (frenteIds.length === 0) {
                 console.log('⚠️ No hay frentes en la versión activa');
                 return [];
             }
-            
+
             // 3. Obtener los atributos de esos frentes
             const atributosResponse = await fetch('/api/query', {
                 method: 'POST',
@@ -2584,21 +2915,21 @@ async function loginConAPI(usuario, contrasena) {
                     ]
                 })
             });
-            
+
             if (!atributosResponse.ok) throw new Error('Error al obtener atributos de la versión activa');
             const atributosResult = await atributosResponse.json();
             const atributoIds = (atributosResult.data || []).map(a => a.id);
-            
+
             if (atributoIds.length === 0) {
                 console.log('⚠️ No hay atributos en la versión activa');
                 return [];
             }
-            
+
             // 4. Construir filtro para sub-motivos
             let filters = [
                 { type: 'eq', column: 'activo', value: true }
             ];
-            
+
             if (atributoId) {
                 // Si se pasa atributoId, filtrar por él
                 filters.push({ type: 'eq', column: 'version_atributo_id', value: parseInt(atributoId) });
@@ -2606,7 +2937,7 @@ async function loginConAPI(usuario, contrasena) {
                 // Si no se pasa atributoId, filtrar por todos los atributos de la versión activa
                 filters.push({ type: 'in', column: 'version_atributo_id', values: atributoIds });
             }
-            
+
             // 5. Obtener sub-motivos
             const response = await fetch('/api/query', {
                 method: 'POST',
@@ -2629,11 +2960,11 @@ async function loginConAPI(usuario, contrasena) {
                     filters: filters
                 })
             });
-            
+
             if (!response.ok) throw new Error('Error al cargar sub-motivos');
-            
+
             const result = await response.json();
-            
+
             return (result.data || []).map(item => ({
                 id: item.id,
                 codigo: item.codigo,
@@ -2643,7 +2974,7 @@ async function loginConAPI(usuario, contrasena) {
                 activo: item.activo === true || item.activo === 'true',
                 atributo_id: item.atributo_id || item.version_atributo_id
             }));
-            
+
         } catch (error) {
             console.error('❌ Error en getSubMotivos:', error);
             return [];
@@ -2656,7 +2987,7 @@ async function loginConAPI(usuario, contrasena) {
     // ======================================================
     async function eliminarSubMotivo(id) {
         const token = localStorage.getItem('meca_token');
-        
+
         // 🔴 CAMBIAR: Usar /api/query en lugar de /api/matriz/sub-motivos/:id
         const response = await fetch('/api/query', {
             method: 'POST',
@@ -2672,21 +3003,21 @@ async function loginConAPI(usuario, contrasena) {
                 ]
             })
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Error al eliminar sub-motivo');
         }
-        
+
         const result = await response.json();
-        
+
         // Verificar si se eliminó correctamente
         if (result.error) {
             throw new Error(result.error);
         }
-        
-        return { 
-            success: true, 
+
+        return {
+            success: true,
             message: 'Sub-motivo eliminado correctamente',
             data: result.data,
             count: result.count
@@ -2815,7 +3146,7 @@ async function loginConAPI(usuario, contrasena) {
             try {
                 const error = await response.json();
                 errorMsg = error.error || error.message || `HTTP ${response.status}`;
-            } catch(e) {
+            } catch (e) {
                 errorMsg = `HTTP ${response.status}`;
             }
             throw new Error(errorMsg);
@@ -2842,7 +3173,7 @@ async function loginConAPI(usuario, contrasena) {
             try {
                 const error = await response.json();
                 errorMsg = error.error || error.message || `HTTP ${response.status}`;
-            } catch(e) {
+            } catch (e) {
                 errorMsg = `HTTP ${response.status}`;
             }
             throw new Error(errorMsg);
@@ -2867,7 +3198,7 @@ async function loginConAPI(usuario, contrasena) {
             try {
                 const error = await response.json();
                 errorMsg = error.error || error.message || `HTTP ${response.status}`;
-            } catch(e) {
+            } catch (e) {
                 errorMsg = `HTTP ${response.status}`;
             }
             throw new Error(errorMsg);
@@ -2885,7 +3216,7 @@ async function loginConAPI(usuario, contrasena) {
         return await response.json();
     }
 
-    
+
 
     // ======================================================
     // Módulo: Autenticación - Verificar Token (Navegador)
@@ -2898,9 +3229,9 @@ async function loginConAPI(usuario, contrasena) {
     async function verifyToken() {
         const token = localStorage.getItem('meca_token');
         console.log('🔍 [API] verifyToken - Token existe?', !!token);
-        
+
         if (!token) return { valid: false };
-        
+
         try {
             // Decodificar token JWT sin usar Buffer
             const parts = token.split('.');
@@ -2908,7 +3239,7 @@ async function loginConAPI(usuario, contrasena) {
                 console.error('Token inválido: no tiene 3 partes');
                 return { valid: false };
             }
-            
+
             // Decodificar payload (parte 2)
             const payloadEncoded = parts[1];
             // Reemplazar caracteres Base64URL a Base64 estándar
@@ -2916,21 +3247,21 @@ async function loginConAPI(usuario, contrasena) {
             // Decodificar Base64
             const payloadJson = atob(base64);
             const payload = JSON.parse(payloadJson);
-            
+
             console.log('🔍 [API] Payload decodificado:', payload);
-            
+
             // Verificar expiración
             const expirado = payload.exp * 1000 < Date.now();
             console.log('🔍 [API] Token expirado?', expirado);
-            
+
             if (expirado) {
                 localStorage.removeItem('meca_token');
                 localStorage.removeItem('meca_usuario');
                 return { valid: false };
             }
-            
+
             return { valid: true, usuario: payload };
-            
+
         } catch (error) {
             console.error('❌ [API] Error verificando token:', error);
             return { valid: false };
@@ -2971,27 +3302,27 @@ async function loginConAPI(usuario, contrasena) {
     function obtenerInfoDispositivo() {
         const ua = navigator.userAgent;
         let dispositivo = 'Desktop';
-        
+
         if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
             dispositivo = 'Tablet';
         } else if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) {
             dispositivo = 'Móvil';
         }
-        
+
         let so = 'Desconocido';
         if (ua.indexOf('Windows') !== -1) so = 'Windows';
         else if (ua.indexOf('Mac') !== -1) so = 'Mac';
         else if (ua.indexOf('Linux') !== -1) so = 'Linux';
         else if (ua.indexOf('Android') !== -1) so = 'Android';
         else if (ua.indexOf('iOS') !== -1 || ua.indexOf('iPhone') !== -1 || ua.indexOf('iPad') !== -1) so = 'iOS';
-        
+
         let navegador = 'Desconocido';
         if (ua.indexOf('Chrome') !== -1 && ua.indexOf('Edg') === -1) navegador = 'Chrome';
         else if (ua.indexOf('Firefox') !== -1) navegador = 'Firefox';
         else if (ua.indexOf('Safari') !== -1 && ua.indexOf('Chrome') === -1) navegador = 'Safari';
         else if (ua.indexOf('Edg') !== -1) navegador = 'Edge';
         else if (ua.indexOf('Opera') !== -1 || ua.indexOf('OPR') !== -1) navegador = 'Opera';
-        
+
         return `${dispositivo} - ${so} / ${navegador}`;
     }
 
@@ -3001,38 +3332,38 @@ async function loginConAPI(usuario, contrasena) {
      */
     function iniciarMonitorSesion() {
         console.log('🟢 INICIANDO MONITOR DE SESIÓN');
-        
+
         if (window.monitorIntervalSesion) {
             clearInterval(window.monitorIntervalSesion);
         }
-        
+
         window.monitorIntervalSesion = setInterval(async () => {
             const sessionToken = sessionStorage.getItem('session_token_actual');
             if (!sessionToken) return;
-            
+
             const db = getDB();
             if (!db) return;
-            
+
             try {
                 const { data: sesion, error } = await db
                     .from('sesiones_activas')
                     .select('estado')
                     .eq('session_token', sessionToken)
                     .maybeSingle();
-                
+
                 if (error) return;
-                
+
                 if (!sesion || sesion.estado !== 'activa') {
                     console.log('⚠️ Sesión cerrada remotamente');
                     alert('⚠️ Su sesión ha sido cerrada por un administrador o por inicio de sesión en otro dispositivo');
                     sessionStorage.clear();
                     location.reload();
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error('Monitor error:', e);
             }
         }, 10000);
-        
+
         return true;
     }
 
@@ -3045,74 +3376,74 @@ async function loginConAPI(usuario, contrasena) {
      * @returns {Array} Lista de versiones
      */
     async function getVersionesMatriz(matrizId) {
-    const token =
-        localStorage.getItem('meca_token');
+        const token =
+            localStorage.getItem('meca_token');
 
-    const parsedMatrizId =
-        Number(matrizId);
+        const parsedMatrizId =
+            Number(matrizId);
 
-    if (
-        !Number.isInteger(parsedMatrizId) ||
-        parsedMatrizId <= 0
-    ) {
-        throw new Error(
-            'matrizId requerido para obtener versiones de matriz'
-        );
-    }
-
-    const response = await fetch(
-        `/api/matriz/versiones?matrizId=${encodeURIComponent(parsedMatrizId)}`,
-        {
-            headers: {
-                'Authorization':
-                    `Bearer ${token}`,
-
-                'Content-Type':
-                    'application/json'
-            }
+        if (
+            !Number.isInteger(parsedMatrizId) ||
+            parsedMatrizId <= 0
+        ) {
+            throw new Error(
+                'matrizId requerido para obtener versiones de matriz'
+            );
         }
-    );
 
-    if (!response.ok) {
-        let errorBody = {};
+        const response = await fetch(
+            `/api/matriz/versiones?matrizId=${encodeURIComponent(parsedMatrizId)}`,
+            {
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
 
-        try {
-            errorBody =
-                await response.json();
-        } catch (_) {}
-
-        throw new Error(
-            errorBody.error ||
-            `HTTP ${response.status}`
+                    'Content-Type':
+                        'application/json'
+                }
+            }
         );
-    }
 
-    const versiones =
-        await response.json();
+        if (!response.ok) {
+            let errorBody = {};
 
-    if (!Array.isArray(versiones)) {
-        return [];
-    }
+            try {
+                errorBody =
+                    await response.json();
+            } catch (_) { }
 
-    // Protección adicional:
-    // ninguna versión debe pertenecer a otra matriz.
-    const invalidas =
-        versiones.filter(
-            v =>
-                v?.matriz_id != null &&
-                Number(v.matriz_id) !==
+            throw new Error(
+                errorBody.error ||
+                `HTTP ${response.status}`
+            );
+        }
+
+        const versiones =
+            await response.json();
+
+        if (!Array.isArray(versiones)) {
+            return [];
+        }
+
+        // Protección adicional:
+        // ninguna versión debe pertenecer a otra matriz.
+        const invalidas =
+            versiones.filter(
+                v =>
+                    v?.matriz_id != null &&
+                    Number(v.matriz_id) !==
                     parsedMatrizId
-        );
+            );
 
-    if (invalidas.length > 0) {
-        throw new Error(
-            `La API devolvió ${invalidas.length} ` +
-            `versiones ajenas a matriz ${parsedMatrizId}`
-        );
+        if (invalidas.length > 0) {
+            throw new Error(
+                `La API devolvió ${invalidas.length} ` +
+                `versiones ajenas a matriz ${parsedMatrizId}`
+            );
+        }
+
+        return versiones;
     }
-
-    return versiones;
-}
 
     /**
      * crearVersionMatriz - Crea una nueva versión con estructura
@@ -3193,7 +3524,7 @@ async function loginConAPI(usuario, contrasena) {
 
                 try {
                     errorBody = await response.json();
-                } catch (_) {}
+                } catch (_) { }
 
                 throw new Error(
                     errorBody.error ||
@@ -3271,7 +3602,7 @@ async function loginConAPI(usuario, contrasena) {
 
             try {
                 errorBody = await response.json();
-            } catch (_) {}
+            } catch (_) { }
 
             throw new Error(
                 errorBody.error ||
@@ -3426,7 +3757,7 @@ async function loginConAPI(usuario, contrasena) {
      */
     async function getReglasEvaluacion() {
         const token = localStorage.getItem('meca_token');
-        
+
         try {
             // 1. Obtener versión activa
             const versionActiva = await getVersionActiva();
@@ -3434,7 +3765,7 @@ async function loginConAPI(usuario, contrasena) {
                 console.warn('⚠️ No hay versión activa para cargar reglas');
                 return [];
             }
-            
+
             // 2. Obtener reglas de esa versión
             const response = await fetch(`/api/reglas-evaluacion/version/${versionActiva.id}`, {
                 headers: {
@@ -3442,16 +3773,16 @@ async function loginConAPI(usuario, contrasena) {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             if (!response.ok) {
                 if (response.status === 404) return [];
                 throw new Error(`Error ${response.status}: ${response.statusText}`);
             }
-            
+
             const reglas = await response.json();
             console.log(`📋 Reglas cargadas para versión ${versionActiva.version}: ${reglas.length}`);
             return reglas;
-            
+
         } catch (error) {
             console.error('❌ Error cargando reglas:', error);
             return [];
@@ -3469,7 +3800,7 @@ async function loginConAPI(usuario, contrasena) {
      */
     async function getReglasByVersion(versionId) {
         const token = localStorage.getItem('meca_token');
-        
+
         try {
             const response = await fetch(`/api/reglas-evaluacion/version/${versionId}`, {
                 headers: {
@@ -3477,12 +3808,12 @@ async function loginConAPI(usuario, contrasena) {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             if (!response.ok) {
                 if (response.status === 404) return [];
                 throw new Error(`Error ${response.status}: ${response.statusText}`);
             }
-            
+
             return await response.json();
         } catch (error) {
             console.error('❌ Error obteniendo reglas:', error);
@@ -3497,7 +3828,7 @@ async function loginConAPI(usuario, contrasena) {
      */
     async function crearRegla(data) {
         const token = localStorage.getItem('meca_token');
-        
+
         // 🔴 Asegurar que los campos JSON sean válidos
         const bodyData = {
             version_id: data.version_id,
@@ -3512,9 +3843,9 @@ async function loginConAPI(usuario, contrasena) {
             orden: data.orden || 0,
             activo: data.activo !== false
         };
-        
+
         console.log('📤 Enviando a /api/reglas-evaluacion:', JSON.stringify(bodyData, null, 2));
-        
+
         const response = await fetch('/api/reglas-evaluacion', {
             method: 'POST',
             headers: {
@@ -3523,13 +3854,13 @@ async function loginConAPI(usuario, contrasena) {
             },
             body: JSON.stringify(bodyData)
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             console.error('❌ Error del servidor:', error);
             throw new Error(error.error || 'Error al crear regla');
         }
-        
+
         return await response.json();
     }
 
@@ -3541,7 +3872,7 @@ async function loginConAPI(usuario, contrasena) {
      */
     async function actualizarRegla(id, data) {
         const token = localStorage.getItem('meca_token');
-        
+
         const bodyData = {
             submotivo_origen: data.submotivo_origen,
             bloque_origen: data.bloque_origen,
@@ -3554,7 +3885,7 @@ async function loginConAPI(usuario, contrasena) {
             orden: data.orden || 0,
             activo: data.activo !== false
         };
-        
+
         const response = await fetch(`/api/reglas-evaluacion/${id}`, {
             method: 'PUT',
             headers: {
@@ -3563,12 +3894,12 @@ async function loginConAPI(usuario, contrasena) {
             },
             body: JSON.stringify(bodyData)
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Error al actualizar regla');
         }
-        
+
         return await response.json();
     }
 
@@ -3579,7 +3910,7 @@ async function loginConAPI(usuario, contrasena) {
      */
     async function eliminarRegla(id) {
         const token = localStorage.getItem('meca_token');
-        
+
         const response = await fetch(`/api/reglas-evaluacion/${id}`, {
             method: 'DELETE',
             headers: {
@@ -3587,12 +3918,12 @@ async function loginConAPI(usuario, contrasena) {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Error al eliminar regla');
         }
-        
+
         return await response.json();
     }
 
@@ -3707,16 +4038,16 @@ async function loginConAPI(usuario, contrasena) {
      */
     async function subirAudio(file, opciones = {}) {
         console.log('📤 Subiendo archivo de audio:', file?.name);
-        
+
         if (!file) {
             throw new Error('⚠️ No se ha seleccionado ningún archivo');
         }
-        
+
         const token = localStorage.getItem('meca_token');
         if (!token) {
             throw new Error('⚠️ No hay sesión activa');
         }
-        
+
         const formData = new FormData();
         formData.append('audio', file);
         formData.append('crear_tarea', opciones.crearTarea !== undefined ? opciones.crearTarea : 'true');
@@ -3724,7 +4055,7 @@ async function loginConAPI(usuario, contrasena) {
         formData.append('modelo_whisper', opciones.modeloWhisper || 'small');
         formData.append('idioma', opciones.idioma || 'Spanish');
         formData.append('analizar_con_ollama', opciones.analizarConOllama !== undefined ? opciones.analizarConOllama : 'true');
-        
+
         // 🔴 USAR LA VARIABLE GLOBAL
         const response = await fetch(`${API_TRANSCRIPCION_URL}/subir`, {
             method: 'POST',
@@ -3733,12 +4064,12 @@ async function loginConAPI(usuario, contrasena) {
             },
             body: formData
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || `Error HTTP ${response.status}`);
         }
-        
+
         return await response.json();
     }
 
@@ -3753,7 +4084,7 @@ async function loginConAPI(usuario, contrasena) {
         if (!token) {
             throw new Error('⚠️ No hay sesión activa');
         }
-        
+
         // 🔴 USAR LA VARIABLE GLOBAL
         const response = await fetch(`${API_TRANSCRIPCION_URL}/transcribir`, {
             method: 'POST',
@@ -3769,12 +4100,12 @@ async function loginConAPI(usuario, contrasena) {
                 modelo_ollama: opciones.modeloOllama || 'llama3.2:3b'
             })
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Error al transcribir');
         }
-        
+
         return await response.json();
     }
 
@@ -3788,7 +4119,7 @@ async function loginConAPI(usuario, contrasena) {
         if (!token) {
             throw new Error('⚠️ No hay sesión activa');
         }
-        
+
         const params = new URLSearchParams();
         if (filtros.estado) params.append('estado', filtros.estado);
         if (filtros.fecha_desde) params.append('fecha_desde', filtros.fecha_desde);
@@ -3796,23 +4127,23 @@ async function loginConAPI(usuario, contrasena) {
         if (filtros.tarea_id) params.append('tarea_id', filtros.tarea_id);
         if (filtros.limit) params.append('limit', filtros.limit || 50);
         if (filtros.offset) params.append('offset', filtros.offset || 0);
-        
+
         // 🔴 USAR LA VARIABLE GLOBAL
-        const url = params.toString() 
+        const url = params.toString()
             ? `${API_TRANSCRIPCION_URL}/listar?${params.toString()}`
             : `${API_TRANSCRIPCION_URL}/listar`;
-        
+
         console.log('📡 URL de listarTranscripciones:', url);
-        
+
         const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || `Error HTTP ${response.status}`);
         }
-        
+
         return await response.json();
     }
 
@@ -3826,17 +4157,17 @@ async function loginConAPI(usuario, contrasena) {
         if (!token) {
             throw new Error('⚠️ No hay sesión activa');
         }
-        
+
         // 🔴 USAR LA VARIABLE GLOBAL
         const response = await fetch(`${API_TRANSCRIPCION_URL}/${id}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || `Error HTTP ${response.status}`);
         }
-        
+
         return await response.json();
     }
 
@@ -3849,17 +4180,17 @@ async function loginConAPI(usuario, contrasena) {
         if (!token) {
             throw new Error('⚠️ No hay sesión activa');
         }
-        
+
         // 🔴 USAR LA VARIABLE GLOBAL
         const response = await fetch(`${API_TRANSCRIPCION_URL}/estadisticas`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || `Error HTTP ${response.status}`);
         }
-        
+
         return await response.json();
     }
 
@@ -3873,7 +4204,7 @@ async function loginConAPI(usuario, contrasena) {
         if (!token) {
             throw new Error('⚠️ No hay sesión activa');
         }
-        
+
         // 🔴 USAR LA VARIABLE GLOBAL
         const response = await fetch(`${API_TRANSCRIPCION_URL}/${id}/analizar`, {
             method: 'POST',
@@ -3882,12 +4213,12 @@ async function loginConAPI(usuario, contrasena) {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || `Error HTTP ${response.status}`);
         }
-        
+
         return await response.json();
     }
 
@@ -3901,7 +4232,7 @@ async function loginConAPI(usuario, contrasena) {
         if (!token) {
             throw new Error('⚠️ No hay sesión activa');
         }
-        
+
         // 🔴 USAR LA VARIABLE GLOBAL
         const response = await fetch(`${API_TRANSCRIPCION_URL}/tareas`, {
             method: 'POST',
@@ -3911,12 +4242,12 @@ async function loginConAPI(usuario, contrasena) {
             },
             body: JSON.stringify(data)
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || `Error HTTP ${response.status}`);
         }
-        
+
         return await response.json();
     }
 
@@ -3930,7 +4261,7 @@ async function loginConAPI(usuario, contrasena) {
         if (!token) {
             throw new Error('⚠️ No hay sesión activa');
         }
-        
+
         // 🔴 USAR LA VARIABLE GLOBAL
         const response = await fetch(`${API_TRANSCRIPCION_URL}/tareas/${tareaId}/ejecutar`, {
             method: 'POST',
@@ -3939,12 +4270,12 @@ async function loginConAPI(usuario, contrasena) {
                 'Content-Type': 'application/json'
             }
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || `Error HTTP ${response.status}`);
         }
-        
+
         return await response.json();
     }
 
@@ -4024,7 +4355,7 @@ async function loginConAPI(usuario, contrasena) {
             const error = await response.json();
             throw new Error(error.error || 'Error al descargar');
         }
-        
+
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -4137,13 +4468,13 @@ async function loginConAPI(usuario, contrasena) {
         const options = {
             headers: { 'Authorization': `Bearer ${token}` }
         };
-        
+
         if (carpeta_base) {
             options.method = 'POST';
             options.headers['Content-Type'] = 'application/json';
             options.body = JSON.stringify({ carpeta_base });
         }
-        
+
         const response = await fetch('http://localhost:5000/api/reportes/config/carpeta', options);
         if (!response.ok) {
             const error = await response.json();
@@ -4151,7 +4482,7 @@ async function loginConAPI(usuario, contrasena) {
         }
         return response.json();
     }
-        
+
     // ======================================================
     // API PÚBLICA - Exportación de todos los métodos
     // ======================================================
@@ -4191,6 +4522,7 @@ async function loginConAPI(usuario, contrasena) {
         // EVALUACIONES
         // ==============================================
         guardarEvaluacion,
+        actualizarEvaluacion,
         getHistorial,
         eliminarEvaluacion,
         validarTicketDuplicado,
@@ -4241,6 +4573,7 @@ async function loginConAPI(usuario, contrasena) {
         // ==============================================
         getKPIs,
         getRanking,
+        getGestoresResumen,
         getEvolutivo,
         getTopFallas,
         getLideres,
@@ -4261,6 +4594,9 @@ async function loginConAPI(usuario, contrasena) {
         actualizarPDA,
         completarAccionPDA,
         getPDADetalle,
+        registrarFeedbackPDA,
+        registrarCicloSeguimientoPDA,
+        evaluarSeguimientoPDA,
 
         // ==============================================
         // VERSIONES
@@ -4305,7 +4641,7 @@ async function loginConAPI(usuario, contrasena) {
         // ==============================================
         // MATRIZ DE EVALUACIÓN - ADMINISTRACIÓN
         // ==============================================
-        getEstructuraEvaluacion,        
+        getEstructuraEvaluacion,
         getFrentes,
         crearFrente,
         actualizarFrente,
@@ -4318,6 +4654,7 @@ async function loginConAPI(usuario, contrasena) {
         crearSubMotivo,
         actualizarSubMotivo,
         eliminarSubMotivo,
+        getClasificacionesPda,
         getVersionesMatriz,
         crearVersionMatriz,
         activarVersionMatriz,
@@ -4395,3 +4732,360 @@ async function loginConAPI(usuario, contrasena) {
 // ======================================================
 // 📌 Hace que API esté disponible en window para uso global
 window.API = API;
+
+
+
+async function registrarFeedbackPDA(
+    pdaId,
+    datos
+) {
+    const token =
+        localStorage.getItem(
+            'meca_token'
+        );
+
+
+    const response =
+        await fetch(
+            `/api/pda/${pdaId}/feedback`,
+            {
+                method:
+                    'POST',
+
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+
+                    'Content-Type':
+                        'application/json'
+                },
+
+                body:
+                    JSON.stringify(
+                        datos
+                    )
+            }
+        );
+
+
+    const resultado =
+        await response.json();
+
+
+    if (!response.ok) {
+        throw new Error(
+            resultado?.error ||
+            `HTTP ${response.status}`
+        );
+    }
+
+
+    return resultado;
+}
+
+async function registrarCicloSeguimientoPDA(
+    pdaId,
+    ciclo
+) {
+    const token =
+        localStorage.getItem(
+            'meca_token'
+        );
+
+
+    const response =
+        await fetch(
+            `/api/pda/${Number(
+                pdaId
+            )}/seguimiento/ciclo`,
+            {
+                method:
+                    'POST',
+
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+
+                    'Content-Type':
+                        'application/json'
+                },
+
+                body:
+                    JSON.stringify(
+                        ciclo
+                    )
+            }
+        );
+
+
+    const resultado =
+        await response.json();
+
+
+    if (!response.ok) {
+        throw new Error(
+            resultado?.error ||
+            `HTTP ${response.status}`
+        );
+    }
+
+
+    return resultado;
+}
+
+async function evaluarSeguimientoPDA(
+  pdaId
+) {
+  const token =
+    localStorage.getItem(
+      'meca_token'
+    );
+
+
+  const response =
+    await fetch(
+      `/api/pda/${Number(
+        pdaId
+      )}/seguimiento/evaluacion`,
+      {
+        method:
+          'GET',
+
+        headers: {
+          'Authorization':
+            `Bearer ${token}`
+        }
+      }
+    );
+
+
+  const resultado =
+    await response.json();
+
+
+  if (!response.ok) {
+    throw new Error(
+      resultado?.error ||
+      `HTTP ${response.status}`
+    );
+  }
+
+
+  return (
+    resultado?.data ??
+    resultado
+  );
+}
+
+async function derivarPdaACapacitacionApi(
+  pdaId,
+  data
+) {
+  const token =
+    localStorage.getItem(
+      'meca_token'
+    );
+
+
+  const response =
+    await fetch(
+      `/api/pda/${Number(
+        pdaId
+      )}/capacitacion/derivar`,
+      {
+        method:
+          'POST',
+
+        headers: {
+          'Authorization':
+            `Bearer ${token}`,
+
+          'Content-Type':
+            'application/json'
+        },
+
+        body:
+          JSON.stringify(
+            data || {}
+          )
+      }
+    );
+
+
+  const resultado =
+    await response.json();
+
+
+  if (!response.ok) {
+    throw new Error(
+      resultado?.error ||
+      `HTTP ${response.status}`
+    );
+  }
+
+
+  return (
+    resultado?.data ??
+    resultado
+  );
+}
+
+async function cerrarPdaPorMejoraApi(
+  pdaId,
+  data
+) {
+  const token =
+    localStorage.getItem(
+      'meca_token'
+    );
+
+
+  const response =
+    await fetch(
+      `/api/pda/${Number(
+        pdaId
+      )}/cerrar-mejora`,
+      {
+        method:
+          'POST',
+
+        headers: {
+          'Authorization':
+            `Bearer ${token}`,
+
+          'Content-Type':
+            'application/json'
+        },
+
+        body:
+          JSON.stringify(
+            data || {}
+          )
+      }
+    );
+
+
+  const resultado =
+    await response.json();
+
+
+  if (!response.ok) {
+    throw new Error(
+      resultado?.error ||
+      `HTTP ${response.status}`
+    );
+  }
+
+
+  return (
+    resultado?.data ??
+    resultado
+  );
+}
+
+async function registrarCapacitacionPDA(
+  pdaId,
+  data
+) {
+  const token =
+    localStorage.getItem(
+      'meca_token'
+    );
+
+
+  const response =
+    await fetch(
+      `/api/pda/${Number(
+        pdaId
+      )}/capacitacion`,
+      {
+        method:
+          'POST',
+
+        headers: {
+          'Authorization':
+            `Bearer ${token}`,
+
+          'Content-Type':
+            'application/json'
+        },
+
+        body:
+          JSON.stringify(
+            data || {}
+          )
+      }
+    );
+
+
+  const resultado =
+    await response.json();
+
+
+  if (!response.ok) {
+    throw new Error(
+      resultado?.error ||
+      `HTTP ${response.status}`
+    );
+  }
+
+
+  return (
+    resultado?.data ??
+    resultado
+  );
+}
+
+
+async function escalarPdaApi(
+    pdaId,
+    data
+) {
+    const token =
+        localStorage.getItem(
+            'meca_token'
+        );
+
+
+    const response =
+        await fetch(
+            `/api/pda/${Number(
+                pdaId
+            )}/escalar`,
+            {
+                method:
+                    'POST',
+
+                headers: {
+                    'Authorization':
+                        `Bearer ${token}`,
+
+                    'Content-Type':
+                        'application/json'
+                },
+
+                body:
+                    JSON.stringify(
+                        data || {}
+                    )
+            }
+        );
+
+
+    const resultado =
+        await response.json();
+
+
+    if (!response.ok) {
+        throw new Error(
+            resultado?.error ||
+            `HTTP ${response.status}`
+        );
+    }
+
+
+    return (
+        resultado?.data ??
+        resultado
+    );
+}

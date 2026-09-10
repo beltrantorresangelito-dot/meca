@@ -53,20 +53,15 @@ async saveAssignments({ tarea_id, asignaciones } = {}) {
       };
 
       if (quiebreInformado) {
-        if (!campanaInformada) {
-          throw ListeningsService.error(
-            `La Campaña es obligatoria cuando se informa Quiebre para el ticket "${asig.ticket || ''}"`,
-            400
-          );
-        }
-
         let dominio;
 
         try {
           dominio =
             await this.repository.resolveListeningDomain(
               String(asig.quiebre).trim(),
-              String(asig.campana).trim(),
+              campanaInformada
+                ? String(asig.campana).trim()
+                : null,
               client
             );
         } catch (error) {
@@ -261,20 +256,15 @@ async createAtomicLoad({
         // ======================================================
 
         if (quiebreInformado) {
-          if (!campanaInformada) {
-            throw ListeningsService.error(
-              `La Campaña es obligatoria cuando se informa Quiebre para el ticket "${asig.ticket || ''}"`,
-              400
-            );
-          }
-
           let dominio;
 
           try {
             dominio =
               await this.repository.resolveListeningDomain(
                 String(asig.quiebre).trim(),
-                String(asig.campana).trim(),
+                campanaInformada
+                  ? String(asig.campana).trim()
+                  : null,
                 client
               );
           } catch (error) {

@@ -37,8 +37,9 @@ test('EVALSVC-002 create valida input', async () => {
   );
 });
 
-test('EVALSVC-003 create delega repository', async () => {
+test('EVALSVC-003 create con campaña delega repository', async () => {
   let received;
+
   const service = new EvaluationsService(repo({
     saveWithDetails: async evaluation => {
       received = evaluation;
@@ -46,11 +47,16 @@ test('EVALSVC-003 create delega repository', async () => {
     }
   }));
 
-  const evaluation = { id: 'E1' };
+  const evaluation = {
+    id: 'E1',
+    campana_id: 2
+  };
+
   assert.deepEqual(
     await service.create(evaluation),
     { success: true }
   );
+
   assert.equal(received, evaluation);
 });
 
@@ -106,4 +112,62 @@ test('EVALSVC-008 listDetails valida y delega', async () => {
     await service.listDetails('E1'),
     [{ evaluacion_id: 'E1' }]
   );
+});
+
+test('EVALSVC-009 create directo con quiebre y sin campaña delega repository', async () => {
+  let received;
+
+  const service = new EvaluationsService(repo({
+    saveWithDetails: async evaluation => {
+      received = evaluation;
+      return { success: true };
+    }
+  }));
+
+  const evaluation = {
+    id: 'E-DIRECTA-1',
+    quiebre_id: 1,
+    campana_id: null
+  };
+
+  assert.deepEqual(
+    await service.create(evaluation),
+    { success: true }
+  );
+
+  assert.equal(received, evaluation);
+});
+
+test('EVALSVC-010 create rechaza evaluación sin campaña ni quiebre', async () => {
+  let repositoryCalled = false;
+
+  const service = new EvaluationsService(repo({
+    saveWithDetails: async () => {
+      repositoryCalled = true;
+      return { success: true };
+    }
+  }));
+
+  await assert.rejects(
+    service.create({
+      id: 'E-SIN-CONTEXTO',
+      campana_id: null,
+      quiebre_id: null
+    }),
+    error => {
+      assert.equal(error.status, 400);
+      assert.equal(
+        error.code,
+        'EVALUATION_CONTEXT_REQUIRED'
+      );
+      assert.equal(
+        error.message,
+        'La evaluación debe tener campana_id o quiebre_id'
+      );
+
+      return true;
+    }
+  );
+
+  assert.equal(repositoryCalled, false);
 });

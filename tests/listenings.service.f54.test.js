@@ -202,3 +202,183 @@ test('LISTSVC-008 listTicketsByTask valida lote y 404', async () => {
     { status: 404, message: 'Lote no encontrado' }
   );
 });
+
+test(
+  'LISTSVC-009 saveAssignments resuelve Quiebre + Campaña',
+  async () => {
+    let dominioRecibido = null;
+    let asignacionInsertada = null;
+
+    const service =
+      new ListeningsService(
+        repository({
+          resolveListeningDomain:
+            async (
+              quiebre,
+              campana,
+              executor
+            ) => {
+              dominioRecibido = {
+                quiebre,
+                campana,
+                executor
+              };
+
+              return {
+                quiebre_id: 1,
+                quiebre_codigo: 'COBRANZAS',
+                quiebre_nombre: 'Cobranzas',
+                campana_id: 2,
+                campana_codigo: 'ST',
+                campana_descripcion:
+                  'Super Temprana'
+              };
+            },
+
+          insertAssignment:
+            async data => {
+              asignacionInsertada = data;
+
+              return {
+                id: data.id
+              };
+            }
+        })
+      );
+
+    const result =
+      await service.saveAssignments({
+        tarea_id: 5,
+        asignaciones: [
+          {
+            id: 'A1',
+            ticket: 'TICKET-1',
+            quiebre: ' COBRANZAS ',
+            campana: ' ST '
+          }
+        ]
+      });
+
+    assert.equal(
+      dominioRecibido.quiebre,
+      'COBRANZAS'
+    );
+
+    assert.equal(
+      dominioRecibido.campana,
+      'ST'
+    );
+
+    assert.equal(
+      asignacionInsertada.quiebre_id,
+      1
+    );
+
+    assert.equal(
+      asignacionInsertada.campana_id,
+      2
+    );
+
+    assert.equal(
+      asignacionInsertada.campana,
+      'ST'
+    );
+
+    assert.equal(
+      result.insertados,
+      1
+    );
+  }
+);
+
+test(
+  'LISTSVC-010 saveAssignments permite Quiebre sin Campaña',
+  async () => {
+    let dominioRecibido = null;
+    let asignacionInsertada = null;
+
+    const service =
+      new ListeningsService(
+        repository({
+          resolveListeningDomain:
+            async (
+              quiebre,
+              campana,
+              executor
+            ) => {
+              dominioRecibido = {
+                quiebre,
+                campana,
+                executor
+              };
+
+              return {
+                quiebre_id: 1,
+                quiebre_codigo: 'COBRANZAS',
+                quiebre_nombre: 'Cobranzas',
+                campana_id: null,
+                campana_codigo: null,
+                campana_descripcion: null
+              };
+            },
+
+          insertAssignment:
+            async data => {
+              asignacionInsertada = data;
+
+              return {
+                id: data.id
+              };
+            }
+        })
+      );
+
+    const result =
+      await service.saveAssignments({
+        tarea_id: 5,
+        asignaciones: [
+          {
+            id: 'A2',
+            ticket: 'TICKET-DIRECTO',
+            quiebre: ' COBRANZAS ',
+            campana: ''
+          }
+        ]
+      });
+
+    assert.equal(
+      dominioRecibido.quiebre,
+      'COBRANZAS'
+    );
+
+    assert.equal(
+      dominioRecibido.campana,
+      null
+    );
+
+    assert.equal(
+      asignacionInsertada.quiebre_id,
+      1
+    );
+
+    assert.equal(
+      asignacionInsertada.campana_id,
+      null
+    );
+
+    assert.equal(
+      asignacionInsertada.campana,
+      null
+    );
+
+    assert.equal(
+      result.insertados,
+      1
+    );
+
+    assert.equal(
+      result.duplicados,
+      0
+    );
+  }
+);

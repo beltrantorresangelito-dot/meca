@@ -171,17 +171,38 @@ class DomainController {
   }
 
   async resolveContext(req, res, query = {}) {
-    if (!this.requireAuth(req, res)) return;
-    try {
-      const context = await this.service.resolveContext({
-        campaignId: query.campanaId,
-        date: query.fecha || null
+  if (!this.requireAuth(req, res)) return;
+
+  try {
+    const context =
+      await this.service.resolveContext({
+        campaignId:
+          query.campanaId ??
+          query.campana_id ??
+          null,
+
+        breakId:
+          query.quiebreId ??
+          query.quiebre_id ??
+          null,
+
+        date:
+          query.fecha || null
       });
-      DomainController.sendJson(res, 200, context);
-    } catch (error) {
-      DomainController.handleError(res, error);
-    }
+
+    DomainController.sendJson(
+      res,
+      200,
+      context
+    );
+
+  } catch (error) {
+    DomainController.handleError(
+      res,
+      error
+    );
   }
+}
 
   async consistency(req, res) {
     if (!this.requireAuth(req, res)) return;
@@ -472,6 +493,126 @@ class DomainController {
         200,
         row
       );
+    } catch (error) {
+      DomainController.handleError(
+        res,
+        error
+      );
+    }
+  }
+
+    async breakMatrixHistory(
+    req,
+    res,
+    query = {}
+  ) {
+    if (!this.requireAuth(req, res)) return;
+
+    try {
+      const rows =
+        await this.service
+          .getBreakMatrixHistory(
+            query.quiebreId ??
+            query.quiebre_id
+          );
+
+      DomainController.sendJson(
+        res,
+        200,
+        rows
+      );
+
+    } catch (error) {
+      DomainController.handleError(
+        res,
+        error
+      );
+    }
+  }
+
+
+  async createBreakMatrixAssignment(
+    req,
+    res,
+    body = {}
+  ) {
+    if (!this.requireAuth(req, res)) return;
+
+    try {
+      const row =
+        await this.service
+          .createBreakMatrixAssignment(
+            body
+          );
+
+      DomainController.sendJson(
+        res,
+        201,
+        row
+      );
+
+    } catch (error) {
+      DomainController.handleError(
+        res,
+        error
+      );
+    }
+  }
+
+
+  async updateBreakMatrixAssignment(
+    req,
+    res,
+    id,
+    body = {}
+  ) {
+    if (!this.requireAuth(req, res)) return;
+
+    try {
+      const row =
+        await this.service
+          .updateBreakMatrixAssignment(
+            id,
+            body
+          );
+
+      DomainController.sendJson(
+        res,
+        200,
+        row
+      );
+
+    } catch (error) {
+      DomainController.handleError(
+        res,
+        error
+      );
+    }
+  }
+
+
+  async setBreakMatrixAssignmentActive(
+    req,
+    res,
+    id,
+    body = {}
+  ) {
+    if (!this.requireAuth(req, res)) return;
+
+    try {
+      const row =
+        await this.service
+          .setBreakMatrixAssignmentActive(
+            id,
+            body.activa
+          );
+
+      DomainController.sendJson(
+        res,
+        200,
+        row
+      );
+
     } catch (error) {
       DomainController.handleError(
         res,

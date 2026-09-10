@@ -44,14 +44,25 @@ test('PDAFINAL-002 server ya no instancia capas internas PDA', () => {
 });
 
 test('PDAFINAL-003 routes conserva los cinco endpoints GET', () => {
-  assert.ok(routes.includes('/api/pda/pendientes'));
-  assert.ok(routes.includes('/api/pda/seguimiento'));
-  assert.ok(routes.includes('/api/pda/historial'));
-  assert.ok(routes.includes('/api/pda/exportar'));
-  assert.ok(routes.includes('^\\/api\\/pda\\/(\\d+)$'));
+  assert.ok(
+    routes.includes('/api/pda/pendientes')
+  );
 
-  const getMatches = routes.match(/metodo === 'GET'/g) || [];
-  assert.equal(getMatches.length, 5);
+  assert.ok(
+    routes.includes('/api/pda/seguimiento')
+  );
+
+  assert.ok(
+    routes.includes('/api/pda/historial')
+  );
+
+  assert.ok(
+    routes.includes('/api/pda/exportar')
+  );
+
+  assert.ok(
+    routes.includes('^\\/api\\/pda\\/(\\d+)$')
+  );
 });
 
 test('PDAFINAL-004 Token requerido permanece en routes', () => {

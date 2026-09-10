@@ -14,6 +14,7 @@ const { applyCors } = require('./security/cors');
 const { authorizeRequest } = require('./security/authorization');
 const { createMatrixReadHandler, createMatrixWriteHandler } = require('./src/modules/matrix');
 const { createReportsHandler } = require('./src/modules/reports');
+const { createAnalyticsHandler } = require('./src/modules/analytics');
 const { createAgentsHandler } = require('./src/modules/agents');
 const { createListeningsHandler } = require('./src/modules/listenings');
 const { createUsersHandler } = require('./src/modules/users');
@@ -23,6 +24,7 @@ const { createSessionsHandler } = require('./src/modules/sessions');
 const { createRequestsHandler } = require('./src/modules/requests');
 const { createPdaHandler } = require('./src/modules/pda');
 const { createQuartileCriteriaHandler } = require('./src/modules/quartile-criteria');
+const { createGestoresHandler } = require('./src/modules/gestores');
 const { createVersionsHandler } = require('./src/modules/versions');
 const { createDatabaseStatusHandler } = require('./src/modules/database-status');
 const { createAudioProxyHandler } = require('./src/modules/audio-proxy');
@@ -43,6 +45,7 @@ const PYTHON_API_URL = process.env.PYTHON_API_URL ||
 const handleMatrixReadRequest = createMatrixReadHandler();
 const handleMatrixWriteRequest = createMatrixWriteHandler();
 const handleReportsRequest = createReportsHandler({ db: pool });
+const handleAnalyticsRequest = createAnalyticsHandler({ db: pool });
 const handleAgentsRequest = createAgentsHandler({ db: pool });
 const handleListeningsRequest = createListeningsHandler({ db: pool });
 const handleUsersRequest = createUsersHandler({
@@ -56,6 +59,7 @@ const handleEvaluationsRequest = createEvaluationsHandler({ db: pool });
 const handleSessionsRequest = createSessionsHandler({ db: pool });
 const handleRequestsRequest = createRequestsHandler({ db: pool });
 const handlePdaRequest = createPdaHandler({ db: pool });
+const handleGestoresRequest = createGestoresHandler({ db: pool });
 const handleQuartileCriteriaRequest = createQuartileCriteriaHandler({ db: pool });
 const handleVersionsRequest = createVersionsHandler({ db: pool });
 const handleDatabaseStatusRequest = createDatabaseStatusHandler({ db: pool });
@@ -231,6 +235,17 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         return;
     }
 
+    // ANALYTICS 2.0 - ANALYTICS MODULE
+    if (await handleAnalyticsRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta,
+        query: urlParseada.query
+    })) {
+        return;
+    }
+
     // F10.5 - PDA MODULE
     if (await handlePdaRequest({
         ruta,
@@ -343,7 +358,18 @@ const servidor = http.createServer(async (peticion, respuesta) => {
         ruta,
         metodo,
         peticion,
-        respuesta
+        respuesta,
+        query: urlParseada.query
+    })) {
+        return;
+    }
+
+    if (await handleGestoresRequest({
+        ruta,
+        metodo,
+        peticion,
+        respuesta,
+        query: urlParseada.query
     })) {
         return;
     }

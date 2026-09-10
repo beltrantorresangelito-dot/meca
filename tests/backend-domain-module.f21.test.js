@@ -99,3 +99,133 @@ test('DOMMOD-007 validateConsistency reporta anomalías', async () => {
   assert.equal(result.ok, false);
   assert.equal(result.violations.length, 2);
 });
+
+test('DOMMOD-008 resolveContext permite contexto directo por quiebre', async () => {
+  const expected = {
+    quiebre_id: 1,
+    quiebre_codigo: 'COBRANZAS',
+    campana_id: null,
+    campana_codigo: null,
+    matriz_id: 1,
+    matriz_codigo: 'MATRIZ_COBRANZAS',
+    version_matriz_id: 7,
+    version: 'v2.1.0'
+  };
+
+  let receivedArgs = null;
+
+  const s = new DomainService(repo({
+    resolveEvaluationContext: async (
+      campaignId,
+      date,
+      breakId
+    ) => {
+      receivedArgs = {
+        campaignId,
+        date,
+        breakId
+      };
+
+      return [expected];
+    }
+  }));
+
+  const result =
+    await s.resolveContext({
+      breakId: 1,
+      date: '2026-09-02'
+    });
+
+  assert.deepEqual(
+    receivedArgs,
+    {
+      campaignId: null,
+      date: '2026-09-02',
+      breakId: 1
+    }
+  );
+
+  assert.deepEqual(result, expected);
+});
+
+
+test('DOMMOD-009 resolveContext mantiene prioridad de campaña', async () => {
+  let receivedArgs = null;
+
+  const expected = {
+    quiebre_id: 1,
+    quiebre_codigo: 'COBRANZAS',
+    campana_id: 2,
+    campana_codigo: 'ST',
+    matriz_id: 1,
+    matriz_codigo: 'MATRIZ_COBRANZAS',
+    version_matriz_id: 7,
+    version: 'v2.1.0'
+  };
+
+  const s = new DomainService(repo({
+    resolveEvaluationContext: async (
+      campaignId,
+      date,
+      breakId
+    ) => {
+      receivedArgs = {
+        campaignId,
+        date,
+        breakId
+      };
+
+      return [expected];
+    }
+  }));
+
+  const result =
+    await s.resolveContext({
+      campaignId: 2,
+      breakId: 1,
+      date: '2026-09-02'
+    });
+
+  assert.deepEqual(
+    receivedArgs,
+    {
+      campaignId: 2,
+      date: '2026-09-02',
+      breakId: null
+    }
+  );
+
+  assert.deepEqual(result, expected);
+});
+
+
+test('DOMMOD-010 resolveContext exige campaña o quiebre', async () => {
+  const s = new DomainService(repo());
+
+  await assert.rejects(
+    () =>
+      s.resolveContext({
+        date: '2026-09-02'
+      }),
+    error =>
+      error.status === 400 &&
+      error.code === 'VALIDATION_ERROR' &&
+      /campanaId o quiebreId/.test(error.message)
+  );
+});
+
+
+test('DOMMOD-011 resolveContext valida quiebreId positivo', async () => {
+  const s = new DomainService(repo());
+
+  await assert.rejects(
+    () =>
+      s.resolveContext({
+        breakId: 0,
+        date: '2026-09-02'
+      }),
+    error =>
+      error.code === 'VALIDATION_ERROR' &&
+      /entero positivo/.test(error.message)
+  );
+});

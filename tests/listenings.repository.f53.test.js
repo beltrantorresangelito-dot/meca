@@ -160,10 +160,23 @@ test('LISTREPO-006 mis escuchas conserva filtros', async () => {
 
 test('LISTREPO-007 estados legacy permanecen', async () => {
   const sqls = [];
+
   const repo = new ListeningsRepository({
     async query(q) {
-      sqls.push(String(q));
-      return { rows: [] };
+      const sql = String(q);
+      sqls.push(sql);
+
+      if (/UPDATE asignaciones_escucha/i.test(sql)) {
+        return {
+          rowCount: 1,
+          rows: [{ id: '1' }]
+        };
+      }
+
+      return {
+        rowCount: 0,
+        rows: []
+      };
     }
   });
 
@@ -172,10 +185,25 @@ test('LISTREPO-007 estados legacy permanecen', async () => {
   await repo.cancelManagement('1');
   await repo.reactivateByTicket('T');
 
-  assert.match(sqls[0], /en_proceso/);
-  assert.match(sqls[1], /gestionado/);
-  assert.match(sqls[2], /pendiente/);
-  assert.match(sqls[3], /pendiente/);
+  assert.match(
+    sqls[0],
+    /en_proceso/
+  );
+
+  assert.match(
+    sqls[1],
+    /gestionado/
+  );
+
+  assert.match(
+    sqls[2],
+    /pendiente/
+  );
+
+  assert.match(
+    sqls[3],
+    /pendiente/
+  );
 });
 
 test('LISTREPO-008 incidencia conserva audio y fecha', async () => {
@@ -223,3 +251,196 @@ test('LISTREPO-010 repository queda encapsulado por ListeningsModule en F5.5', (
   assert.match(serverSource, /createListeningsHandler/);
   assert.doesNotMatch(serverSource, /new ListeningsRepository/);
 });
+
+test(
+  'LISTREPO-011 obtiene escucha exacta por id con executor',
+  async () => {
+    let llamada = null;
+
+    const executor = {
+      async query(sql, params) {
+        llamada = {
+          sql: String(sql),
+          params
+        };
+
+        return {
+          rows: [
+            {
+              id: '123',
+              ticket: 'TICKET-123',
+              campana_id: 1,
+              quiebre_id: 1,
+              auditor_asignado: 'AUDITOR TEST',
+              estado: 'en_proceso'
+            }
+          ]
+        };
+      }
+    };
+
+    const repo = new ListeningsRepository({
+      async query() {
+        throw new Error(
+          'No debe utilizar db.query'
+        );
+      }
+    });
+
+    const resultado =
+      await repo.getAssignmentById(
+        '123',
+        executor
+      );
+
+    assert.equal(
+      resultado.id,
+      '123'
+    );
+
+    assert.equal(
+      resultado.ticket,
+      'TICKET-123'
+    );
+
+    assert.match(
+      llamada.sql,
+      /FROM asignaciones_escucha/
+    );
+
+    assert.match(
+      llamada.sql,
+      /WHERE id = \$1/
+    );
+
+    assert.deepEqual(
+      llamada.params,
+      ['123']
+    );
+  }
+);
+
+test(
+  'LISTREPO-012 resuelve dominio con campaña usando resolver campaña',
+  async () => {
+    let llamada = null;
+
+    const repo = new ListeningsRepository({
+      async query(sql, params) {
+        llamada = {
+          sql: String(sql),
+          params
+        };
+
+        return {
+          rows: [
+            {
+              quiebre_id: 1,
+              quiebre_codigo: 'COBRANZAS',
+              quiebre_nombre: 'Cobranzas',
+              campana_id: 2,
+              campana_codigo: 'ST',
+              campana_descripcion: 'Super Temprana'
+            }
+          ]
+        };
+      }
+    });
+
+    const resultado =
+      await repo.resolveListeningDomain(
+        'COBRANZAS',
+        'ST'
+      );
+
+    assert.match(
+      llamada.sql,
+      /resolver_contexto_carga_escucha\(\$1,\s*\$2\)/
+    );
+
+    assert.doesNotMatch(
+      llamada.sql,
+      /resolver_contexto_carga_escucha_quiebre/
+    );
+
+    assert.deepEqual(
+      llamada.params,
+      ['COBRANZAS', 'ST']
+    );
+
+    assert.equal(
+      resultado.quiebre_id,
+      1
+    );
+
+    assert.equal(
+      resultado.campana_id,
+      2
+    );
+  }
+);
+
+test(
+  'LISTREPO-013 resuelve dominio directo por quiebre cuando campaña está vacía',
+  async () => {
+    let llamada = null;
+
+    const repo = new ListeningsRepository({
+      async query(sql, params) {
+        llamada = {
+          sql: String(sql),
+          params
+        };
+
+        return {
+          rows: [
+            {
+              quiebre_id: 1,
+              quiebre_codigo: 'COBRANZAS',
+              quiebre_nombre: 'Cobranzas',
+              campana_id: null,
+              campana_codigo: null,
+              campana_descripcion: null
+            }
+          ]
+        };
+      }
+    });
+
+    const resultado =
+      await repo.resolveListeningDomain(
+        'COBRANZAS',
+        ''
+      );
+
+    assert.match(
+      llamada.sql,
+      /resolver_contexto_carga_escucha_quiebre\(\$1\)/
+    );
+
+    assert.doesNotMatch(
+      llamada.sql,
+      /resolver_contexto_carga_escucha\(\$1,\s*\$2\)/
+    );
+
+    assert.deepEqual(
+      llamada.params,
+      ['COBRANZAS']
+    );
+
+    assert.equal(
+      resultado.quiebre_id,
+      1
+    );
+
+    assert.equal(
+      resultado.campana_id,
+      null
+    );
+
+    assert.equal(
+      resultado.campana_codigo,
+      null
+    );
+  }
+);

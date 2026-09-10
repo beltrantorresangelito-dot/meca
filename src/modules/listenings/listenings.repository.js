@@ -29,22 +29,43 @@ async resolveListeningDomain(
   campana,
   executor = this.db
 ) {
-  const result = await executor.query(
-    `
-      SELECT
-        quiebre_id,
-        quiebre_codigo,
-        quiebre_nombre,
-        campana_id,
-        campana_codigo,
-        campana_descripcion
-      FROM public.resolver_contexto_carga_escucha($1, $2)
-    `,
-    [
-      quiebre,
-      campana
-    ]
-  );
+  const hasCampaign =
+    campana !== null &&
+    campana !== undefined &&
+    String(campana).trim() !== '';
+
+  const result = hasCampaign
+    ? await executor.query(
+      `
+        SELECT
+          quiebre_id,
+          quiebre_codigo,
+          quiebre_nombre,
+          campana_id,
+          campana_codigo,
+          campana_descripcion
+        FROM public.resolver_contexto_carga_escucha($1, $2)
+      `,
+      [
+        quiebre,
+        campana
+      ]
+    )
+    : await executor.query(
+      `
+        SELECT
+          quiebre_id,
+          quiebre_codigo,
+          quiebre_nombre,
+          campana_id,
+          campana_codigo,
+          campana_descripcion
+        FROM public.resolver_contexto_carga_escucha_quiebre($1)
+      `,
+      [
+        quiebre
+      ]
+    );
 
   return result.rows[0] || null;
 }
@@ -152,7 +173,7 @@ async insertAssignment(
       data.usuario_mov || '',
       data.motivo_call || '',
       data.fecha_descarga || null,
-      data.campana || '',
+      data.campana ?? null,
       data.campana_id || null,
       data.quiebre_id || null,
       data.estado || 'pendiente',
@@ -306,15 +327,26 @@ async insertTask(
     `, [motivo, id]);
   }
 
-  async markManaged(id) {
-    await this.db.query(`
-      UPDATE asignaciones_escucha
-      SET estado = 'gestionado',
-          fecha_gestion = NOW(),
-          updated_at = NOW()
-      WHERE id = $1
-    `, [id]);
+  async markManaged(id, executor = this.db) {
+  const result = await executor.query(`
+    UPDATE asignaciones_escucha
+    SET estado = 'gestionado',
+        fecha_gestion = NOW(),
+        updated_at = NOW()
+    WHERE id = $1
+    RETURNING id
+  `, [id]);
+
+  if (result.rowCount !== 1) {
+    const error = new Error(
+      `Escucha ${id} no encontrada`
+    );
+    error.status = 404;
+    throw error;
   }
+
+  return result.rows[0];
+}
 
   async cancelManagement(id) {
     await this.db.query(
@@ -322,6 +354,26 @@ async insertTask(
       [id]
     );
   }
+
+  async getAssignmentById(id, executor = this.db) {
+  const result = await executor.query(
+    `
+      SELECT
+        id,
+        ticket,
+        campana_id,
+        quiebre_id,
+        auditor_asignado,
+        estado
+      FROM asignaciones_escucha
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [id]
+  );
+
+  return result.rows[0] || null;
+}
 
   async getAssignmentByTicket(ticket) {
     const result = await this.db.query(

@@ -85,6 +85,27 @@ function createEvaluationsHandler({ db } = {}) {
       /^\/api\/evaluaciones\/([\w-]+)$/
     );
 
+    if (match && metodo === 'PUT') {
+      try {
+        const evaluation =
+          await readJsonBody(peticion);
+
+        await controller.update(
+          respuesta,
+          match[1],
+          evaluation
+        );
+      } catch (error) {
+        EvaluationsController.json(
+          respuesta,
+          400,
+          { error: error.message }
+        );
+      }
+
+      return true;
+    }
+
     if (match && metodo === 'DELETE') {
       await controller.delete(
         respuesta,
